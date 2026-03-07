@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let inventory = [];
   let currentScreen = 'pod'; // 'pod' or 'planet'
   let currentMessage = 'The air is cold. You need resources to survive.';
+  let justWokeUp = false; // Track if we just woke up
   
   // Check Telegram
   if (window.Telegram?.WebApp) {
@@ -63,6 +64,12 @@ document.addEventListener('DOMContentLoaded', function() {
   function renderPlanet() {
     const appEl = document.getElementById('app');
     if (!appEl) return;
+    
+    // Set message based on whether we just woke up
+    if (justWokeUp) {
+      currentMessage = 'You step out of the pod. The air is thin but breathable.';
+      justWokeUp = false; // Reset the flag
+    }
     
     appEl.innerHTML = `
       <div class="planet-view">
@@ -138,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Game functions
   function wakeUp() {
     currentScreen = 'planet';
-    currentMessage = 'You step out of the pod. The air is thin but breathable.';
+    justWokeUp = true; // Set flag for welcome message
     render();
   }
   
