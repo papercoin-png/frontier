@@ -1,1 +1,511 @@
+/* styles.css - The Frontier
+   Pure CSS styling for the game
+*/
 
+/* ===== RESET & BASE ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: #0B1026;
+  color: white;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ===== BACKGROUND EFFECTS ===== */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(1px 1px at 10px 20px, rgba(255, 255, 255, 0.3) 1px, transparent 0),
+    radial-gradient(1px 1px at 30px 40px, rgba(255, 255, 255, 0.2) 1px, transparent 0),
+    radial-gradient(2px 2px at 50px 60px, rgba(255, 255, 255, 0.1) 1px, transparent 0),
+    radial-gradient(1px 1px at 70px 80px, rgba(255, 255, 255, 0.2) 1px, transparent 0),
+    radial-gradient(1px 1px at 90px 100px, rgba(255, 255, 255, 0.3) 1px, transparent 0);
+  background-size: 200px 200px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ===== LAYOUT CONTAINERS ===== */
+#app {
+  width: 100%;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+#loading {
+  text-align: center;
+  color: #4a90e2;
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* ===== POD SCREEN ===== */
+.pod-screen {
+  background: #1a1f3a;
+  border-radius: 32px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  border: 2px solid #4a90e2;
+  box-shadow: 0 0 30px rgba(74, 144, 226, 0.3);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(5px);
+}
+
+/* Scanning line animation */
+.pod-screen::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    #4a90e2, 
+    #00ffff, 
+    #4a90e2, 
+    transparent
+  );
+  animation: scan 3s linear infinite;
+  z-index: 2;
+}
+
+@keyframes scan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Glitch effect overlay */
+.pod-screen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    rgba(74, 144, 226, 0.1) 0%,
+    transparent 10%,
+    transparent 90%,
+    rgba(74, 144, 226, 0.1) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pod-window {
+  text-align: center;
+  position: relative;
+  z-index: 3;
+}
+
+.pod-window h1 {
+  color: #4a90e2;
+  font-size: 24px;
+  margin-bottom: 24px;
+  letter-spacing: 4px;
+  text-shadow: 
+    0 0 10px rgba(74, 144, 226, 0.5),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+  font-weight: 400;
+  position: relative;
+  display: inline-block;
+}
+
+.pod-window h1::before,
+.pod-window h1::after {
+  content: "🚀";
+  position: absolute;
+  top: 0;
+  color: #4a90e2;
+  opacity: 0.3;
+  animation: glitch 2s infinite;
+}
+
+.pod-window h1::before {
+  left: -30px;
+  animation-delay: 0.2s;
+}
+
+.pod-window h1::after {
+  right: -30px;
+  animation-delay: 0.4s;
+}
+
+@keyframes glitch {
+  0%, 100% { transform: translate(0); opacity: 0.3; }
+  25% { transform: translate(-2px, 1px); opacity: 0.5; }
+  50% { transform: translate(2px, -1px); opacity: 0.2; }
+  75% { transform: translate(-1px, -1px); opacity: 0.4; }
+}
+
+.pod-window p {
+  margin: 16px 0;
+  font-size: 18px;
+  color: #fff;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+/* Player name highlight */
+.pod-window p:first-of-type {
+  color: #00ffff;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+.status {
+  color: #8e9ab0;
+  font-family: 'Courier New', monospace;
+  border-top: 1px solid #2a2f4a;
+  border-bottom: 1px solid #2a2f4a;
+  padding: 12px 0;
+  font-size: 14px;
+  letter-spacing: 1px;
+  margin: 8px 0 !important;
+  position: relative;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Blinking cursor effect on last status */
+.status:last-of-type::after {
+  content: "_";
+  animation: blink 1s step-end infinite;
+  margin-left: 4px;
+  color: #4a90e2;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ===== BUTTONS ===== */
+.wake-button {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  font-size: 20px;
+  padding: 16px 32px;
+  border-radius: 16px;
+  margin-top: 24px;
+  width: 100%;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(74, 144, 226, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wake-button:hover {
+  background: linear-gradient(135deg, #5a9ef0, #4a90e2);
+  transform: scale(1.02);
+  box-shadow: 0 0 30px rgba(74, 144, 226, 0.5);
+}
+
+.wake-button:active {
+  transform: scale(0.98);
+}
+
+/* Button shine effect */
+.wake-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.wake-button:hover::before {
+  left: 100%;
+}
+
+.back-button {
+  background: transparent;
+  color: #8e9ab0;
+  border: 1px solid #2a2f4a;
+  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 30px;
+  margin-top: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+.back-button:hover {
+  border-color: #4a90e2;
+  color: white;
+  background: rgba(74, 144, 226, 0.1);
+  box-shadow: 0 0 15px rgba(74, 144, 226, 0.3);
+}
+
+.back-button:active {
+  transform: scale(0.95);
+}
+
+/* ===== PLANET VIEW ===== */
+.planet-view {
+  text-align: center;
+  color: white;
+  max-width: 500px;
+  margin: 0 auto;
+  background: rgba(26, 31, 58, 0.7);
+  border-radius: 32px;
+  padding: 32px 24px;
+  border: 1px solid #2a2f4a;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+  position: relative;
+  animation: fadeIn 1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.planet-view h2 {
+  color: #4a90e2;
+  margin-bottom: 16px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  font-size: 28px;
+  text-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
+  position: relative;
+  display: inline-block;
+}
+
+.planet-view h2::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4a90e2, transparent);
+}
+
+.planet-view p {
+  line-height: 1.6;
+  color: #c0c0c0;
+  margin: 20px 0;
+  font-size: 16px;
+}
+
+.environment {
+  font-style: italic;
+  color: #8e9ab0;
+  padding: 20px;
+  border: 1px dashed #2a2f4a;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  margin: 30px 0;
+  position: relative;
+  font-size: 18px;
+}
+
+.environment::before {
+  content: "🌍";
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1f3a;
+  padding: 0 10px;
+  font-size: 20px;
+}
+
+/* ===== RESOURCE DISPLAY (for future use) ===== */
+.resources {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  border: 1px solid #2a2f4a;
+}
+
+.resource-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.resource-icon {
+  font-size: 24px;
+  margin-bottom: 5px;
+}
+
+.resource-value {
+  color: #4a90e2;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.resource-label {
+  font-size: 12px;
+  color: #8e9ab0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ===== ACTION BUTTONS (for future use) ===== */
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.action-button {
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid #2a2f4a;
+  color: white;
+  padding: 15px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.action-button:hover {
+  background: rgba(74, 144, 226, 0.2);
+  border-color: #4a90e2;
+  transform: translateY(-2px);
+}
+
+.action-icon {
+  font-size: 20px;
+}
+
+/* ===== DAMAGE EFFECTS (for future use) ===== */
+.crack {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.crack-1 {
+  top: 20%;
+  left: 10%;
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: rotate(15deg);
+}
+
+.crack-2 {
+  bottom: 30%;
+  right: 15%;
+  width: 80px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: rotate(-10deg);
+}
+
+/* ===== MOBILE OPTIMIZATIONS ===== */
+@media (max-width: 480px) {
+  .pod-screen, .planet-view {
+    padding: 24px 16px;
+  }
+  
+  .pod-window h1 {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+  
+  .pod-window p {
+    font-size: 16px;
+  }
+  
+  .wake-button {
+    font-size: 18px;
+    padding: 14px 24px;
+  }
+  
+  .planet-view h2 {
+    font-size: 24px;
+  }
+  
+  .environment {
+    font-size: 16px;
+    padding: 15px;
+  }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.hidden {
+  display: none !important;
+}
+
+.text-glow {
+  text-shadow: 0 0 10px currentColor;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== SCREEN SHAKE EFFECT (for future use) ===== */
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-2px, 0); }
+  20%, 40%, 60%, 80% { transform: translate(2px, 0); }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
