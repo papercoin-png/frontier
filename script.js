@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     stone: 10,
     food: 8,
     metal: 3,
-    cloth: 5
+    cloth: 5,
+    crystal: 0,
+    oil: 0
   };
   
   let inventory = [];
@@ -23,13 +25,25 @@ document.addEventListener('DOMContentLoaded', function() {
   let score = 0;
   let discoveries = [];
   
-  // NEW: Ship parts for escape
-  let shipParts = {
-    hull: 0,
-    engine: 0,
-    fuel: 0,
-    navigation: 0
+  // NEW: Game phases
+  let phase = 'planet'; // 'planet', 'space', 'colony'
+  
+  // NEW: Space exploration
+  let spaceMap = [];
+  let currentSector = { x: 0, y: 0 };
+  let discoveredSectors = ['0,0'];
+  
+  // NEW: Colony building
+  let colony = {
+    population: 1,
+    buildings: [],
+    defense: 0,
+    research: 0,
+    happiness: 50
   };
+  
+  // NEW: Achievements
+  let achievements = [];
   
   // Check Telegram
   if (window.Telegram?.WebApp) {
@@ -49,90 +63,77 @@ document.addEventListener('DOMContentLoaded', function() {
     const appEl = document.getElementById('app');
     if (!appEl) return;
     
-    // Check if player has escaped
-    const allPartsComplete = shipParts.hull >= 1 && shipParts.engine >= 1 && 
-                            shipParts.fuel >= 1 && shipParts.navigation >= 1;
-    
-    if (allPartsComplete) {
-      // ESCAPE SUCCESS SCREEN
-      appEl.innerHTML = `
-        <div style="background: #1e2439; border-radius: 30px; padding: 30px 20px; max-width: 400px; margin: 0 auto; border: 2px solid #4a90e2; text-align: center;">
-          <h1 style="color: #4a90e2; font-size: 32px; margin-bottom: 20px;">🚀 ESCAPE!</h1>
-          <p style="font-size: 20px; margin: 20px 0;">You repaired the ship and left the planet!</p>
-          <p style="color: #4a90e2; font-size: 24px;">Final Score: ${score}</p>
-          <p style="color: #8f9bb5;">Days survived: ${day}</p>
-          <p style="color: #8f9bb5;">Discoveries: ${discoveries.length}</p>
-          <button id="playAgainBtn" style="background: #4a90e2; color: white; border: none; padding: 15px 30px; border-radius: 15px; font-size: 18px; margin-top: 30px; cursor: pointer;">PLAY AGAIN</button>
-        </div>
-      `;
-      document.getElementById('playAgainBtn')?.addEventListener('click', resetGame);
-      return;
-    }
-    
-    // Normal pod screen
     appEl.innerHTML = `
       <div style="background: #1e2439; border-radius: 30px; padding: 30px 20px; max-width: 400px; margin: 0 auto; border: 2px solid #4a90e2;">
-        <h1 style="color: #4a90e2; text-align: center; margin-bottom: 30px; font-size: 28px;">🚀 CRASH LANDING</h1>
-        <p style="color: #4a90e2; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px;">${playerName}</p>
-        <p style="text-align: center; border-top: 1px solid #2a3349; border-bottom: 1px solid #2a3349; padding: 15px; margin: 10px 0;">DAY ${day} | SCORE: ${score}</p>
-        <p style="text-align: center;">❤️ ${health}/${maxHealth}</p>
-        <p style="text-align: center; color: #4a90e2; margin-top: 15px;">🎯 GOAL: Repair your ship</p>
-        <button id="wakeBtn" style="width: 100%; padding: 18px; background: #4a90e2; color: white; border: none; border-radius: 15px; font-size: 20px; margin-top: 25px; cursor: pointer; font-weight: bold;">WAKE UP</button>
+        <h1 style="color: #4a90e2; text-align: center; margin-bottom: 20px;">🚀 THE FRONTIER</h1>
+        <p style="color: #4a90e2; text-align: center; font-size: 22px;">${playerName}</p>
+        
+        <div style="margin: 30px 0;">
+          <p style="text-align: center;">Day ${day} | Score: ${score}</p>
+          <p style="text-align: center;">❤️ ${health}%</p>
+        </div>
+        
+        <div style="background: #151a2b; border-radius: 15px; padding: 15px; margin: 20px 0;">
+          <p style="color: #4a90e2; margin-bottom: 10px;">🎯 YOUR JOURNEY</p>
+          <p>1. Survive the crash</p>
+          <p>2. Build a ship</p>
+          <p>3. Explore space</p>
+          <p>4. Build a colony</p>
+          <p>5. ???</p>
+        </div>
+        
+        <button id="startBtn" style="width: 100%; padding: 16px; background: #4a90e2; color: white; border: none; border-radius: 15px; font-size: 18px; cursor: pointer;">BEGIN</button>
       </div>
     `;
     
-    document.getElementById('wakeBtn').addEventListener('click', showPlanet);
+    document.getElementById('startBtn').addEventListener('click', showPlanet);
   }
   
   function showPlanet() {
     const appEl = document.getElementById('app');
     if (!appEl) return;
     
-    // Calculate ship progress
-    const shipProgress = (shipParts.hull + shipParts.engine + shipParts.fuel + shipParts.navigation) / 4 * 100;
+    if (phase === 'planet') {
+      showPlanetPhase();
+    } else if (phase === 'space') {
+      showSpacePhase();
+    } else if (phase === 'colony') {
+      showColonyPhase();
+    }
+  }
+  
+  function showPlanetPhase() {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    
+    // Check if ship is built (simplified for now)
+    const shipBuilt = tools.includes('🚀 Basic Ship');
     
     appEl.innerHTML = `
       <div style="background: #1e2439; border-radius: 30px; padding: 20px; max-width: 450px; margin: 0 auto; border: 2px solid #4a90e2;">
         
-        <!-- Header with stats -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-          <h2 style="color: #4a90e2; margin: 0;">🌍 DAY ${day}</h2>
-          <div style="display: flex; gap: 15px;">
-            <span>⭐ ${score}</span>
-            <span>❤️ ${health}</span>
-          </div>
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+          <h2 style="color: #4a90e2;">🌍 CRASH SITE</h2>
+          <span>Day ${day}</span>
         </div>
         
-        <!-- Health bar -->
-        <div style="background: #2a3349; height: 8px; border-radius: 4px; margin-bottom: 15px;">
-          <div style="width: ${(health/maxHealth)*100}%; height: 100%; background: #4a90e2; border-radius: 4px;"></div>
-        </div>
-        
-        <!-- SHIP PROGRESS - NEW -->
-        <div style="background: #151a2b; border-radius: 10px; padding: 12px; margin-bottom: 15px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-            <span style="color: #4a90e2;">🚀 SHIP REPAIR</span>
-            <span>${Math.round(shipProgress)}%</span>
-          </div>
-          <div style="background: #2a3349; height: 6px; border-radius: 3px;">
-            <div style="width: ${shipProgress}%; height: 100%; background: #4a90e2; border-radius: 3px;"></div>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; font-size: 12px; text-align: center;">
-            <div>🛡️ Hull ${shipParts.hull > 0 ? '✅' : '❌'}</div>
-            <div>⚙️ Engine ${shipParts.engine > 0 ? '✅' : '❌'}</div>
-            <div>⛽ Fuel ${shipParts.fuel > 0 ? '✅' : '❌'}</div>
-            <div>🧭 Nav ${shipParts.navigation > 0 ? '✅' : '❌'}</div>
-          </div>
+        <!-- Stats -->
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+          <span>❤️ ${health}</span>
+          <span>⭐ ${score}</span>
+          <span>👥 ${colony.population}</span>
         </div>
         
         <!-- Resources -->
         <div style="background: #151a2b; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
-          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; text-align: center;">
-            <div><div style="font-size: 20px;">🪵</div><div style="color: #4a90e2; font-weight: bold;">${resources.wood}</div><div style="font-size: 10px;">WOOD</div></div>
-            <div><div style="font-size: 20px;">🪨</div><div style="color: #4a90e2; font-weight: bold;">${resources.stone}</div><div style="font-size: 10px;">STONE</div></div>
-            <div><div style="font-size: 20px;">🍎</div><div style="color: #4a90e2; font-weight: bold;">${resources.food}</div><div style="font-size: 10px;">FOOD</div></div>
-            <div><div style="font-size: 20px;">🔩</div><div style="color: #4a90e2; font-weight: bold;">${resources.metal}</div><div style="font-size: 10px;">METAL</div></div>
-            <div><div style="font-size: 20px;">🧵</div><div style="color: #4a90e2; font-weight: bold;">${resources.cloth}</div><div style="font-size: 10px;">CLOTH</div></div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+            <div><div>🪵</div><div>${resources.wood}</div></div>
+            <div><div>🪨</div><div>${resources.stone}</div></div>
+            <div><div>🍎</div><div>${resources.food}</div></div>
+            <div><div>🔩</div><div>${resources.metal}</div></div>
+            <div><div>🧵</div><div>${resources.cloth}</div></div>
+            <div><div>💎</div><div>${resources.crystal}</div></div>
           </div>
         </div>
         
@@ -140,330 +141,277 @@ document.addEventListener('DOMContentLoaded', function() {
         ${tools.length > 0 ? `
           <div style="background: #151a2b; border-radius: 10px; padding: 10px; margin-bottom: 15px;">
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              ${tools.map(t => `<span style="background: #2a3349; padding: 5px 12px; border-radius: 20px; border: 1px solid #4a90e2;">${t}</span>`).join('')}
-            </div>
-          </div>
-        ` : ''}
-        
-        <!-- Discoveries -->
-        ${discoveries.length > 0 ? `
-          <div style="background: #151a2b; border-radius: 10px; padding: 10px; margin-bottom: 15px;">
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              ${discoveries.map(d => `<span style="background: #2a3349; padding: 3px 10px; border-radius: 15px; border-color: #ffd700;">${d}</span>`).join('')}
+              ${tools.map(t => `<span style="background: #2a3349; padding: 5px 12px; border-radius: 20px;">${t}</span>`).join('')}
             </div>
           </div>
         ` : ''}
         
         <!-- Message -->
-        <div style="background: #151a2b; border-radius: 10px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #4a90e2; min-height: 60px;">
+        <div style="background: #151a2b; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
           ${currentMessage}
         </div>
         
-        <!-- Action Buttons -->
+        <!-- Actions -->
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
-          <button id="gatherWood" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🪵 Gather Wood</button>
-          <button id="gatherStone" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🪨 Mine Stone</button>
-          <button id="gatherFood" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🍎 Hunt Food</button>
-          <button id="gatherMetal" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🔩 Scavenge</button>
+          <button id="gatherWood" class="action-btn">🪵 Gather</button>
+          <button id="gatherStone" class="action-btn">🪨 Mine</button>
+          <button id="gatherFood" class="action-btn">🍎 Hunt</button>
+          <button id="gatherMetal" class="action-btn">🔩 Scavenge</button>
         </div>
         
-        <!-- CRAFTING -->
-        <h3 style="color: #4a90e2; margin: 20px 0 10px;">🔨 CRAFTING</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
-          <button id="craftAxe" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🪓 Stone Axe</div>
-            <div style="font-size: 10px; color: #8f9bb5;">5 wood, 3 stone</div>
-          </button>
-          <button id="craftPickaxe" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>⛏️ Pickaxe</div>
-            <div style="font-size: 10px; color: #8f9bb5;">3 wood, 5 stone</div>
-          </button>
-          <button id="craftSpear" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔱 Spear</div>
-            <div style="font-size: 10px; color: #8f9bb5;">4 wood, 1 stone</div>
-          </button>
-          <button id="craftCampfire" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔥 Campfire</div>
-            <div style="font-size: 10px; color: #8f9bb5;">3 wood, 2 food</div>
-          </button>
-          <button id="craftBed" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🛏️ Bed</div>
-            <div style="font-size: 10px; color: #8f9bb5;">8 wood, 4 cloth</div>
-          </button>
-          <button id="craftFurnace" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔥 Furnace</div>
-            <div style="font-size: 10px; color: #8f9bb5;">10 stone, 5 wood</div>
-          </button>
-        </div>
-        
-        <!-- SHIP REPAIR - NEW SECTION -->
-        <h3 style="color: #4a90e2; margin: 20px 0 10px;">🚀 REPAIR SHIP</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0;">
-          <button id="repairHull" style="background: ${shipParts.hull > 0 ? '#2a3349' : '#151a2b'}; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;" ${shipParts.hull > 0 ? 'disabled' : ''}>
-            <div>🛡️ Repair Hull</div>
-            <div style="font-size: 10px;">30 wood, 20 metal</div>
-          </button>
-          <button id="repairEngine" style="background: ${shipParts.engine > 0 ? '#2a3349' : '#151a2b'}; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;" ${shipParts.engine > 0 ? 'disabled' : ''}>
-            <div>⚙️ Fix Engine</div>
-            <div style="font-size: 10px;">25 metal, 15 stone</div>
-          </button>
-          <button id="refuel" style="background: ${shipParts.fuel > 0 ? '#2a3349' : '#151a2b'}; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;" ${shipParts.fuel > 0 ? 'disabled' : ''}>
-            <div>⛽ Refuel</div>
-            <div style="font-size: 10px;">20 wood, 10 cloth</div>
-          </button>
-          <button id="repairNav" style="background: ${shipParts.navigation > 0 ? '#2a3349' : '#151a2b'}; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;" ${shipParts.navigation > 0 ? 'disabled' : ''}>
-            <div>🧭 Calibrate Nav</div>
-            <div style="font-size: 10px;">15 metal, 10 crystal</div>
-          </button>
-        </div>
-        
-        <!-- Special Actions -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0;">
-          <button id="restBtn" style="background: #2a3349; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">😴 Rest</button>
-          <button id="exploreBtn" style="background: #2a3349; border: 1px solid #4a90e2; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🗺️ Explore</button>
-        </div>
-        
-        <!-- Inventory -->
-        ${inventory.length > 0 ? `
-          <div style="margin: 15px 0;">
-            <h4 style="color: #4a90e2;">📦 INVENTORY</h4>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;">
-              ${inventory.map(item => `<div style="background: #151a2b; padding: 8px; border-radius: 5px; text-align: center;">${item}</div>`).join('')}
-            </div>
+        <!-- Crafting -->
+        <details style="margin-bottom: 15px;">
+          <summary style="color: #4a90e2; padding: 10px; background: #151a2b; border-radius: 10px;">🔨 Crafting</summary>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px;">
+            <button id="craftAxe" class="craft-btn">🪓 Axe<br><small>5 wood, 3 stone</small></button>
+            <button id="craftPickaxe" class="craft-btn">⛏️ Pickaxe<br><small>3 wood, 5 stone</small></button>
+            <button id="craftSpear" class="craft-btn">🔱 Spear<br><small>4 wood, 1 stone</small></button>
+            <button id="craftCampfire" class="craft-btn">🔥 Campfire<br><small>3 wood, 2 food</small></button>
+            <button id="craftBed" class="craft-btn">🛏️ Bed<br><small>8 wood, 4 cloth</small></button>
+            <button id="craftFurnace" class="craft-btn">🔥 Furnace<br><small>10 stone, 5 wood</small></button>
           </div>
+        </details>
+        
+        <!-- Special -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0;">
+          <button id="restBtn" class="special-btn">😴 Rest</button>
+          <button id="exploreBtn" class="special-btn">🗺️ Explore</button>
+        </div>
+        
+        <!-- Build Ship - SHOWS ONCE YOU HAVE ENOUGH -->
+        ${resources.wood >= 30 && resources.metal >= 20 && !shipBuilt ? `
+          <button id="buildShipBtn" style="width: 100%; padding: 15px; background: #4a90e2; border: none; border-radius: 10px; color: white; font-weight: bold; margin: 10px 0; cursor: pointer;">
+            🚀 BUILD SHIP (30 wood, 20 metal)
+          </button>
         ` : ''}
         
-        <!-- Back button -->
+        <!-- Launch - ONLY IF SHIP IS BUILT -->
+        ${shipBuilt ? `
+          <button id="launchBtn" style="width: 100%; padding: 15px; background: #00ff88; color: black; border: none; border-radius: 10px; font-weight: bold; margin: 10px 0; cursor: pointer;">
+            🚀 LAUNCH INTO SPACE
+          </button>
+        ` : ''}
+        
+        <!-- Back to pod -->
         <button id="backBtn" style="width: 100%; padding: 12px; background: #2a3349; border: none; border-radius: 10px; color: white; margin-top: 10px; cursor: pointer;">⬅ RETURN TO POD</button>
       </div>
     `;
     
     // Add event listeners
-    document.getElementById('gatherWood').addEventListener('click', () => gather('wood'));
-    document.getElementById('gatherStone').addEventListener('click', () => gather('stone'));
-    document.getElementById('gatherFood').addEventListener('click', () => gather('food'));
-    document.getElementById('gatherMetal').addEventListener('click', () => gather('metal'));
+    document.getElementById('gatherWood')?.addEventListener('click', () => gather('wood'));
+    document.getElementById('gatherStone')?.addEventListener('click', () => gather('stone'));
+    document.getElementById('gatherFood')?.addEventListener('click', () => gather('food'));
+    document.getElementById('gatherMetal')?.addEventListener('click', () => gather('metal'));
     
-    document.getElementById('craftAxe').addEventListener('click', () => craft('axe'));
-    document.getElementById('craftPickaxe').addEventListener('click', () => craft('pickaxe'));
-    document.getElementById('craftSpear').addEventListener('click', () => craft('spear'));
-    document.getElementById('craftCampfire').addEventListener('click', () => craft('campfire'));
-    document.getElementById('craftBed').addEventListener('click', () => craft('bed'));
-    document.getElementById('craftFurnace').addEventListener('click', () => craft('furnace'));
+    document.getElementById('craftAxe')?.addEventListener('click', () => craft('axe'));
+    document.getElementById('craftPickaxe')?.addEventListener('click', () => craft('pickaxe'));
+    document.getElementById('craftSpear')?.addEventListener('click', () => craft('spear'));
+    document.getElementById('craftCampfire')?.addEventListener('click', () => craft('campfire'));
+    document.getElementById('craftBed')?.addEventListener('click', () => craft('bed'));
+    document.getElementById('craftFurnace')?.addEventListener('click', () => craft('furnace'));
     
-    // Ship repair buttons
-    document.getElementById('repairHull').addEventListener('click', () => repairShip('hull'));
-    document.getElementById('repairEngine').addEventListener('click', () => repairShip('engine'));
-    document.getElementById('refuel').addEventListener('click', () => repairShip('fuel'));
-    document.getElementById('repairNav').addEventListener('click', () => repairShip('navigation'));
-    
-    document.getElementById('restBtn').addEventListener('click', rest);
-    document.getElementById('exploreBtn').addEventListener('click', explore);
-    document.getElementById('backBtn').addEventListener('click', showPod);
+    document.getElementById('restBtn')?.addEventListener('click', rest);
+    document.getElementById('exploreBtn')?.addEventListener('click', explore);
+    document.getElementById('buildShipBtn')?.addEventListener('click', buildShip);
+    document.getElementById('launchBtn')?.addEventListener('click', launchShip);
+    document.getElementById('backBtn')?.addEventListener('click', showPod);
   }
   
-  // NEW: Repair ship function
-  function repairShip(part) {
-    if (part === 'hull' && shipParts.hull === 0) {
-      if (resources.wood >= 30 && resources.metal >= 20) {
-        resources.wood -= 30;
-        resources.metal -= 20;
-        shipParts.hull = 1;
-        currentMessage = '🛡️ Hull repaired! The ship can withstand takeoff.';
-        score += 50;
-      } else {
-        currentMessage = '❌ Need 30 wood and 20 metal for hull repair.';
-      }
-    }
-    else if (part === 'engine' && shipParts.engine === 0) {
-      if (resources.metal >= 25 && resources.stone >= 15) {
-        resources.metal -= 25;
-        resources.stone -= 15;
-        shipParts.engine = 1;
-        currentMessage = '⚙️ Engine fixed! The ship can fly.';
-        score += 50;
-      } else {
-        currentMessage = '❌ Need 25 metal and 15 stone for engine.';
-      }
-    }
-    else if (part === 'fuel' && shipParts.fuel === 0) {
-      if (resources.wood >= 20 && resources.cloth >= 10) {
-        resources.wood -= 20;
-        resources.cloth -= 10;
-        shipParts.fuel = 1;
-        currentMessage = '⛽ Fuel tanks filled! Ready for launch.';
-        score += 50;
-      } else {
-        currentMessage = '❌ Need 20 wood and 10 cloth for fuel.';
-      }
-    }
-    else if (part === 'navigation' && shipParts.navigation === 0) {
-      // Check if player has a crystal (from discoveries)
-      const hasCrystal = inventory.includes('💎 Crystal') || inventory.includes('💎 Rough Gem');
-      if (resources.metal >= 15 && hasCrystal) {
-        resources.metal -= 15;
-        // Remove crystal from inventory
-        const crystalIndex = inventory.findIndex(i => i.includes('💎'));
-        if (crystalIndex > -1) inventory.splice(crystalIndex, 1);
-        shipParts.navigation = 1;
-        currentMessage = '🧭 Navigation calibrated! You can find your way home.';
-        score += 50;
-      } else {
-        currentMessage = '❌ Need 15 metal and a crystal for navigation.';
-      }
-    }
+  function showSpacePhase() {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
     
-    showPlanet();
+    appEl.innerHTML = `
+      <div style="background: #0a0c1a; border-radius: 30px; padding: 20px; max-width: 450px; margin: 0 auto; border: 2px solid #4a90e2;">
+        
+        <!-- Header -->
+        <h2 style="color: #4a90e2; text-align: center; margin-bottom: 20px;">🚀 DEEP SPACE</h2>
+        
+        <!-- Stats -->
+        <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+          <span>⭐ ${score}</span>
+          <span>❤️ ${health}</span>
+          <span>⛽ Fuel: ${resources.oil || 0}</span>
+        </div>
+        
+        <!-- Space Map -->
+        <div style="background: #000; border-radius: 15px; padding: 20px; margin-bottom: 20px; text-align: center;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px;">🪐</div>
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px;">✨</div>
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px; border: 2px solid #4a90e2;">🚀</div>
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px;">🌌</div>
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px;">💫</div>
+            <div style="background: #1a1f3a; padding: 15px; border-radius: 10px;">☄️</div>
+          </div>
+          <p style="color: #8f9bb5;">Current Sector: ${currentSector.x},${currentSector.y}</p>
+        </div>
+        
+        <!-- Message -->
+        <div style="background: #151a2b; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+          ${currentMessage}
+        </div>
+        
+        <!-- Space Actions -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <button id="scanBtn" class="action-btn">📡 Scan Sector</button>
+          <button id="moveUp" class="action-btn">⬆️ Move Up</button>
+          <button id="moveDown" class="action-btn">⬇️ Move Down</button>
+          <button id="moveLeft" class="action-btn">⬅️ Move Left</button>
+          <button id="moveRight" class="action-btn">➡️ Move Right</button>
+          <button id="landBtn" class="action-btn">🪐 Land on Planet</button>
+        </div>
+        
+        <!-- Return -->
+        <button id="backToPod" style="width: 100%; padding: 12px; background: #2a3349; border: none; border-radius: 10px; color: white; margin-top: 20px; cursor: pointer;">⬅ RETURN TO POD</button>
+      </div>
+    `;
+    
+    document.getElementById('scanBtn')?.addEventListener('click', scanSector);
+    document.getElementById('moveUp')?.addEventListener('click', () => moveInSpace(0, 1));
+    document.getElementById('moveDown')?.addEventListener('click', () => moveInSpace(0, -1));
+    document.getElementById('moveLeft')?.addEventListener('click', () => moveInSpace(-1, 0));
+    document.getElementById('moveRight')?.addEventListener('click', () => moveInSpace(1, 0));
+    document.getElementById('landBtn')?.addEventListener('click', landOnPlanet);
+    document.getElementById('backToPod')?.addEventListener('click', showPod);
   }
   
-  // Reset game
-  function resetGame() {
-    resources = { wood: 15, stone: 10, food: 8, metal: 3, cloth: 5 };
-    inventory = [];
-    tools = [];
-    discoveries = [];
-    shipParts = { hull: 0, engine: 0, fuel: 0, navigation: 0 };
-    day = 1;
-    health = 100;
-    maxHealth = 100;
-    score = 0;
-    currentMessage = 'You wake up again. The pod feels familiar.';
-    showPod();
+  function showColonyPhase() {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    
+    appEl.innerHTML = `
+      <div style="background: #1e2439; border-radius: 30px; padding: 20px; max-width: 450px; margin: 0 auto; border: 2px solid #4a90e2;">
+        
+        <!-- Header -->
+        <h2 style="color: #4a90e2; text-align: center;">🏰 NEW COLONY</h2>
+        <p style="text-align: center; margin-bottom: 20px;">Day ${day}</p>
+        
+        <!-- Colony Stats -->
+        <div style="background: #151a2b; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+            <div>Population: ${colony.population}</div>
+            <div>Happiness: ${colony.happiness}%</div>
+            <div>Defense: ${colony.defense}</div>
+            <div>Research: ${colony.research}</div>
+          </div>
+        </div>
+        
+        <!-- Buildings -->
+        <h3 style="color: #4a90e2;">Buildings</h3>
+        <div style="background: #151a2b; border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+          ${colony.buildings.length > 0 ? colony.buildings.map(b => `
+            <div style="padding: 5px;">${b}</div>
+          `).join('') : 'No buildings yet'}
+        </div>
+        
+        <!-- Build Options -->
+        <h3 style="color: #4a90e2;">Construct</h3>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
+          <button id="buildHouse" class="craft-btn">🏠 House<br><small>20 wood, 10 stone</small></button>
+          <button id="buildFarm" class="craft-btn">🌾 Farm<br><small>15 wood, 5 cloth</small></button>
+          <button id="buildWall" class="craft-btn">🧱 Wall<br><small>30 stone</small></button>
+          <button id="buildLab" class="craft-btn">🔬 Lab<br><small>25 metal, 10 crystal</small></button>
+        </div>
+        
+        <!-- Message -->
+        <div style="background: #151a2b; border-radius: 10px; padding: 15px; margin: 15px 0;">
+          ${currentMessage}
+        </div>
+        
+        <!-- Actions -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <button id="workBtn" class="action-btn">⚒️ Work</button>
+          <button id="tradeBtn" class="action-btn">🤝 Trade</button>
+          <button id="exploreSpaceBtn" class="action-btn">🚀 Explore Space</button>
+          <button id="researchBtn" class="action-btn">📚 Research</button>
+        </div>
+        
+        <!-- Return -->
+        <button id="backToPod" style="width: 100%; padding: 12px; background: #2a3349; border: none; border-radius: 10px; color: white; margin-top: 20px; cursor: pointer;">⬅ RETURN TO POD</button>
+      </div>
+    `;
+    
+    document.getElementById('buildHouse')?.addEventListener('click', () => buildColony('house'));
+    document.getElementById('buildFarm')?.addEventListener('click', () => buildColony('farm'));
+    document.getElementById('buildWall')?.addEventListener('click', () => buildColony('wall'));
+    document.getElementById('buildLab')?.addEventListener('click', () => buildColony('lab'));
+    document.getElementById('workBtn')?.addEventListener('click', work);
+    document.getElementById('tradeBtn')?.addEventListener('click', trade);
+    document.getElementById('exploreSpaceBtn')?.addEventListener('click', () => {
+      phase = 'space';
+      showPlanet();
+    });
+    document.getElementById('researchBtn')?.addEventListener('click', research);
+    document.getElementById('backToPod')?.addEventListener('click', showPod);
   }
+  
+  // GAME FUNCTIONS
   
   function gather(type) {
-    // Tool bonuses
     let bonus = 1;
-    if (tools.includes('🪓 Stone Axe') && type === 'wood') bonus = 3;
-    if (tools.includes('⛏️ Stone Pickaxe') && type === 'stone') bonus = 3;
-    if (tools.includes('🔱 Wooden Spear') && type === 'food') bonus = 3;
+    if (tools.includes('🪓 Stone Axe') && type === 'wood') bonus = 2;
+    if (tools.includes('⛏️ Stone Pickaxe') && type === 'stone') bonus = 2;
+    if (tools.includes('🔱 Wooden Spear') && type === 'food') bonus = 2;
     
-    const gain = Math.floor(Math.random() * 8) + 3 * bonus;
+    const gain = Math.floor(Math.random() * 6) + 2 * bonus;
     resources[type] += gain;
     score += gain;
     
     // Random events
     const rand = Math.random();
-    
-    if (type === 'wood') {
-      if (rand < 0.2) {
-        let found = Math.floor(Math.random() * 3) + 1;
-        resources.cloth += found;
-        currentMessage = `🌳 You find animal nests! +${found} cloth`;
-      } else if (rand < 0.35) {
-        resources.metal += 2;
-        currentMessage = `⚡ You find an old metal trap! +2 metal`;
-      } else if (rand < 0.45) {
-        health = Math.min(maxHealth, health + 5);
-        currentMessage = `🌿 You find healing herbs! +5 health`;
-      } else {
-        currentMessage = `🪵 You gather ${gain} wood.`;
-      }
-    }
-    else if (type === 'stone') {
-      if (rand < 0.15) {
-        inventory.push('💎 Rough Gem');
-        currentMessage = `💎 You find gems!`;
-        score += 20;
-      } else if (rand < 0.3) {
-        resources.metal += 3;
-        currentMessage = `⛏️ You hit a metal vein! +3 metal`;
-      } else {
-        currentMessage = `🪨 You mine ${gain} stone.`;
-      }
-    }
-    else if (type === 'food') {
-      if (rand < 0.25) {
-        let fur = Math.floor(Math.random() * 3) + 2;
-        resources.cloth += fur;
-        currentMessage = `🦊 You hunt a furry animal! +${fur} cloth`;
-      } else if (rand < 0.4) {
-        health = Math.max(0, health - 10);
-        currentMessage = `🐗 A wild boar attacks! -10 health`;
-      } else if (rand < 0.5) {
-        discoveries.push('🐾 Animal Tracks');
-        currentMessage = `🔍 You discover animal tracks!`;
-      } else {
-        currentMessage = `🍎 You find ${gain} food.`;
-      }
-    }
-    else if (type === 'metal') {
-      const metalGain = Math.floor(Math.random() * 5) + 2;
-      resources.metal += metalGain;
-      
-      if (rand < 0.2) {
-        inventory.push('⚙️ Rusty Gear');
-        currentMessage = `⚙️ You find ancient machinery! +${metalGain} metal`;
-        score += 15;
-      } else if (rand < 0.4) {
-        resources.cloth += 2;
-        currentMessage = `🧵 You find old tarps! +${metalGain} metal, +2 cloth`;
-      } else {
-        currentMessage = `🔩 You scavenge ${metalGain} metal.`;
-      }
+    if (rand < 0.1) {
+      resources.crystal += 1;
+      currentMessage = `✨ You found a crystal! +${gain} ${type}, +1 crystal`;
+    } else if (rand < 0.2) {
+      health = Math.min(maxHealth, health + 5);
+      currentMessage = `🌿 You feel stronger! +${gain} ${type}, +5 health`;
+    } else {
+      currentMessage = `You gathered ${gain} ${type}.`;
     }
     
     // Hunger
     resources.food = Math.max(0, resources.food - 1);
     if (resources.food === 0) {
-      health = Math.max(0, health - 15);
-      currentMessage += ' 😵 You are starving!';
+      health -= 5;
     }
     
-    // Check death
-    if (health <= 0) {
-      alert(`💀 You survived ${day} days! Score: ${score}`);
-      resetGame();
-    } else {
-      showPlanet();
-    }
+    showPlanet();
   }
   
   function craft(item) {
     if (item === 'axe' && resources.wood >= 5 && resources.stone >= 3) {
-      resources.wood -= 5;
-      resources.stone -= 3;
+      resources.wood -= 5; resources.stone -= 3;
       tools.push('🪓 Stone Axe');
-      currentMessage = '🔨 Crafted Stone Axe! Wood gathering x3!';
-      score += 10;
+      currentMessage = 'Crafted Stone Axe!';
     }
     else if (item === 'pickaxe' && resources.wood >= 3 && resources.stone >= 5) {
-      resources.wood -= 3;
-      resources.stone -= 5;
+      resources.wood -= 3; resources.stone -= 5;
       tools.push('⛏️ Stone Pickaxe');
-      currentMessage = '🔨 Crafted Pickaxe! Stone mining x3!';
-      score += 10;
+      currentMessage = 'Crafted Pickaxe!';
     }
     else if (item === 'spear' && resources.wood >= 4 && resources.stone >= 1) {
-      resources.wood -= 4;
-      resources.stone -= 1;
+      resources.wood -= 4; resources.stone -= 1;
       tools.push('🔱 Wooden Spear');
-      currentMessage = '🔨 Crafted Spear! Hunting x3!';
-      score += 10;
+      currentMessage = 'Crafted Spear!';
     }
     else if (item === 'campfire' && resources.wood >= 3 && resources.food >= 2) {
-      resources.wood -= 3;
-      resources.food -= 2;
+      resources.wood -= 3; resources.food -= 2;
       inventory.push('🔥 Campfire');
-      currentMessage = '🔨 Crafted Campfire! Rest heals more.';
-      score += 5;
+      currentMessage = 'Crafted Campfire!';
     }
     else if (item === 'bed' && resources.wood >= 8 && resources.cloth >= 4) {
-      resources.wood -= 8;
-      resources.cloth -= 4;
+      resources.wood -= 8; resources.cloth -= 4;
       inventory.push('🛏️ Bed');
-      currentMessage = '🔨 Crafted Bed! Rest heals even more!';
-      score += 20;
+      currentMessage = 'Crafted Bed!';
     }
     else if (item === 'furnace' && resources.stone >= 10 && resources.wood >= 5) {
-      resources.stone -= 10;
-      resources.wood -= 5;
+      resources.stone -= 10; resources.wood -= 5;
       inventory.push('🔥 Furnace');
-      currentMessage = '🔨 Crafted Furnace!';
-      score += 15;
+      currentMessage = 'Crafted Furnace!';
     }
     else {
-      currentMessage = '❌ Not enough resources!';
+      currentMessage = 'Not enough resources!';
     }
     
     showPlanet();
@@ -472,58 +420,155 @@ document.addEventListener('DOMContentLoaded', function() {
   function rest() {
     if (resources.food >= 2) {
       resources.food -= 2;
-      
-      let restHeal = 20;
-      if (inventory.includes('🔥 Campfire')) restHeal += 15;
-      if (inventory.includes('🛏️ Bed')) restHeal += 25;
-      
-      health = Math.min(maxHealth, health + restHeal);
-      currentMessage = `😴 You rest. +${restHeal} health.`;
-      score += 5;
+      let heal = 20;
+      if (inventory.includes('🛏️ Bed')) heal += 20;
+      if (inventory.includes('🔥 Campfire')) heal += 10;
+      health = Math.min(maxHealth, health + heal);
+      currentMessage = `You rest. +${heal} health.`;
     } else {
-      currentMessage = '❌ Not enough food to rest.';
+      currentMessage = 'Not enough food to rest.';
     }
     showPlanet();
   }
   
   function explore() {
     day++;
+    resources.food -= 2;
     
     const events = [
-      { msg: '🏚️ Abandoned shelter! +5 cloth, +3 metal', cloth: 5, metal: 3 },
-      { msg: '🦖 Dinosaur attack! -20 health', health: -20 },
-      { msg: '🌴 Paradise valley! +10 food', food: 10 },
-      { msg: '🗿 Ancient ruins!', discovery: '🗿 Ancient Ruins' },
-      { msg: '💎 Crystal cave!', item: '💎 Crystal' },
-      { msg: '🚁 Crash site! +8 metal', metal: 8 },
-      { msg: '🌺 Peaceful meadow. +10 health', health: 10 },
-      { msg: '📡 Mysterious signal!', discovery: '📡 Strange Signal' }
+      'You find an abandoned camp. +5 cloth',
+      'A wild animal attacks! -10 health',
+      'You discover a crystal cave. +2 crystal',
+      'You find ancient ruins.',
+      'Nothing special today.'
     ];
     
     const event = events[Math.floor(Math.random() * events.length)];
+    currentMessage = event;
     
-    if (event.cloth) resources.cloth += event.cloth;
-    if (event.metal) resources.metal += event.metal;
-    if (event.food) resources.food += event.food;
-    if (event.health) health = Math.min(maxHealth, health + event.health);
-    if (event.discovery) {
-      discoveries.push(event.discovery);
-      score += 30;
-    }
-    if (event.item) {
-      inventory.push(event.item);
-      score += 15;
+    if (event.includes('cloth')) resources.cloth += 5;
+    if (event.includes('health')) health -= 10;
+    if (event.includes('crystal')) resources.crystal += 2;
+    if (event.includes('ruins')) {
+      discoveries.push('🗿 Ancient Ruins');
+      score += 20;
     }
     
-    resources.food = Math.max(0, resources.food - 3);
-    currentMessage = event.msg;
-    
-    if (resources.food === 0) {
-      health = Math.max(0, health - 10);
-      currentMessage += ' You have no food!';
+    if (resources.food <= 0) {
+      health -= 10;
+      currentMessage += ' You are starving!';
     }
     
-    score += 10;
     showPlanet();
+  }
+  
+  function buildShip() {
+    if (resources.wood >= 30 && resources.metal >= 20) {
+      resources.wood -= 30;
+      resources.metal -= 20;
+      tools.push('🚀 Basic Ship');
+      currentMessage = 'You built a ship! You can now explore space.';
+      score += 100;
+    }
+    showPlanet();
+  }
+  
+  function launchShip() {
+    phase = 'space';
+    currentMessage = 'You blast off into space! The planet shrinks behind you.';
+    showPlanet();
+  }
+  
+  function scanSector() {
+    const discoveries = [
+      '🌍 Habitable planet detected',
+      '💎 Asteroid belt with minerals',
+      '👾 Alien signals detected',
+      '💀 Abandoned space station',
+      '✨ Beautiful nebula'
+    ];
+    currentMessage = discoveries[Math.floor(Math.random() * discoveries.length)];
+    showSpacePhase();
+  }
+  
+  function moveInSpace(dx, dy) {
+    if (resources.oil > 0 || resources.oil === undefined) {
+      resources.oil = (resources.oil || 5) - 1;
+      currentSector.x += dx;
+      currentSector.y += dy;
+      currentMessage = `Moved to sector ${currentSector.x},${currentSector.y}`;
+    } else {
+      currentMessage = 'Not enough fuel!';
+    }
+    showSpacePhase();
+  }
+  
+  function landOnPlanet() {
+    phase = 'colony';
+    currentMessage = 'You land on a new planet. Time to build a colony!';
+    showPlanet();
+  }
+  
+  function buildColony(type) {
+    if (type === 'house' && resources.wood >= 20 && resources.stone >= 10) {
+      resources.wood -= 20; resources.stone -= 10;
+      colony.buildings.push('🏠 House');
+      colony.population += 2;
+      colony.happiness += 10;
+      currentMessage = 'Built a house! Population increased.';
+    }
+    else if (type === 'farm' && resources.wood >= 15 && resources.cloth >= 5) {
+      resources.wood -= 15; resources.cloth -= 5;
+      colony.buildings.push('🌾 Farm');
+      resources.food += 10;
+      currentMessage = 'Built a farm! Food production increased.';
+    }
+    else if (type === 'wall' && resources.stone >= 30) {
+      resources.stone -= 30;
+      colony.buildings.push('🧱 Wall');
+      colony.defense += 20;
+      currentMessage = 'Built a wall! Defense increased.';
+    }
+    else if (type === 'lab' && resources.metal >= 25 && resources.crystal >= 10) {
+      resources.metal -= 25; resources.crystal -= 10;
+      colony.buildings.push('🔬 Lab');
+      colony.research += 15;
+      currentMessage = 'Built a lab! Research increased.';
+    }
+    else {
+      currentMessage = 'Not enough resources!';
+    }
+    showColonyPhase();
+  }
+  
+  function work() {
+    resources.food -= 1;
+    resources.metal += 2;
+    resources.wood += 2;
+    currentMessage = 'You work the colony. Gathered some resources.';
+    showColonyPhase();
+  }
+  
+  function trade() {
+    if (resources.crystal > 0) {
+      resources.crystal -= 1;
+      resources.metal += 5;
+      resources.food += 5;
+      currentMessage = 'Traded crystals for supplies.';
+    } else {
+      currentMessage = 'Nothing to trade.';
+    }
+    showColonyPhase();
+  }
+  
+  function research() {
+    if (resources.food >= 5) {
+      resources.food -= 5;
+      colony.research += 5;
+      currentMessage = 'Research complete! New technologies discovered.';
+    } else {
+      currentMessage = 'Not enough food for research.';
+    }
+    showColonyPhase();
   }
 });
