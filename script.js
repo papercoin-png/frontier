@@ -1,7 +1,8 @@
 // Wait for page to load
 document.addEventListener('DOMContentLoaded', function() {
   // Hide loading
-  document.getElementById('loading').style.display = 'none';
+  const loadingEl = document.getElementById('loading');
+  if (loadingEl) loadingEl.style.display = 'none';
   
   // Game state
   let playerName = 'Explorer';
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let inventory = [];
   let currentScreen = 'pod';
+  let currentMessage = 'The air is cold. You need resources to survive.';
   
   // Check Telegram
   if (window.Telegram?.WebApp) {
@@ -24,9 +26,6 @@ document.addEventListener('DOMContentLoaded', function() {
       playerName = tg.initDataUnsafe.user.first_name;
     }
   }
-  
-  // Message queue
-  let currentMessage = 'The air is cold. You need resources to survive.';
   
   // Render initial screen
   render();
@@ -42,22 +41,30 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Render pod screen
   function renderPod() {
-    const html = `
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    
+    appEl.innerHTML = `
       <div class="pod-screen">
         <h1>🚀 CRASH LANDING</h1>
         <p class="player-name">${playerName}</p>
         <p class="status-line">SYSTEMS: OFFLINE</p>
         <p class="status-line">VITALS: STABLE</p>
         <p class="status-line">PLANET: UNKNOWN</p>
-        <button class="wake-btn" onclick="wakeUp()">WAKE UP</button>
+        <button class="wake-btn" id="wakeBtn">WAKE UP</button>
       </div>
     `;
-    document.getElementById('app').innerHTML = html;
+    
+    // Add event listener to button
+    document.getElementById('wakeBtn').addEventListener('click', wakeUp);
   }
   
   // Render planet screen
   function renderPlanet() {
-    const html = `
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    
+    appEl.innerHTML = `
       <div class="planet-view">
         <h2>🌍 THE SURFACE</h2>
         
@@ -85,19 +92,19 @@ document.addEventListener('DOMContentLoaded', function() {
         
         <!-- Actions -->
         <div class="actions">
-          <div class="action-btn" onclick="gather('wood')">
+          <div class="action-btn" id="gatherWood">
             <span class="action-icon">🪵</span>
             <span>Gather Wood</span>
           </div>
-          <div class="action-btn" onclick="gather('stone')">
+          <div class="action-btn" id="gatherStone">
             <span class="action-icon">🪨</span>
             <span>Mine Stone</span>
           </div>
-          <div class="action-btn" onclick="gather('food')">
+          <div class="action-btn" id="gatherFood">
             <span class="action-icon">🍎</span>
             <span>Hunt Food</span>
           </div>
-          <div class="action-btn" onclick="craft()">
+          <div class="action-btn" id="craftBtn">
             <span class="action-icon">🔨</span>
             <span>Craft</span>
           </div>
@@ -116,25 +123,31 @@ document.addEventListener('DOMContentLoaded', function() {
         ` : ''}
         
         <!-- Back button -->
-        <button class="back-btn" onclick="goBack()">⬅ BACK TO POD</button>
+        <button class="back-btn" id="backBtn">⬅ BACK TO POD</button>
       </div>
     `;
-    document.getElementById('app').innerHTML = html;
+    
+    // Add event listeners
+    document.getElementById('gatherWood').addEventListener('click', () => gather('wood'));
+    document.getElementById('gatherStone').addEventListener('click', () => gather('stone'));
+    document.getElementById('gatherFood').addEventListener('click', () => gather('food'));
+    document.getElementById('craftBtn').addEventListener('click', craft);
+    document.getElementById('backBtn').addEventListener('click', goBack);
   }
   
-  // Game functions - attached to window so they're callable from HTML
-  window.wakeUp = function() {
+  // Game functions
+  function wakeUp() {
     currentScreen = 'planet';
     currentMessage = 'You step out of the pod. The air is thin but breathable.';
     render();
-  };
+  }
   
-  window.goBack = function() {
+  function goBack() {
     currentScreen = 'pod';
     render();
-  };
+  }
   
-  window.gather = function(type) {
+  function gather(type) {
     // Random gain between 1-5
     const gain = Math.floor(Math.random() * 5) + 1;
     resources[type] += gain;
@@ -170,9 +183,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     render();
-  };
+  }
   
-  window.craft = function() {
+  function craft() {
     // Simple crafting
     if (resources.wood >= 5 && resources.stone >= 3) {
       resources.wood -= 5;
@@ -188,5 +201,5 @@ document.addEventListener('DOMContentLoaded', function() {
       currentMessage = 'Not enough resources. You need 5 wood + 3 stone for an axe, or 3 wood + 2 food for a campfire.';
     }
     render();
-  };
+  }
 });
