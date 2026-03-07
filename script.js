@@ -4,14 +4,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const loadingEl = document.getElementById('loading');
   if (loadingEl) loadingEl.style.display = 'none';
   
-  // Game state
+  // Game state - START WITH MORE RESOURCES
   let playerName = 'Explorer';
   let resources = {
-    wood: 15,
-    stone: 10,
-    food: 8,
-    metal: 2,
-    cloth: 1
+    wood: 20,
+    stone: 15,
+    food: 12,
+    metal: 5,
+    cloth: 5  // CHANGED: Start with 5 cloth so you can craft bed
   };
   
   let inventory = [];
@@ -39,12 +39,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!appEl) return;
     
     appEl.innerHTML = `
-      <div style="background: #1e2439; border-radius: 30px; padding: 30px 20px; max-width: 400px; margin: 0 auto; border: 2px solid #3a4e6b;">
-        <h1 style="color: #4a90e2; text-align: center; margin-bottom: 30px;">🚀 CRASH LANDING</h1>
-        <p style="color: #4a90e2; text-align: center; font-size: 22px; font-weight: bold;">${playerName}</p>
-        <p style="text-align: center; border-top: 1px solid #2a3349; border-bottom: 1px solid #2a3349; padding: 12px; margin: 10px 0;">DAY ${day}</p>
-        <p style="text-align: center;">HEALTH: ${health}%</p>
-        <button id="wakeBtn" style="width: 100%; padding: 16px; background: #4a90e2; color: white; border: none; border-radius: 15px; font-size: 18px; margin-top: 20px; cursor: pointer;">WAKE UP</button>
+      <div class="pod-screen">
+        <h1>🚀 CRASH LANDING</h1>
+        <p class="player-name">${playerName}</p>
+        <p class="status-line">DAY ${day}</p>
+        <p class="status-line">HEALTH: ${health}%</p>
+        <p class="status-line">PLANET: UNKNOWN</p>
+        <button class="wake-btn" id="wakeBtn">WAKE UP</button>
       </div>
     `;
     
@@ -56,97 +57,124 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!appEl) return;
     
     appEl.innerHTML = `
-      <div style="background: #1e2439; border-radius: 30px; padding: 20px; max-width: 450px; margin: 0 auto; border: 2px solid #3a4e6b;">
-        
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-          <h2 style="color: #4a90e2;">🌍 DAY ${day}</h2>
-          <div style="background: #2a3349; width: 100px; height: 10px; border-radius: 5px;">
-            <div style="width: ${health}%; height: 100%; background: #4a90e2; border-radius: 5px;"></div>
+      <div class="planet-view">
+        <div class="header">
+          <h2>🌍 DAY ${day}</h2>
+          <div class="health-bar">
+            <div class="health-fill" style="width: ${health}%"></div>
           </div>
         </div>
         
         <!-- Resources -->
-        <div style="background: #151a2b; border-radius: 15px; padding: 15px; margin: 15px 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; text-align: center;">
-          <div><div>🪵</div><div style="color: #4a90e2;">${resources.wood}</div><div style="font-size: 10px;">WOOD</div></div>
-          <div><div>🪨</div><div style="color: #4a90e2;">${resources.stone}</div><div style="font-size: 10px;">STONE</div></div>
-          <div><div>🍎</div><div style="color: #4a90e2;">${resources.food}</div><div style="font-size: 10px;">FOOD</div></div>
-          <div><div>🔩</div><div style="color: #4a90e2;">${resources.metal}</div><div style="font-size: 10px;">METAL</div></div>
-          <div><div>🧵</div><div style="color: #4a90e2;">${resources.cloth}</div><div style="font-size: 10px;">CLOTH</div></div>
+        <div class="resources">
+          <div class="resource-item">
+            <span class="resource-icon">🪵</span>
+            <span class="resource-value">${resources.wood}</span>
+            <span class="resource-label">WOOD</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-icon">🪨</span>
+            <span class="resource-value">${resources.stone}</span>
+            <span class="resource-label">STONE</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-icon">🍎</span>
+            <span class="resource-value">${resources.food}</span>
+            <span class="resource-label">FOOD</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-icon">🔩</span>
+            <span class="resource-value">${resources.metal}</span>
+            <span class="resource-label">METAL</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-icon">🧵</span>
+            <span class="resource-value">${resources.cloth}</span>
+            <span class="resource-label">CLOTH</span>
+          </div>
         </div>
         
         <!-- Tools -->
         ${tools.length > 0 ? `
-          <div style="display: flex; gap: 5px; flex-wrap: wrap; margin: 10px 0;">
-            ${tools.map(t => `<span style="background: #2a3349; padding: 5px 10px; border-radius: 20px;">${t}</span>`).join('')}
+          <div class="tools">
+            ${tools.map(tool => `<span class="tool-badge">${tool}</span>`).join('')}
           </div>
         ` : ''}
         
         <!-- Message -->
-        <div style="background: #151a2b; border-radius: 10px; padding: 15px; margin: 15px 0; border-left: 3px solid #4a90e2;">
-          ${currentMessage}
-        </div>
+        <div class="message" id="message">${currentMessage}</div>
         
         <!-- Action Buttons -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0;">
-          <button id="gatherWood" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🪵 Gather Wood</button>
-          <button id="gatherStone" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🪨 Mine Stone</button>
-          <button id="gatherFood" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🍎 Hunt Food</button>
-          <button id="gatherMetal" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">🔩 Scavenge</button>
+        <div class="actions">
+          <div class="action-btn" id="gatherWood">
+            <span class="action-icon">🪵</span>
+            <span>Gather Wood</span>
+          </div>
+          <div class="action-btn" id="gatherStone">
+            <span class="action-icon">🪨</span>
+            <span>Mine Stone</span>
+          </div>
+          <div class="action-btn" id="gatherFood">
+            <span class="action-icon">🍎</span>
+            <span>Hunt Food</span>
+          </div>
+          <div class="action-btn" id="gatherMetal">
+            <span class="action-icon">🔩</span>
+            <span>Scavenge Metal</span>
+          </div>
         </div>
         
-        <!-- CRAFTING SECTION - ALL BUTTONS VISIBLE -->
-        <h3 style="color: #4a90e2; margin: 20px 0 10px;">🔨 CRAFTING</h3>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-          <button id="craftAxe" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🪓 Stone Axe</div>
-            <div style="font-size: 10px; color: #8f9bb5;">5 wood, 3 stone</div>
-          </button>
-          
-          <button id="craftPickaxe" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>⛏️ Pickaxe</div>
-            <div style="font-size: 10px; color: #8f9bb5;">3 wood, 5 stone</div>
-          </button>
-          
-          <button id="craftCampfire" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔥 Campfire</div>
-            <div style="font-size: 10px; color: #8f9bb5;">3 wood, 2 food</div>
-          </button>
-          
-          <button id="craftSpear" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔱 Spear</div>
-            <div style="font-size: 10px; color: #8f9bb5;">4 wood, 1 stone</div>
-          </button>
-          
-          <button id="craftBed" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🛏️ Bed</div>
-            <div style="font-size: 10px; color: #8f9bb5;">8 wood, 4 cloth</div>
-          </button>
-          
-          <button id="craftFurnace" style="background: #151a2b; border: 1px solid #2a3349; padding: 12px; border-radius: 10px; color: white; cursor: pointer;">
-            <div>🔥 Furnace</div>
-            <div style="font-size: 10px; color: #8f9bb5;">10 stone, 5 wood</div>
-          </button>
+        <!-- Crafting Section -->
+        <div class="crafting-section">
+          <h3>🔨 CRAFTING</h3>
+          <div class="crafting-grid">
+            <div class="craft-btn" id="craftAxeBtn">
+              <span>🪓 Stone Axe</span>
+              <span class="craft-cost">5 wood, 3 stone</span>
+            </div>
+            <div class="craft-btn" id="craftPickaxeBtn">
+              <span>⛏️ Stone Pickaxe</span>
+              <span class="craft-cost">3 wood, 5 stone</span>
+            </div>
+            <div class="craft-btn" id="craftCampfireBtn">
+              <span>🔥 Campfire</span>
+              <span class="craft-cost">3 wood, 2 food</span>
+            </div>
+            <div class="craft-btn" id="craftSpearBtn">
+              <span>🔱 Wooden Spear</span>
+              <span class="craft-cost">4 wood, 1 stone</span>
+            </div>
+            <div class="craft-btn" id="craftBedBtn">
+              <span>🛏️ Bed</span>
+              <span class="craft-cost">8 wood, 4 cloth</span>
+            </div>
+            <div class="craft-btn" id="craftFurnaceBtn">
+              <span>🔥 Furnace</span>
+              <span class="craft-cost">10 stone, 5 wood</span>
+            </div>
+          </div>
         </div>
         
         <!-- Inventory -->
         ${inventory.length > 0 ? `
-          <div style="margin-top: 20px;">
-            <h4 style="color: #4a90e2;">📦 INVENTORY</h4>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px;">
-              ${inventory.map(item => `<div style="background: #1e2439; padding: 8px; border-radius: 5px; text-align: center;">${item}</div>`).join('')}
+          <div class="inventory">
+            <h3>📦 INVENTORY</h3>
+            <div class="inventory-items">
+              ${inventory.map(item => `
+                <div class="inventory-item">${item}</div>
+              `).join('')}
             </div>
           </div>
         ` : ''}
         
         <!-- Special Actions -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 20px 0;">
-          <button id="restBtn" style="background: #2a3349; padding: 12px; border-radius: 10px; color: white; border: 1px solid #4a90e2; cursor: pointer;">😴 Rest</button>
-          <button id="exploreBtn" style="background: #2a3349; padding: 12px; border-radius: 10px; color: white; border: 1px solid #4a90e2; cursor: pointer;">🗺️ Explore</button>
+        <div class="special-actions">
+          <button class="special-btn" id="restBtn">😴 Rest (uses 2 food)</button>
+          <button class="special-btn" id="exploreBtn">🗺️ Explore</button>
         </div>
         
-        <!-- Back button -->
-        <button id="backBtn" style="width: 100%; padding: 12px; background: #2a3349; border: none; border-radius: 10px; color: white; margin-top: 10px; cursor: pointer;">⬅ BACK TO POD</button>
+        <!-- Back to pod -->
+        <button class="back-btn" id="backBtn">⬅ RETURN TO POD</button>
       </div>
     `;
     
@@ -156,13 +184,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('gatherFood').addEventListener('click', () => gather('food'));
     document.getElementById('gatherMetal').addEventListener('click', () => gather('metal'));
     
-    // Crafting buttons
-    document.getElementById('craftAxe').addEventListener('click', () => craft('axe'));
-    document.getElementById('craftPickaxe').addEventListener('click', () => craft('pickaxe'));
-    document.getElementById('craftCampfire').addEventListener('click', () => craft('campfire'));
-    document.getElementById('craftSpear').addEventListener('click', () => craft('spear'));
-    document.getElementById('craftBed').addEventListener('click', () => craft('bed'));
-    document.getElementById('craftFurnace').addEventListener('click', () => craft('furnace'));
+    document.getElementById('craftAxeBtn').addEventListener('click', () => craft('axe'));
+    document.getElementById('craftPickaxeBtn').addEventListener('click', () => craft('pickaxe'));
+    document.getElementById('craftCampfireBtn').addEventListener('click', () => craft('campfire'));
+    document.getElementById('craftSpearBtn').addEventListener('click', () => craft('spear'));
+    document.getElementById('craftBedBtn').addEventListener('click', () => craft('bed'));
+    document.getElementById('craftFurnaceBtn').addEventListener('click', () => craft('furnace'));
     
     document.getElementById('restBtn').addEventListener('click', rest);
     document.getElementById('exploreBtn').addEventListener('click', explore);
@@ -170,65 +197,124 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   function gather(type) {
+    // Calculate bonus from tools
     let bonus = 1;
     if (tools.includes('🪓 Stone Axe') && type === 'wood') bonus = 2;
     if (tools.includes('⛏️ Stone Pickaxe') && type === 'stone') bonus = 2;
     if (tools.includes('🔱 Wooden Spear') && type === 'food') bonus = 2;
     
-    const gain = Math.floor(Math.random() * 5) + 1 * bonus;
+    const gain = (Math.floor(Math.random() * 5) + 1) * bonus;
     resources[type] += gain;
     
-    currentMessage = `You gathered ${gain} ${type}.`;
+    // Random events - MORE CHANCE TO GET CLOTH
+    const random = Math.random();
+    
+    if (type === 'wood') {
+      if (random < 0.2) { // 20% chance
+        resources.cloth += 1;
+        currentMessage = `You gather ${gain} wood and find animal nests! +1 cloth`;
+      } else if (random < 0.3) {
+        resources.metal += 1;
+        currentMessage = `You gather ${gain} wood and find metal scraps! +1 metal`;
+      } else {
+        currentMessage = `You gather ${gain} wood.`;
+      }
+    } 
+    else if (type === 'stone') {
+      if (random < 0.15) {
+        resources.metal += 2;
+        currentMessage = `You mine ${gain} stone and find a metal vein! +2 metal`;
+      } else {
+        currentMessage = `You mine ${gain} stone.`;
+      }
+    } 
+    else if (type === 'food') {
+      if (random < 0.25) { // 25% chance
+        resources.cloth += 2;
+        currentMessage = `You hunt ${gain} food and find animal fur! +2 cloth`;
+      } else if (random < 0.4) {
+        health = Math.max(0, health - 5);
+        currentMessage = `You hunt ${gain} food but get injured. -5 health`;
+      } else {
+        currentMessage = `You find ${gain} food.`;
+      }
+    } 
+    else if (type === 'metal') {
+      const metalGain = Math.floor(Math.random() * 4) + 1;
+      resources.metal += metalGain;
+      if (random < 0.3) {
+        resources.cloth += 1;
+        currentMessage = `You scavenge ${metalGain} metal and find old fabric! +1 cloth`;
+      } else {
+        currentMessage = `You scavenge ${metalGain} metal.`;
+      }
+    }
     
     // Hunger
     resources.food = Math.max(0, resources.food - 1);
     if (resources.food === 0) {
-      health -= 5;
-      currentMessage += ' You are hungry!';
+      health = Math.max(0, health - 10);
+      currentMessage += ' You are starving! -10 health';
     }
     
     showPlanet();
   }
   
   function craft(item) {
-    if (item === 'axe' && resources.wood >= 5 && resources.stone >= 3) {
-      resources.wood -= 5;
-      resources.stone -= 3;
-      tools.push('🪓 Stone Axe');
-      currentMessage = 'Crafted Stone Axe!';
+    let success = false;
+    
+    if (item === 'axe') {
+      if (resources.wood >= 5 && resources.stone >= 3) {
+        resources.wood -= 5;
+        resources.stone -= 3;
+        tools.push('🪓 Stone Axe');
+        currentMessage = 'You crafted a Stone Axe!';
+        success = true;
+      }
+    } else if (item === 'pickaxe') {
+      if (resources.wood >= 3 && resources.stone >= 5) {
+        resources.wood -= 3;
+        resources.stone -= 5;
+        tools.push('⛏️ Stone Pickaxe');
+        currentMessage = 'You crafted a Stone Pickaxe!';
+        success = true;
+      }
+    } else if (item === 'campfire') {
+      if (resources.wood >= 3 && resources.food >= 2) {
+        resources.wood -= 3;
+        resources.food -= 2;
+        inventory.push('🔥 Campfire');
+        currentMessage = 'You crafted a Campfire!';
+        success = true;
+      }
+    } else if (item === 'spear') {
+      if (resources.wood >= 4 && resources.stone >= 1) {
+        resources.wood -= 4;
+        resources.stone -= 1;
+        tools.push('🔱 Wooden Spear');
+        currentMessage = 'You crafted a Wooden Spear!';
+        success = true;
+      }
+    } else if (item === 'bed') {
+      if (resources.wood >= 8 && resources.cloth >= 4) {
+        resources.wood -= 8;
+        resources.cloth -= 4;
+        inventory.push('🛏️ Bed');
+        currentMessage = 'You crafted a Bed! Rest restores more health.';
+        success = true;
+      }
+    } else if (item === 'furnace') {
+      if (resources.stone >= 10 && resources.wood >= 5) {
+        resources.stone -= 10;
+        resources.wood -= 5;
+        inventory.push('🔥 Furnace');
+        currentMessage = 'You crafted a Furnace!';
+        success = true;
+      }
     }
-    else if (item === 'pickaxe' && resources.wood >= 3 && resources.stone >= 5) {
-      resources.wood -= 3;
-      resources.stone -= 5;
-      tools.push('⛏️ Stone Pickaxe');
-      currentMessage = 'Crafted Stone Pickaxe!';
-    }
-    else if (item === 'campfire' && resources.wood >= 3 && resources.food >= 2) {
-      resources.wood -= 3;
-      resources.food -= 2;
-      inventory.push('🔥 Campfire');
-      currentMessage = 'Crafted Campfire!';
-    }
-    else if (item === 'spear' && resources.wood >= 4 && resources.stone >= 1) {
-      resources.wood -= 4;
-      resources.stone -= 1;
-      tools.push('🔱 Wooden Spear');
-      currentMessage = 'Crafted Wooden Spear!';
-    }
-    else if (item === 'bed' && resources.wood >= 8 && resources.cloth >= 4) {
-      resources.wood -= 8;
-      resources.cloth -= 4;
-      inventory.push('🛏️ Bed');
-      currentMessage = 'Crafted Bed!';
-    }
-    else if (item === 'furnace' && resources.stone >= 10 && resources.wood >= 5) {
-      resources.stone -= 10;
-      resources.wood -= 5;
-      inventory.push('🔥 Furnace');
-      currentMessage = 'Crafted Furnace!';
-    }
-    else {
-      currentMessage = 'Not enough resources!';
+    
+    if (!success) {
+      currentMessage = 'Not enough resources.';
     }
     
     showPlanet();
@@ -237,8 +323,13 @@ document.addEventListener('DOMContentLoaded', function() {
   function rest() {
     if (resources.food >= 2) {
       resources.food -= 2;
-      health = Math.min(100, health + 20);
-      currentMessage = 'You rest and recover health.';
+      
+      let restHeal = 20;
+      if (inventory.includes('🛏️ Bed')) restHeal = 40;
+      if (inventory.includes('🔥 Campfire')) restHeal += 10;
+      
+      health = Math.min(100, health + restHeal);
+      currentMessage = `You rest and recover ${restHeal} health.`;
     } else {
       currentMessage = 'Not enough food to rest.';
     }
@@ -247,8 +338,53 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function explore() {
     day++;
+    
+    const events = [
+      { msg: 'You find an abandoned camp. +3 metal, +2 cloth', metal: 3, cloth: 2 },
+      { msg: 'A wild animal attacks! -15 health', health: -15 },
+      { msg: 'You discover berry bushes. +5 food', food: 5 },
+      { msg: 'Old ruins yield tools. +1 random tool', tool: true },
+      { msg: 'You find a fabric stash. +4 cloth', cloth: 4 },
+      { msg: 'Nothing interesting today.' }
+    ];
+    
+    const event = events[Math.floor(Math.random() * events.length)];
+    
+    if (event.metal) resources.metal += event.metal;
+    if (event.food) resources.food += event.food;
+    if (event.cloth) resources.cloth += event.cloth;
+    if (event.health) health = Math.max(0, health + event.health);
+    if (event.tool) {
+      const newTools = ['🪓 Stone Axe', '⛏️ Stone Pickaxe', '🔱 Wooden Spear'];
+      tools.push(newTools[Math.floor(Math.random() * newTools.length)]);
+    }
+    
+    // Daily food consumption
     resources.food = Math.max(0, resources.food - 2);
-    currentMessage = `Day ${day}. You explore the area.`;
+    
+    if (event.msg) {
+      currentMessage = event.msg;
+    } else {
+      currentMessage = `Day ${day}. You explore the area.`;
+    }
+    
+    if (resources.food === 0) {
+      health = Math.max(0, health - 15);
+      currentMessage += ' You have no food!';
+    }
+    
+    // Check death
+    if (health <= 0) {
+      alert('You have died. Starting over...');
+      // Reset with more cloth
+      resources = { wood: 20, stone: 15, food: 12, metal: 5, cloth: 5 };
+      inventory = [];
+      tools = [];
+      day = 1;
+      health = 100;
+      currentMessage = 'You wake up again.';
+    }
+    
     showPlanet();
   }
 });
