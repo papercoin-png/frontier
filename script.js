@@ -71,27 +71,27 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="resources">
           <div class="resource-item">
             <span class="resource-icon">🪵</span>
-            <span class="resource-value">${resources.wood}</span>
+            <span class="resource-value" id="woodValue">${resources.wood}</span>
             <span class="resource-label">WOOD</span>
           </div>
           <div class="resource-item">
             <span class="resource-icon">🪨</span>
-            <span class="resource-value">${resources.stone}</span>
+            <span class="resource-value" id="stoneValue">${resources.stone}</span>
             <span class="resource-label">STONE</span>
           </div>
           <div class="resource-item">
             <span class="resource-icon">🍎</span>
-            <span class="resource-value">${resources.food}</span>
+            <span class="resource-value" id="foodValue">${resources.food}</span>
             <span class="resource-label">FOOD</span>
           </div>
           <div class="resource-item">
             <span class="resource-icon">🔩</span>
-            <span class="resource-value">${resources.metal}</span>
+            <span class="resource-value" id="metalValue">${resources.metal}</span>
             <span class="resource-label">METAL</span>
           </div>
           <div class="resource-item">
             <span class="resource-icon">🧵</span>
-            <span class="resource-value">${resources.cloth}</span>
+            <span class="resource-value" id="clothValue">${resources.cloth}</span>
             <span class="resource-label">CLOTH</span>
           </div>
         </div>
@@ -126,31 +126,31 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         </div>
         
-        <!-- Crafting Section -->
+        <!-- Crafting Section - EACH BUTTON HAS UNIQUE ID -->
         <div class="crafting-section">
           <h3>🔨 CRAFTING</h3>
           <div class="crafting-grid">
-            <div class="craft-btn" id="craftAxe">
+            <div class="craft-btn" id="craftAxeBtn">
               <span>🪓 Stone Axe</span>
               <span class="craft-cost">5 wood, 3 stone</span>
             </div>
-            <div class="craft-btn" id="craftPickaxe">
+            <div class="craft-btn" id="craftPickaxeBtn">
               <span>⛏️ Stone Pickaxe</span>
               <span class="craft-cost">3 wood, 5 stone</span>
             </div>
-            <div class="craft-btn" id="craftCampfire">
+            <div class="craft-btn" id="craftCampfireBtn">
               <span>🔥 Campfire</span>
               <span class="craft-cost">3 wood, 2 food</span>
             </div>
-            <div class="craft-btn" id="craftSpear">
+            <div class="craft-btn" id="craftSpearBtn">
               <span>🔱 Wooden Spear</span>
               <span class="craft-cost">4 wood, 1 stone</span>
             </div>
-            <div class="craft-btn" id="craftBed">
+            <div class="craft-btn" id="craftBedBtn">
               <span>🛏️ Bed</span>
               <span class="craft-cost">8 wood, 4 cloth</span>
             </div>
-            <div class="craft-btn" id="craftFurnace">
+            <div class="craft-btn" id="craftFurnaceBtn">
               <span>🔥 Furnace</span>
               <span class="craft-cost">10 stone, 5 wood</span>
             </div>
@@ -180,19 +180,21 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     `;
     
-    // Add event listeners
+    // Add event listeners for gathering
     document.getElementById('gatherWood').addEventListener('click', () => gather('wood'));
     document.getElementById('gatherStone').addEventListener('click', () => gather('stone'));
     document.getElementById('gatherFood').addEventListener('click', () => gather('food'));
     document.getElementById('gatherMetal').addEventListener('click', () => gather('metal'));
     
-    document.getElementById('craftAxe').addEventListener('click', () => craft('axe'));
-    document.getElementById('craftPickaxe').addEventListener('click', () => craft('pickaxe'));
-    document.getElementById('craftCampfire').addEventListener('click', () => craft('campfire'));
-    document.getElementById('craftSpear').addEventListener('click', () => craft('spear'));
-    document.getElementById('craftBed').addEventListener('click', () => craft('bed'));
-    document.getElementById('craftFurnace').addEventListener('click', () => craft('furnace'));
+    // Add event listeners for crafting - EACH WITH UNIQUE ID
+    document.getElementById('craftAxeBtn').addEventListener('click', () => craft('axe'));
+    document.getElementById('craftPickaxeBtn').addEventListener('click', () => craft('pickaxe'));
+    document.getElementById('craftCampfireBtn').addEventListener('click', () => craft('campfire'));
+    document.getElementById('craftSpearBtn').addEventListener('click', () => craft('spear'));
+    document.getElementById('craftBedBtn').addEventListener('click', () => craft('bed'));
+    document.getElementById('craftFurnaceBtn').addEventListener('click', () => craft('furnace'));
     
+    // Add event listeners for special actions
     document.getElementById('restBtn').addEventListener('click', rest);
     document.getElementById('exploreBtn').addEventListener('click', explore);
     document.getElementById('backBtn').addEventListener('click', showPod);
@@ -215,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (type === 'wood') {
       if (random < 0.1) {
         resources.metal += 1;
-        currentMessage = `You gather ${gain} wood and find ${bonus > 1 ? 'more' : ''}some metal scraps! +1 metal`;
+        currentMessage = `You gather ${gain} wood and find some metal scraps! +1 metal`;
       } else {
         currentMessage = `You gather ${gain} wood. ${bonus > 1 ? 'Your axe helps you work faster!' : ''}`;
       }
