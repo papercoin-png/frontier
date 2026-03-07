@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
   
   let inventory = [];
-  let currentScreen = 'pod';
+  let currentScreen = 'pod'; // 'pod' or 'planet'
   let currentMessage = 'The air is cold. You need resources to survive.';
   
   // Check Telegram
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="pod-screen">
         <h1>🚀 CRASH LANDING</h1>
         <p class="player-name">${playerName}</p>
-        <p class="status-line">SYSTEMS: OFFLINE</p>
+        <p class="status-line">SYSTEMS: ONLINE</p>
         <p class="status-line">VITALS: STABLE</p>
         <p class="status-line">PLANET: UNKNOWN</p>
         <button class="wake-btn" id="wakeBtn">WAKE UP</button>
