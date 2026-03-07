@@ -13,9 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
   
   let inventory = [];
-  let currentScreen = 'pod'; // 'pod' or 'planet'
   let currentMessage = 'The air is cold. You need resources to survive.';
-  let justWokeUp = false; // Track if we just woke up
   
   // Check Telegram
   if (window.Telegram?.WebApp) {
@@ -28,20 +26,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Render initial screen
-  render();
+  // Start with pod screen
+  showPod();
   
-  // Main render function
-  function render() {
-    if (currentScreen === 'pod') {
-      renderPod();
-    } else {
-      renderPlanet();
-    }
-  }
-  
-  // Render pod screen
-  function renderPod() {
+  // Show pod screen
+  function showPod() {
     const appEl = document.getElementById('app');
     if (!appEl) return;
     
@@ -56,20 +45,14 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     `;
     
-    // Add event listener to button
-    document.getElementById('wakeBtn').addEventListener('click', wakeUp);
+    // Add event listener
+    document.getElementById('wakeBtn').addEventListener('click', showPlanet);
   }
   
-  // Render planet screen
-  function renderPlanet() {
+  // Show planet screen with all buttons
+  function showPlanet() {
     const appEl = document.getElementById('app');
     if (!appEl) return;
-    
-    // Set message based on whether we just woke up
-    if (justWokeUp) {
-      currentMessage = 'You step out of the pod. The air is thin but breathable.';
-      justWokeUp = false; // Reset the flag
-    }
     
     appEl.innerHTML = `
       <div class="planet-view">
@@ -97,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <!-- Message -->
         <div class="message" id="message">${currentMessage}</div>
         
-        <!-- Actions -->
+        <!-- Action Buttons - THESE ARE THE ONES YOU WERE MISSING -->
         <div class="actions">
           <div class="action-btn" id="gatherWood">
             <span class="action-icon">🪵</span>
@@ -117,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         </div>
         
-        <!-- Inventory (only shows if has items) -->
+        <!-- Inventory (only shows if you have items) -->
         ${inventory.length > 0 ? `
           <div class="inventory">
             <h3>📦 INVENTORY</h3>
@@ -129,57 +112,47 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
         ` : ''}
         
-        <!-- Back button -->
+        <!-- Back to pod button -->
         <button class="back-btn" id="backBtn">⬅ BACK TO POD</button>
       </div>
     `;
     
-    // Add event listeners
-    document.getElementById('gatherWood').addEventListener('click', () => gather('wood'));
-    document.getElementById('gatherStone').addEventListener('click', () => gather('stone'));
-    document.getElementById('gatherFood').addEventListener('click', () => gather('food'));
-    document.getElementById('craftBtn').addEventListener('click', craft);
-    document.getElementById('backBtn').addEventListener('click', goBack);
+    // Add event listeners to ALL buttons
+    document.getElementById('gatherWood').addEventListener('click', function() {
+      gather('wood');
+    });
+    
+    document.getElementById('gatherStone').addEventListener('click', function() {
+      gather('stone');
+    });
+    
+    document.getElementById('gatherFood').addEventListener('click', function() {
+      gather('food');
+    });
+    
+    document.getElementById('craftBtn').addEventListener('click', function() {
+      craft();
+    });
+    
+    document.getElementById('backBtn').addEventListener('click', function() {
+      showPod();
+    });
   }
   
-  // Game functions
-  function wakeUp() {
-    currentScreen = 'planet';
-    justWokeUp = true; // Set flag for welcome message
-    render();
-  }
-  
-  function goBack() {
-    currentScreen = 'pod';
-    render();
-  }
-  
+  // Gather resources
   function gather(type) {
     // Random gain between 1-5
     const gain = Math.floor(Math.random() * 5) + 1;
     resources[type] += gain;
     
-    // Random message based on type
-    const messages = {
-      wood: [
-        `You find some dead trees. +${gain} wood`,
-        `Branches are scattered everywhere. +${gain} wood`,
-        `You gather fallen timber. +${gain} wood`
-      ],
-      stone: [
-        `You pick up some rocks. +${gain} stone`,
-        `A rocky outcrop provides stones. +${gain} stone`,
-        `You find sharp stones on the ground. +${gain} stone`
-      ],
-      food: [
-        `You find edible berries. +${gain} food`,
-        `A small creature crosses your path. +${gain} food`,
-        `You discover wild plants. +${gain} food`
-      ]
-    };
-    
-    const messageList = messages[type];
-    currentMessage = messageList[Math.floor(Math.random() * messageList.length)];
+    // Set message
+    if (type === 'wood') {
+      currentMessage = `You gather ${gain} wood from nearby trees.`;
+    } else if (type === 'stone') {
+      currentMessage = `You mine ${gain} stone from the rocks.`;
+    } else if (type === 'food') {
+      currentMessage = `You find ${gain} food.`;
+    }
     
     // 20% chance to find something special
     if (Math.random() < 0.2) {
@@ -189,11 +162,12 @@ document.addEventListener('DOMContentLoaded', function() {
       currentMessage += ` You also found ${item}!`;
     }
     
-    render();
+    // Show updated planet screen
+    showPlanet();
   }
   
+  // Craft items
   function craft() {
-    // Simple crafting
     if (resources.wood >= 5 && resources.stone >= 3) {
       resources.wood -= 5;
       resources.stone -= 3;
@@ -205,8 +179,10 @@ document.addEventListener('DOMContentLoaded', function() {
       inventory.push('🔥 Campfire');
       currentMessage = 'You crafted a Campfire. It provides warmth and light.';
     } else {
-      currentMessage = 'Not enough resources. You need 5 wood + 3 stone for an axe, or 3 wood + 2 food for a campfire.';
+      currentMessage = 'Not enough resources. Need 5 wood + 3 stone for axe, or 3 wood + 2 food for campfire.';
     }
-    render();
+    
+    // Show updated planet screen
+    showPlanet();
   }
 });
