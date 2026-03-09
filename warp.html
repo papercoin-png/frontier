@@ -1,1 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Warp Drive</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #000;
+        }
+        
+        .warp-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        #status {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0af;
+            font-family: 'WindSong', cursive;
+            font-size: 28px;
+            text-shadow: 0 0 20px #0af, 0 0 40px #0af;
+            z-index: 100;
+            transition: color 1s, opacity 1s;
+            white-space: nowrap;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            padding: 8px 30px;
+            border-radius: 60px 20px 60px 20px;
+            border: 2px solid #0af;
+            letter-spacing: 2px;
+        }
+        
+        #destination {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 15px #0af;
+            z-index: 100;
+            opacity: 0.8;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            padding: 6px 20px;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #6af;
+            transition: opacity 0.5s;
+        }
+        
+        #skip-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            color: #e0f0ff;
+            padding: 12px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            z-index: 100;
+            box-shadow: 0 0 30px #2a5a8a;
+            letter-spacing: 1px;
+        }
+        
+        #skip-btn:active {
+            background: #6a8ac0;
+            transform: translateX(-50%) scale(0.97);
+            color: #fff;
+        }
+        
+        #skip-btn.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="warp-container">
+            <div id="status">WARP DRIVE ACTIVE</div>
+            <div id="destination">→ Verdant System</div>
+            <button id="skip-btn" onclick="skipWarp()">SKIP</button>
+            <canvas id="c"></canvas>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#000000');
+            tg.setBackgroundColor('#000000');
+        }
+        
+        // Get destination from URL parameters or localStorage
+        function getDestination() {
+            // Check URL parameters first
+            const urlParams = new URLSearchParams(window.location.search);
+            const dest = urlParams.get('dest');
+            
+            if (dest) {
+                return decodeURIComponent(dest);
+            }
+            
+            // Check localStorage for destination
+            const returnTo = localStorage.getItem('voidfarer_warp_destination');
+            if (returnTo) {
+                return returnTo;
+            }
+            
+            // Default destinations based on context
+            const from = document.referrer;
+            if (from.includes('earth-hub')) {
+                return 'Ship Bridge';
+            } else if (from.includes('system-view')) {
+                const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+                return planet;
+            } else if (from.includes('ship-bridge')) {
+                return 'Verdant System';
+            } else {
+                return 'Verdant System';
+            }
+        }
+        
+        // Set destination display
+        const destination = getDestination();
+        document.getElementById('destination').textContent = `→ ${destination}`;
+        
+        // Canvas setup
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // ===== WARP STARS =====
+        const stars = [];
+        for (let i = 0; i < 500; i++) {
+            stars.push({
+                x: (Math.random() - 0.5) * 2000,
+                y: (Math.random() - 0.5) * 2000,
+                z: Math.random() * 2000,
+                baseSpeed: 40 + Math.random() * 40 // VIOLENT start
+            });
+        }
+
+        let time = 0;
+        let phase = 'warp';
+        let warpStart = Date.now();
+        let progress = 0; // 0 to 1 over 4 seconds
+        let animationFrame;
+        
+        // Check if we should auto-redirect after warp
+        const redirectAfterWarp = localStorage.getItem('voidfarer_warp_redirect') || 'ship-bridge.html';
+        
+        function checkPhase() {
+            const elapsed = (Date.now() - warpStart) / 1000; // seconds
+            progress = Math.min(elapsed / 4, 1); // 0 to 1 over 4 seconds
+            
+            if (elapsed >= 4 && phase === 'warp') {
+                phase = 'ripple';
+                document.getElementById('status').textContent = 'ARRIVED';
+                document.getElementById('status').style.color = '#6f6';
+                document.getElementById('status').style.borderColor = '#6f6';
+                document.getElementById('destination').style.opacity = '1';
+                
+                // Clear warp destination from localStorage
+                localStorage.removeItem('voidfarer_warp_destination');
+                
+                // Auto-redirect after arrival
+                setTimeout(() => {
+                    completeWarp();
+                }, 1500);
+            }
+        }
+        
+        function completeWarp() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            
+            // Get redirect URL
+            const redirect = localStorage.getItem('voidfarer_warp_redirect') || 'ship-bridge.html';
+            
+            // Clear warp data
+            localStorage.removeItem('voidfarer_warp_redirect');
+            localStorage.removeItem('voidfarer_warp_destination');
+            
+            // Navigate
+            window.location.href = redirect;
+        }
+        
+        function skipWarp() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            // Immediately complete warp
+            phase = 'ripple';
+            document.getElementById('status').textContent = 'ARRIVED';
+            document.getElementById('status').style.color = '#6f6';
+            document.getElementById('status').style.borderColor = '#6f6';
+            document.getElementById('skip-btn').classList.add('hidden');
+            
+            setTimeout(() => {
+                completeWarp();
+            }, 500);
+        }
+
+        function draw() {
+            checkPhase();
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (phase === 'warp') {
+                // ===== WARP WITH PROGRESSIVE SLOWING & DIMMING =====
+                time += 0.02;
+                
+                // Calculate speed factor and brightness based on progress
+                // Start fast (1.0) and slow down to 0.1 by end
+                const speedFactor = 1.0 - (progress * 0.9); // 1.0 → 0.1
+                
+                // Brightness fades from 1.0 to 0.2
+                const brightnessFactor = 1.0 - (progress * 0.8); // 1.0 → 0.2
+
+                stars.forEach(s => {
+                    // Apply slowed speed
+                    s.z -= s.baseSpeed * speedFactor;
+
+                    if (s.z < 1) {
+                        s.z = 2000;
+                        s.x = (Math.random() - 0.5) * 2000;
+                        s.y = (Math.random() - 0.5) * 2000;
+                    }
+
+                    const factor = 500 / s.z;
+                    const x = s.x * factor + canvas.width / 2;
+                    const y = s.y * factor + canvas.height / 2;
+                    
+                    // Skip if outside view
+                    if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;
+                    
+                    // Star brightness dims over time
+                    const starBrightness = Math.min(255, 100 + (2000 - s.z) * 0.2) * brightnessFactor;
+                    
+                    // Draw streaks (shorter as we slow down)
+                    if (s.z < 1200) {
+                        // Streak length also decreases with speed
+                        const streakLength = 50 * speedFactor;
+                        ctx.strokeStyle = `rgba(100, 150, 255, ${0.5 * brightnessFactor})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        
+                        const streakX = (s.x / s.z) * streakLength;
+                        const streakY = (s.y / s.z) * streakLength;
+                        ctx.lineTo(x + streakX, y + streakY);
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle = `rgba(255, 255, 255, ${brightnessFactor})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2 + (2000 - s.z) * 0.02, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Warp glow fades over time
+                const glowIntensity = 0.3 * brightnessFactor;
+                const gradient = ctx.createRadialGradient(
+                    canvas.width/2, canvas.height/2, 0,
+                    canvas.width/2, canvas.height/2, 150
+                );
+                gradient.addColorStop(0, `rgba(100, 150, 255, ${glowIntensity})`);
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            } else {
+                // ===== RIPPLE SPHERE (peaceful arrival) =====
+                time += 0.02;
+                
+                // Draw grid of rippling dots
+                for (let y = -50; y < canvas.height + 50; y += 20) {
+                    for (let x = -50; x < canvas.width + 50; x += 20) {
+                        const dx = x - canvas.width/2;
+                        const dy = y - canvas.height/2;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        const ripple = Math.sin(dist * 0.03 - time * 5) * 0.5 + 0.5;
+                        const angle = Math.atan2(dy, dx);
+                        
+                        const warpX = x + Math.cos(angle) * ripple * 30;
+                        const warpY = y + Math.sin(angle) * ripple * 30;
+                        
+                        // Fade out ripple effect
+                        const fadeOut = Math.max(0, 1 - (progress - 0.8) * 5);
+                        
+                        ctx.fillStyle = `rgba(100, 200, 255, ${ripple * 0.2 * fadeOut})`;
+                        ctx.fillRect(warpX, warpY, 4, 4);
+                    }
+                }
+                
+                // Calm central glow
+                const gradient = ctx.createRadialGradient(
+                    canvas.width/2, canvas.height/2, 0,
+                    canvas.width/2, canvas.height/2, 200
+                );
+                gradient.addColorStop(0, `rgba(150, 200, 255, ${0.2 * (1 - progress)})`);
+                gradient.addColorStop(1, 'transparent');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Show skip button during ripple phase
+                document.getElementById('skip-btn').classList.remove('hidden');
+            }
+
+            animationFrame = requestAnimationFrame(draw);
+        }
+
+        draw();
+        
+        // Clean up animation frame on page unload
+        window.addEventListener('beforeunload', function() {
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+        });
+        
+        // Handle back button - redirect to ship bridge if user tries to go back during warp
+        window.addEventListener('popstate', function() {
+            window.location.href = 'ship-bridge.html';
+        });
+        
+        // Push state to handle back button
+        history.pushState({}, '');
+    </script>
+</body>
+</html>
