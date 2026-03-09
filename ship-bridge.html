@@ -7,10 +7,35 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/voidfarer.css">
     
     <style>
-        /* Screen-specific styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
         .bridge-view {
             position: relative;
             width: 100%;
@@ -182,45 +207,52 @@
             text-align: right;
         }
         
-        /* Button Grid - 4x2 */
+        /* Button Grid - 4x2 for mobile */
         .button-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 25px;
         }
         
         .nav-button {
             background: rgba(30, 45, 70, 0.7);
             backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 2px solid #6a8ac0;
-            border-radius: 25px 8px 25px 8px;
-            padding: 12px 4px;
+            border-radius: 20px 6px 20px 6px;
+            padding: 12px 2px;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.1s;
             color: #ffffff;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
         }
         
         .nav-button:active {
-            background: rgba(60, 90, 140, 0.8);
-            transform: scale(0.97);
+            background: rgba(90, 120, 180, 0.9);
+            transform: scale(0.96);
             border-color: #aac8ff;
         }
         
         .button-icon {
-            font-size: 24px;
+            font-size: 22px;
             filter: drop-shadow(0 0 8px #6a8ac0);
+            pointer-events: none;
         }
         
         .button-label {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             color: #c0d0ff;
             text-align: center;
+            pointer-events: none;
         }
         
         /* Stats Footer */
@@ -239,37 +271,89 @@
             font-weight: 600;
         }
         
-        /* Back button */
+        /* Back button - mobile optimized */
         .back-button {
             position: sticky;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(30, 50, 80, 0.9);
+            background: rgba(30, 50, 80, 0.95);
             backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             border: 2px solid #9ac0ff;
             color: #ffffff;
-            padding: 12px 30px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
+            padding: 14px 40px;
+            border-radius: 40px 12px 40px 12px;
+            font-size: 18px;
             cursor: pointer;
             font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
+            transition: all 0.1s;
             width: fit-content;
             box-shadow: 0 0 30px #3a5a8a;
             z-index: 100;
             margin-top: 10px;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: manipulation;
+            font-weight: 600;
+            letter-spacing: 1px;
         }
         
         .back-button:active {
             background: #6a8ac0;
-            transform: translateX(-50%) scale(0.98);
+            transform: translateX(-50%) scale(0.96);
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
         }
         
         /* Element colors */
         .icon-gold { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
         .icon-uranium { color: #7ac0b0; text-shadow: 0 0 10px #7ac0b0; }
         .icon-promethium { color: #ff9e5e; text-shadow: 0 0 10px #ff9e5e; }
+        
+        /* Safe area for notches */
+        @supports (padding: max(0px)) {
+            .bridge-view {
+                padding-left: max(20px, env(safe-area-inset-left));
+                padding-right: max(20px, env(safe-area-inset-right));
+                padding-bottom: max(30px, env(safe-area-inset-bottom));
+            }
+        }
     </style>
 </head>
 <body>
@@ -301,51 +385,36 @@
                 </div>
             </div>
             
-            <!-- Main Button Grid (8 buttons) - ALL CONNECTIONS VERIFIED -->
+            <!-- Main Button Grid (8 buttons) - Mobile optimized -->
             <div class="button-grid">
-                <!-- Button 1: Journal -->
-                <div class="nav-button" onclick="openJournal()">
+                <div class="nav-button" onclick="navigateTo('journal.html')">
                     <span class="button-icon">📚</span>
                     <span class="button-label">Journal</span>
                 </div>
-                
-                <!-- Button 2: Nebulae Map (was Galaxy) -->
-                <div class="nav-button" onclick="openNebulaeMap()">
+                <div class="nav-button" onclick="navigateTo('nebulae-map.html')">
                     <span class="button-icon">🌌</span>
                     <span class="button-label">Nebulae</span>
                 </div>
-                
-                <!-- Button 3: System View -->
-                <div class="nav-button" onclick="openSystemView()">
+                <div class="nav-button" onclick="navigateTo('system-view.html')">
                     <span class="button-icon">🪐</span>
                     <span class="button-label">System</span>
                 </div>
-                
-                <!-- Button 4: Surface -->
                 <div class="nav-button" onclick="goToSurface()">
                     <span class="button-icon">🚀</span>
                     <span class="button-label">Surface</span>
                 </div>
-                
-                <!-- Button 5: Earth -->
                 <div class="nav-button" onclick="returnToEarth()">
                     <span class="button-icon">🌍</span>
                     <span class="button-label">Earth</span>
                 </div>
-                
-                <!-- Button 6: Rest -->
                 <div class="nav-button" onclick="rest()">
                     <span class="button-icon">🛏️</span>
                     <span class="button-label">Rest</span>
                 </div>
-                
-                <!-- Button 7: Settings -->
-                <div class="nav-button" onclick="openSettings()">
+                <div class="nav-button" onclick="navigateTo('settings.html')">
                     <span class="button-icon">⚙️</span>
                     <span class="button-label">Settings</span>
                 </div>
-                
-                <!-- Button 8: Status -->
                 <div class="nav-button" onclick="openShipStatus()">
                     <span class="button-icon">📊</span>
                     <span class="button-label">Status</span>
@@ -359,7 +428,7 @@
             </div>
             
             <!-- Back button to Earth Hub -->
-            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            <button class="back-button" onclick="navigateTo('earth-hub.html')">← EARTH HUB</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -368,26 +437,36 @@
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/voidfarer.js"></script>
-    <script src="js/missions.js"></script>
-    
     <script>
-        // Telegram Mini App
+        // Telegram Mini App initialization
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
-            tg.expand();
+            tg.expand(); // Expand to full height
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
+            
+            // Enable closing confirmation if needed
+            tg.enableClosingConfirmation();
         }
         
         // Loading overlay
         const loadingOverlay = document.getElementById('loadingOverlay');
         
+        // Navigation function with haptic feedback
+        function navigateTo(url) {
+            // Haptic feedback
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+            
+            // Simple direct navigation
+            window.location.href = url;
+        }
+        
         // Load current planet
         function loadCurrentPlanet() {
-            const planet = getCurrentPlanet();
+            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
             document.getElementById('currentPlanetName').textContent = planet;
             
             // Update planet image based on name
@@ -405,16 +484,15 @@
             } else {
                 planetImage.src = 'assets/images/planet-verdant.jpg';
             }
-            
-            // Fallback to postimage if local images don't exist
-            planetImage.onerror = function() {
-                this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
-            };
         }
         
         // Load missions
         function loadMissions() {
-            const missions = getMissions();
+            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [
+                { element: 'Gold', current: 32, target: 50, planet: 'Pyros' },
+                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
+                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
+            ];
             
             if (missions.length === 0) {
                 document.getElementById('missionList').innerHTML = '<div style="color:#a0c0ff; text-align:center; padding:20px;">No active missions</div>';
@@ -422,7 +500,6 @@
                 return;
             }
             
-            // Update mission planet display
             document.getElementById('missionPlanet').textContent = missions[0].planet;
             
             const missionList = document.getElementById('missionList');
@@ -431,7 +508,7 @@
             missions.slice(0, 3).forEach(mission => {
                 const percent = (mission.current / mission.target) * 100;
                 let icon = '🟡';
-                let iconClass = 'icon-gold';
+                let iconClass = '';
                 
                 if (mission.element === 'Uranium') {
                     icon = '🟣';
@@ -439,14 +516,6 @@
                 } else if (mission.element === 'Promethium') {
                     icon = '✨';
                     iconClass = 'icon-promethium';
-                } else if (mission.element === 'Carbon') {
-                    icon = '⚫';
-                } else if (mission.element === 'Iron') {
-                    icon = '⚙️';
-                } else if (mission.element === 'Silver') {
-                    icon = '🔘';
-                } else if (mission.element === 'Platinum') {
-                    icon = '⬜';
                 }
                 
                 const item = document.createElement('div');
@@ -454,7 +523,7 @@
                 item.innerHTML = `
                     <span class="item-icon ${iconClass}">${icon}</span>
                     <div class="item-details">
-                        <div class="item-name">${mission.element} (${mission.planet})</div>
+                        <div class="item-name">${mission.element}</div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${percent}%"></div>
                         </div>
@@ -463,137 +532,115 @@
                 `;
                 missionList.appendChild(item);
             });
-            
-            if (missions.length > 3) {
-                const more = document.createElement('div');
-                more.style.color = '#a0c0ff';
-                more.style.textAlign = 'center';
-                more.style.padding = '10px';
-                more.style.fontSize = '12px';
-                more.textContent = `+${missions.length - 3} more missions`;
-                missionList.appendChild(more);
-            }
         }
         
         // Load collection stats
         function loadCollectionStats() {
-            const collection = getCollection();
+            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
             const count = Object.keys(collection).length;
             document.getElementById('collectionCount').textContent = `${count} / 118`;
         }
         
         // Load ship power
         function loadShipPower() {
-            const power = getShipPower();
+            const power = localStorage.getItem('voidfarer_ship_power') || '87';
             document.getElementById('shipPower').textContent = `⚡ ${power}%`;
         }
         
-        // ===== NAVIGATION HANDLERS - ALL 8 BUTTONS VERIFIED =====
-        
-        // Button 1: Journal
-        function openJournal() {
-            console.log('Journal button clicked'); // Debug
-            hapticLight();
-            navigateTo('journal.html');
-        }
-        
-        // Button 2: Nebulae Map (formerly Galaxy)
-        function openNebulaeMap() {
-            console.log('Nebulae button clicked'); // Debug
-            hapticLight();
-            navigateTo('nebulae-map.html');
-        }
-        
-        // Button 3: System View
-        function openSystemView() {
-            console.log('System button clicked'); // Debug
-            hapticLight();
-            navigateTo('system-view.html', true);
-        }
-        
-        // Button 4: Surface
+        // Surface button with validation
         function goToSurface() {
-            console.log('Surface button clicked'); // Debug
-            const planet = getCurrentPlanet();
+            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
             
-            // Check if planet is gas giant
             if (planet.includes('Aether')) {
-                hapticError();
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                 alert('Cannot land on gas giant Aether. Choose a different planet from System View.');
                 return;
             }
             
-            hapticMedium();
-            navigateTo('surface.html', true);
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            window.location.href = 'surface.html';
         }
         
-        // Button 5: Earth
+        // Earth button with confirmation
         function returnToEarth() {
-            console.log('Earth button clicked'); // Debug
-            hapticMedium();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
             if (confirm('Return to Earth? This will end your current expedition.')) {
-                setCurrentPlanet('Earth');
-                navigateTo('earth-hub.html', true);
+                localStorage.setItem('voidfarer_current_planet', 'Earth');
+                window.location.href = 'earth-hub.html';
             }
         }
         
-        // Button 6: Rest
+        // Rest button
         function rest() {
-            console.log('Rest button clicked'); // Debug
-            hapticLight();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            // Restore ship power
-            setShipPower(100);
+            localStorage.setItem('voidfarer_ship_power', '100');
             document.getElementById('shipPower').textContent = '⚡ 100%';
             
-            alert('Crew rested. Ship power restored to 100%.');
+            // Show Telegram popup if available
+            if (tg?.showPopup) {
+                tg.showPopup({
+                    title: 'Crew Rested',
+                    message: 'Ship power restored to 100%.',
+                    buttons: [{ type: 'ok' }]
+                });
+            } else {
+                alert('Crew rested. Ship power restored to 100%.');
+            }
         }
         
-        // Button 7: Settings
-        function openSettings() {
-            console.log('Settings button clicked'); // Debug
-            hapticLight();
-            navigateTo('settings.html');
-        }
-        
-        // Button 8: Status
+        // Status button
         function openShipStatus() {
-            console.log('Status button clicked'); // Debug
-            hapticLight();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            const player = getPlayer();
-            const collection = getCollection();
-            const credits = getCredits();
-            const missions = getMissions();
+            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const credits = localStorage.getItem('voidfarer_credits') || '12450';
+            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [];
             
-            alert(`🚢 SHIP STATUS\n\nCaptain: ${player?.name || 'Voidfarer'}\nShip: ${player?.ship || 'Prospector'}\nCredits: ${credits.toLocaleString()}⭐\nElements: ${Object.keys(collection).length}/118\nActive Missions: ${missions.length}\nShip Power: ${getShipPower()}%\n\nMining Bonus: +50%\nCargo Capacity: 8,200c`);
-        }
-        
-        // Back button to Earth Hub
-        function returnToEarthHub() {
-            console.log('Earth Hub button clicked'); // Debug
-            hapticLight();
-            navigateTo('earth-hub.html');
+            const message = `🚢 SHIP STATUS\n\n` +
+                `Credits: ${Number(credits).toLocaleString()}⭐\n` +
+                `Elements: ${Object.keys(collection).length}/118\n` +
+                `Active Missions: ${missions.length}\n` +
+                `Ship Power: ${localStorage.getItem('voidfarer_ship_power') || '87'}%`;
+            
+            // Use Telegram popup if available
+            if (tg?.showPopup) {
+                tg.showPopup({
+                    title: 'Ship Status',
+                    message: message,
+                    buttons: [{ type: 'ok' }]
+                });
+            } else {
+                alert(message);
+            }
         }
         
         // Initialize
         function init() {
-            console.log('Bridge initializing'); // Debug
             // Check if player exists
-            if (!checkPlayer()) return;
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
             
             loadCurrentPlanet();
             loadMissions();
             loadCollectionStats();
             loadShipPower();
             
-            // Update missions from collection
-            updateAllMissionsFromCollection();
+            // Set main button color for Telegram
+            if (tg) {
+                tg.MainButton.setParams({
+                    color: '#6a8ac0',
+                    text_color: '#ffffff'
+                });
+            }
         }
         
-        // Run initialization
-        init();
+        // Run initialization when DOM is ready
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
