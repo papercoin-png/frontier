@@ -1,1 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Main Menu</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .menu-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 20px 30px 20px;
+        }
+        
+        /* Window Frame */
+        .window-frame {
+            background: #1a2a3a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 15px;
+            margin-bottom: 30px;
+            border: 3px solid #4a8a9a;
+            box-shadow: 0 0 40px #2a5a6a80;
+        }
+        
+        .window-view {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            border-radius: 40px 10px 40px 10px;
+            overflow: hidden;
+            background: #0a1a2a;
+        }
+        
+        .earth-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.9) saturate(1.2) hue-rotate(10deg);
+            animation: slow-rotate 60s linear infinite;
+        }
+        
+        @keyframes slow-rotate {
+            from { transform: scale(1.2) rotate(0deg); }
+            to { transform: scale(1.2) rotate(360deg); }
+        }
+        
+        .window-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, rgba(10, 26, 42, 0.4) 100%);
+            pointer-events: none;
+        }
+        
+        .window-label {
+            position: absolute;
+            bottom: 15px;
+            left: 20px;
+            color: #ffffff;
+            font-size: 20px;
+            font-family: 'WindSong', cursive;
+            text-shadow: 0 0 15px #000, 0 0 30px #4a8a9a;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 40px 5px 40px 5px;
+            backdrop-filter: blur(5px);
+            border: 1px solid #8ac0d0;
+        }
+        
+        /* Title */
+        .game-title {
+            font-family: 'WindSong', cursive;
+            font-size: 48px;
+            color: #e0f0ff;
+            text-shadow: 0 0 30px #4a8a9a, 0 0 60px #2a5a6a;
+            text-align: center;
+            margin-bottom: 20px;
+            letter-spacing: 4px;
+        }
+        
+        /* Menu Buttons */
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .menu-button {
+            background: rgba(30, 60, 80, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a9a;
+            border-radius: 60px 15px 60px 15px;
+            padding: 18px 25px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        .menu-button:active {
+            background: rgba(50, 100, 120, 0.8);
+            transform: scale(0.98);
+            border-color: #8ac8c8;
+            box-shadow: 0 0 30px #3a8a8a;
+        }
+        
+        .button-icon {
+            font-size: 32px;
+            min-width: 50px;
+            text-align: center;
+            filter: drop-shadow(0 0 10px #4a9a9a);
+        }
+        
+        .button-text {
+            flex: 1;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-align: left;
+        }
+        
+        /* Tagline */
+        .tagline {
+            color: #a0c0d0;
+            font-size: 16px;
+            text-align: center;
+            font-style: italic;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #2a5a6a;
+        }
+        
+        /* Version */
+        .version {
+            color: #608080;
+            font-size: 12px;
+            text-align: center;
+            margin-top: auto;
+        }
+        
+        /* Loading overlay for transitions */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="menu-view" id="menuView">
+            <!-- Window with Earth view -->
+            <div class="window-frame">
+                <div class="window-view">
+                    <!-- Using local image - YOU NEED TO SAVE THIS IMAGE LOCALLY -->
+                    <img src="assets/images/earth-view.jpg" class="earth-image" alt="Earth view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+                    <div class="window-overlay"></div>
+                    <div class="window-label">Earth • home</div>
+                </div>
+            </div>
+            
+            <!-- Game Title -->
+            <div class="game-title">VOIDFARER</div>
+            
+            <!-- Menu Buttons -->
+            <div class="menu-buttons">
+                <div class="menu-button" onclick="handleMenu('new')">
+                    <span class="button-icon">🌙</span>
+                    <span class="button-text">New Journey</span>
+                </div>
+                
+                <div class="menu-button" onclick="handleMenu('continue')">
+                    <span class="button-icon">🚀</span>
+                    <span class="button-text">Continue</span>
+                </div>
+                
+                <div class="menu-button" onclick="handleMenu('settings')">
+                    <span class="button-icon">⚙️</span>
+                    <span class="button-text">Settings</span>
+                </div>
+                
+                <div class="menu-button" onclick="handleMenu('credits')">
+                    <span class="button-icon">✨</span>
+                    <span class="button-text">Credits</span>
+                </div>
+            </div>
+            
+            <!-- Tagline -->
+            <div class="tagline">find your place in the cosmos</div>
+            
+            <!-- Version -->
+            <div class="version">v1.0 · alone in the stars</div>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-text">warping...</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Navigation function
+        function navigateTo(screen, useWarp = false) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            if (useWarp) {
+                // Show warp effect then navigate
+                loadingOverlay.classList.add('active');
+                setTimeout(() => {
+                    window.location.href = screen;
+                }, 800);
+            } else {
+                // Navigate immediately
+                window.location.href = screen;
+            }
+        }
+        
+        // Check if this is first time playing
+        function isNewGame() {
+            return !localStorage.getItem('voidfarer_player');
+        }
+        
+        // Handle menu actions
+        function handleMenu(action) {
+            switch(action) {
+                case 'new':
+                    if (confirm('Start a new journey? This will erase all progress.')) {
+                        // Clear all saved data
+                        localStorage.removeItem('voidfarer_player');
+                        localStorage.removeItem('voidfarer_collection');
+                        localStorage.removeItem('voidfarer_missions');
+                        localStorage.removeItem('voidfarer_credits');
+                        
+                        // Set default values
+                        localStorage.setItem('voidfarer_player', JSON.stringify({
+                            name: 'Voidfarer',
+                            ship: 'Prospector',
+                            credits: 1000,
+                            created: new Date().toISOString()
+                        }));
+                        
+                        // Navigate to Earth Hub with warp effect
+                        navigateTo('earth-hub.html', true);
+                    }
+                    break;
+                    
+                case 'continue':
+                    if (isNewGame()) {
+                        // First time playing - create default save
+                        localStorage.setItem('voidfarer_player', JSON.stringify({
+                            name: 'Voidfarer',
+                            ship: 'Prospector',
+                            credits: 1000,
+                            created: new Date().toISOString()
+                        }));
+                        
+                        // Initialize empty collection
+                        localStorage.setItem('voidfarer_collection', JSON.stringify({}));
+                        
+                        // Default missions
+                        localStorage.setItem('voidfarer_missions', JSON.stringify([
+                            { element: 'Gold', current: 0, target: 50, planet: 'Pyros' },
+                            { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
+                            { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
+                        ]));
+                        
+                        localStorage.setItem('voidfarer_credits', '12450');
+                    }
+                    
+                    // Navigate to Earth Hub with warp effect
+                    navigateTo('earth-hub.html', true);
+                    break;
+                    
+                case 'settings':
+                    navigateTo('settings.html');
+                    break;
+                    
+                case 'credits':
+                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos');
+                    break;
+            }
+        }
+        
+        // Preload next screen for faster transition
+        function preloadScreen(url) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.href = url;
+            link.as = 'document';
+            document.head.appendChild(link);
+        }
+        
+        // Preload Earth Hub for faster continue
+        preloadScreen('earth-hub.html');
+    </script>
+</body>
+</html>
