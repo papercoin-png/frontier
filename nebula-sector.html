@@ -103,6 +103,8 @@
             cursor: pointer;
             z-index: 20;
             transition: all 0.2s ease;
+            width: 60px;
+            height: 60px;
         }
         
         .object-glow {
@@ -145,6 +147,7 @@
             border: 1px solid #a0b0c0;
             pointer-events: none;
             transition: opacity 0.2s;
+            z-index: 30;
         }
         
         .celestial-object:hover .object-label {
@@ -299,18 +302,18 @@
         }
         .anomaly-asteroid .object-label { top: 25px; }
         
-        .anomaly-station .object-glow {
+        .station-station .object-glow {
             width: 30px;
             height: 30px;
             background: radial-gradient(circle at center, #4aaaff60, transparent 80%);
         }
-        .anomaly-station .object-core {
+        .station-station .object-core {
             width: 10px;
             height: 10px;
             background: #4aaaff;
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
         }
-        .anomaly-station .object-label { top: 20px; }
+        .station-station .object-label { top: 20px; }
         
         /* Connection lines */
         .connection-line {
@@ -722,6 +725,9 @@
             }
         }
         
+        // ===== GLOBAL OBJECTS ARRAY =====
+        let sectorObjects = [];
+        
         // ===== GENERATE CELESTIAL OBJECTS =====
         function generateObjects() {
             const mapContainer = document.getElementById('mapContainer');
@@ -785,20 +791,29 @@
                 const x = centerX + Math.cos(angle) * radius;
                 const y = centerY + Math.sin(angle) * radius;
                 
-                objects.push({
+                // Ensure within bounds
+                const safeX = Math.min(95, Math.max(5, x));
+                const safeY = Math.min(95, Math.max(5, y));
+                
+                const obj = {
                     id: `obj-${i}`,
                     type: type,
                     subtype: subtype,
                     name: name,
-                    x: x,
-                    y: y,
+                    x: safeX,
+                    y: safeY,
                     distance: Math.floor(Math.random() * 50 + 10) / 10 + ' ly',
                     resources: Math.floor(Math.random() * 5) + 1,
                     danger: Math.floor(Math.random() * 5) + 1,
                     interest: Math.floor(Math.random() * 5) + 1,
                     desc: getDescription(type, subtype)
-                });
+                };
+                
+                objects.push(obj);
             }
+            
+            // Store globally
+            sectorObjects = objects;
             
             // Create connection lines
             for (let i = 0; i < objects.length; i += 3) {
@@ -834,6 +849,7 @@
                 el.style.top = obj.y + '%';
                 el.setAttribute('data-type', obj.type);
                 el.setAttribute('data-subtype', obj.subtype);
+                el.setAttribute('data-id', obj.id);
                 el.setAttribute('onclick', `selectObject('${obj.id}')`);
                 
                 el.innerHTML = `
@@ -843,13 +859,7 @@
                 `;
                 
                 mapContainer.appendChild(el);
-                
-                // Store object data
-                el.data = obj;
             });
-            
-            // Store objects globally
-            window.objects = objects;
         }
         
         function getDescription(type, subtype) {
@@ -867,6 +877,7 @@
             } else {
                 return 'A deep space station. Trade, rest, and refuel here.';
             }
+            return 'Unknown celestial object.';
         }
         
         // ===== OBJECT SELECTION =====
@@ -884,7 +895,11 @@
             const element = document.getElementById(id);
             if (element) {
                 element.classList.add('selected');
-                const obj = element.data;
+                
+                // Find object data
+                const obj = sectorObjects.find(o => o.id === id);
+                if (!obj) return;
+                
                 currentObject = obj;
                 
                 // Update info panel
@@ -929,7 +944,10 @@
         }
         
         function travelToObject() {
-            if (!currentObject) return;
+            if (!currentObject) {
+                alert('Please select an object first');
+                return;
+            }
             
             loadingOverlay.classList.add('active');
             
@@ -938,7 +956,12 @@
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
                 
-                alert(`Traveling to ${currentObject.name}...\n\n${currentObject.desc}\n\n(Would open detailed view for this location)`);
+                // Save the selected object as current location
+                localStorage.setItem('voidfarer_current_planet', currentObject.name);
+                localStorage.setItem('voidfarer_current_object_type', currentObject.type);
+                
+                // Navigate to system view
+                window.location.href = 'system-view.html';
                 
                 closeInfo();
             }, 2000);
@@ -954,14 +977,18 @@
             
             // Filter objects
             document.querySelectorAll('.celestial-object').forEach(el => {
+                const type = el.classList.contains('star-') ? 'star' : 
+                            el.classList.contains('anomaly-') ? 'anomaly' : 
+                            el.classList.contains('station-') ? 'station' : '';
+                
                 if (filter === 'all') {
                     el.style.display = 'block';
                 } else if (filter === 'star') {
-                    el.style.display = el.classList.contains('star-') ? 'block' : 'none';
+                    el.style.display = type === 'star' ? 'block' : 'none';
                 } else if (filter === 'anomaly') {
-                    el.style.display = el.classList.contains('anomaly-') ? 'block' : 'none';
+                    el.style.display = type === 'anomaly' ? 'block' : 'none';
                 } else if (filter === 'station') {
-                    el.style.display = el.classList.contains('station-') ? 'block' : 'none';
+                    el.style.display = type === 'station' ? 'block' : 'none';
                 }
             });
             
