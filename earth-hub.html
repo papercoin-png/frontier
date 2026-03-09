@@ -1,1 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Earth Hub</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .earth-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .earth-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .earth-title {
+            font-family: 'WindSong', cursive;
+            font-size: 36px;
+            color: #c0e0ff;
+            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
+            margin-bottom: 4px;
+        }
+        
+        .earth-subtitle {
+            color: #a0d0c0;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .cargo-value {
+            font-size: 14px;
+            color: #a0d0c0;
+            text-align: right;
+        }
+        
+        /* Hub Cards */
+        .hub-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .hub-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 18px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        
+        .hub-card:active {
+            background: rgba(50, 100, 110, 0.7);
+            transform: scale(0.99);
+            border-color: #7ac0b0;
+        }
+        
+        .card-icon {
+            font-size: 42px;
+            min-width: 60px;
+            text-align: center;
+            filter: drop-shadow(0 0 15px #4a9a8a);
+        }
+        
+        .card-content {
+            flex: 1;
+        }
+        
+        .card-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .card-desc {
+            color: #a0d0c0;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+        
+        .card-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #c0e0ff;
+        }
+        
+        /* Mission Card - Special Highlight */
+        .mission-card {
+            background: rgba(40, 80, 90, 0.8);
+            backdrop-filter: blur(10px);
+            border: 3px solid #7ac0b0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 30px #3a7a6a;
+        }
+        
+        .mission-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .mission-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .edit-mission {
+            color: #a0d0c0;
+            font-size: 13px;
+            padding: 4px 12px;
+            border: 1px solid #7ac0b0;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+        
+        .edit-mission:active {
+            background: #7ac0b0;
+            color: #0a2a3a;
+        }
+        
+        .mission-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .mission-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .item-icon {
+            font-size: 20px;
+            width: 30px;
+        }
+        
+        .item-details {
+            flex: 1;
+        }
+        
+        .item-name {
+            color: #ffffff;
+            font-size: 15px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7ac0b0, #b0e0d0);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        
+        .item-target {
+            color: #a0d0c0;
+            font-size: 13px;
+            min-width: 50px;
+            text-align: right;
+        }
+        
+        /* Launch Button */
+        .launch-button {
+            background: rgba(40, 100, 90, 0.9);
+            backdrop-filter: blur(15px);
+            border: 3px solid #9ad0c0;
+            color: #ffffff;
+            padding: 18px 20px;
+            border-radius: 80px 25px 80px 25px;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            margin: 10px 0 20px 0;
+            transition: all 0.2s;
+            box-shadow: 0 0 40px #2a7a6a;
+            font-family: 'WindSong', cursive;
+            letter-spacing: 2px;
+        }
+        
+        .launch-button:active {
+            background: rgba(60, 140, 120, 0.9);
+            transform: scale(0.98);
+            border-color: #c0f0e0;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: #608080;
+            font-size: 12px;
+            padding: 10px;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 60, 70, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #6aa0a0;
+            color: #ffffff;
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #2a5a5a;
+            z-index: 100;
+            margin-top: 10px;
+        }
+        
+        .back-button:active {
+            background: #4a9a8a;
+            transform: translateX(-50%) scale(0.98);
+        }
+        
+        /* Element colors for mission icons */
+        .icon-gold { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+        .icon-uranium { color: #7ac0b0; text-shadow: 0 0 10px #7ac0b0; }
+        .icon-promethium { color: #ff9e5e; text-shadow: 0 0 10px #ff9e5e; }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="earth-view" id="earthView">
+            <!-- Header -->
+            <div class="earth-header">
+                <div class="earth-title">Earth Central</div>
+                <div class="earth-subtitle">✦ home port ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar" id="statsBar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> 12,450
+                </div>
+                <div class="cargo-value" id="cargoDisplay">
+                    Cargo: 8,200c<br>
+                    0/94 elements
+                </div>
+            </div>
+            
+            <!-- Active Mission Card -->
+            <div class="mission-card" id="missionCard">
+                <div class="mission-header">
+                    <span class="mission-title">Active Mission</span>
+                    <span class="edit-mission" onclick="editMissions()">EDIT</span>
+                </div>
+                <div class="mission-list" id="missionList">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Hub Cards -->
+            <div class="hub-grid">
+                <!-- Mission Planning -->
+                <div class="hub-card" onclick="navigateTo('journal.html')">
+                    <div class="card-icon">📋</div>
+                    <div class="card-content">
+                        <div class="card-title">Mission Planning</div>
+                        <div class="card-desc">Create shopping lists, set targets</div>
+                        <div class="card-stats">
+                            <span id="missionCount">3 items</span>
+                            <span>✎ edit</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Market -->
+                <div class="hub-card" onclick="openMarket()">
+                    <div class="card-icon">🏪</div>
+                    <div class="card-content">
+                        <div class="card-title">Market</div>
+                        <div class="card-desc">Sell elements, buy fuel & upgrades</div>
+                        <div class="card-stats">
+                            <span id="marketCredits">⭐ 12,450</span>
+                            <span id="marketCargo">📦 8,200c</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ship Hangar -->
+                <div class="hub-card" onclick="openHangar()">
+                    <div class="card-icon">🚢</div>
+                    <div class="card-content">
+                        <div class="card-title">Ship Hangar</div>
+                        <div class="card-desc" id="shipDesc">Current: Prospector (Mining +50%)</div>
+                        <div class="card-stats">
+                            <span id="shipSpeed">⚡ Speed ★★</span>
+                            <span id="shipMining">🪨 Mining ★★★★★</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Element Library -->
+                <div class="hub-card" onclick="navigateTo('journal.html')">
+                    <div class="card-icon">📚</div>
+                    <div class="card-content">
+                        <div class="card-title">Element Library</div>
+                        <div class="card-desc" id="collectionDesc">Complete collection: 0/94</div>
+                        <div class="card-stats" id="rarityStats">
+                            <span>🟩 0</span>
+                            <span>🟦 0</span>
+                            <span>🟪 0</span>
+                            <span>🟨 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Launch Button -->
+            <div class="launch-button" onclick="launchToShip()">
+                🚀 LAUNCH TO SHIP
+            </div>
+            
+            <!-- Footer -->
+            <div class="footer">
+                Earth Central Station • Home Port
+            </div>
+            
+            <!-- Back button to main menu -->
+            <button class="back-button" onclick="returnToMenu()">← MAIN MENU</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-text">warping...</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a2a3a');
+            tg.setBackgroundColor('#0a2a3a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Navigation function
+        function navigateTo(screen, useWarp = false) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            if (useWarp) {
+                loadingOverlay.classList.add('active');
+                setTimeout(() => {
+                    window.location.href = screen;
+                }, 800);
+            } else {
+                window.location.href = screen;
+            }
+        }
+        
+        // Return to main menu
+        function returnToMenu() {
+            navigateTo('index.html');
+        }
+        
+        // Load player data
+        function loadPlayerData() {
+            // Load credits
+            const credits = localStorage.getItem('voidfarer_credits') || '12450';
+            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${Number(credits).toLocaleString()}`;
+            
+            // Load collection
+            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const collectedCount = Object.keys(collection).length;
+            
+            // Update collection display
+            document.getElementById('collectionDesc').textContent = `Complete collection: ${collectedCount}/94`;
+            
+            // Calculate rarity counts
+            const rarityCounts = { common: 0, uncommon: 0, rare: 0, 'very-rare': 0, legendary: 0 };
+            
+            // This would need the elements data to calculate properly
+            // For now, use sample data
+            document.getElementById('rarityStats').innerHTML = `
+                <span>🟩 ${Math.floor(Math.random() * 20)}</span>
+                <span>🟦 ${Math.floor(Math.random() * 10)}</span>
+                <span>🟪 ${Math.floor(Math.random() * 5)}</span>
+                <span>🟨 ${Math.floor(Math.random() * 3)}</span>
+            `;
+            
+            // Load cargo value (simulated)
+            const cargoValue = Math.floor(Math.random() * 5000) + 5000;
+            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoValue.toLocaleString()}c<br>${collectedCount}/94 elements`;
+            
+            // Update market stats
+            document.getElementById('marketCredits').innerHTML = `⭐ ${Number(credits).toLocaleString()}`;
+            document.getElementById('marketCargo').innerHTML = `📦 ${cargoValue.toLocaleString()}c`;
+        }
+        
+        // Load missions
+        function loadMissions() {
+            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [
+                { element: 'Gold', current: 0, target: 50, planet: 'Pyros' },
+                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
+                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
+            ];
+            
+            const missionList = document.getElementById('missionList');
+            missionList.innerHTML = '';
+            
+            missions.forEach(mission => {
+                const percent = (mission.current / mission.target) * 100;
+                let icon = '🟡';
+                let iconClass = 'icon-gold';
+                
+                if (mission.element === 'Uranium') {
+                    icon = '🟣';
+                    iconClass = 'icon-uranium';
+                } else if (mission.element === 'Promethium') {
+                    icon = '✨';
+                    iconClass = 'icon-promethium';
+                }
+                
+                const item = document.createElement('div');
+                item.className = 'mission-item';
+                item.innerHTML = `
+                    <span class="item-icon ${iconClass}">${icon}</span>
+                    <div class="item-details">
+                        <div class="item-name">${mission.element}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                    <span class="item-target">${mission.current}/${mission.target}</span>
+                `;
+                missionList.appendChild(item);
+            });
+            
+            document.getElementById('missionCount').textContent = `${missions.length} items`;
+        }
+        
+        // Edit missions
+        function editMissions() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            alert('Mission Planning\n\nSet new collection targets:\n• Gold (50)\n• Uranium (20)\n• Promethium (5)\n\n(This would open a mission editor)');
+        }
+        
+        // Open market
+        function openMarket() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            alert('Earth Market\n\nSell Elements:\n• Common: 100c each\n• Uncommon: 250c each\n• Rare: 1,000c each\n• Very Rare: 5,000c each\n• Legendary: 25,000c each\n\nFuel: 500c/unit\nShield recharge: 1,000c');
+        }
+        
+        // Open hangar
+        function openHangar() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            alert('Ship Hangar\n\nCurrent Ship: Prospector\nMining Bonus: +50%\nSpeed: ★★☆☆☆\nCargo: ★★★☆☆\n\nAvailable Upgrades:\n• Mining Laser (5,000c)\n• Cargo Hold (3,000c)\n• Warp Drive (10,000c)');
+        }
+        
+        // Launch to ship
+        function launchToShip() {
+            // Save current planet
+            localStorage.setItem('voidfarer_current_planet', 'Verdant Prime');
+            
+            // Navigate to ship bridge with warp effect
+            navigateTo('ship-bridge.html', true);
+        }
+        
+        // Initialize
+        function init() {
+            loadPlayerData();
+            loadMissions();
+            
+            // Check if player exists
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                // Redirect to main menu if no player data
+                window.location.href = 'index.html';
+            }
+        }
+        
+        // Run initialization
+        init();
+    </script>
+</body>
+</html>
