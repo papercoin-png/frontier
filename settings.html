@@ -1,1 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Starlight Settings</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .settings-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .settings-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .settings-title {
+            font-family: 'WindSong', cursive;
+            font-size: 42px;
+            color: #e0f0ff;
+            text-shadow: 0 0 30px #4a8ac0, 0 0 60px #2a5a8a;
+            margin-bottom: 5px;
+        }
+        
+        .settings-subtitle {
+            color: #a0c0e0;
+            font-size: 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        
+        /* Settings Cards */
+        .settings-card {
+            background: rgba(30, 50, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 50px 15px 50px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px #1a3a5a80;
+        }
+        
+        .setting-item {
+            margin-bottom: 25px;
+        }
+        
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .setting-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .setting-icon {
+            font-size: 28px;
+            filter: drop-shadow(0 0 10px #4a8ac0);
+        }
+        
+        .setting-name {
+            flex: 1;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .setting-value {
+            color: #aac8ff;
+            font-size: 16px;
+            font-family: 'WindSong', cursive;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 12px;
+            border-radius: 30px;
+            border: 1px solid #4a8ac0;
+        }
+        
+        .setting-description {
+            color: #a0b0c0;
+            font-size: 13px;
+            margin-left: 40px;
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+        
+        /* Slider */
+        .slider-container {
+            margin-left: 40px;
+            position: relative;
+        }
+        
+        .slider-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .slider-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
+            border-radius: 3px;
+            position: relative;
+            box-shadow: 0 0 15px #4a8ac0;
+            transition: width 0.1s;
+        }
+        
+        .slider-thumb {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translate(50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border: 3px solid #8ac0ff;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #8ac0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .slider-thumb:active {
+            transform: translate(50%, -50%) scale(1.2);
+        }
+        
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            color: #6080a0;
+            font-size: 12px;
+        }
+        
+        /* Toggle */
+        .toggle-container {
+            margin-left: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .toggle-option {
+            padding: 8px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid #4a6a9a;
+            color: #a0b0c0;
+            background: transparent;
+            min-width: 70px;
+            text-align: center;
+        }
+        
+        .toggle-option.active {
+            background: #4a8ac0;
+            border-color: #8ac0ff;
+            color: #ffffff;
+            box-shadow: 0 0 20px #2a5a8a;
+        }
+        
+        /* Reset Button */
+        .reset-button {
+            background: rgba(139, 0, 0, 0.3);
+            border: 2px solid #8b0000;
+            color: #ffa0a0;
+            padding: 16px 20px;
+            border-radius: 50px 15px 50px 15px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            font-family: 'Libre Baskerville', serif;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .reset-button:active {
+            background: rgba(139, 0, 0, 0.6);
+            transform: scale(0.98);
+            border-color: #ff0000;
+            color: #ffffff;
+        }
+        
+        .reset-icon {
+            font-size: 24px;
+        }
+        
+        /* Divider */
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4a8ac0, transparent);
+            margin: 25px 0;
+            opacity: 0.3;
+        }
+        
+        /* Back Button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #6a9ac0;
+            color: #ffffff;
+            padding: 14px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #2a5a8a;
+            z-index: 100;
+            margin-top: 20px;
+        }
+        
+        .back-button:active {
+            background: #4a8ac0;
+            transform: translateX(-50%) scale(0.98);
+            border-color: #aac8ff;
+        }
+        
+        /* Decorative stars */
+        .star-small {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: twinkle 4s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Data stats */
+        .data-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0e0;
+            font-size: 13px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="settings-view" id="settingsView">
+            <!-- Header -->
+            <div class="settings-header">
+                <div class="settings-title">Starlight Settings</div>
+                <div class="settings-subtitle">✦ tune your journey ✦</div>
+            </div>
+            
+            <!-- Audio Settings Card -->
+            <div class="settings-card">
+                <!-- Nebula Intensity (Music) -->
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">🌌</span>
+                        <span class="setting-name">Nebula Intensity</span>
+                        <span class="setting-value" id="musicValue">50%</span>
+                    </div>
+                    <div class="setting-description">the music of distant stars</div>
+                    <div class="slider-container">
+                        <div class="slider-track" id="musicTrack" onclick="setMusicSlider(event)">
+                            <div class="slider-fill" id="musicFill" style="width: 50%">
+                                <div class="slider-thumb" id="musicThumb" onmousedown="startDrag('music')" ontouchstart="startDrag('music')"></div>
+                            </div>
+                        </div>
+                        <div class="slider-labels">
+                            <span>whisper</span>
+                            <span>cosmic</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="height: 20px;"></div>
+                
+                <!-- Wind Whispers (Ambient) -->
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">🍃</span>
+                        <span class="setting-name">Wind Whispers</span>
+                        <span class="setting-value" id="ambientValue">50%</span>
+                    </div>
+                    <div class="setting-description">the breath of alien worlds</div>
+                    <div class="slider-container">
+                        <div class="slider-track" id="ambientTrack" onclick="setAmbientSlider(event)">
+                            <div class="slider-fill" id="ambientFill" style="width: 50%">
+                                <div class="slider-thumb" id="ambientThumb" onmousedown="startDrag('ambient')" ontouchstart="startDrag('ambient')"></div>
+                            </div>
+                        </div>
+                        <div class="slider-labels">
+                            <span>silence</span>
+                            <span>storm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gameplay Settings Card -->
+            <div class="settings-card">
+                <!-- Star Pulse (Haptics) -->
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">✨</span>
+                        <span class="setting-name">Star Pulse</span>
+                        <span class="setting-value" id="hapticValue">On</span>
+                    </div>
+                    <div class="setting-description">feel the universe respond</div>
+                    <div class="toggle-container">
+                        <div class="toggle-option" onclick="setHaptic(true)">On</div>
+                        <div class="toggle-option active" onclick="setHaptic(false)">Off</div>
+                    </div>
+                </div>
+                
+                <div style="height: 20px;"></div>
+                
+                <!-- Cosmic Harvest (Auto-Gather) -->
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">🌾</span>
+                        <span class="setting-name">Cosmic Harvest</span>
+                        <span class="setting-value" id="gatherValue">On</span>
+                    </div>
+                    <div class="setting-description">elements gather as you explore</div>
+                    <div class="toggle-container">
+                        <div class="toggle-option" onclick="setAutoGather(true)">On</div>
+                        <div class="toggle-option active" onclick="setAutoGather(false)">Off</div>
+                    </div>
+                </div>
+                
+                <div style="height: 20px;"></div>
+                
+                <!-- Celestial Motion (Orbit Speed) -->
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">🪐</span>
+                        <span class="setting-name">Celestial Motion</span>
+                        <span class="setting-value" id="motionValue">Gentle</span>
+                    </div>
+                    <div class="setting-description">how fast planets turn</div>
+                    <div class="toggle-container">
+                        <div class="toggle-option" onclick="setMotion('gentle')">Gentle</div>
+                        <div class="toggle-option" onclick="setMotion('medium')">Medium</div>
+                        <div class="toggle-option" onclick="setMotion('real')">Real</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Data Management Card -->
+            <div class="settings-card">
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <span class="setting-icon">💾</span>
+                        <span class="setting-name">Save Data</span>
+                    </div>
+                    <div class="data-stats" id="saveStats">
+                        <span>Elements: 0/118</span>
+                        <span>Credits: 0⭐</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reset Progress Button -->
+            <div class="reset-button" onclick="resetProgress()">
+                <span class="reset-icon">⚠️</span>
+                <span>Reset All Progress</span>
+                <span class="reset-icon">⚠️</span>
+            </div>
+            
+            <!-- Back Button -->
+            <button class="back-button" onclick="goBack()">← Return</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-text">saving...</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Navigation
+        function goBack() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        }
+        
+        // ===== SLIDER HANDLING =====
+        let activeSlider = null;
+        let isDragging = false;
+        
+        function startDrag(slider) {
+            activeSlider = slider;
+            isDragging = true;
+            event.preventDefault();
+        }
+        
+        function setMusicSlider(event) {
+            const track = document.getElementById('musicTrack');
+            const rect = track.getBoundingClientRect();
+            let x = event.clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            const percent = Math.round((x / rect.width) * 100);
+            
+            document.getElementById('musicFill').style.width = percent + '%';
+            document.getElementById('musicValue').textContent = percent + '%';
+            localStorage.setItem('voidfarer_music', percent.toString());
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        function setAmbientSlider(event) {
+            const track = document.getElementById('ambientTrack');
+            const rect = track.getBoundingClientRect();
+            let x = event.clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            const percent = Math.round((x / rect.width) * 100);
+            
+            document.getElementById('ambientFill').style.width = percent + '%';
+            document.getElementById('ambientValue').textContent = percent + '%';
+            localStorage.setItem('voidfarer_ambient', percent.toString());
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // Global mouse/touch handlers
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !activeSlider) return;
+            
+            if (activeSlider === 'music') {
+                const track = document.getElementById('musicTrack');
+                const rect = track.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = Math.round((x / rect.width) * 100);
+                
+                document.getElementById('musicFill').style.width = percent + '%';
+                document.getElementById('musicValue').textContent = percent + '%';
+            } else if (activeSlider === 'ambient') {
+                const track = document.getElementById('ambientTrack');
+                const rect = track.getBoundingClientRect();
+                let x = e.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = Math.round((x / rect.width) * 100);
+                
+                document.getElementById('ambientFill').style.width = percent + '%';
+                document.getElementById('ambientValue').textContent = percent + '%';
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging && activeSlider && tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            isDragging = false;
+            activeSlider = null;
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging || !activeSlider) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            
+            if (activeSlider === 'music') {
+                const track = document.getElementById('musicTrack');
+                const rect = track.getBoundingClientRect();
+                let x = touch.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = Math.round((x / rect.width) * 100);
+                
+                document.getElementById('musicFill').style.width = percent + '%';
+                document.getElementById('musicValue').textContent = percent + '%';
+            } else if (activeSlider === 'ambient') {
+                const track = document.getElementById('ambientTrack');
+                const rect = track.getBoundingClientRect();
+                let x = touch.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = Math.round((x / rect.width) * 100);
+                
+                document.getElementById('ambientFill').style.width = percent + '%';
+                document.getElementById('ambientValue').textContent = percent + '%';
+            }
+        });
+        
+        document.addEventListener('touchend', () => {
+            if (isDragging && activeSlider && tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            isDragging = false;
+            activeSlider = null;
+        });
+        
+        // ===== TOGGLE HANDLERS =====
+        function setHaptic(on) {
+            const options = document.querySelectorAll('.toggle-container')[0].children;
+            options[0].classList.remove('active');
+            options[1].classList.remove('active');
+            
+            if (on) {
+                options[0].classList.add('active');
+                document.getElementById('hapticValue').textContent = 'On';
+                localStorage.setItem('voidfarer_haptics', 'true');
+            } else {
+                options[1].classList.add('active');
+                document.getElementById('hapticValue').textContent = 'Off';
+                localStorage.setItem('voidfarer_haptics', 'false');
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        function setAutoGather(on) {
+            const options = document.querySelectorAll('.toggle-container')[1].children;
+            options[0].classList.remove('active');
+            options[1].classList.remove('active');
+            
+            if (on) {
+                options[0].classList.add('active');
+                document.getElementById('gatherValue').textContent = 'On';
+                localStorage.setItem('voidfarer_auto_gather', 'true');
+            } else {
+                options[1].classList.add('active');
+                document.getElementById('gatherValue').textContent = 'Off';
+                localStorage.setItem('voidfarer_auto_gather', 'false');
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        function setMotion(speed) {
+            const options = document.querySelectorAll('.toggle-container')[2].children;
+            for (let opt of options) {
+                opt.classList.remove('active');
+            }
+            
+            let value = 'Gentle';
+            if (speed === 'gentle') {
+                options[0].classList.add('active');
+                value = 'Gentle';
+            } else if (speed === 'medium') {
+                options[1].classList.add('active');
+                value = 'Medium';
+            } else if (speed === 'real') {
+                options[2].classList.add('active');
+                value = 'Real';
+            }
+            
+            document.getElementById('motionValue').textContent = value;
+            localStorage.setItem('voidfarer_orbit_speed', speed);
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // ===== RESET PROGRESS =====
+        function resetProgress() {
+            if (confirm('⚠️ WARNING ⚠️\n\nThis will erase ALL your progress:\n• Element collection\n• Credits\n• Missions\n• Ship upgrades\n\nThis cannot be undone. Continue?')) {
+                
+                if (confirm('Are you absolutely sure? All your discoveries will be lost forever.')) {
+                    
+                    loadingOverlay.classList.add('active');
+                    
+                    setTimeout(() => {
+                        // Clear all game data
+                        localStorage.removeItem('voidfarer_player');
+                        localStorage.removeItem('voidfarer_collection');
+                        localStorage.removeItem('voidfarer_missions');
+                        localStorage.removeItem('voidfarer_credits');
+                        localStorage.removeItem('voidfarer_current_planet');
+                        localStorage.removeItem('voidfarer_ship_power');
+                        
+                        // Reset to main menu
+                        window.location.href = 'index.html';
+                    }, 1500);
+                }
+            }
+        }
+        
+        // ===== LOAD SAVED SETTINGS =====
+        function loadSettings() {
+            // Load audio settings
+            const music = parseInt(localStorage.getItem('voidfarer_music')) || 50;
+            document.getElementById('musicFill').style.width = music + '%';
+            document.getElementById('musicValue').textContent = music + '%';
+            
+            const ambient = parseInt(localStorage.getItem('voidfarer_ambient')) || 50;
+            document.getElementById('ambientFill').style.width = ambient + '%';
+            document.getElementById('ambientValue').textContent = ambient + '%';
+            
+            // Load haptics
+            const haptics = localStorage.getItem('voidfarer_haptics') !== 'false'; // default true
+            setHaptic(haptics);
+            
+            // Load auto gather
+            const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false'; // default true
+            setAutoGather(autoGather);
+            
+            // Load orbit speed
+            const orbitSpeed = localStorage.getItem('voidfarer_orbit_speed') || 'gentle';
+            setMotion(orbitSpeed);
+        }
+        
+        // ===== LOAD SAVE STATS =====
+        function loadSaveStats() {
+            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const elementCount = Object.keys(collection).length;
+            
+            const credits = localStorage.getItem('voidfarer_credits') || '12450';
+            
+            document.getElementById('saveStats').innerHTML = `
+                <span>Elements: ${elementCount}/118</span>
+                <span>Credits: ${Number(credits).toLocaleString()}⭐</span>
+            `;
+        }
+        
+        // ===== INITIALIZE =====
+        function init() {
+            // Check if player exists
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadSettings();
+            loadSaveStats();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
