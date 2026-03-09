@@ -7,35 +7,10 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/voidfarer.css">
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        body {
-            background: #0a0a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: 'Libre Baskerville', serif;
-        }
-        
-        .phone-frame {
-            width: 100%;
-            max-width: 390px;
-            height: 844px;
-            position: relative;
-            overflow: hidden;
-            border-radius: 40px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-            background: #0a0a1a;
-        }
-        
+        /* Screen-specific styles */
         .bridge-view {
             position: relative;
             width: 100%;
@@ -46,42 +21,6 @@
             padding: 20px 20px 30px 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-            opacity: 1;
-            pointer-events: all;
-        }
-        
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'WindSong', cursive;
-            font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
         }
         
         /* Header */
@@ -243,11 +182,11 @@
             text-align: right;
         }
         
-        /* Button Grid */
+        /* Button Grid - 4x2 */
         .button-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
             margin-bottom: 25px;
         }
         
@@ -255,12 +194,12 @@
             background: rgba(30, 45, 70, 0.7);
             backdrop-filter: blur(10px);
             border: 2px solid #6a8ac0;
-            border-radius: 30px 8px 30px 8px;
-            padding: 16px 8px;
+            border-radius: 25px 8px 25px 8px;
+            padding: 12px 4px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             cursor: pointer;
             transition: all 0.2s;
             color: #ffffff;
@@ -273,14 +212,15 @@
         }
         
         .button-icon {
-            font-size: 28px;
+            font-size: 24px;
             filter: drop-shadow(0 0 8px #6a8ac0);
         }
         
         .button-label {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 500;
             color: #c0d0ff;
+            text-align: center;
         }
         
         /* Stats Footer */
@@ -361,15 +301,19 @@
                 </div>
             </div>
             
-            <!-- Main Button Grid (6 buttons) -->
+            <!-- Main Button Grid (8 buttons) -->
             <div class="button-grid">
                 <div class="nav-button" onclick="openJournal()">
                     <span class="button-icon">📚</span>
                     <span class="button-label">Journal</span>
                 </div>
+                <div class="nav-button" onclick="openGalaxyMap()">
+                    <span class="button-icon">🌌</span>
+                    <span class="button-label">Galaxy</span>
+                </div>
                 <div class="nav-button" onclick="openSystemView()">
-                    <span class="button-icon">🗺️</span>
-                    <span class="button-label">System View</span>
+                    <span class="button-icon">🪐</span>
+                    <span class="button-label">System</span>
                 </div>
                 <div class="nav-button" onclick="goToSurface()">
                     <span class="button-icon">🚀</span>
@@ -387,12 +331,16 @@
                     <span class="button-icon">⚙️</span>
                     <span class="button-label">Settings</span>
                 </div>
+                <div class="nav-button" onclick="openShipStatus()">
+                    <span class="button-icon">📊</span>
+                    <span class="button-label">Status</span>
+                </div>
             </div>
             
             <!-- Stats Footer -->
             <div class="stats-footer">
                 <span>Elements found</span>
-                <span class="collection-stat" id="collectionCount">0 / 94</span>
+                <span class="collection-stat" id="collectionCount">0 / 118</span>
             </div>
             
             <!-- Back button to Earth Hub -->
@@ -405,6 +353,10 @@
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/voidfarer.js"></script>
+    <script src="js/missions.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -418,23 +370,9 @@
         // Loading overlay
         const loadingOverlay = document.getElementById('loadingOverlay');
         
-        // Navigation function
-        function navigateTo(screen, useWarp = false) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            if (useWarp) {
-                loadingOverlay.classList.add('active');
-                setTimeout(() => {
-                    window.location.href = screen;
-                }, 800);
-            } else {
-                window.location.href = screen;
-            }
-        }
-        
         // Load current planet
         function loadCurrentPlanet() {
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+            const planet = getCurrentPlanet();
             document.getElementById('currentPlanetName').textContent = planet;
             
             // Update planet image based on name
@@ -461,26 +399,22 @@
         
         // Load missions
         function loadMissions() {
-            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [
-                { element: 'Gold', current: 0, target: 50, planet: 'Pyros' },
-                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
-                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
-            ];
+            const missions = getMissions();
+            
+            if (missions.length === 0) {
+                document.getElementById('missionList').innerHTML = '<div style="color:#a0c0ff; text-align:center; padding:20px;">No active missions</div>';
+                document.getElementById('missionPlanet').textContent = 'None';
+                return;
+            }
             
             // Update mission planet display
-            if (missions.length > 0) {
-                document.getElementById('missionPlanet').textContent = missions[0].planet;
-            }
+            document.getElementById('missionPlanet').textContent = missions[0].planet;
             
             const missionList = document.getElementById('missionList');
             missionList.innerHTML = '';
             
-            missions.forEach(mission => {
-                // Try to load current progress from collection
-                const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                const current = collection[mission.element] || mission.current;
-                
-                const percent = (current / mission.target) * 100;
+            missions.slice(0, 3).forEach(mission => {
+                const percent = (mission.current / mission.target) * 100;
                 let icon = '🟡';
                 let iconClass = 'icon-gold';
                 
@@ -490,6 +424,14 @@
                 } else if (mission.element === 'Promethium') {
                     icon = '✨';
                     iconClass = 'icon-promethium';
+                } else if (mission.element === 'Carbon') {
+                    icon = '⚫';
+                } else if (mission.element === 'Iron') {
+                    icon = '⚙️';
+                } else if (mission.element === 'Silver') {
+                    icon = '🔘';
+                } else if (mission.element === 'Platinum') {
+                    icon = '⬜';
                 }
                 
                 const item = document.createElement('div');
@@ -497,91 +439,122 @@
                 item.innerHTML = `
                     <span class="item-icon ${iconClass}">${icon}</span>
                     <div class="item-details">
-                        <div class="item-name">${mission.element}</div>
+                        <div class="item-name">${mission.element} (${mission.planet})</div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${percent}%"></div>
                         </div>
                     </div>
-                    <span class="item-count">${current}/${mission.target}</span>
+                    <span class="item-count">${mission.current}/${mission.target}</span>
                 `;
                 missionList.appendChild(item);
             });
+            
+            if (missions.length > 3) {
+                const more = document.createElement('div');
+                more.style.color = '#a0c0ff';
+                more.style.textAlign = 'center';
+                more.style.padding = '10px';
+                more.style.fontSize = '12px';
+                more.textContent = `+${missions.length - 3} more missions`;
+                missionList.appendChild(more);
+            }
         }
         
         // Load collection stats
         function loadCollectionStats() {
-            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const collection = getCollection();
             const count = Object.keys(collection).length;
-            document.getElementById('collectionCount').textContent = `${count} / 94`;
+            document.getElementById('collectionCount').textContent = `${count} / 118`;
         }
         
         // Load ship power
         function loadShipPower() {
-            const power = localStorage.getItem('voidfarer_ship_power') || '87';
+            const power = getShipPower();
             document.getElementById('shipPower').textContent = `⚡ ${power}%`;
         }
         
         // Navigation handlers
         function openJournal() {
+            hapticLight();
             navigateTo('journal.html');
         }
         
+        function openGalaxyMap() {
+            hapticLight();
+            alert('🌌 GALAXY MAP\n\nTravel to other star systems:\n• Verdant System (current)\n• Alpha Centauri\n• Sirius\n• Procyon\n• Betelgeuse\n\n(Feature coming soon!)');
+        }
+        
         function openSystemView() {
+            hapticLight();
             navigateTo('system-view.html', true);
         }
         
         function goToSurface() {
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+            const planet = getCurrentPlanet();
             
             // Check if planet is gas giant
             if (planet.includes('Aether')) {
-                alert('Cannot land on gas giant Aether. Choose a different planet.');
+                hapticError();
+                alert('Cannot land on gas giant Aether. Choose a different planet from System View.');
                 return;
             }
             
+            hapticMedium();
             navigateTo('surface.html', true);
         }
         
         function returnToEarth() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            hapticMedium();
             
             if (confirm('Return to Earth? This will end your current expedition.')) {
-                localStorage.setItem('voidfarer_current_planet', 'Earth');
+                setCurrentPlanet('Earth');
                 navigateTo('earth-hub.html', true);
             }
         }
         
         function returnToEarthHub() {
+            hapticLight();
             navigateTo('earth-hub.html');
         }
         
         function rest() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            hapticLight();
             
             // Restore ship power
-            localStorage.setItem('voidfarer_ship_power', '100');
+            setShipPower(100);
             document.getElementById('shipPower').textContent = '⚡ 100%';
             
             alert('Crew rested. Ship power restored to 100%.');
         }
         
         function openSettings() {
+            hapticLight();
             navigateTo('settings.html');
+        }
+        
+        function openShipStatus() {
+            hapticLight();
+            
+            const player = getPlayer();
+            const collection = getCollection();
+            const credits = getCredits();
+            const missions = getMissions();
+            
+            alert(`🚢 SHIP STATUS\n\nCaptain: ${player?.name || 'Voidfarer'}\nShip: ${player?.ship || 'Prospector'}\nCredits: ${credits.toLocaleString()}⭐\nElements: ${Object.keys(collection).length}/118\nActive Missions: ${missions.length}\nShip Power: ${getShipPower()}%\n\nMining Bonus: +50%\nCargo Capacity: 8,200c`);
         }
         
         // Initialize
         function init() {
             // Check if player exists
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
-            }
+            if (!checkPlayer()) return;
             
             loadCurrentPlanet();
             loadMissions();
             loadCollectionStats();
             loadShipPower();
+            
+            // Update missions from collection
+            updateAllMissionsFromCollection();
         }
         
         // Run initialization
