@@ -1,1 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Element Journal</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .journal-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px 30px 16px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        .journal-header {
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .journal-title {
+            font-family: 'WindSong', cursive;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+        
+        .journal-stats {
+            color: #c0d0f0;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            background: rgba(30, 40, 60, 0.7);
+            backdrop-filter: blur(5px);
+            padding: 8px 20px;
+            border-radius: 40px 10px 40px 10px;
+            display: inline-block;
+            border: 1px solid #6a8ac0;
+            box-shadow: 0 0 15px #3a5a8a80;
+        }
+        
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 16px 22px;
+            background: rgba(20, 30, 50, 0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            color: #ffffff;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .search-input:focus {
+            border-color: #9ac0ff;
+            box-shadow: 0 0 25px #4a6a9a;
+            background: rgba(30, 40, 70, 0.9);
+        }
+        
+        .search-input::placeholder {
+            color: #b0c8f0;
+            font-size: 15px;
+            font-weight: 400;
+            opacity: 0.8;
+        }
+        
+        .rarity-filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .filter-pill {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(30, 40, 60, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .filter-pill.active {
+            background: #6a8ac0;
+            color: #ffffff;
+            border-color: #aac8ff;
+            box-shadow: 0 0 20px #3a5a8a;
+            font-weight: 700;
+        }
+        
+        .filter-pill.common.active { background: #ffffff; color: #000000; border-color: #ffffff; }
+        .filter-pill.uncommon.active { background: #6aff6a; color: #000000; border-color: #ffffff; }
+        .filter-pill.rare.active { background: #6a6aff; color: #ffffff; border-color: #ffffff; }
+        .filter-pill.very-rare.active { background: #c06aff; color: #ffffff; border-color: #ffffff; }
+        .filter-pill.legendary.active { background: #ffc06a; color: #000000; border-color: #ffffff; }
+        
+        .element-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .element-card {
+            background: rgba(20, 35, 55, 0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 30px 10px 30px 10px;
+            overflow: hidden;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        
+        .element-card.expanded {
+            box-shadow: 0 0 25px #4a6a9a;
+            border-color: #9ac0ff;
+        }
+        
+        .element-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            background: rgba(30, 45, 70, 0.5);
+        }
+        
+        .element-header:active {
+            background: rgba(60, 90, 140, 0.5);
+        }
+        
+        .element-rarity {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        .element-symbol {
+            font-size: 26px;
+            font-weight: bold;
+            min-width: 55px;
+            font-family: monospace;
+            text-shadow: 0 0 15px currentColor;
+            letter-spacing: 1px;
+        }
+        
+        .element-name {
+            flex: 2;
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.3;
+            padding-right: 8px;
+        }
+        
+        .status-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-left: auto;
+            box-shadow: 0 0 10px currentColor;
+        }
+        
+        .status-found {
+            background: #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        
+        .status-not-found {
+            background: #808080;
+            box-shadow: 0 0 10px #808080;
+        }
+        
+        .expand-icon {
+            font-size: 22px;
+            color: #c0d0ff;
+            transition: transform 0.3s;
+            text-shadow: 0 0 10px #6a8ac0;
+            margin-left: 4px;
+            flex-shrink: 0;
+        }
+        
+        .element-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+        
+        .element-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+            border-top: 0 solid #6a8ac0;
+            background: rgba(15, 25, 40, 0.9);
+        }
+        
+        .element-card.expanded .element-details {
+            max-height: 600px;
+            border-top-width: 2px;
+            border-top-style: solid;
+            border-top-color: #6a8ac0;
+        }
+        
+        .details-content {
+            padding: 20px;
+        }
+        
+        .atomic-info {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 600;
+            background: rgba(40, 60, 90, 0.5);
+            padding: 10px;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #8aa8d0;
+            flex-wrap: wrap;
+        }
+        
+        .planet-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .planet-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(20, 35, 55, 0.8);
+            border-radius: 30px 8px 30px 8px;
+            border: 1px solid #7a9ac0;
+        }
+        
+        .planet-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 8px #aac8ff);
+        }
+        
+        .planet-name {
+            flex: 1;
+            font-weight: bold;
+            color: #ffffff;
+            font-size: 17px;
+            white-space: normal;
+            word-break: break-word;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        
+        .planet-type {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            padding: 4px 10px;
+            background: rgba(90, 120, 170, 0.5);
+            border-radius: 30px;
+            border: 1px solid #aac8ff;
+            white-space: nowrap;
+        }
+        
+        .many-planets-note {
+            color: #ffffff;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+            background: rgba(30, 50, 80, 0.5);
+            border-radius: 30px 8px 30px 8px;
+            font-size: 15px;
+            border: 1px solid #7a9ac0;
+            font-weight: 500;
+            line-height: 1.6;
+        }
+        
+        .count-badge {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 12px;
+            color: #aac8ff;
+            margin-left: 8px;
+        }
+        
+        .text-common { color: #ffffff; text-shadow: 0 0 15px #ffffff; }
+        .text-uncommon { color: #b0ffb0; text-shadow: 0 0 15px #80ff80; }
+        .text-rare { color: #b0b0ff; text-shadow: 0 0 15px #8080ff; }
+        .text-very-rare { color: #e0b0ff; text-shadow: 0 0 15px #b080ff; }
+        .text-legendary { color: #ffd700; text-shadow: 0 0 15px #ffaa00; }
+        
+        .rarity-common { background: #ffffff; box-shadow: 0 0 20px #ffffff; }
+        .rarity-uncommon { background: #80ff80; box-shadow: 0 0 20px #40ff40; }
+        .rarity-rare { background: #8080ff; box-shadow: 0 0 20px #4040ff; }
+        .rarity-very-rare { background: #b080ff; box-shadow: 0 0 20px #8040ff; }
+        .rarity-legendary { background: #ffd700; box-shadow: 0 0 20px #ffaa00; }
+        
+        .sort-indicator {
+            text-align: right;
+            color: #c0d0ff;
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-style: italic;
+            font-weight: 500;
+            text-shadow: 0 0 8px #6a8ac0;
+        }
+        
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #9ac0ff;
+            color: #ffffff;
+            padding: 14px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #3a5a8a;
+            z-index: 100;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            letter-spacing: 1px;
+        }
+        
+        .back-button:active {
+            background: #6a8ac0;
+            transform: translateX(-50%) scale(0.98);
+            box-shadow: 0 0 40px #8ab0ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="journal-view" id="journalView">
+            <div class="journal-header">
+                <div class="journal-title">Element Archive</div>
+                <div class="journal-stats" id="journalStats">0 / 118 elements collected</div>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="🔍 Search by name or symbol..." id="searchInput">
+            </div>
+            
+            <div class="rarity-filters" id="rarityFilters">
+                <span class="filter-pill active" data-rarity="all">All (A-Z)</span>
+                <span class="filter-pill common" data-rarity="common">Common</span>
+                <span class="filter-pill uncommon" data-rarity="uncommon">Uncommon</span>
+                <span class="filter-pill rare" data-rarity="rare">Rare</span>
+                <span class="filter-pill very-rare" data-rarity="very-rare">Very Rare</span>
+                <span class="filter-pill legendary" data-rarity="legendary">Legendary</span>
+            </div>
+            
+            <div class="sort-indicator" id="sortIndicator">▼ Alphabetical order</div>
+            
+            <div class="element-list" id="elementList"></div>
+            
+            <button class="back-button" onclick="goBack()">← Return to Ship</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-text">loading...</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Navigation function
+        function navigateTo(screen) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = screen;
+        }
+        
+        // ===== COMPLETE ELEMENTS DATASET =====
+        const elements = [
+            // Common (white)
+            { name: 'Actinium', symbol: 'Ac', atomic: 89, mass: '227.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Aluminum', symbol: 'Al', atomic: 13, mass: '26.98', rarity: 'common', planets: 378, value: 100 },
+            { name: 'Americium', symbol: 'Am', atomic: 95, mass: '243.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Antimony', symbol: 'Sb', atomic: 51, mass: '121.8', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Argon', symbol: 'Ar', atomic: 18, mass: '39.95', rarity: 'uncommon', planets: 178, value: 250 },
+            { name: 'Arsenic', symbol: 'As', atomic: 33, mass: '74.92', rarity: 'rare', planets: 11, value: 1000 },
+            { name: 'Astatine', symbol: 'At', atomic: 85, mass: '210.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Barium', symbol: 'Ba', atomic: 56, mass: '137.3', rarity: 'rare', planets: 4, value: 1000 },
+            { name: 'Berkelium', symbol: 'Bk', atomic: 97, mass: '247.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Beryllium', symbol: 'Be', atomic: 4, mass: '9.012', rarity: 'common', planets: 498, value: 100 },
+            { name: 'Bismuth', symbol: 'Bi', atomic: 83, mass: '209.0', rarity: 'rare', planets: 4, value: 1000 },
+            { name: 'Bohrium', symbol: 'Bh', atomic: 107, mass: '270.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Boron', symbol: 'B', atomic: 5, mass: '10.81', rarity: 'common', planets: 467, value: 100 },
+            { name: 'Bromine', symbol: 'Br', atomic: 35, mass: '79.90', rarity: 'rare', planets: 8, value: 1000 },
+            { name: 'Cadmium', symbol: 'Cd', atomic: 48, mass: '112.4', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Calcium', symbol: 'Ca', atomic: 20, mass: '40.08', rarity: 'common', planets: 345, value: 100 },
+            { name: 'Californium', symbol: 'Cf', atomic: 98, mass: '251.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Carbon', symbol: 'C', atomic: 6, mass: '12.01', rarity: 'uncommon', planets: 534, value: 250 },
+            { name: 'Cerium', symbol: 'Ce', atomic: 58, mass: '140.1', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Cesium', symbol: 'Cs', atomic: 55, mass: '132.9', rarity: 'rare', planets: 4, value: 1000 },
+            { name: 'Chlorine', symbol: 'Cl', atomic: 17, mass: '35.45', rarity: 'uncommon', planets: 245, value: 250 },
+            { name: 'Chromium', symbol: 'Cr', atomic: 24, mass: '52.00', rarity: 'rare', planets: 29, value: 1000 },
+            { name: 'Cobalt', symbol: 'Co', atomic: 27, mass: '58.93', rarity: 'rare', planets: 27, value: 1000 },
+            { name: 'Copernicium', symbol: 'Cn', atomic: 112, mass: '285.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Copper', symbol: 'Cu', atomic: 29, mass: '63.55', rarity: 'rare', planets: 23, value: 1000 },
+            { name: 'Curium', symbol: 'Cm', atomic: 96, mass: '247.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Darmstadtium', symbol: 'Ds', atomic: 110, mass: '281.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Dubnium', symbol: 'Db', atomic: 105, mass: '268.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Dysprosium', symbol: 'Dy', atomic: 66, mass: '162.5', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Einsteinium', symbol: 'Es', atomic: 99, mass: '252.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Erbium', symbol: 'Er', atomic: 68, mass: '167.3', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Europium', symbol: 'Eu', atomic: 63, mass: '152.0', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Fermium', symbol: 'Fm', atomic: 100, mass: '257.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Flerovium', symbol: 'Fl', atomic: 114, mass: '289.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Fluorine', symbol: 'F', atomic: 9, mass: '19.00', rarity: 'uncommon', planets: 234, value: 250 },
+            { name: 'Francium', symbol: 'Fr', atomic: 87, mass: '223.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Gadolinium', symbol: 'Gd', atomic: 64, mass: '157.3', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Gallium', symbol: 'Ga', atomic: 31, mass: '69.72', rarity: 'rare', planets: 15, value: 1000 },
+            { name: 'Germanium', symbol: 'Ge', atomic: 32, mass: '72.63', rarity: 'rare', planets: 12, value: 1000 },
+            { name: 'Gold', symbol: 'Au', atomic: 79, mass: '197.0', rarity: 'rare', planets: 12, value: 1000 },
+            { name: 'Hafnium', symbol: 'Hf', atomic: 72, mass: '178.5', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Hassium', symbol: 'Hs', atomic: 108, mass: '277.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Helium', symbol: 'He', atomic: 2, mass: '4.003', rarity: 'common', planets: 612, value: 100 },
+            { name: 'Holmium', symbol: 'Ho', atomic: 67, mass: '164.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Hydrogen', symbol: 'H', atomic: 1, mass: '1.008', rarity: 'common', planets: 843, value: 100 },
+            { name: 'Indium', symbol: 'In', atomic: 49, mass: '114.8', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Iodine', symbol: 'I', atomic: 53, mass: '126.9', rarity: 'rare', planets: 4, value: 1000 },
+            { name: 'Iridium', symbol: 'Ir', atomic: 77, mass: '192.2', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Iron', symbol: 'Fe', atomic: 26, mass: '55.85', rarity: 'uncommon', planets: 412, value: 250 },
+            { name: 'Krypton', symbol: 'Kr', atomic: 36, mass: '83.80', rarity: 'rare', planets: 7, value: 1000 },
+            { name: 'Lanthanum', symbol: 'La', atomic: 57, mass: '138.9', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Lawrencium', symbol: 'Lr', atomic: 103, mass: '262.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Lead', symbol: 'Pb', atomic: 82, mass: '207.2', rarity: 'uncommon', planets: 156, value: 250 },
+            { name: 'Lithium', symbol: 'Li', atomic: 3, mass: '6.94', rarity: 'common', planets: 534, value: 100 },
+            { name: 'Livermorium', symbol: 'Lv', atomic: 116, mass: '293.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Lutetium', symbol: 'Lu', atomic: 71, mass: '175.0', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Magnesium', symbol: 'Mg', atomic: 12, mass: '24.31', rarity: 'common', planets: 398, value: 100 },
+            { name: 'Manganese', symbol: 'Mn', atomic: 25, mass: '54.94', rarity: 'rare', planets: 31, value: 1000 },
+            { name: 'Meitnerium', symbol: 'Mt', atomic: 109, mass: '278.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Mendelevium', symbol: 'Md', atomic: 101, mass: '258.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Mercury', symbol: 'Hg', atomic: 80, mass: '200.6', rarity: 'rare', planets: 5, value: 1000 },
+            { name: 'Molybdenum', symbol: 'Mo', atomic: 42, mass: '95.95', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Moscovium', symbol: 'Mc', atomic: 115, mass: '290.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Neodymium', symbol: 'Nd', atomic: 60, mass: '144.2', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Neon', symbol: 'Ne', atomic: 10, mass: '20.18', rarity: 'uncommon', planets: 198, value: 250 },
+            { name: 'Neptunium', symbol: 'Np', atomic: 93, mass: '237.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Nickel', symbol: 'Ni', atomic: 28, mass: '58.69', rarity: 'uncommon', planets: 234, value: 250 },
+            { name: 'Nihonium', symbol: 'Nh', atomic: 113, mass: '286.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Niobium', symbol: 'Nb', atomic: 41, mass: '92.91', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Nitrogen', symbol: 'N', atomic: 7, mass: '14.01', rarity: 'uncommon', planets: 512, value: 250 },
+            { name: 'Nobelium', symbol: 'No', atomic: 102, mass: '259.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Oganesson', symbol: 'Og', atomic: 118, mass: '294.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Osmium', symbol: 'Os', atomic: 76, mass: '190.2', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Oxygen', symbol: 'O', atomic: 8, mass: '16.00', rarity: 'uncommon', planets: 498, value: 250 },
+            { name: 'Palladium', symbol: 'Pd', atomic: 46, mass: '106.4', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Phosphorus', symbol: 'P', atomic: 15, mass: '30.97', rarity: 'uncommon', planets: 267, value: 250 },
+            { name: 'Platinum', symbol: 'Pt', atomic: 78, mass: '195.1', rarity: 'rare', planets: 6, value: 1000 },
+            { name: 'Plutonium', symbol: 'Pu', atomic: 94, mass: '244.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Polonium', symbol: 'Po', atomic: 84, mass: '209.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Potassium', symbol: 'K', atomic: 19, mass: '39.10', rarity: 'common', planets: 356, value: 100 },
+            { name: 'Praseodymium', symbol: 'Pr', atomic: 59, mass: '140.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Promethium', symbol: 'Pm', atomic: 61, mass: '145.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Protactinium', symbol: 'Pa', atomic: 91, mass: '231.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Radium', symbol: 'Ra', atomic: 88, mass: '226.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Radon', symbol: 'Rn', atomic: 86, mass: '222.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Rhenium', symbol: 'Re', atomic: 75, mass: '186.2', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Rhodium', symbol: 'Rh', atomic: 45, mass: '102.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Roentgenium', symbol: 'Rg', atomic: 111, mass: '282.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Rubidium', symbol: 'Rb', atomic: 37, mass: '85.47', rarity: 'rare', planets: 6, value: 1000 },
+            { name: 'Ruthenium', symbol: 'Ru', atomic: 44, mass: '101.1', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Rutherfordium', symbol: 'Rf', atomic: 104, mass: '267.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Samarium', symbol: 'Sm', atomic: 62, mass: '150.4', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Scandium', symbol: 'Sc', atomic: 21, mass: '44.96', rarity: 'rare', planets: 23, value: 1000 },
+            { name: 'Seaborgium', symbol: 'Sg', atomic: 106, mass: '269.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Selenium', symbol: 'Se', atomic: 34, mass: '78.97', rarity: 'rare', planets: 9, value: 1000 },
+            { name: 'Silicon', symbol: 'Si', atomic: 14, mass: '28.09', rarity: 'common', planets: 456, value: 100 },
+            { name: 'Silver', symbol: 'Ag', atomic: 47, mass: '107.9', rarity: 'rare', planets: 8, value: 1000 },
+            { name: 'Sodium', symbol: 'Na', atomic: 11, mass: '22.99', rarity: 'common', planets: 423, value: 100 },
+            { name: 'Strontium', symbol: 'Sr', atomic: 38, mass: '87.62', rarity: 'rare', planets: 5, value: 1000 },
+            { name: 'Sulfur', symbol: 'S', atomic: 16, mass: '32.06', rarity: 'uncommon', planets: 289, value: 250 },
+            { name: 'Tantalum', symbol: 'Ta', atomic: 73, mass: '180.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Technetium', symbol: 'Tc', atomic: 43, mass: '98.00', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Tellurium', symbol: 'Te', atomic: 52, mass: '127.6', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Tennessine', symbol: 'Ts', atomic: 117, mass: '294.0', rarity: 'legendary', planets: 1, value: 25000 },
+            { name: 'Terbium', symbol: 'Tb', atomic: 65, mass: '158.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Thallium', symbol: 'Tl', atomic: 81, mass: '204.4', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Thorium', symbol: 'Th', atomic: 90, mass: '232.0', rarity: 'very-rare', planets: 2, value: 5000 },
+            { name: 'Thulium', symbol: 'Tm', atomic: 69, mass: '168.9', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Tin', symbol: 'Sn', atomic: 50, mass: '118.7', rarity: 'rare', planets: 15, value: 1000 },
+            { name: 'Titanium', symbol: 'Ti', atomic: 22, mass: '47.87', rarity: 'rare', planets: 45, value: 1000 },
+            { name: 'Tungsten', symbol: 'W', atomic: 74, mass: '183.8', rarity: 'rare', planets: 3, value: 1000 },
+            { name: 'Uranium', symbol: 'U', atomic: 92, mass: '238.0', rarity: 'very-rare', planets: 3, value: 5000 },
+            { name: 'Vanadium', symbol: 'V', atomic: 23, mass: '50.94', rarity: 'rare', planets: 34, value: 1000 },
+            { name: 'Xenon', symbol: 'Xe', atomic: 54, mass: '131.3', rarity: 'rare', planets: 5, value: 1000 },
+            { name: 'Ytterbium', symbol: 'Yb', atomic: 70, mass: '173.0', rarity: 'rare', planets: 2, value: 1000 },
+            { name: 'Yttrium', symbol: 'Y', atomic: 39, mass: '88.91', rarity: 'rare', planets: 4, value: 1000 },
+            { name: 'Zinc', symbol: 'Zn', atomic: 30, mass: '65.38', rarity: 'rare', planets: 19, value: 1000 },
+            { name: 'Zirconium', symbol: 'Zr', atomic: 40, mass: '91.22', rarity: 'rare', planets: 4, value: 1000 }
+        ];
+        
+        // Planet location examples
+        const planetLocations = {
+            'Gold': ['Pyros', 'Verdant Prime', 'Aether Moons'],
+            'Silver': ['Pyros', 'Aether Moons'],
+            'Platinum': ['Pyros', 'Aether Core'],
+            'Uranium': ['Pyros', 'Glacier-7', 'Aether Moons'],
+            'Promethium': ['Aether Moons'],
+            'Carbon': ['Verdant Prime', 'Glacier-7', 'Everywhere'],
+            'Iron': ['Verdant Prime', 'Pyros', 'Everywhere'],
+            'Oxygen': ['Verdant Prime', 'Glacier-7', 'Aether Moons'],
+            'Silicon': ['Verdant Prime', 'Pyros', 'Everywhere'],
+            'Helium': ['Aether', 'Everywhere'],
+            'Hydrogen': ['Aether', 'Everywhere']
+        };
+        
+        let currentFilter = 'all';
+        let searchTerm = '';
+        let collection = {};
+        
+        // Load collection from localStorage
+        function loadCollection() {
+            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            return collection;
+        }
+        
+        function renderElements() {
+            const list = document.getElementById('elementList');
+            const statsSpan = document.getElementById('journalStats');
+            const sortIndicator = document.getElementById('sortIndicator');
+            
+            // Load latest collection
+            collection = loadCollection();
+            
+            // Calculate stats
+            const foundCount = Object.keys(collection).length;
+            
+            statsSpan.textContent = `${foundCount} / ${elements.length} elements collected`;
+            
+            sortIndicator.textContent = currentFilter === 'all' 
+                ? '▼ All elements (A-Z)' 
+                : `▼ ${currentFilter} elements (A-Z)`;
+            
+            // Filter
+            let filtered = elements;
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(e => e.rarity === currentFilter);
+            }
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = filtered.filter(e => 
+                    e.name.toLowerCase().includes(term) ||
+                    e.symbol.toLowerCase().includes(term)
+                );
+            }
+            
+            // Render
+            list.innerHTML = '';
+            
+            filtered.forEach(element => {
+                const card = document.createElement('div');
+                card.className = 'element-card';
+                
+                const isFound = !!collection[element.name];
+                
+                const header = document.createElement('div');
+                header.className = 'element-header';
+                header.onclick = () => card.classList.toggle('expanded');
+                
+                header.innerHTML = `
+                    <div class="element-rarity rarity-${element.rarity}"></div>
+                    <div class="element-symbol text-${element.rarity}">${element.symbol}</div>
+                    <div class="element-name">${element.name}</div>
+                    <div class="status-dot ${isFound ? 'status-found' : 'status-not-found'}"></div>
+                    <div class="expand-icon">▼</div>
+                `;
+                
+                const details = document.createElement('div');
+                details.className = 'element-details';
+                
+                // Get planet locations
+                let locationHtml = '';
+                const locations = planetLocations[element.name] || 
+                    (element.planets > 10 ? ['Multiple planets', 'Common element'] : ['Unknown location']);
+                
+                if (element.planets > 20) {
+                    locationHtml = `
+                        <div class="many-planets-note">
+                            ✦ Found on ${element.planets} planets
+                            <span style="display:block; font-size:12px; margin-top:4px;">Common element - found throughout galaxy</span>
+                        </div>
+                    `;
+                } else {
+                    locationHtml = '<div class="planet-list">';
+                    locations.forEach(loc => {
+                        locationHtml += `
+                            <div class="planet-item">
+                                <span class="planet-icon">🪐</span>
+                                <span class="planet-name">${loc}</span>
+                                <span class="planet-type">${element.rarity}</span>
+                            </div>
+                        `;
+                    });
+                    locationHtml += '</div>';
+                }
+                
+                const count = collection[element.name]?.count || 0;
+                
+                details.innerHTML = `
+                    <div class="details-content">
+                        <div class="atomic-info">
+                            <span>⚛️ Atomic ${element.atomic}</span>
+                            <span>⚖️ Mass ${element.mass}</span>
+                            <span>💰 ${element.value}⭐</span>
+                        </div>
+                        ${locationHtml}
+                        ${isFound ? `<div style="text-align:center; margin-top:15px; color:#8ac0ff;">Collected: ${count} × ${element.value}⭐ = ${count * element.value}⭐</div>` : ''}
+                    </div>
+                `;
+                
+                card.appendChild(header);
+                card.appendChild(details);
+                list.appendChild(card);
+            });
+            
+            if (filtered.length === 0) {
+                list.innerHTML = '<div class="many-planets-note" style="padding:40px;">No elements found</div>';
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderElements();
+        });
+        
+        document.querySelectorAll('.filter-pill').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                currentFilter = pill.dataset.rarity;
+                renderElements();
+            });
+        });
+        
+        function goBack() {
+            navigateTo('ship-bridge.html');
+        }
+        
+        // Initialize
+        function init() {
+            // Check if player exists
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            renderElements();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
