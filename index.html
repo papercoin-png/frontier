@@ -1,15 +1,410 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>The Frontier</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voidfarer - Orbital View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0ff;
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px #0ff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f00;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border: 1px solid #f00;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
 </head>
 <body>
-  <div id="loading">🪐 Establishing connection...</div>
-  <div id="app"></div>
-  <script src="script.js"></script>
+    <div id="game-container">
+        <div class="loading">🪐 INITIALIZING VOIDFARER...</div>
+        <div class="error" id="error-message"></div>
+    </div>
+
+    <!-- Load React and ReactDOM from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Load Babel for JSX support -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Our game code will go here -->
+    <script type="text/babel" data-presets="react">
+        // =============================================
+        // PHASE 1: Planet Templates (Your 20 Types)
+        // =============================================
+        const planetTemplates = [
+            {
+                id: 'lush-1',
+                name: 'VERDANT PRIME',
+                type: 'Lush',
+                colors: {
+                    oceanBase: '#1a3344',
+                    oceanMid: '#2d4b66',
+                    oceanShallow: '#4a7a9e',
+                    landDark: '#3d2b1a',
+                    landLight: '#6b4e2e',
+                    highlight: '#d9b38c'
+                },
+                atmosphere: '#4a7a9e',
+                hasRings: false,
+                temperature: 22,
+                atmosphere_type: 'Breathable'
+            },
+            {
+                id: 'frozen-1',
+                name: 'GLACIER-7',
+                type: 'Frozen',
+                colors: {
+                    oceanBase: '#2a3f5e',
+                    oceanMid: '#3d5f7a',
+                    oceanShallow: '#6d9eb0',
+                    landDark: '#4a5b66',
+                    landLight: '#8ba5b5',
+                    highlight: '#ffffff'
+                },
+                atmosphere: '#a5d0e0',
+                hasRings: true,
+                ringColor: '#c0d0e0',
+                temperature: -45,
+                atmosphere_type: 'Toxic'
+            }
+            // Add 18 more templates here later!
+        ];
+
+        // =============================================
+        // PHASE 2: Planet Canvas Component
+        // =============================================
+        function PlanetCanvas({ template, rotation = 0 }) {
+            const canvasRef = React.useRef(null);
+            
+            React.useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const size = Math.min(window.innerWidth * 0.6, 400);
+                
+                canvas.width = size;
+                canvas.height = size;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, size, size);
+                
+                // Save context state
+                ctx.save();
+                
+                // Translate to center and rotate
+                ctx.translate(size/2, size/2);
+                ctx.rotate(rotation);
+                
+                // Draw planet sphere
+                const radius = size * 0.4;
+                
+                // Base gradient (ocean)
+                const gradient = ctx.createRadialGradient(
+                    -radius*0.2, -radius*0.2, 0,
+                    0, 0, radius
+                );
+                gradient.addColorStop(0, template.colors.oceanShallow);
+                gradient.addColorStop(0.5, template.colors.oceanMid);
+                gradient.addColorStop(1, template.colors.oceanBase);
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Draw land masses (simplified for demo)
+                ctx.fillStyle = template.colors.landDark;
+                ctx.beginPath();
+                ctx.ellipse(radius*0.2, -radius*0.1, radius*0.3, radius*0.2, 0, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.fillStyle = template.colors.landLight;
+                ctx.beginPath();
+                ctx.ellipse(-radius*0.1, radius*0.2, radius*0.25, radius*0.15, 0, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Restore context
+                ctx.restore();
+                
+                // Draw atmosphere glow (not affected by rotation)
+                ctx.save();
+                ctx.filter = 'blur(10px)';
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, radius + 10, 0, Math.PI * 2);
+                ctx.fillStyle = template.atmosphere + '40';
+                ctx.fill();
+                ctx.restore();
+                
+                // Draw rings if planet has them
+                if (template.hasRings) {
+                    ctx.save();
+                    ctx.translate(size/2, size/2);
+                    ctx.rotate(rotation * 0.5);
+                    
+                    ctx.strokeStyle = template.ringColor || '#c0c0c0';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([10, 10]);
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, radius*1.4, radius*0.3, 0, 0, Math.PI*2);
+                    ctx.stroke();
+                    
+                    ctx.restore();
+                }
+                
+            }, [template, rotation]);
+            
+            return <canvas ref={canvasRef} className="planet-canvas" />;
+        }
+
+        // =============================================
+        // PHASE 3: Starfield Background
+        // =============================================
+        function Starfield() {
+            const canvasRef = React.useRef(null);
+            
+            React.useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                
+                const resize = () => {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    drawStars();
+                };
+                
+                const drawStars = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    // Draw 200 stars
+                    for (let i = 0; i < 200; i++) {
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height;
+                        const radius = Math.random() * 2;
+                        const brightness = Math.random() * 155 + 100;
+                        
+                        ctx.beginPath();
+                        ctx.arc(x, y, radius, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+                        ctx.fill();
+                    }
+                };
+                
+                window.addEventListener('resize', resize);
+                resize();
+                
+                return () => window.removeEventListener('resize', resize);
+            }, []);
+            
+            return <canvas ref={canvasRef} className="starfield" />;
+        }
+
+        // =============================================
+        // PHASE 4: Main Orbital View Component
+        // =============================================
+        function OrbitalView() {
+            const [currentPlanet, setCurrentPlanet] = React.useState(0);
+            const [rotation, setRotation] = React.useState(0);
+            
+            // Rotation animation
+            React.useEffect(() => {
+                let frame;
+                const animate = () => {
+                    setRotation(prev => (prev + 0.002) % (Math.PI * 2));
+                    frame = requestAnimationFrame(animate);
+                };
+                frame = requestAnimationFrame(animate);
+                return () => cancelAnimationFrame(frame);
+            }, []);
+            
+            // Cycle planet (for demo)
+            const nextPlanet = () => {
+                setCurrentPlanet((prev) => (prev + 1) % planetTemplates.length);
+            };
+            
+            const template = planetTemplates[currentPlanet];
+            
+            return (
+                <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: '#000',
+                    overflow: 'hidden'
+                }}>
+                    {/* Starfield background */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        zIndex: 0
+                    }}>
+                        <Starfield />
+                    </div>
+                    
+                    {/* Planet container */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 1,
+                        textAlign: 'center',
+                        width: 'min(80vw, 500px)'
+                    }}>
+                        <PlanetCanvas template={template} rotation={rotation} />
+                        
+                        {/* Planet info */}
+                        <div style={{
+                            marginTop: '20px',
+                            background: 'rgba(0,0,0,0.7)',
+                            border: '1px solid #0ff',
+                            borderRadius: '10px',
+                            padding: '15px',
+                            color: '#0ff',
+                            fontFamily: 'monospace',
+                            textShadow: '0 0 5px #0ff',
+                            backdropFilter: 'blur(5px)'
+                        }}>
+                            <h2 style={{ marginBottom: '10px' }}>{template.name}</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div>TYPE: {template.type}</div>
+                                <div>TEMP: {template.temperature}°C</div>
+                                <div>ATMOS: {template.atmosphere_type}</div>
+                                <div>RINGS: {template.hasRings ? 'YES' : 'NO'}</div>
+                            </div>
+                        </div>
+                        
+                        {/* Action buttons */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '10px',
+                            marginTop: '20px',
+                            justifyContent: 'center'
+                        }}>
+                            <button onClick={() => alert('SCANNING ' + template.name)}
+                                    style={buttonStyle}>
+                                🔍 SCAN
+                            </button>
+                            <button onClick={() => alert('LANDING ON ' + template.name)}
+                                    style={buttonStyle}>
+                                🚀 LAND
+                            </button>
+                            <button onClick={nextPlanet}
+                                    style={buttonStyle}>
+                                ⏭️ NEXT
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* HUD corners */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: '10px',
+                        color: '#0ff',
+                        fontFamily: 'monospace',
+                        fontSize: '12px',
+                        textShadow: '0 0 5px #0ff',
+                        zIndex: 2
+                    }}>
+                        ⚡ FUEL: 87%<br />
+                        🛡️ SHIELD: 100%
+                    </div>
+                    
+                    <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        color: '#0ff',
+                        fontFamily: 'monospace',
+                        fontSize: '12px',
+                        textShadow: '0 0 5px #0ff',
+                        zIndex: 2,
+                        textAlign: 'right'
+                    }}>
+                        📦 CARGO: 45/100<br />
+                        ⭐ UNITS: 12,450
+                    </div>
+                </div>
+            );
+        }
+        
+        const buttonStyle = {
+            background: 'rgba(0,0,0,0.5)',
+            border: '1px solid #0ff',
+            color: '#0ff',
+            padding: '12px 24px',
+            fontFamily: 'monospace',
+            fontSize: '16px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            textShadow: '0 0 5px #0ff',
+            boxShadow: '0 0 10px rgba(0,255,255,0.3)',
+            transition: 'all 0.3s',
+            flex: 1,
+            maxWidth: '120px'
+        };
+
+        // =============================================
+        // PHASE 5: Render the App
+        // =============================================
+        function App() {
+            return <OrbitalView />;
+        }
+
+        // Hide loading, show app
+        document.querySelector('.loading').style.display = 'none';
+        
+        // Mount React app
+        const container = document.getElementById('game-container');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
 </body>
 </html>
