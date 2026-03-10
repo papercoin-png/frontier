@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voidfarer - Galaxy Map</title>
     <style>
         * {
@@ -16,54 +16,66 @@
             background: #0a0a1a;
             overflow: hidden;
             font-family: 'Libre Baskerville', serif;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
         
         .galaxy-container {
             position: relative;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+            background: #0a0a1a;
         }
         
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            object-fit: cover;
+            touch-action: none;
         }
         
         .ui-overlay {
             position: absolute;
-            top: 20px;
+            top: max(20px, env(safe-area-inset-top));
             left: 50%;
             transform: translateX(-50%);
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
-            font-size: 28px;
+            font-size: clamp(20px, 7vw, 28px);
             text-shadow: 0 0 30px #8a6aff, 0 0 60px #4a2a8a;
             background: rgba(10,10,26,0.4);
             backdrop-filter: blur(5px);
-            padding: 8px 30px;
+            padding: 8px 20px;
             border-radius: 60px 20px 60px 20px;
             border: 2px solid #a0b0c0;
             z-index: 10;
             white-space: nowrap;
+            max-width: 90%;
+            text-overflow: ellipsis;
+            overflow: hidden;
         }
         
         .back-btn {
             position: absolute;
-            bottom: 30px;
-            left: 20px;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            left: max(20px, env(safe-area-inset-left));
             background: rgba(10,10,26,0.6);
             backdrop-filter: blur(10px);
             border: 2px solid #a0b0c0;
             color: #d0e0f0;
-            padding: 12px 30px;
+            padding: 12px 20px;
             border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
+            font-size: 14px;
             cursor: pointer;
             font-family: 'Libre Baskerville', serif;
             transition: all 0.1s;
             z-index: 10;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 120px;
+            text-align: center;
         }
         
         .back-btn:active {
@@ -74,25 +86,29 @@
         
         .info-panel {
             position: absolute;
-            bottom: 30px;
-            right: 20px;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: max(20px, env(safe-area-inset-right));
             background: rgba(10,10,26,0.6);
             backdrop-filter: blur(10px);
             border: 2px solid #a0b0c0;
             color: #d0e0f0;
-            padding: 12px 20px;
+            padding: 12px 16px;
             border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
+            font-size: 13px;
             z-index: 10;
             text-align: center;
-            min-width: 150px;
+            min-width: 130px;
+            max-width: 200px;
         }
         
         .info-title {
             font-family: 'WindSong', cursive;
-            font-size: 18px;
+            font-size: 16px;
             color: #ffffff;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         /* Aesthetic boxes for clickable regions */
@@ -110,12 +126,18 @@
             align-items: center;
             justify-content: center;
             animation: pulse-glow 3s infinite alternate;
+            -webkit-tap-highlight-color: transparent;
         }
         
         .region-box:hover {
             border-color: #ffffff;
             box-shadow: 0 0 30px rgba(255, 255, 255, 0.5), inset 0 0 30px rgba(255, 255, 255, 0.2);
             transform: scale(1.02);
+        }
+        
+        .region-box:active {
+            transform: scale(0.98);
+            border-color: #ffffff;
         }
         
         .region-box::after {
@@ -133,33 +155,37 @@
         .region-label {
             color: white;
             font-family: 'WindSong', cursive;
-            font-size: 18px;
+            font-size: clamp(14px, 4vw, 18px);
             text-shadow: 0 0 20px #ffffff, 0 0 40px #8a6aff;
             background: rgba(10,10,26,0.3);
             backdrop-filter: blur(5px);
-            padding: 5px 15px;
+            padding: 5px 12px;
             border-radius: 40px 10px 40px 10px;
             border: 1px solid rgba(255,255,255,0.5);
             white-space: nowrap;
             pointer-events: none;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .region-count {
             position: absolute;
-            bottom: -10px;
-            right: -10px;
+            bottom: -8px;
+            right: -8px;
             background: #ffaa4a;
             color: white;
-            font-size: 12px;
-            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 6px;
             border-radius: 50%;
-            min-width: 25px;
-            height: 25px;
+            min-width: 22px;
+            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 2px solid white;
-            box-shadow: 0 0 20px #ffaa4a;
+            box-shadow: 0 0 15px #ffaa4a;
         }
         
         @keyframes pulse-glow {
@@ -191,8 +217,8 @@
         }
         
         .loading-spinner {
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             border: 3px solid #8a6aff;
             border-top: 3px solid transparent;
             border-radius: 50%;
@@ -202,56 +228,105 @@
         .loading-text {
             color: white;
             font-family: 'WindSong', cursive;
-            font-size: 24px;
+            font-size: 20px;
             text-shadow: 0 0 20px #8a6aff;
+            text-align: center;
+            padding: 0 20px;
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Safe area adjustments for notches */
+        @supports (padding: max(0px)) {
+            .ui-overlay {
+                top: max(20px, env(safe-area-inset-top));
+            }
+            
+            .back-btn {
+                bottom: max(20px, env(safe-area-inset-bottom));
+                left: max(20px, env(safe-area-inset-left));
+            }
+            
+            .info-panel {
+                bottom: max(20px, env(safe-area-inset-bottom));
+                right: max(20px, env(safe-area-inset-right));
+            }
+        }
+        
+        /* Mobile-specific adjustments */
+        @media (max-width: 480px) {
+            .region-label {
+                font-size: 14px;
+                padding: 4px 10px;
+            }
+            
+            .region-count {
+                font-size: 10px;
+                min-width: 20px;
+                height: 20px;
+            }
+            
+            .back-btn {
+                padding: 10px 16px;
+                font-size: 13px;
+                min-width: 100px;
+            }
+            
+            .info-panel {
+                padding: 10px 12px;
+                min-width: 110px;
+                font-size: 12px;
+            }
+            
+            .info-title {
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="galaxy-container">
         <div class="ui-overlay">✦ MILKY WAY ✦</div>
-        <button class="back-btn" onclick="window.location.href='ship-bridge.html'">← RETURN TO SHIP</button>
+        <button class="back-btn" onclick="window.location.href='ship-bridge.html'">← SHIP</button>
         
         <!-- Aesthetic boxes for clickable regions -->
-        <div class="region-box" id="regionOrion" style="left: 35%; top: 40%; width: 140px; height: 100px;" onclick="zoomToRegion('Orion')">
+        <div class="region-box" id="regionOrion" style="left: 35%; top: 40%; width: 130px; height: 90px;" onclick="zoomToRegion('Orion')">
             <span class="region-label">Orion Arm</span>
             <span class="region-count">300</span>
         </div>
         
-        <div class="region-box" id="regionCygnus" style="left: 60%; top: 30%; width: 130px; height: 90px;" onclick="zoomToRegion('Cygnus')">
+        <div class="region-box" id="regionCygnus" style="left: 60%; top: 30%; width: 120px; height: 80px;" onclick="zoomToRegion('Cygnus')">
             <span class="region-label">Cygnus Arm</span>
             <span class="region-count">350</span>
         </div>
         
-        <div class="region-box" id="regionSagittarius" style="left: 45%; top: 60%; width: 150px; height: 110px;" onclick="zoomToRegion('Sagittarius')">
+        <div class="region-box" id="regionSagittarius" style="left: 45%; top: 60%; width: 140px; height: 100px;" onclick="zoomToRegion('Sagittarius')">
             <span class="region-label">Sagittarius</span>
             <span class="region-count">280</span>
         </div>
         
-        <div class="region-box" id="regionPerseus" style="left: 65%; top: 55%; width: 140px; height: 100px;" onclick="zoomToRegion('Perseus')">
+        <div class="region-box" id="regionPerseus" style="left: 65%; top: 55%; width: 130px; height: 90px;" onclick="zoomToRegion('Perseus')">
             <span class="region-label">Perseus Arm</span>
             <span class="region-count">400</span>
         </div>
         
-        <div class="region-box" id="regionCarina" style="left: 30%; top: 65%; width: 120px; height: 90px;" onclick="zoomToRegion('Carina')">
+        <div class="region-box" id="regionCarina" style="left: 30%; top: 65%; width: 110px; height: 80px;" onclick="zoomToRegion('Carina')">
             <span class="region-label">Carina Arm</span>
             <span class="region-count">320</span>
         </div>
         
-        <div class="region-box" id="regionOuter" style="left: 70%; top: 70%; width: 130px; height: 90px;" onclick="zoomToRegion('Outer')">
+        <div class="region-box" id="regionOuter" style="left: 70%; top: 70%; width: 120px; height: 80px;" onclick="zoomToRegion('Outer')">
             <span class="region-label">Outer Arm</span>
             <span class="region-count">250</span>
         </div>
         
         <div class="info-panel" id="infoPanel">
             <div class="info-title">Galactic Core</div>
-            <div>12 sectors • 1,900 star systems</div>
-            <div style="font-size:10px; margin-top:5px;">Click a region to explore</div>
+            <div>1,900 star systems</div>
+            <div style="font-size:10px; margin-top:5px;">Tap a region</div>
         </div>
         
         <canvas id="galaxyCanvas"></canvas>
@@ -259,7 +334,7 @@
         <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">warping to sector...</div>
+            <div class="loading-text">warping...</div>
         </div>
     </div>
 
@@ -268,7 +343,7 @@
         const ctx = canvas.getContext('2d');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
-        function resize() {
+        function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             drawGalaxy();
@@ -280,7 +355,7 @@
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
-            // === 1. BACKGROUND STARFIELD ===
+            // === 1. BACKGROUND STARFIELD (monochrome) ===
             for (let i = 0; i < 2000; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
@@ -307,36 +382,24 @@
             ctx.fillStyle = coreGlow;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Individual stars in core (dense packing)
+            // Individual stars in core (monochrome white)
             for (let i = 0; i < 3000; i++) {
-                // Polar coordinates - more stars near center
                 const angle = Math.random() * Math.PI * 2;
                 const distance = Math.pow(Math.random(), 1.2) * canvas.width * 0.2;
                 const x = centerX + Math.cos(angle) * distance;
                 const y = centerY + Math.sin(angle) * distance;
                 
-                // Star color based on distance from center
-                let color;
-                if (distance < canvas.width * 0.05) {
-                    // Core center - hot, young stars (blue-white)
-                    color = `rgba(180, 200, 255, ${Math.random() * 0.8 + 0.2})`;
-                } else if (distance < canvas.width * 0.1) {
-                    // Intermediate - yellow-white
-                    color = `rgba(255, 240, 200, ${Math.random() * 0.7 + 0.2})`;
-                } else {
-                    // Outer core - cooler, redder
-                    color = `rgba(255, 200, 150, ${Math.random() * 0.6 + 0.1})`;
-                }
-                
+                // All stars white with varying brightness
+                const brightness = Math.random() * 0.8 + 0.2;
                 const size = Math.random() * 2.5 + 0.5;
                 
-                ctx.fillStyle = color;
+                ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
                 ctx.beginPath();
                 ctx.arc(x, y, size, 0, Math.PI * 2);
                 ctx.fill();
             }
             
-            // === 3. SPIRAL ARMS (formed by star density) ===
+            // === 3. SPIRAL ARMS (monochrome stars - no colors) ===
             const armCount = 4;
             
             for (let arm = 0; arm < armCount; arm++) {
@@ -344,13 +407,9 @@
                 
                 // Generate stars along this arm
                 for (let s = 0; s < 800; s++) {
-                    // Distance from center (farther = more spread)
                     const distance = 50 + Math.pow(Math.random(), 1.5) * canvas.width * 0.4;
-                    
-                    // Spiral angle increases with distance
                     const spiralAngle = armOffset + distance * 0.02;
                     
-                    // Add some randomness to make arm fuzzy
                     const randomAngle = (Math.random() - 0.5) * 0.3;
                     const randomDist = (Math.random() - 0.5) * 15;
                     
@@ -360,18 +419,12 @@
                     const x = centerX + Math.cos(angle) * finalDist;
                     const y = centerY + Math.sin(angle) * finalDist;
                     
-                    // Only draw if within canvas
                     if (x > 0 && x < canvas.width && y > 0 && y < canvas.height) {
-                        // Color based on arm and distance
-                        let color;
-                        if (arm === 0) color = `rgba(180, 200, 255, ${Math.random() * 0.5 + 0.2})`; // Blue
-                        else if (arm === 1) color = `rgba(255, 200, 200, ${Math.random() * 0.5 + 0.2})`; // Pink
-                        else if (arm === 2) color = `rgba(200, 255, 200, ${Math.random() * 0.5 + 0.2})`; // Green
-                        else color = `rgba(255, 220, 180, ${Math.random() * 0.5 + 0.2})`; // Yellow
-                        
+                        // All stars white with varying brightness
+                        const brightness = Math.random() * 0.5 + 0.2;
                         const size = Math.random() * 2 + 0.5;
                         
-                        ctx.fillStyle = color;
+                        ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
                         ctx.beginPath();
                         ctx.arc(x, y, size, 0, Math.PI * 2);
                         ctx.fill();
@@ -379,14 +432,14 @@
                 }
             }
             
-            // === 4. NEBULAE (stellar nurseries) ===
+            // === 4. NEBULAE (monochrome glowing clouds) ===
             const nebulae = [
-                { name: 'Orion', angle: 30, dist: 0.3, color: '#8a6aff', size: 40, x: 35, y: 40 },
-                { name: 'Cygnus', angle: 120, dist: 0.35, color: '#ff6a9a', size: 45, x: 60, y: 30 },
-                { name: 'Sagittarius', angle: 210, dist: 0.25, color: '#ffaa4a', size: 35, x: 45, y: 60 },
-                { name: 'Perseus', angle: 300, dist: 0.4, color: '#4affaa', size: 50, x: 65, y: 55 },
-                { name: 'Carina', angle: 80, dist: 0.3, color: '#c06aff', size: 40, x: 30, y: 65 },
-                { name: 'Outer', angle: 200, dist: 0.45, color: '#8a8aaa', size: 30, x: 70, y: 70 }
+                { name: 'Orion', angle: 30, dist: 0.3, size: 40, x: 35, y: 40 },
+                { name: 'Cygnus', angle: 120, dist: 0.35, size: 45, x: 60, y: 30 },
+                { name: 'Sagittarius', angle: 210, dist: 0.25, size: 35, x: 45, y: 60 },
+                { name: 'Perseus', angle: 300, dist: 0.4, size: 50, x: 65, y: 55 },
+                { name: 'Carina', angle: 80, dist: 0.3, size: 40, x: 30, y: 65 },
+                { name: 'Outer', angle: 200, dist: 0.45, size: 30, x: 70, y: 70 }
             ];
             
             nebulae.forEach(neb => {
@@ -395,10 +448,10 @@
                 const x = centerX + Math.cos(angleRad) * dist;
                 const y = centerY + Math.sin(angleRad) * dist;
                 
-                // Nebula glow (just a cloud, no stars inside)
+                // Nebula glow (white/gray clouds)
                 const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, neb.size * 2.5);
-                glowGradient.addColorStop(0, neb.color + '40');
-                glowGradient.addColorStop(0.5, neb.color + '15');
+                glowGradient.addColorStop(0, 'rgba(200, 200, 220, 0.3)');
+                glowGradient.addColorStop(0.5, 'rgba(150, 150, 180, 0.1)');
                 glowGradient.addColorStop(1, 'transparent');
                 
                 ctx.fillStyle = glowGradient;
@@ -406,18 +459,17 @@
                 ctx.arc(x, y, neb.size * 2.5, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Add a few very young stars (proto-stars) within the nebula
+                // A few proto-stars within the nebula
                 for (let s = 0; s < 20; s++) {
                     const clusterAngle = Math.random() * Math.PI * 2;
                     const clusterDist = Math.random() * neb.size * 1.5;
                     const nx = x + Math.cos(clusterAngle) * clusterDist;
                     const ny = y + Math.sin(clusterAngle) * clusterDist;
                     
-                    const size = Math.random() * 2 + 0.5;
-                    const opacity = Math.random() * 0.5 + 0.3;
+                    const size = Math.random() * 1.5 + 0.5;
+                    const brightness = Math.random() * 0.4 + 0.2;
                     
-                    // Parse color - young stars are hot and blue
-                    ctx.fillStyle = `rgba(200, 220, 255, ${opacity})`;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
                     ctx.beginPath();
                     ctx.arc(nx, ny, size, 0, Math.PI * 2);
                     ctx.fill();
@@ -448,7 +500,7 @@
         function zoomToRegion(region) {
             loadingOverlay.classList.add('active');
             
-            // Haptic feedback if available
+            // Haptic feedback
             if (window.Telegram?.WebApp?.HapticFeedback) {
                 window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
             }
@@ -463,7 +515,7 @@
             }, 1500);
         }
         
-        // Update info panel on hover (simplified)
+        // Update info panel on hover/tap
         document.querySelectorAll('.region-box').forEach(box => {
             box.addEventListener('mouseenter', (e) => {
                 const label = box.querySelector('.region-label').textContent;
@@ -471,13 +523,29 @@
                 document.getElementById('infoPanel').innerHTML = `
                     <div class="info-title">${label}</div>
                     <div>${count} star systems</div>
-                    <div style="font-size:10px; margin-top:5px;">Click to explore</div>
+                    <div style="font-size:10px; margin-top:5px;">Tap to explore</div>
+                `;
+            });
+            
+            // For mobile touch
+            box.addEventListener('touchstart', (e) => {
+                const label = box.querySelector('.region-label').textContent;
+                const count = box.querySelector('.region-count').textContent;
+                document.getElementById('infoPanel').innerHTML = `
+                    <div class="info-title">${label}</div>
+                    <div>${count} star systems</div>
+                    <div style="font-size:10px; margin-top:5px;">Tap to explore</div>
                 `;
             });
         });
         
-        window.addEventListener('resize', resize);
-        resize();
+        // Handle resize
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+        
+        // Initial draw
+        resizeCanvas();
     </script>
 </body>
 </html>
