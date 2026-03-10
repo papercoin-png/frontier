@@ -67,7 +67,7 @@
         
         #destination {
             position: absolute;
-            bottom: 100px;
+            bottom: 150px;
             left: 50%;
             transform: translateX(-50%);
             color: #fff;
@@ -75,13 +75,30 @@
             font-size: 24px;
             text-shadow: 0 0 15px #0af;
             z-index: 100;
-            opacity: 0.8;
+            opacity: 0.9;
             background: rgba(0,0,0,0.3);
             backdrop-filter: blur(5px);
             padding: 6px 20px;
             border-radius: 40px 10px 40px 10px;
             border: 1px solid #6af;
             transition: opacity 0.5s;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        #coordinates {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0c0ff;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 100;
+            opacity: 0.7;
+            background: rgba(0,0,0,0.2);
+            padding: 4px 16px;
+            border-radius: 20px;
         }
         
         #skip-btn {
@@ -120,6 +137,22 @@
             width: 100%;
             height: 100%;
         }
+        
+        .warp-stats {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            color: #a0c0ff;
+            font-size: 12px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #6a8ac0;
+            z-index: 100;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -127,6 +160,8 @@
         <div class="warp-container">
             <div id="status">WARP DRIVE ACTIVE</div>
             <div id="destination">→ Verdant System</div>
+            <div id="coordinates">Sector B2 • Orion Nebula</div>
+            <div class="warp-stats" id="warpStats">Speed: 0.5c</div>
             <button id="skip-btn" onclick="skipWarp()">SKIP</button>
             <canvas id="c"></canvas>
         </div>
@@ -142,39 +177,52 @@
             tg.setBackgroundColor('#000000');
         }
         
-        // Get destination from URL parameters or localStorage
-        function getDestination() {
+        // ===== GET DESTINATION DATA =====
+        function getDestinationData() {
             // Check URL parameters first
             const urlParams = new URLSearchParams(window.location.search);
             const dest = urlParams.get('dest');
+            const destType = urlParams.get('type') || 'system';
+            const destSector = urlParams.get('sector') || localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+            const destNebula = urlParams.get('nebula') || localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
             
             if (dest) {
-                return decodeURIComponent(dest);
+                return {
+                    name: decodeURIComponent(dest),
+                    type: destType,
+                    sector: destSector,
+                    nebula: destNebula
+                };
             }
             
             // Check localStorage for destination
-            const returnTo = localStorage.getItem('voidfarer_warp_destination');
-            if (returnTo) {
-                return returnTo;
+            const destName = localStorage.getItem('voidfarer_warp_destination');
+            const redirect = localStorage.getItem('voidfarer_warp_redirect');
+            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+            const nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+            
+            if (destName) {
+                return {
+                    name: destName,
+                    type: 'system',
+                    sector: sector,
+                    nebula: nebula
+                };
             }
             
-            // Default destinations based on context
-            const from = document.referrer;
-            if (from.includes('earth-hub')) {
-                return 'Ship Bridge';
-            } else if (from.includes('system-view')) {
-                const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-                return planet;
-            } else if (from.includes('ship-bridge')) {
-                return 'Verdant System';
-            } else {
-                return 'Verdant System';
-            }
+            // Default
+            return {
+                name: 'Verdant System',
+                type: 'system',
+                sector: 'B2',
+                nebula: 'Orion Nebula'
+            };
         }
         
         // Set destination display
-        const destination = getDestination();
-        document.getElementById('destination').textContent = `→ ${destination}`;
+        const destData = getDestinationData();
+        document.getElementById('destination').textContent = `→ ${destData.name}`;
+        document.getElementById('coordinates').textContent = `${destData.nebula} • Sector ${destData.sector}`;
         
         // Canvas setup
         const canvas = document.getElementById('c');
@@ -194,7 +242,8 @@
                 x: (Math.random() - 0.5) * 2000,
                 y: (Math.random() - 0.5) * 2000,
                 z: Math.random() * 2000,
-                baseSpeed: 40 + Math.random() * 40 // VIOLENT start
+                baseSpeed: 40 + Math.random() * 40,
+                color: `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`
             });
         }
 
@@ -204,22 +253,31 @@
         let progress = 0; // 0 to 1 over 4 seconds
         let animationFrame;
         
+        // Speed display
+        const speedDisplay = document.getElementById('warpStats');
+        
         // Check if we should auto-redirect after warp
-        const redirectAfterWarp = localStorage.getItem('voidfarer_warp_redirect') || 'ship-bridge.html';
+        const redirectAfterWarp = localStorage.getItem('voidfarer_warp_redirect') || 'system-view.html';
         
         function checkPhase() {
             const elapsed = (Date.now() - warpStart) / 1000; // seconds
             progress = Math.min(elapsed / 4, 1); // 0 to 1 over 4 seconds
+            
+            // Update speed display
+            const speedValue = (1 - progress) * 100;
+            speedDisplay.textContent = `Speed: ${speedValue.toFixed(1)}c`;
             
             if (elapsed >= 4 && phase === 'warp') {
                 phase = 'ripple';
                 document.getElementById('status').textContent = 'ARRIVED';
                 document.getElementById('status').style.color = '#6f6';
                 document.getElementById('status').style.borderColor = '#6f6';
-                document.getElementById('destination').style.opacity = '1';
+                document.getElementById('coordinates').style.opacity = '1';
+                speedDisplay.textContent = 'Speed: 0.0c';
                 
                 // Clear warp destination from localStorage
                 localStorage.removeItem('voidfarer_warp_destination');
+                localStorage.removeItem('voidfarer_warp_redirect');
                 
                 // Auto-redirect after arrival
                 setTimeout(() => {
@@ -232,7 +290,7 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
             // Get redirect URL
-            const redirect = localStorage.getItem('voidfarer_warp_redirect') || 'ship-bridge.html';
+            const redirect = localStorage.getItem('voidfarer_warp_redirect') || 'system-view.html';
             
             // Clear warp data
             localStorage.removeItem('voidfarer_warp_redirect');
@@ -251,6 +309,7 @@
             document.getElementById('status').style.color = '#6f6';
             document.getElementById('status').style.borderColor = '#6f6';
             document.getElementById('skip-btn').classList.add('hidden');
+            speedDisplay.textContent = 'Speed: 0.0c';
             
             setTimeout(() => {
                 completeWarp();
@@ -268,10 +327,7 @@
                 time += 0.02;
                 
                 // Calculate speed factor and brightness based on progress
-                // Start fast (1.0) and slow down to 0.1 by end
                 const speedFactor = 1.0 - (progress * 0.9); // 1.0 → 0.1
-                
-                // Brightness fades from 1.0 to 0.2
                 const brightnessFactor = 1.0 - (progress * 0.8); // 1.0 → 0.2
 
                 stars.forEach(s => {
@@ -291,12 +347,8 @@
                     // Skip if outside view
                     if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;
                     
-                    // Star brightness dims over time
-                    const starBrightness = Math.min(255, 100 + (2000 - s.z) * 0.2) * brightnessFactor;
-                    
-                    // Draw streaks (shorter as we slow down)
+                    // Draw streaks
                     if (s.z < 1200) {
-                        // Streak length also decreases with speed
                         const streakLength = 50 * speedFactor;
                         ctx.strokeStyle = `rgba(100, 150, 255, ${0.5 * brightnessFactor})`;
                         ctx.lineWidth = 2;
@@ -315,7 +367,7 @@
                     ctx.fill();
                 });
 
-                // Warp glow fades over time
+                // Warp glow
                 const glowIntensity = 0.3 * brightnessFactor;
                 const gradient = ctx.createRadialGradient(
                     canvas.width/2, canvas.height/2, 0,
@@ -370,19 +422,18 @@
 
         draw();
         
-        // Clean up animation frame on page unload
+        // Clean up
         window.addEventListener('beforeunload', function() {
             if (animationFrame) {
                 cancelAnimationFrame(animationFrame);
             }
         });
         
-        // Handle back button - redirect to ship bridge if user tries to go back during warp
+        // Handle back button
         window.addEventListener('popstate', function() {
             window.location.href = 'ship-bridge.html';
         });
         
-        // Push state to handle back button
         history.pushState({}, '');
     </script>
 </body>
