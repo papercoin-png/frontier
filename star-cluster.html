@@ -55,7 +55,7 @@
             cursor: grabbing;
         }
         
-        /* UI Elements - fixed position */
+        /* UI Elements */
         .ui-header {
             position: absolute;
             top: max(15px, env(safe-area-inset-top));
@@ -65,7 +65,7 @@
             font-family: 'WindSong', cursive;
             font-size: 22px;
             text-shadow: 0 0 20px #b09aff;
-            background: rgba(10,10,26,0.7);
+            background: rgba(10,10,26,0.8);
             backdrop-filter: blur(8px);
             padding: 8px 20px;
             border-radius: 40px 15px 40px 15px;
@@ -80,7 +80,7 @@
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
             left: max(15px, env(safe-area-inset-left));
-            background: rgba(10,10,26,0.7);
+            background: rgba(10,10,26,0.8);
             backdrop-filter: blur(8px);
             border: 1px solid rgba(200, 180, 255, 0.3);
             color: #ffffff;
@@ -105,7 +105,7 @@
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
             right: max(15px, env(safe-area-inset-right));
-            background: rgba(10,10,26,0.7);
+            background: rgba(10,10,26,0.8);
             backdrop-filter: blur(8px);
             border: 1px solid rgba(200, 180, 255, 0.3);
             color: #ffffff;
@@ -125,7 +125,17 @@
             margin-bottom: 4px;
         }
         
-        /* Star markers - positioned absolutely but will move with pan/zoom */
+        /* Star markers container - fixed positioning */
+        .star-markers-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
         .star-marker {
             position: absolute;
             width: 80px;
@@ -133,7 +143,6 @@
             transform: translate(-50%, -50%);
             cursor: pointer;
             pointer-events: auto;
-            z-index: 20;
             transition: transform 0.1s ease;
             display: flex;
             flex-direction: column;
@@ -172,7 +181,7 @@
             font-family: 'WindSong', cursive;
             font-size: 14px;
             text-shadow: 0 0 10px #000;
-            background: rgba(10,10,26,0.8);
+            background: rgba(10,10,26,0.9);
             backdrop-filter: blur(4px);
             padding: 6px 12px;
             border-radius: 30px 8px 30px 8px;
@@ -184,7 +193,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         
-        /* Star type colors - larger for easy tapping */
+        /* Star type colors */
         .star-blue .star-glow {
             background: radial-gradient(circle, rgba(100, 150, 255, 0.6), transparent 80%);
         }
@@ -239,20 +248,38 @@
             background: radial-gradient(circle at 30% 30%, #e0b0ff, #a06aff);
         }
         
-        /* Mini-map indicator */
-        .minimap {
+        /* Zoom controls */
+        .zoom-controls {
             position: absolute;
-            top: max(15px, env(safe-area-inset-top));
+            top: 50%;
             right: max(15px, env(safe-area-inset-right));
-            width: 80px;
-            height: 80px;
-            background: rgba(10,10,26,0.6);
-            backdrop-filter: blur(4px);
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 35;
+        }
+        
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
             border: 1px solid rgba(200, 180, 255, 0.3);
-            border-radius: 15px;
-            z-index: 25;
-            overflow: hidden;
-            display: none;
+            color: white;
+            border-radius: 50%;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+        }
+        
+        .zoom-btn:active {
+            background: rgba(200, 180, 255, 0.3);
+            transform: scale(0.9);
         }
         
         /* Loading overlay */
@@ -299,40 +326,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Zoom controls */
-        .zoom-controls {
-            position: absolute;
-            top: 50%;
-            right: max(15px, env(safe-area-inset-right));
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 35;
-        }
-        
-        .zoom-btn {
-            width: 50px;
-            height: 50px;
-            background: rgba(10,10,26,0.7);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(200, 180, 255, 0.3);
-            color: white;
-            border-radius: 50%;
-            font-size: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            transition: all 0.1s;
-        }
-        
-        .zoom-btn:active {
-            background: rgba(200, 180, 255, 0.3);
-            transform: scale(0.9);
-        }
-        
         @supports (padding: max(0px)) {
             .ui-header { top: max(15px, env(safe-area-inset-top)); }
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
@@ -347,8 +340,8 @@
             <canvas id="clusterCanvas"></canvas>
         </div>
         
-        <!-- Star markers container (will be positioned absolutely) -->
-        <div id="starMarkers"></div>
+        <!-- Star markers container -->
+        <div class="star-markers-container" id="starMarkersContainer"></div>
         
         <!-- UI Elements -->
         <div class="ui-header" id="clusterTitle">Star Cluster</div>
@@ -378,13 +371,16 @@
         const canvas = document.getElementById('clusterCanvas');
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('canvasContainer');
+        const markersContainer = document.getElementById('starMarkersContainer');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
-            Telegram.WebApp.disableVerticalSwipes(); // Prevent app minimize
+            if (Telegram.WebApp.disableVerticalSwipes) {
+                Telegram.WebApp.disableVerticalSwipes();
+            }
         }
         
         // ===== SEEDED RANDOM =====
@@ -459,7 +455,7 @@
                 { type: 'purple', prob: 0.05 }
             ];
             
-            // Create a larger canvas area (200x200%) for panning
+            // Create stars spread across the canvas
             for (let i = 0; i < starCount; i++) {
                 const rand = seededRandom(clusterSeed, i * 10);
                 let cumulative = 0;
@@ -475,7 +471,7 @@
                 
                 const name = generateStarName(clusterSeed, i * 100);
                 
-                // Spread stars across a larger area (20% to 80% of expanded canvas)
+                // Spread stars across the canvas (10% to 90% range)
                 const x = seededRandomRange(clusterSeed, i * 10 + 1, 10, 90);
                 const y = seededRandomRange(clusterSeed, i * 10 + 2, 10, 90);
                 
@@ -510,44 +506,43 @@
         let panzoomInstance;
         
         function initPanzoom() {
-            // Set canvas size to be larger for panning
-            canvas.width = window.innerWidth * 2;
-            canvas.height = window.innerHeight * 2;
+            // Set canvas size
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
             
             panzoomInstance = Panzoom(canvas, {
                 maxScale: 3,
-                minScale: 0.8,
+                minScale: 1,
                 contain: 'outside',
                 canvas: true,
                 startScale: 1,
-                startX: (canvas.width - window.innerWidth) / 2,
-                startY: (canvas.height - window.innerHeight) / 2
+                startX: 0,
+                startY: 0
             });
             
             container.addEventListener('wheel', panzoomInstance.zoomWithWheel);
             
             // Update marker positions on pan/zoom
-            canvas.addEventListener('panzoomchange', updateMarkerPositions);
-        }
-        
-        function updateMarkerPositions() {
-            const markers = document.getElementById('starMarkers');
-            const scale = panzoomInstance.getScale();
-            const pan = panzoomInstance.getPan();
-            
-            markers.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${scale})`;
+            canvas.addEventListener('panzoom', function(e) {
+                const scale = panzoomInstance.getScale();
+                const pan = panzoomInstance.getPan();
+                markersContainer.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${scale})`;
+            });
         }
         
         // ===== DRAW BACKGROUND =====
         function drawBackground() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Distant background stars
-            for (let i = 0; i < 2000; i++) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Background stars
+            for (let i = 0; i < 500; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
                 const size = Math.random() * 2;
-                const opacity = Math.random() * 0.1 + 0.03;
+                const opacity = Math.random() * 0.1 + 0.02;
                 
                 ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
                 ctx.beginPath();
@@ -556,12 +551,9 @@
             }
             
             // Cluster nebula glow
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            
             const gradient = ctx.createRadialGradient(
                 centerX, centerY, 0,
-                centerX, centerY, canvas.width * 0.3
+                centerX, centerY, canvas.width * 0.4
             );
             
             gradient.addColorStop(0, 'rgba(90, 70, 140, 0.1)');
@@ -570,18 +562,29 @@
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw actual stars on canvas as additional visual
+            stars.forEach(star => {
+                const x = (star.x / 100) * canvas.width;
+                const y = (star.y / 100) * canvas.height;
+                
+                // Draw a small dot for the star
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fill();
+            });
         }
         
         // ===== CREATE STAR MARKERS =====
         function createStarMarkers() {
-            const container = document.getElementById('starMarkers');
-            container.innerHTML = '';
+            markersContainer.innerHTML = '';
             
             stars.forEach((star, index) => {
                 const marker = document.createElement('div');
                 marker.className = `star-marker star-${star.type}`;
-                marker.style.left = (star.x / 100 * canvas.width) + 'px';
-                marker.style.top = (star.y / 100 * canvas.height) + 'px';
+                marker.style.left = star.x + '%';
+                marker.style.top = star.y + '%';
                 marker.setAttribute('onclick', `selectStar(${index})`);
                 
                 marker.innerHTML = `
@@ -590,7 +593,7 @@
                     <span class="star-label">${star.name}</span>
                 `;
                 
-                container.appendChild(marker);
+                markersContainer.appendChild(marker);
             });
         }
         
@@ -605,17 +608,17 @@
         function zoomOut() {
             if (panzoomInstance) {
                 const scale = panzoomInstance.getScale();
-                panzoomInstance.zoomTo(scale - 0.3);
+                if (scale > 1) {
+                    panzoomInstance.zoomTo(scale - 0.3);
+                }
             }
         }
         
         function resetZoom() {
             if (panzoomInstance) {
                 panzoomInstance.zoomTo(1);
-                panzoomInstance.panTo(
-                    (canvas.width - window.innerWidth) / 2,
-                    (canvas.height - window.innerHeight) / 2
-                );
+                panzoomInstance.panTo(0, 0);
+                markersContainer.style.transform = 'translate(0px, 0px) scale(1)';
             }
         }
         
@@ -656,9 +659,8 @@
             createStarMarkers();
             
             window.addEventListener('resize', () => {
-                // Reinitialize on resize
-                canvas.width = window.innerWidth * 2;
-                canvas.height = window.innerHeight * 2;
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
                 drawBackground();
                 createStarMarkers();
             });
