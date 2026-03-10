@@ -74,6 +74,21 @@
             animation: pulse 1.5s infinite;
         }
         
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #6a8ac0;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
@@ -540,6 +555,19 @@
             0%, 100% { opacity: 0.1; }
             50% { opacity: 0.2; }
         }
+        
+        /* Planet count indicator */
+        .planet-count {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #a0b0c0;
+            font-size: 11px;
+            background: rgba(10,10,26,0.5);
+            padding: 4px 8px;
+            border-radius: 20px;
+            border: 1px solid #a0b0c0;
+        }
     </style>
 </head>
 <body>
@@ -566,6 +594,9 @@
                 </div>
                 <div class="star-label" id="starLabel">Star Name</div>
                 <div class="star-type" id="starType">Main Sequence</div>
+                
+                <!-- Planet count indicator -->
+                <div class="planet-count" id="planetCount">0 planets</div>
                 
                 <!-- Container for orbiting bodies -->
                 <div class="orbit-container" id="orbitContainer"></div>
@@ -603,15 +634,13 @@
                 
                 <!-- Loading Overlay -->
                 <div class="loading-overlay" id="loadingOverlay">
-                    <div class="loading-text">warping...</div>
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">warping to surface...</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/procedural-universe.js"></script>
-    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -622,10 +651,51 @@
             tg.setBackgroundColor('#0a0a1a');
         }
         
-        // ===== LOAD SELECTED STAR =====
-        const starName = localStorage.getItem('voidfarer_current_star') || 'Unknown Star';
-        const starIndex = parseInt(localStorage.getItem('voidfarer_current_star_index')) || 0;
-        const starType = localStorage.getItem('voidfarer_current_star_type') || 'main';
+        // ===== SIMPLE SEEDED RANDOM =====
+        const UNIVERSE_SEED = 42793;
+        
+        function seededRandom(seed, index = 0) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+        
+        function seededRandomRange(seed, index, min, max) {
+            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+        }
+        
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+        
+        // ===== LOAD DATA FROM STORAGE =====
+        function getCurrentSector() {
+            return localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+        }
+        
+        function getCurrentNebula() {
+            return localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+        }
+        
+        function getCurrentStar() {
+            return localStorage.getItem('voidfarer_current_star') || 'Unknown Star';
+        }
+        
+        function getCurrentStarIndex() {
+            return parseInt(localStorage.getItem('voidfarer_current_star_index')) || 0;
+        }
+        
+        function getCurrentStarType() {
+            return localStorage.getItem('voidfarer_current_star_type') || 'main';
+        }
+        
+        const starName = getCurrentStar();
+        const starIndex = getCurrentStarIndex();
+        const starType = getCurrentStarType();
         const currentSector = getCurrentSector();
         const currentNebula = getCurrentNebula();
         
@@ -684,7 +754,8 @@
             else if (starType === 'neutron') planetCount = 0;
             else if (starType === 'blackhole') planetCount = 0;
             
-            console.log(`Generating ${planetCount} planets for ${starName}`); // Debug log
+            console.log(`Generating ${planetCount} planets for ${starName}`);
+            document.getElementById('planetCount').textContent = planetCount + ' planets';
             
             // Planet type definitions
             const planetTypes = [
@@ -702,27 +773,38 @@
                 'Nova', 'Prime', 'Secundus', 'Tertius'
             ];
             
+            // Resource pools
+            const resourcePools = [
+                'Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 
+                'Uranium', 'Thorium', 'Titanium', 'Copper', 'Cobalt', 'Nickel',
+                'Promethium', 'Helium-3', 'Deuterium', 'Antimatter'
+            ];
+            
             // Generate each planet
             for (let i = 0; i < planetCount; i++) {
                 const planetSeed = systemSeed + (i * 100);
                 
-                // Determine planet type
-                const typeRand = seededRandom(planetSeed, 0);
+                // Determine planet type based on position (inner planets hotter, outer colder)
                 let planetType;
-                if (typeRand < 0.15) planetType = planetTypes[0]; // scorched
-                else if (typeRand < 0.4) planetType = planetTypes[1]; // barren
-                else if (typeRand < 0.55) planetType = planetTypes[2]; // lush
-                else if (typeRand < 0.75) planetType = planetTypes[3]; // frozen
-                else planetType = planetTypes[4]; // gas
+                if (i < planetCount * 0.2) {
+                    planetType = planetTypes[0]; // scorched (inner)
+                } else if (i < planetCount * 0.4) {
+                    planetType = planetTypes[1]; // barren
+                } else if (i < planetCount * 0.6) {
+                    planetType = planetTypes[2]; // lush (habitable zone)
+                } else if (i < planetCount * 0.8) {
+                    planetType = planetTypes[3]; // frozen
+                } else {
+                    planetType = planetTypes[4]; // gas giant (outer)
+                }
                 
-                // Generate resources
+                // Generate resources (2-4 per planet)
                 const resources = [];
                 const resourceCount = seededRandomRange(planetSeed, 1, 2, 4);
-                const resourcePool = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 'Uranium', 'Promethium'];
                 
                 for (let r = 0; r < resourceCount; r++) {
-                    const resourceIndex = Math.floor(seededRandom(planetSeed, 100 + r) * resourcePool.length);
-                    const resource = resourcePool[resourceIndex];
+                    const resourceIndex = Math.floor(seededRandom(planetSeed, 100 + r) * resourcePools.length);
+                    const resource = resourcePools[resourceIndex];
                     if (!resources.includes(resource)) {
                         resources.push(resource);
                     }
@@ -732,7 +814,7 @@
                 const prefixIndex = Math.floor(seededRandom(planetSeed, 2) * planetPrefixes.length);
                 const planetName = planetPrefixes[prefixIndex] + '-' + (i + 1);
                 
-                // Determine moon count
+                // Determine moon count (gas giants have more moons)
                 let moonCount = 0;
                 if (planetType.type === 'gas') {
                     moonCount = seededRandomRange(planetSeed, 3, 3, 8);
@@ -751,9 +833,9 @@
                     landable: planetType.landable,
                     resources: resources,
                     moonCount: moonCount,
-                    orbitRadius: 70 + i * 25,
-                    orbitSpeed: 0.001 - (i * 0.0001),
-                    description: `A ${planetType.name.toLowerCase()} world orbiting ${starName}.`
+                    orbitRadius: 60 + i * 28, // Increasing distance from star
+                    orbitSpeed: 0.002 - (i * 0.00015), // Outer planets orbit slower
+                    description: `A ${planetType.name.toLowerCase()} world orbiting ${starName}. ${resources.slice(0, 3).join(', ')} detected.`
                 });
             }
             
@@ -765,7 +847,7 @@
         const planets = generatePlanets();
         const bodyElements = new Map();
         
-        console.log(`Rendering ${planets.length} planets`); // Debug log
+        console.log(`Rendering ${planets.length} planets`);
         
         function createPlanet(planet, index) {
             const container = document.createElement('div');
@@ -795,7 +877,7 @@
                 element: container,
                 visual: visual,
                 planet: planet,
-                angle: index * 1.5
+                angle: index * 1.2
             });
             
             // Generate moons
@@ -815,7 +897,7 @@
             visual.id = `moon-${planet.index}-${moonIndex}`;
             
             // Generate moon name (letter designation)
-            const moonLetter = String.fromCharCode(97 + moonIndex);
+            const moonLetter = String.fromCharCode(97 + moonIndex); // a, b, c, etc.
             
             visual.innerHTML = `
                 <div class="body-glow"></div>
@@ -832,12 +914,15 @@
                 planet: {
                     name: `${planet.name}-${moonLetter}`,
                     type: 'barren',
+                    temp: '-50°C',
+                    atmos: 'None',
+                    gravity: '0.2g',
                     landable: true
                 },
                 parentPlanet: planet,
                 moonIndex: moonIndex,
                 angle: moonIndex * 2,
-                orbitRadius: 20 + moonIndex * 5
+                orbitRadius: 18 + moonIndex * 4
             });
         }
         
@@ -871,14 +956,14 @@
                     data.angle += data.planet.orbitSpeed || 0.0005;
                     
                     const x = data.planet.orbitRadius * Math.cos(data.angle);
-                    const y = data.planet.orbitRadius * Math.sin(data.angle) * 0.6;
+                    const y = data.planet.orbitRadius * Math.sin(data.angle) * 0.6; // Flatten for perspective
                     
                     data.element.style.transform = `translate(${x}px, ${y}px)`;
                     data.x = x;
                     data.y = y;
                 } else if (data.parentPlanet) {
                     // Moon orbiting planet
-                    data.angle += 0.002;
+                    data.angle += 0.003;
                     
                     const parent = bodyElements.get(data.parentPlanet.index);
                     if (parent) {
@@ -993,7 +1078,7 @@
         
         // Initialize
         function init() {
-            const player = getPlayer();
+            const player = localStorage.getItem('voidfarer_player');
             if (!player) {
                 window.location.href = 'index.html';
                 return;
