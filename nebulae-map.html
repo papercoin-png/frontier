@@ -164,10 +164,26 @@
             pointer-events: none;
         }
         
+        .nebula-sector {
+            position: absolute;
+            left: 50%;
+            top: 100px;
+            transform: translateX(-50%);
+            color: #6a8ac0;
+            font-size: 9px;
+            white-space: nowrap;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        
         .nebula-region:hover .nebula-name,
         .nebula-region:hover .nebula-count,
+        .nebula-region:hover .nebula-sector,
         .nebula-region.selected .nebula-name,
-        .nebula-region.selected .nebula-count {
+        .nebula-region.selected .nebula-count,
+        .nebula-region.selected .nebula-sector {
             opacity: 1;
         }
         
@@ -194,7 +210,7 @@
             pointer-events: none;
         }
         
-        /* UI Controls - Moonlit theme */
+        /* UI Controls */
         .map-controls {
             position: absolute;
             bottom: 30px;
@@ -251,7 +267,30 @@
             transform: scale(0.96);
         }
         
-        .zoom-indicator {
+        .galaxy-btn {
+            position: absolute;
+            top: 30px;
+            right: 20px;
+            z-index: 50;
+            background: rgba(10, 10, 26, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #a0b0c0;
+            color: #d0e0f0;
+            padding: 8px 20px;
+            border-radius: 40% 20% 40% 20%;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+        }
+        
+        .galaxy-btn:active {
+            background: #a0b0c0;
+            color: #0a0a1a;
+            transform: scale(0.96);
+        }
+        
+        .sector-indicator {
             position: absolute;
             top: 30px;
             left: 50%;
@@ -267,7 +306,7 @@
             font-family: 'WindSong', cursive;
         }
         
-        /* Info Panel - Moonlit theme */
+        /* Info Panel */
         .info-panel {
             position: absolute;
             bottom: 30px;
@@ -443,60 +482,13 @@
             <canvas class="nebulae-canvas" id="nebulaeCanvas"></canvas>
             
             <!-- Map container with regions -->
-            <div class="map-container" id="mapContainer">
-                <!-- Orion Nebula -->
-                <div class="nebula-region" id="orion" style="left: 25%; top: 30%;" onclick="selectNebula('orion')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #8a6aff, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #8a6aff; box-shadow: 0 0 30px #8a6aff;"></div>
-                    <span class="nebula-name">Orion Nebula</span>
-                    <span class="nebula-count">43 systems</span>
-                </div>
-                
-                <!-- Cygnus Nebula -->
-                <div class="nebula-region" id="cygnus" style="left: 45%; top: 25%;" onclick="selectNebula('cygnus')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #ff6a9a, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #ff6a9a; box-shadow: 0 0 30px #ff6a9a;"></div>
-                    <span class="nebula-name">Cygnus Nebula</span>
-                    <span class="nebula-count">57 systems</span>
-                </div>
-                
-                <!-- Sagittarius Nebula -->
-                <div class="nebula-region" id="sagittarius" style="left: 35%; top: 65%;" onclick="selectNebula('sagittarius')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #ffaa4a, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #ffaa4a; box-shadow: 0 0 30px #ffaa4a;"></div>
-                    <span class="nebula-name">Sagittarius</span>
-                    <span class="nebula-count">38 systems</span>
-                </div>
-                
-                <!-- Perseus Nebula -->
-                <div class="nebula-region" id="perseus" style="left: 60%; top: 35%;" onclick="selectNebula('perseus')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #4affaa, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #4affaa; box-shadow: 0 0 30px #4affaa;"></div>
-                    <span class="nebula-name">Perseus Nebula</span>
-                    <span class="nebula-count">62 systems</span>
-                </div>
-                
-                <!-- Carina Nebula -->
-                <div class="nebula-region" id="carina" style="left: 55%; top: 70%;" onclick="selectNebula('carina')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #c06aff, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #c06aff; box-shadow: 0 0 30px #c06aff;"></div>
-                    <span class="nebula-name">Carina Nebula</span>
-                    <span class="nebula-count">51 systems</span>
-                </div>
-                
-                <!-- Outer Nebula -->
-                <div class="nebula-region" id="outer" style="left: 75%; top: 45%;" onclick="selectNebula('outer')">
-                    <div class="nebula-glow" style="background: radial-gradient(circle at center, #8a8aaa, transparent 80%);"></div>
-                    <div class="nebula-core" style="background: #8a8aaa; box-shadow: 0 0 30px #8a8aaa;"></div>
-                    <span class="nebula-name">Outer Nebula</span>
-                    <span class="nebula-count">29 systems</span>
-                </div>
-            </div>
+            <div class="map-container" id="mapContainer"></div>
             
             <!-- UI Controls -->
             <button class="back-btn" onclick="returnToShip()">← SHIP</button>
+            <button class="galaxy-btn" onclick="returnToGalaxy()">🌌 GALAXY</button>
             
-            <div class="zoom-indicator" id="zoomIndicator">NEBULAE MAP</div>
+            <div class="sector-indicator" id="sectorIndicator">Orion Arm • Sector B2</div>
             
             <div class="map-controls">
                 <button class="map-btn" onclick="zoomIn()">+</button>
@@ -512,15 +504,15 @@
                 <div class="info-details">
                     <div class="info-item">
                         <div class="info-label">SYSTEMS</div>
-                        <div class="info-value" id="infoSystems">43</div>
+                        <div class="info-value" id="infoSystems">50</div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">EXPLORED</div>
                         <div class="info-value" id="infoExplored">12</div>
                     </div>
                     <div class="info-item">
-                        <div class="info-label">DISTANCE</div>
-                        <div class="info-value" id="infoDistance">2.3k ly</div>
+                        <div class="info-label">SECTOR</div>
+                        <div class="info-value" id="infoSector">B2</div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">TYPE</div>
@@ -550,6 +542,50 @@
             tg.setHeaderColor('#0a0a1a');
             tg.setBackgroundColor('#0a0a1a');
         }
+        
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
+        const CURRENT_SECTOR = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+        
+        // ===== NEBULA DATA (6 per sector, procedural from seed) =====
+        function generateNebulaeForSector(sector) {
+            // Use sector to seed nebula generation
+            const sectorSeed = UNIVERSE_SEED + (sector.charCodeAt(0) * 1000) + (parseInt(sector[1]) * 100);
+            
+            const nebulaNames = [
+                'Orion', 'Cygnus', 'Sagittarius', 'Perseus', 'Carina', 'Eagle',
+                'Omega', 'Trifid', 'Lagoon', 'Veil', 'Crab', 'Helix',
+                'Rosette', 'Tarantula', 'Pelican', 'North America', 'Elephant Trunk', 'Bubble'
+            ];
+            
+            const nebulaTypes = ['Emission', 'Supernova', 'Dark', 'Reflection', 'Planetary', 'Star-forming'];
+            const colors = ['#8a6aff', '#ff6a9a', '#ffaa4a', '#4affaa', '#c06aff', '#6a8aff'];
+            
+            const nebulae = [];
+            
+            // Generate 6 nebulae for this sector
+            for (let i = 0; i < 6; i++) {
+                const nameIndex = (sectorSeed + i * 7) % nebulaNames.length;
+                const typeIndex = (sectorSeed + i * 13) % nebulaTypes.length;
+                const colorIndex = (sectorSeed + i * 23) % colors.length;
+                
+                nebulae.push({
+                    id: `nebula-${sector}-${i}`,
+                    name: nebulaNames[nameIndex] + ' Nebula',
+                    type: nebulaTypes[typeIndex],
+                    color: colors[colorIndex],
+                    systems: 50, // Fixed: 50 stars per nebula
+                    explored: Math.floor(Math.random() * 20) + 1, // Random for demo
+                    posX: 20 + (i * 12), // Position in grid
+                    posY: 30 + (i % 2 === 0 ? 0 : 20)
+                });
+            }
+            
+            return nebulae;
+        }
+        
+        // Generate nebulae for current sector
+        const nebulae = generateNebulaeForSector(CURRENT_SECTOR);
         
         // ===== STAR FIELD GENERATION =====
         function generateStars() {
@@ -586,24 +622,15 @@
         function drawNebulae() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw colorful nebula backgrounds
-            const regions = [
-                { x: 0.25, y: 0.3, color: '#8a6aff', size: 0.3 }, // Orion
-                { x: 0.45, y: 0.25, color: '#ff6a9a', size: 0.35 }, // Cygnus
-                { x: 0.35, y: 0.65, color: '#ffaa4a', size: 0.25 }, // Sagittarius
-                { x: 0.6, y: 0.35, color: '#4affaa', size: 0.3 }, // Perseus
-                { x: 0.55, y: 0.7, color: '#c06aff', size: 0.28 }, // Carina
-                { x: 0.75, y: 0.45, color: '#8a8aaa', size: 0.2 } // Outer
-            ];
-            
-            regions.forEach(region => {
-                const x = region.x * canvas.width;
-                const y = region.y * canvas.height;
-                const radius = canvas.width * region.size;
+            // Draw nebulae backgrounds
+            nebulae.forEach((nebula, index) => {
+                const x = nebula.posX / 100 * canvas.width;
+                const y = nebula.posY / 100 * canvas.height;
+                const radius = canvas.width * 0.25;
                 
                 const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                gradient.addColorStop(0, region.color + '40');
-                gradient.addColorStop(0.5, region.color + '10');
+                gradient.addColorStop(0, nebula.color + '40');
+                gradient.addColorStop(0.5, nebula.color + '10');
                 gradient.addColorStop(1, 'transparent');
                 
                 ctx.fillStyle = gradient;
@@ -617,26 +644,53 @@
             ctx.lineWidth = 1;
             ctx.setLineDash([5, 5]);
             
-            const points = regions.map(r => ({
-                x: r.x * canvas.width,
-                y: r.y * canvas.height
-            }));
-            
-            // Connect nearby regions
-            for (let i = 0; i < points.length; i++) {
-                for (let j = i + 1; j < points.length; j++) {
-                    const dx = points[i].x - points[j].x;
-                    const dy = points[i].y - points[j].y;
+            for (let i = 0; i < nebulae.length; i++) {
+                for (let j = i + 1; j < nebulae.length; j++) {
+                    const x1 = nebulae[i].posX / 100 * canvas.width;
+                    const y1 = nebulae[i].posY / 100 * canvas.height;
+                    const x2 = nebulae[j].posX / 100 * canvas.width;
+                    const y2 = nebulae[j].posY / 100 * canvas.height;
+                    
+                    const dx = x1 - x2;
+                    const dy = y1 - y2;
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
                     if (dist < canvas.width * 0.4) {
                         ctx.beginPath();
-                        ctx.moveTo(points[i].x, points[i].y);
-                        ctx.lineTo(points[j].x, points[j].y);
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
                         ctx.stroke();
                     }
                 }
             }
+        }
+        
+        // ===== RENDER NEBULAE REGIONS =====
+        function renderNebulae() {
+            const mapContainer = document.getElementById('mapContainer');
+            mapContainer.innerHTML = '';
+            
+            nebulae.forEach((nebula, index) => {
+                const region = document.createElement('div');
+                region.className = 'nebula-region';
+                region.id = nebula.id;
+                region.style.left = nebula.posX + '%';
+                region.style.top = nebula.posY + '%';
+                region.setAttribute('onclick', `selectNebula('${nebula.id}')`);
+                
+                region.innerHTML = `
+                    <div class="nebula-glow" style="background: radial-gradient(circle at center, ${nebula.color}, transparent 80%);"></div>
+                    <div class="nebula-core" style="background: ${nebula.color}; box-shadow: 0 0 30px ${nebula.color};"></div>
+                    <span class="nebula-name">${nebula.name}</span>
+                    <span class="nebula-count">${nebula.systems} systems</span>
+                    <span class="nebula-sector">Sector ${CURRENT_SECTOR}</span>
+                `;
+                
+                mapContainer.appendChild(region);
+            });
+            
+            // Update sector indicator
+            document.getElementById('sectorIndicator').textContent = `Orion Arm • Sector ${CURRENT_SECTOR}`;
         }
         
         // ===== MAP STATE =====
@@ -645,64 +699,6 @@
         const mapContainer = document.getElementById('mapContainer');
         const loadingOverlay = document.getElementById('loadingOverlay');
         const infoPanel = document.getElementById('infoPanel');
-        
-        // Nebula data
-        const nebulae = {
-            orion: {
-                name: 'Orion Nebula',
-                systems: 43,
-                explored: 12,
-                distance: '2.3k ly',
-                type: 'Emission',
-                color: '#8a6aff',
-                desc: 'A stellar nursery where new stars are born. Rich in rare elements.'
-            },
-            cygnus: {
-                name: 'Cygnus Nebula',
-                systems: 57,
-                explored: 8,
-                distance: '3.1k ly',
-                type: 'Supernova Remnant',
-                color: '#ff6a9a',
-                desc: 'Home to massive blue giants and colorful gas clouds.'
-            },
-            sagittarius: {
-                name: 'Sagittarius Nebula',
-                systems: 38,
-                explored: 19,
-                distance: '1.8k ly',
-                type: 'Dark Nebula',
-                color: '#ffaa4a',
-                desc: 'Near the galactic core. Ancient stars and dense clusters.'
-            },
-            perseus: {
-                name: 'Perseus Nebula',
-                systems: 62,
-                explored: 4,
-                distance: '4.2k ly',
-                type: 'Reflection Nebula',
-                color: '#4affaa',
-                desc: 'Vast star-forming regions with young stellar clusters.'
-            },
-            carina: {
-                name: 'Carina Nebula',
-                systems: 51,
-                explored: 7,
-                distance: '3.7k ly',
-                type: 'Emission Nebula',
-                color: '#c06aff',
-                desc: 'Home to some of the most massive stars in the galaxy.'
-            },
-            outer: {
-                name: 'Outer Nebula',
-                systems: 29,
-                explored: 2,
-                distance: '5.1k ly',
-                type: 'Planetary Nebula',
-                color: '#8a8aaa',
-                desc: 'The mysterious edge of known space. Few have ventured here.'
-            }
-        };
         
         function selectNebula(id) {
             // Remove previous selection
@@ -714,15 +710,19 @@
             const element = document.getElementById(id);
             if (element) {
                 element.classList.add('selected');
-                currentNebula = id;
+                
+                // Find nebula data
+                const nebula = nebulae.find(n => n.id === id);
+                if (!nebula) return;
+                
+                currentNebula = nebula;
                 
                 // Update info panel
-                const nebula = nebulae[id];
                 document.getElementById('infoTitle').textContent = nebula.name;
-                document.getElementById('infoDesc').textContent = nebula.desc;
+                document.getElementById('infoDesc').textContent = `A ${nebula.type.toLowerCase()} nebula in Sector ${CURRENT_SECTOR}. ${nebula.systems} star systems to explore.`;
                 document.getElementById('infoSystems').textContent = nebula.systems;
                 document.getElementById('infoExplored').textContent = nebula.explored;
-                document.getElementById('infoDistance').textContent = nebula.distance;
+                document.getElementById('infoSector').textContent = CURRENT_SECTOR;
                 document.getElementById('infoType').textContent = nebula.type;
                 
                 // Show panel
@@ -753,15 +753,15 @@
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
                 
-                const nebula = nebulae[currentNebula];
                 // Save the selected nebula
-                localStorage.setItem('voidfarer_current_nebula', nebula.name);
+                localStorage.setItem('voidfarer_current_nebula', currentNebula.name);
+                localStorage.setItem('voidfarer_current_galaxy_sector', CURRENT_SECTOR);
                 
                 // Navigate to sector map
                 window.location.href = 'nebula-sector.html';
                 
                 closeInfo();
-            }, 2000);
+            }, 1500);
         }
         
         function returnToShip() {
@@ -769,25 +769,27 @@
             window.location.href = 'ship-bridge.html';
         }
         
+        function returnToGalaxy() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'galaxy-map.html';
+        }
+        
         // Zoom controls
         function zoomIn() {
             scale = Math.min(scale + 0.2, 2);
             mapContainer.style.transform = `scale(${scale})`;
-            document.getElementById('zoomIndicator').textContent = `${Math.round(scale * 100)}% ZOOM`;
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
         function zoomOut() {
             scale = Math.max(scale - 0.2, 0.5);
             mapContainer.style.transform = `scale(${scale})`;
-            document.getElementById('zoomIndicator').textContent = `${Math.round(scale * 100)}% ZOOM`;
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
         function resetView() {
             scale = 1;
             mapContainer.style.transform = `scale(1)`;
-            document.getElementById('zoomIndicator').textContent = 'NEBULAE MAP';
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
@@ -795,6 +797,7 @@
         function init() {
             generateStars();
             resizeCanvas();
+            renderNebulae();
             
             window.addEventListener('resize', () => {
                 resizeCanvas();
