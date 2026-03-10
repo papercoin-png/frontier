@@ -337,6 +337,9 @@
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/procedural-universe.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -347,16 +350,13 @@
             tg.setBackgroundColor('#0a1a2a');
         }
         
-        // ===== CONSTANTS =====
-        const UNIVERSE_SEED = 42793;
-        
         // ===== LOAD LOCATION DATA =====
-        const planetName = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-        const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-        const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || ['Carbon', 'Iron', 'Gold'];
-        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-        const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-        const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
+        const planetName = getCurrentPlanet();
+        const planetType = getCurrentPlanetType();
+        const planetResources = getCurrentPlanetResources();
+        const currentSector = getCurrentSector();
+        const currentNebula = getCurrentNebula();
+        const currentStar = getCurrentStar();
         
         // Update UI
         document.getElementById('planetName').textContent = planetName;
@@ -376,7 +376,7 @@
         
         // Check if planet already has colony
         function checkForColony() {
-            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            const colonies = getColonies();
             const existingColony = colonies.find(c => 
                 c.planet === planetName && 
                 c.star === currentStar && 
@@ -390,12 +390,6 @@
                 return true;
             }
             return false;
-        }
-        
-        // ===== SEEDED RANDOM =====
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
         }
         
         // ===== ELEMENT RARITY SYSTEM =====
@@ -464,66 +458,47 @@
         
         // Load collection from localStorage
         function loadCollection() {
-            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const collection = getCollection();
             collectedCount = Object.keys(collection).length;
             collectionSpan.textContent = `✨ ${collectedCount}`;
         }
         
         // Save element to collection
         function saveElement(elementName) {
-            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            const collection = getCollection();
+            
+            const location = {
+                planet: planetName,
+                star: currentStar,
+                nebula: currentNebula,
+                sector: currentSector
+            };
             
             if (!collection[elementName]) {
                 collection[elementName] = {
-                    firstFound: new Date().toISOString(),
                     count: 1,
-                    location: {
-                        planet: planetName,
-                        star: currentStar,
-                        nebula: currentNebula,
-                        sector: currentSector
-                    }
+                    firstFound: new Date().toISOString(),
+                    location: location
                 };
             } else {
                 collection[elementName].count = (collection[elementName].count || 1) + 1;
             }
             
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+            saveCollection(collection);
             
             // Update missions
-            updateMissions(elementName);
+            updateMissionProgress(elementName, 1);
             
             // Update credits
-            updateCredits(elementName);
+            const element = elementMap[elementName];
+            if (element) {
+                addCredits(element.value);
+            }
+            
+            // Add to discovered locations
+            addDiscoveredLocation(location);
             
             return Object.keys(collection).length;
-        }
-        
-        // Update missions with collected element
-        function updateMissions(elementName) {
-            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [];
-            let updated = false;
-            
-            missions.forEach(mission => {
-                if (mission.element === elementName && mission.current < mission.target) {
-                    mission.current = (mission.current || 0) + 1;
-                    updated = true;
-                }
-            });
-            
-            if (updated) {
-                localStorage.setItem('voidfarer_missions', JSON.stringify(missions));
-            }
-        }
-        
-        // Update credits
-        function updateCredits(elementName) {
-            const element = elementMap[elementName];
-            if (!element) return;
-            
-            let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
-            credits += element.value;
-            localStorage.setItem('voidfarer_credits', credits.toString());
         }
         
         // Show auto notice
@@ -538,7 +513,7 @@
         let gatherInterval;
         
         function startAutoGather() {
-            const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
+            const autoGather = getAutoGatherEnabled();
             
             if (!autoGather) return;
             
@@ -546,19 +521,24 @@
             const planetSeed = UNIVERSE_SEED + 
                               (currentSector.charCodeAt(0) * 1000000) + 
                               (parseInt(currentSector[1]) * 100000) +
-                              currentNebula.length * 10000 +
-                              currentStar.length * 1000 +
-                              planetName.length * 100;
+                              hashString(currentNebula) * 100 +
+                              hashString(currentStar) * 10 +
+                              hashString(planetName);
             
             gatherInterval = setInterval(() => {
                 // Get available elements for this planet
                 const availableElements = planetResources;
                 
-                // Pick element based on seed + time for consistency
-                const timeSeed = Math.floor(Date.now() / 60000); // Change every minute
+                // Pick element based on seed + time for consistency (changes every minute)
+                const timeSeed = Math.floor(Date.now() / 60000);
                 const elementIndex = Math.floor(seededRandom(planetSeed + timeSeed, 0) * availableElements.length);
                 const elementName = availableElements[elementIndex];
-                const element = elementMap[elementName] || { name: elementName, color: '#ffffff', rarity: 'common', value: 100 };
+                const element = elementMap[elementName] || { 
+                    name: elementName, 
+                    color: '#ffffff', 
+                    rarity: 'common', 
+                    value: 100 
+                };
                 
                 // Save to collection
                 const newCount = saveElement(elementName);
@@ -600,7 +580,7 @@
         
         // ===== COLONY FUNCTIONS =====
         function toggleColony() {
-            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            const colonies = getColonies();
             const existingIndex = colonies.findIndex(c => 
                 c.planet === planetName && 
                 c.star === currentStar && 
@@ -611,7 +591,7 @@
                 // Remove colony
                 if (confirm('Abandon this colony?')) {
                     colonies.splice(existingIndex, 1);
-                    localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
+                    saveColonies(colonies);
                     
                     document.getElementById('colonyBtn').innerHTML = '🏭 ESTABLISH COLONY';
                     document.getElementById('colonyBtn').style.background = 'rgba(10, 20, 30, 0.5)';
@@ -624,7 +604,7 @@
                 // Establish colony
                 const colonyName = prompt('Name your colony:', planetName + ' Outpost');
                 if (colonyName) {
-                    colonies.push({
+                    const newColony = {
                         name: colonyName,
                         planet: planetName,
                         type: planetType,
@@ -633,9 +613,10 @@
                         sector: currentSector,
                         resources: planetResources,
                         established: new Date().toISOString()
-                    });
+                    };
                     
-                    localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
+                    colonies.push(newColony);
+                    saveColonies(colonies);
                     
                     document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
                     document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
@@ -644,9 +625,7 @@
                     showNotice(`🏭 ${colonyName} established`);
                     
                     // Bonus credits for establishing colony
-                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
-                    credits += 5000;
-                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    addCredits(5000);
                     
                     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
                 }
@@ -664,17 +643,13 @@
             showNotice(`✨ Collected ${sessionElements} elements`);
             
             setTimeout(() => {
-                navigateTo('system-view.html');
+                window.location.href = 'system-view.html';
             }, 1000);
-        }
-        
-        function navigateTo(screen) {
-            window.location.href = screen;
         }
         
         // ===== INITIALIZE =====
         function init() {
-            const player = localStorage.getItem('voidfarer_player');
+            const player = getPlayer();
             if (!player) {
                 window.location.href = 'index.html';
                 return;
@@ -690,8 +665,8 @@
             
             startAutoGather();
             
-            const autoGather = localStorage.getItem('voidfarer_auto_gather');
-            if (autoGather === 'false') {
+            const autoGather = getAutoGatherEnabled();
+            if (!autoGather) {
                 showNotice('⚠️ Auto-extractor disabled');
             }
         }
