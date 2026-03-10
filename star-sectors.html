@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Star Sectors</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .star-map-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            overflow: hidden;
+        }
+        
+        /* Canvas for star map */
+        #starMapCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            touch-action: none;
+        }
+        
+        /* UI Overlay */
+        .map-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(100, 150, 255, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(100, 150, 255, 0.15) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 11;
+        }
+        
+        .ui-header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 20px #8a6aff;
+            background: rgba(10,10,26,0.3);
+            backdrop-filter: blur(5px);
+            padding: 6px 20px;
+            border-radius: 40px 15px 40px 15px;
+            border: 1px solid #a0b0c0;
+            z-index: 20;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        .back-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            background: rgba(10,10,26,0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid #a0b0c0;
+            color: #d0e0f0;
+            padding: 10px 20px;
+            border-radius: 40px 15px 40px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        
+        .back-btn:active {
+            background: #a0b0c0;
+            color: #0a0a1a;
+            transform: scale(0.96);
+        }
+        
+        .region-info {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            background: rgba(10,10,26,0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid #a0b0c0;
+            color: #d0e0f0;
+            padding: 10px 16px;
+            border-radius: 30px 10px 30px 10px;
+            font-size: 12px;
+            z-index: 20;
+            text-align: center;
+            pointer-events: none;
+        }
+        
+        .region-name {
+            font-family: 'WindSong', cursive;
+            font-size: 14px;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        
+        /* Sector markers */
+        .sector-marker {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 15;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sector-marker:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        
+        .sector-marker:active {
+            transform: translate(-50%, -50%) scale(0.95);
+        }
+        
+        .sector-glow {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(106, 138, 255, 0.6), transparent 80%);
+            animation: pulse 3s infinite alternate;
+            z-index: 16;
+        }
+        
+        .sector-core {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffffff, #8a6aff);
+            box-shadow: 0 0 30px #8a6aff;
+            z-index: 17;
+            border: 2px solid rgba(255,255,255,0.5);
+        }
+        
+        .sector-label {
+            position: absolute;
+            top: 40px;
+            color: white;
+            font-family: 'WindSong', cursive;
+            font-size: 12px;
+            text-shadow: 0 0 10px #ffffff;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(5px);
+            padding: 4px 8px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.5);
+            white-space: nowrap;
+            z-index: 18;
+        }
+        
+        .star-count {
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            background: #ffaa4a;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 6px;
+            border-radius: 50%;
+            min-width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 0 15px #ffaa4a;
+            z-index: 19;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(1); }
+            100% { opacity: 0.8; transform: scale(1.3); }
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #8a6aff;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: white;
+            font-family: 'WindSong', cursive;
+            font-size: 20px;
+            text-shadow: 0 0 20px #8a6aff;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="star-map-view">
+            <canvas id="starMapCanvas"></canvas>
+            <div class="grid-overlay"></div>
+            
+            <div class="ui-header" id="regionTitle">Orion Sector</div>
+            <button class="back-btn" onclick="returnToGalaxy()">← GALAXY</button>
+            
+            <div class="region-info" id="regionInfo">
+                <div class="region-name" id="regionName">Orion Arm</div>
+                <div id="sectorCount">6 star sectors</div>
+                <div id="totalStars" style="font-size:11px; margin-top:3px;">2,400 total stars</div>
+            </div>
+            
+            <div id="sectorMarkers"></div>
+            
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">entering sector...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('starMapCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+        
+        // ===== LOAD REGION DATA =====
+        const currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
+        document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
+        document.getElementById('regionName').textContent = currentRegion + ' Arm';
+        
+        // ===== SECTOR POSITIONS WITH STAR COUNTS =====
+        const sectorData = {
+            'Orion': [
+                { name: 'Orion Molecular Cloud', x: 30, y: 40, stars: 85, type: 'Star-forming', icon: '🌟' },
+                { name: 'Barnard\'s Loop', x: 60, y: 30, stars: 62, type: 'Emission', icon: '🌀' },
+                { name: 'Lambda Orionis', x: 45, y: 60, stars: 48, type: 'Cluster', icon: '⭐' },
+                { name: 'Sigma Orionis', x: 70, y: 55, stars: 55, type: 'Multiple', icon: '✨' },
+                { name: 'Trapezium', x: 25, y: 65, stars: 120, type: 'Young', icon: '🌟' },
+                { name: 'NGC 1980', x: 55, y: 70, stars: 40, type: 'Reflection', icon: '💫' }
+            ],
+            'Cygnus': [
+                { name: 'Cygnus OB2', x: 35, y: 30, stars: 150, type: 'Association', icon: '🌟' },
+                { name: 'Veil Nebula', x: 65, y: 35, stars: 45, type: 'Supernova', icon: '🌀' },
+                { name: 'North America', x: 40, y: 60, stars: 70, type: 'Emission', icon: '🌫️' },
+                { name: 'Pelican', x: 60, y: 65, stars: 55, type: 'Emission', icon: '🌫️' },
+                { name: 'Crescent', x: 75, y: 45, stars: 35, type: 'Wolf-Rayet', icon: '✨' },
+                { name: 'Butterfly', x: 25, y: 70, stars: 25, type: 'Planetary', icon: '💫' }
+            ],
+            'Sagittarius': [
+                { name: 'Lagoon', x: 30, y: 35, stars: 95, type: 'Emission', icon: '🌫️' },
+                { name: 'Trifid', x: 55, y: 30, stars: 65, type: 'Mixed', icon: '🌀' },
+                { name: 'Omega', x: 45, y: 60, stars: 110, type: 'Star-forming', icon: '🌟' },
+                { name: 'Eagle', x: 70, y: 55, stars: 130, type: 'Star-forming', icon: '🌟' },
+                { name: 'M18', x: 25, y: 65, stars: 40, type: 'Cluster', icon: '⭐' },
+                { name: 'M25', x: 60, y: 70, stars: 55, type: 'Cluster', icon: '⭐' }
+            ],
+            'Perseus': [
+                { name: 'Double Cluster', x: 35, y: 30, stars: 200, type: 'Open Cluster', icon: '✨' },
+                { name: 'California', x: 60, y: 35, stars: 75, type: 'Emission', icon: '🌫️' },
+                { name: 'Heart', x: 45, y: 60, stars: 90, type: 'Emission', icon: '❤️' },
+                { name: 'Soul', x: 70, y: 55, stars: 85, type: 'Emission', icon: '💫' },
+                { name: 'Little Dumbbell', x: 25, y: 65, stars: 25, type: 'Planetary', icon: '🌀' },
+                { name: 'M34', x: 55, y: 70, stars: 60, type: 'Cluster', icon: '⭐' }
+            ],
+            'Carina': [
+                { name: 'Eta Carinae', x: 35, y: 30, stars: 180, type: 'Hypergiant', icon: '🌟' },
+                { name: 'Keyhole', x: 60, y: 35, stars: 95, type: 'Emission', icon: '🔑' },
+                { name: 'Homunculus', x: 45, y: 60, stars: 30, type: 'Bipolar', icon: '🌀' },
+                { name: 'Southern Pleiades', x: 70, y: 55, stars: 70, type: 'Cluster', icon: '⭐' },
+                { name: 'Wishing Well', x: 25, y: 65, stars: 85, type: 'Cluster', icon: '✨' },
+                { name: 'NGC 3293', x: 55, y: 70, stars: 65, type: 'Cluster', icon: '⭐' }
+            ],
+            'Outer': [
+                { name: 'Ghost', x: 35, y: 30, stars: 45, type: 'Reflection', icon: '👻' },
+                { name: 'Witch Head', x: 60, y: 35, stars: 55, type: 'Reflection', icon: '🧙' },
+                { name: 'Monkey Head', x: 45, y: 60, stars: 60, type: 'Emission', icon: '🐒' },
+                { name: 'Cone', x: 70, y: 55, stars: 70, type: 'Emission', icon: '🔺' },
+                { name: 'Christmas Tree', x: 25, y: 65, stars: 50, type: 'Cluster', icon: '🎄' },
+                { name: 'Iris', x: 55, y: 70, stars: 40, type: 'Reflection', icon: '🌸' }
+            ],
+            'Core': [
+                { name: 'Central Cluster', x: 50, y: 50, stars: 500, type: 'Galactic Core', icon: '🌌' },
+                { name: 'Quintuplet', x: 35, y: 40, stars: 85, type: 'Compact', icon: '✨' },
+                { name: 'Arches', x: 65, y: 45, stars: 120, type: 'Massive', icon: '🌟' },
+                { name: 'Sagittarius A*', x: 50, y: 60, stars: 200, type: 'Black Hole', icon: '⚫' },
+                { name: 'Nuclear Bulge', x: 40, y: 65, stars: 350, type: 'Old Stars', icon: '⭐' },
+                { name: 'Galactic Center', x: 60, y: 55, stars: 450, type: 'Core Region', icon: '🌠' }
+            ]
+        };
+        
+        const sectors = sectorData[currentRegion] || sectorData['Orion'];
+        document.getElementById('sectorCount').textContent = sectors.length + ' star sectors';
+        
+        const totalStars = sectors.reduce((sum, s) => sum + s.stars, 0);
+        document.getElementById('totalStars').textContent = totalStars.toLocaleString() + ' total stars';
+        
+        // ===== DRAW STAR MAP =====
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawStarMap();
+        }
+        
+        function drawStarMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // === 1. BACKGROUND STARS (much brighter) ===
+            for (let i = 0; i < 2000; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 2.5 + 0.5;
+                const opacity = Math.random() * 0.7 + 0.2; // Much brighter
+                
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // === 2. BRIGHTER STARS (occasional) ===
+            for (let i = 0; i < 100; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() * 4 + 2;
+                
+                ctx.fillStyle = `rgba(255, 240, 200, 0.9)`;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add glow
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            
+            // === 3. NEBULA GLOW ===
+            sectors.forEach(sector => {
+                const x = (sector.x / 100) * canvas.width;
+                const y = (sector.y / 100) * canvas.height;
+                
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 100);
+                gradient.addColorStop(0, 'rgba(106, 138, 255, 0.2)');
+                gradient.addColorStop(0.5, 'rgba(106, 138, 255, 0.05)');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, 100, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // === 4. GRID NUMBERS (star counts per grid section) ===
+            ctx.font = '10px monospace';
+            ctx.fillStyle = 'rgba(160, 176, 255, 0.5)';
+            
+            // Draw grid coordinates with star counts
+            for (let gx = 0; gx < canvas.width; gx += 80) {
+                for (let gy = 0; gy < canvas.height; gy += 80) {
+                    // Count stars in this grid cell
+                    let starCount = 0;
+                    for (let i = 0; i < 50; i++) {
+                        if (Math.random() < 0.3) starCount += Math.floor(Math.random() * 10);
+                    }
+                    
+                    ctx.fillStyle = 'rgba(160, 176, 255, 0.4)';
+                    ctx.fillText(starCount + '★', gx + 5, gy + 15);
+                }
+            }
+        }
+        
+        // ===== CREATE SECTOR MARKERS =====
+        function createSectorMarkers() {
+            const container = document.getElementById('sectorMarkers');
+            container.innerHTML = '';
+            
+            sectors.forEach((sector, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'sector-marker';
+                marker.style.left = sector.x + '%';
+                marker.style.top = sector.y + '%';
+                marker.setAttribute('onclick', `selectSector(${index})`);
+                
+                marker.innerHTML = `
+                    <div class="sector-glow"></div>
+                    <div class="sector-core"></div>
+                    <span class="sector-label">${sector.name}</span>
+                    <span class="star-count">${sector.stars}</span>
+                `;
+                
+                container.appendChild(marker);
+            });
+        }
+        
+        // ===== SECTOR SELECTION =====
+        function selectSector(index) {
+            const sector = sectors[index];
+            if (!sector) return;
+            
+            loadingOverlay.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                
+                localStorage.setItem('voidfarer_current_nebula', sector.name);
+                localStorage.setItem('voidfarer_current_sector_stars', sector.stars);
+                window.location.href = 'nebula-sector.html';
+            }, 1000);
+        }
+        
+        function returnToGalaxy() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'galaxy-map.html';
+        }
+        
+        // ===== INITIALIZE =====
+        function init() {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            resizeCanvas();
+            createSectorMarkers();
+            
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                createSectorMarkers();
+            });
+        }
+        
+        init();
+    </script>
+</body>
+</html>
