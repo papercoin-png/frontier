@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voidfarer - Surface</title>
+    <title>Voidfarer - System View</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
@@ -36,7 +36,7 @@
             background: #0a0a1a;
         }
         
-        .surface-view {
+        .app {
             position: relative;
             width: 100%;
             height: 100%;
@@ -79,762 +79,930 @@
             50% { opacity: 1; transform: scale(1.1); }
         }
         
-        /* Planet surface background */
-        .surface-bg {
+        /* ===== SYSTEM VIEW ===== */
+        .system-view {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            filter: brightness(0.9) saturate(1.1);
+            z-index: 40;
+            background: #0a0a1a;
+            overflow: hidden;
         }
         
-        /* Dark overlay for mood */
-        .atmosphere {
+        /* Nebula background */
+        .system-nebula {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 40%, rgba(120, 80, 160, 0.2) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 60%, rgba(60, 100, 140, 0.2) 0%, transparent 50%);
+            filter: blur(40px);
+            animation: drift-slow 120s infinite alternate;
+            z-index: 1;
+        }
+        
+        @keyframes drift-slow {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-5%, -5%); }
+        }
+        
+        /* Central Star */
+        .central-star {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            z-index: 10;
+            animation: star-pulse 8s infinite alternate;
+        }
+        
+        .star-core {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #ffffff;
+            filter: blur(15px);
+            opacity: 0.8;
+        }
+        
+        @keyframes star-pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
+        }
+        
+        /* Star label */
+        .star-label {
+            position: absolute;
+            top: calc(50% + 70px);
+            left: 50%;
+            transform: translateX(-50%);
+            color: #d0e0f0;
+            font-family: 'WindSong', cursive;
+            font-size: 22px;
+            text-shadow: 0 0 20px currentColor;
+            white-space: nowrap;
+            z-index: 6;
+            background: rgba(10,10,26,0.4);
+            backdrop-filter: blur(5px);
+            padding: 5px 20px;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #a0b0c0;
+        }
+        
+        /* Star type indicator */
+        .star-type {
+            position: absolute;
+            top: calc(50% + 110px);
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0b0c0;
+            font-size: 12px;
+            z-index: 6;
+            background: rgba(10,10,26,0.4);
+            backdrop-filter: blur(5px);
+            padding: 3px 15px;
+            border-radius: 20px;
+            border: 1px solid #a0b0c0;
+        }
+        
+        /* Container for orbiting bodies */
+        .orbit-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: radial-gradient(circle at center, transparent 30%, rgba(10, 20, 30, 0.5) 100%);
-            z-index: 2;
+            z-index: 20;
             pointer-events: none;
         }
         
-        /* Planet name overlay */
-        .planet-name-overlay {
+        /* Individual planet/moon container */
+        .orbital-body {
             position: absolute;
-            top: 30px;
+            top: 50%;
+            left: 50%;
+            transform-origin: 0 0;
+            z-index: 30;
+            transition: transform 0.1s linear;
+            pointer-events: auto;
+        }
+        
+        /* Planet/moon visual */
+        .body-visual {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: filter 0.3s;
+            z-index: 35;
+        }
+        
+        .body-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(5px);
+            animation: body-pulse 8s infinite alternate;
+        }
+        
+        .body-dot {
+            position: absolute;
+            border-radius: 50%;
+            box-shadow: 0 0 20px currentColor;
+            transition: all 0.2s;
+        }
+        
+        .body-label {
+            position: absolute;
+            left: 25px;
+            top: -10px;
+            color: #d0e0f0;
+            font-family: 'WindSong', cursive;
+            font-size: 12px;
+            white-space: nowrap;
+            text-shadow: 0 0 10px #a0b0c0;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            background: rgba(10,10,26,0.4);
+            backdrop-filter: blur(5px);
+            padding: 2px 8px;
+            border-radius: 20px 5px 20px 5px;
+            border: 1px solid #a0b0c0;
+        }
+        
+        .body-visual:hover .body-label {
+            opacity: 1;
+        }
+        
+        .body-visual.selected .body-dot {
+            transform: scale(1.3);
+            box-shadow: 0 0 40px currentColor, 0 0 60px #ffffff;
+        }
+        
+        .body-visual.selected .body-label {
+            opacity: 1;
+            font-size: 13px;
+            color: #ffffff;
+        }
+        
+        @keyframes body-pulse {
+            0% { opacity: 0.3; transform: scale(1); }
+            100% { opacity: 0.5; transform: scale(1.1); }
+        }
+        
+        /* Planet type styles */
+        .planet-lush .body-glow {
+            background: radial-gradient(circle at center, rgba(100, 200, 100, 0.4), transparent 80%);
+            width: 40px;
+            height: 40px;
+            top: -20px;
+            left: -20px;
+        }
+        .planet-lush .body-dot {
+            background: radial-gradient(circle at 30% 30%, #a0ffa0, #2e8b57);
+            width: 12px;
+            height: 12px;
+            top: -6px;
+            left: -6px;
+        }
+        
+        .planet-barren .body-glow {
+            background: radial-gradient(circle at center, rgba(160, 140, 120, 0.4), transparent 80%);
+            width: 30px;
+            height: 30px;
+            top: -15px;
+            left: -15px;
+        }
+        .planet-barren .body-dot {
+            background: radial-gradient(circle at 30% 30%, #c0b0a0, #8b6b4a);
+            width: 10px;
+            height: 10px;
+            top: -5px;
+            left: -5px;
+        }
+        
+        .planet-frozen .body-glow {
+            background: radial-gradient(circle at center, rgba(150, 200, 255, 0.4), transparent 80%);
+            width: 35px;
+            height: 35px;
+            top: -17px;
+            left: -17px;
+        }
+        .planet-frozen .body-dot {
+            background: radial-gradient(circle at 30% 30%, #d0f0ff, #4682b4);
+            width: 11px;
+            height: 11px;
+            top: -5.5px;
+            left: -5.5px;
+        }
+        
+        .planet-scorched .body-glow {
+            background: radial-gradient(circle at center, rgba(255, 150, 100, 0.4), transparent 80%);
+            width: 38px;
+            height: 38px;
+            top: -19px;
+            left: -19px;
+        }
+        .planet-scorched .body-dot {
+            background: radial-gradient(circle at 30% 30%, #ffb090, #cd5c5c);
+            width: 12px;
+            height: 12px;
+            top: -6px;
+            left: -6px;
+        }
+        
+        .planet-gas .body-glow {
+            background: radial-gradient(circle at center, rgba(200, 150, 255, 0.4), transparent 80%);
+            width: 45px;
+            height: 45px;
+            top: -22px;
+            left: -22px;
+        }
+        .planet-gas .body-dot {
+            background: radial-gradient(circle at 30% 30%, #e0c0ff, #9370db);
+            width: 14px;
+            height: 14px;
+            top: -7px;
+            left: -7px;
+        }
+        
+        .moon .body-glow {
+            width: 20px !important;
+            height: 20px !important;
+            top: -10px !important;
+            left: -10px !important;
+        }
+        .moon .body-dot {
+            width: 6px !important;
+            height: 6px !important;
+            top: -3px !important;
+            left: -3px !important;
+        }
+        
+        /* Info Panel */
+        .planet-info-panel {
+            position: absolute;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            color: #ffffff;
+            width: 280px;
+            background: rgba(20, 15, 30, 0.8);
+            backdrop-filter: blur(15px);
+            border: 2px solid #a0b0c0;
+            border-radius: 40% 20% 40% 20%;
+            padding: 20px;
+            z-index: 100;
+            text-align: center;
+            color: #d0e0f0;
+            display: none;
+        }
+        
+        .planet-info-panel.visible {
+            display: block;
+            animation: panel-appear 0.3s ease;
+        }
+        
+        @keyframes panel-appear {
+            0% { transform: translateX(-50%) scale(0.8); opacity: 0; }
+            100% { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+        
+        .planet-info-name {
             font-family: 'WindSong', cursive;
             font-size: 28px;
-            text-shadow: 0 0 20px #000, 0 0 40px #4a8ac0;
-            background: rgba(0,0,0,0.3);
-            padding: 8px 30px;
-            border-radius: 60px 15px 60px 15px;
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            z-index: 10;
-            white-space: nowrap;
-            max-width: 90%;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            color: #ffffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px currentColor;
         }
         
-        /* Location Info */
-        .location-info {
-            position: absolute;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #a0c0ff;
-            font-size: 12px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            padding: 4px 16px;
-            border-radius: 40px 10px 40px 10px;
-            border: 1px solid #8ac0d0;
-            z-index: 10;
-            white-space: nowrap;
-            font-family: monospace;
+        .planet-info-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 15px 0;
         }
         
-        /* Auto-extractor notice */
-        .auto-notice {
-            position: absolute;
-            top: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(10, 20, 30, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 8px 20px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            z-index: 15;
-            opacity: 0;
-            animation: notice-fade 4s ease-out forwards;
-            white-space: nowrap;
-            pointer-events: none;
+        .planet-info-item {
+            background: rgba(10, 10, 26, 0.5);
+            border-radius: 30% 20% 30% 20%;
+            padding: 8px;
         }
         
-        @keyframes notice-fade {
-            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            80% { opacity: 1; }
-            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        }
-        
-        /* Resource log (bottom left) */
-        .resource-log {
-            position: absolute;
-            bottom: 120px;
-            left: 20px;
-            z-index: 20;
-            font-family: monospace;
-            font-size: 14px;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
-            pointer-events: none;
-            max-width: 70%;
-            background: rgba(10,10,26,0.3);
-            backdrop-filter: blur(5px);
-            padding: 10px;
-            border-radius: 30px 10px 30px 10px;
-            border: 1px solid #8ac0d0;
-            min-width: 150px;
-        }
-        
-        .log-entry {
-            margin-bottom: 4px;
-            opacity: 0.9;
-            animation: fadeIn 0.5s;
-            word-break: break-word;
-            padding: 2px 0;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 0.9; transform: translateX(0); }
-        }
-        
-        /* Collection counter */
-        .collection {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            z-index: 20;
-            font-size: 24px;
-            font-family: 'WindSong', cursive;
-            color: #e0f0f0;
-            text-shadow: 0 0 20px #8aa0aa;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            padding: 10px 20px;
-            border-radius: 60px 15px 60px 15px;
-            border: 2px solid #8ac0d0;
-            min-width: 80px;
-            text-align: center;
-        }
-        
-        /* Return button */
-        .return-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 12px 24px;
-            border-radius: 60px 15px 60px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
-            font-weight: 600;
+        .info-item-label {
+            font-size: 10px;
+            color: #a0b0c0;
             letter-spacing: 1px;
         }
         
-        .return-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
-            border-color: #c0e0f0;
+        .info-item-value {
+            font-size: 14px;
+            font-weight: 700;
         }
         
-        /* Resource indicators */
-        .resource-indicator {
-            position: absolute;
-            top: 200px;
-            right: 20px;
-            z-index: 15;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            border: 1px solid #8ac0d0;
-            border-radius: 40px 10px 40px 10px;
-            padding: 8px 16px;
-            color: #ffffff;
+        .planet-description {
             font-size: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+            color: #b0c0d0;
+            margin: 15px 0;
+            font-style: italic;
+            padding: 0 10px;
         }
         
         .planet-resources {
+            font-size: 11px;
             color: #ffd966;
-            font-weight: 600;
+            margin-top: 5px;
         }
         
-        /* Colony button */
-        .colony-btn {
+        .planet-info-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .planet-info-btn {
+            flex: 1;
+            background: rgba(10, 10, 26, 0.7);
+            border: 1.5px solid #a0b0c0;
+            color: #d0e0f0;
+            padding: 8px 0;
+            border-radius: 40% 20% 40% 20%;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.1s;
+        }
+        
+        .planet-info-btn:active {
+            background: #a0b0c0;
+            color: #0a0a1a;
+            transform: scale(0.95);
+        }
+        
+        .planet-info-btn.primary {
+            background: rgba(160, 176, 192, 0.3);
+            border-color: #d0e0f0;
+        }
+        
+        .planet-info-btn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /* Back button */
+        .back-button {
             position: absolute;
             top: 30px;
-            right: 20px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            color: #e0f0f0;
+            left: 20px;
+            z-index: 50;
+            background: rgba(10, 10, 26, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1.5px solid #a0b0c0;
+            color: #d0e0f0;
             padding: 8px 16px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
+            border-radius: 40% 20% 40% 20%;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
+            font-size: 14px;
+            transition: all 0.1s;
         }
         
-        .colony-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
+        .back-button:active {
+            background: #a0b0c0;
+            color: #0a0a1a;
         }
         
-        /* Element colors */
-        .text-common { color: #ffffff; text-shadow: 0 0 8px #ffffff; }
-        .text-uncommon { color: #b0ffb0; text-shadow: 0 0 8px #80ff80; }
-        .text-rare { color: #b0b0ff; text-shadow: 0 0 8px #8080ff; }
-        .text-very-rare { color: #e0b0ff; text-shadow: 0 0 8px #b080ff; }
-        .text-legendary { color: #ffd700; text-shadow: 0 0 8px #ffaa00; }
+        /* System name */
+        .system-name {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #d0e0f0;
+            font-family: 'WindSong', cursive;
+            font-size: 22px;
+            text-shadow: 0 0 20px #a0b0c0;
+            white-space: nowrap;
+            z-index: 50;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(5px);
+            padding: 5px 20px;
+            border-radius: 40% 20% 40% 20%;
+            border: 1px solid #a0b0c080;
+        }
+        
+        /* System coordinates */
+        .system-coords {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0b0c0;
+            font-size: 10px;
+            z-index: 50;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(5px);
+            padding: 3px 12px;
+            border-radius: 20px;
+            border: 1px solid #a0b0c0;
+            font-family: monospace;
+        }
+        
+        /* Stars background */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.2;
+            animation: twinkle 8s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.1; }
+            50% { opacity: 0.2; }
+        }
     </style>
 </head>
 <body>
     <div class="phone-frame">
-        <div class="surface-view" id="surfaceView">
-            <!-- Planet surface background -->
-            <img src="assets/images/surface-bg.jpg" class="surface-bg" id="surfaceBg" alt="Surface view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
-            
-            <!-- Atmosphere overlay -->
-            <div class="atmosphere"></div>
-            
-            <!-- Planet name -->
-            <div class="planet-name-overlay" id="planetName">Verdant Prime</div>
-            
-            <!-- Location Info -->
-            <div class="location-info" id="locationInfo">Sector B2 • Orion Nebula</div>
-            
-            <!-- Colony Button -->
-            <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
-            
-            <!-- Auto notice (appears on collection) -->
-            <div class="auto-notice" id="autoNotice">⚙️ Auto-extractor active</div>
-            
-            <!-- Resource indicator -->
-            <div class="resource-indicator" id="resourceIndicator">
-                <span>📦 This planet:</span>
-                <span class="planet-resources" id="planetResources">Carbon, Iron, Gold</span>
-            </div>
-            
-            <!-- Resource log (color-coded) -->
-            <div class="resource-log" id="resourceLog">
-                <div class="log-entry" style="color:#aaa;">⚙️ Initializing extractor...</div>
-            </div>
-            
-            <!-- Collection counter -->
-            <div class="collection" id="collectionCount">✨ 0</div>
-            
-            <!-- Return button -->
-            <button class="return-btn" id="returnBtn" onclick="returnToShip()">← RETURN TO SHIP</button>
-            
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-text">returning to ship...</div>
+        <div class="app">
+            <!-- System View -->
+            <div class="system-view" id="systemView">
+                <!-- Stars background -->
+                <div class="stars" id="stars"></div>
+                
+                <!-- Nebula background -->
+                <div class="system-nebula" id="systemNebula"></div>
+                
+                <!-- System name -->
+                <div class="system-name" id="systemName">Star System</div>
+                <div class="system-coords" id="systemCoords">Sector B2 • Orion Nebula</div>
+                
+                <!-- Back button -->
+                <button class="back-button" onclick="goBackToSector()">← SECTOR</button>
+                
+                <!-- Central Star -->
+                <div class="central-star" id="centralStar">
+                    <div class="star-core"></div>
+                </div>
+                <div class="star-label" id="starLabel">Star Name</div>
+                <div class="star-type" id="starType">Main Sequence</div>
+                
+                <!-- Container for orbiting bodies -->
+                <div class="orbit-container" id="orbitContainer"></div>
+                
+                <!-- Info Panel -->
+                <div class="planet-info-panel" id="planetInfoPanel">
+                    <div class="planet-info-name" id="planetInfoName">Planet Name</div>
+                    <div class="planet-info-details" id="planetInfoDetails">
+                        <div class="planet-info-item">
+                            <div class="info-item-label">TYPE</div>
+                            <div class="info-item-value" id="planetInfoType">Lush</div>
+                        </div>
+                        <div class="planet-info-item">
+                            <div class="info-item-label">TEMP</div>
+                            <div class="info-item-value" id="planetInfoTemp">22°C</div>
+                        </div>
+                        <div class="planet-info-item">
+                            <div class="info-item-label">ATMOS</div>
+                            <div class="info-item-value" id="planetInfoAtmos">Breathable</div>
+                        </div>
+                        <div class="planet-info-item">
+                            <div class="info-item-label">GRAVITY</div>
+                            <div class="info-item-value" id="planetInfoGravity">0.9g</div>
+                        </div>
+                    </div>
+                    <div class="planet-description" id="planetDescription">
+                        A lush, green world with abundant flora.
+                    </div>
+                    <div class="planet-resources" id="planetResources">Resources: Carbon, Iron, Gold</div>
+                    <div class="planet-info-buttons">
+                        <button class="planet-info-btn" onclick="closeInfo()">BACK</button>
+                        <button class="planet-info-btn primary" id="travelButton" onclick="travelToPlanet()">🚀 LAND</button>
+                    </div>
+                </div>
+                
+                <!-- Loading Overlay -->
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-text">warping...</div>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/procedural-universe.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a1a2a');
-            tg.setBackgroundColor('#0a1a2a');
+            tg.setHeaderColor('#0a0a1a');
+            tg.setBackgroundColor('#0a0a1a');
         }
         
-        // ===== SIMPLE SEEDED RANDOM =====
-        const UNIVERSE_SEED = 42793;
-        
-        function seededRandom(seed, index = 0) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
-        }
-        
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        }
-        
-        // ===== LOAD LOCATION DATA =====
-        function getCurrentPlanet() {
-            return localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-        }
-        
-        function getCurrentPlanetType() {
-            return localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-        }
-        
-        function getCurrentPlanetResources() {
-            const resources = localStorage.getItem('voidfarer_current_planet_resources');
-            return resources ? JSON.parse(resources) : ['Carbon', 'Iron', 'Silicon'];
-        }
-        
-        function getCurrentSector() {
-            return localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-        }
-        
-        function getCurrentNebula() {
-            return localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-        }
-        
-        function getCurrentStar() {
-            return localStorage.getItem('voidfarer_current_star') || 'Sol';
-        }
-        
-        const planetName = getCurrentPlanet();
-        const planetType = getCurrentPlanetType();
-        const planetResources = getCurrentPlanetResources();
+        // ===== LOAD SELECTED STAR =====
+        const starName = localStorage.getItem('voidfarer_current_star') || 'Unknown Star';
+        const starIndex = parseInt(localStorage.getItem('voidfarer_current_star_index')) || 0;
+        const starType = localStorage.getItem('voidfarer_current_star_type') || 'main';
         const currentSector = getCurrentSector();
         const currentNebula = getCurrentNebula();
-        const currentStar = getCurrentStar();
         
-        // Update UI
-        document.getElementById('planetName').textContent = planetName;
-        document.getElementById('locationInfo').textContent = `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
-        document.getElementById('planetResources').textContent = planetResources.slice(0, 5).join(', ');
+        // Update UI with star info
+        document.getElementById('starLabel').textContent = starName;
+        document.getElementById('systemName').textContent = starName + ' System';
+        document.getElementById('systemCoords').textContent = `Sector ${currentSector} • ${currentNebula}`;
         
-        // Set background color based on planet type
-        const surfaceBg = document.getElementById('surfaceBg');
-        const typeFilters = {
-            'scorched': 'hue-rotate(20deg) saturate(1.5) brightness(1.1)',
-            'lush': 'hue-rotate(0deg) saturate(1.2) brightness(1)',
-            'frozen': 'hue-rotate(180deg) brightness(1.2) saturate(0.8)',
-            'barren': 'hue-rotate(0deg) saturate(0.7) brightness(0.9)',
-            'gas': 'hue-rotate(280deg) saturate(1.3) brightness(1.1)'
+        // Set star type text
+        const starTypeMap = {
+            'main': 'Main Sequence',
+            'red': 'Red Dwarf',
+            'blue': 'Blue Giant',
+            'neutron': 'Neutron Star',
+            'blackhole': 'Black Hole'
         };
-        surfaceBg.style.filter = typeFilters[planetType] || 'none';
+        document.getElementById('starType').textContent = starTypeMap[starType] || 'Main Sequence';
         
-        // ===== ELEMENT DATA =====
-        const elements = [
-            // Common (white) - 100 credits
-            { name: 'Hydrogen', symbol: 'H', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Helium', symbol: 'He', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Lithium', symbol: 'Li', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Beryllium', symbol: 'Be', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Boron', symbol: 'B', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Sodium', symbol: 'Na', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Magnesium', symbol: 'Mg', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Aluminum', symbol: 'Al', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Silicon', symbol: 'Si', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Potassium', symbol: 'K', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Calcium', symbol: 'Ca', rarity: 'common', color: '#ffffff', value: 100 },
+        // Set star color based on type
+        const starElement = document.getElementById('centralStar');
+        const starColors = {
+            'main': 'radial-gradient(circle at 30% 30%, #fff5b0, #ffd700)',
+            'red': 'radial-gradient(circle at 30% 30%, #ffb6b6, #ff6b6b)',
+            'blue': 'radial-gradient(circle at 30% 30%, #b0e0ff, #6ba5ff)',
+            'neutron': 'radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0)',
+            'blackhole': 'radial-gradient(circle at 30% 30%, #000000, #330000)'
+        };
+        starElement.style.background = starColors[starType] || starColors.main;
+        
+        // Set star glow
+        const starGlowColors = {
+            'main': '#ffd700',
+            'red': '#ff6b6b',
+            'blue': '#6ba5ff',
+            'neutron': '#ffffff',
+            'blackhole': '#ff4d4d'
+        };
+        starElement.style.boxShadow = `0 0 60px ${starGlowColors[starType]}, 0 0 120px ${starGlowColors[starType]}`;
+        
+        // ===== GENERATE PLANETS =====
+        function generatePlanets() {
+            const planets = [];
             
-            // Uncommon (Green) - 250 credits
-            { name: 'Carbon', symbol: 'C', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Oxygen', symbol: 'O', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Nitrogen', symbol: 'N', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Iron', symbol: 'Fe', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Nickel', symbol: 'Ni', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Sulfur', symbol: 'S', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Phosphorus', symbol: 'P', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Chlorine', symbol: 'Cl', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Argon', symbol: 'Ar', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Lead', symbol: 'Pb', rarity: 'uncommon', color: '#4aff4a', value: 250 },
+            // Create seed for this star system
+            const systemSeed = UNIVERSE_SEED + 
+                              (currentSector.charCodeAt(0) * 100000) + 
+                              (parseInt(currentSector[1]) * 10000) +
+                              hashString(currentNebula) % 10000 +
+                              starIndex * 1000;
             
-            // Rare (Blue) - 1000 credits
-            { name: 'Gold', symbol: 'Au', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Silver', symbol: 'Ag', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Platinum', symbol: 'Pt', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Copper', symbol: 'Cu', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Titanium', symbol: 'Ti', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Zinc', symbol: 'Zn', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Tin', symbol: 'Sn', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Mercury', symbol: 'Hg', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Cobalt', symbol: 'Co', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Chromium', symbol: 'Cr', rarity: 'rare', color: '#4a4aff', value: 1000 },
+            // Determine planet count based on star type
+            let planetCount = 0;
+            if (starType === 'main') planetCount = seededRandomRange(systemSeed, 1, 3, 8);
+            else if (starType === 'red') planetCount = seededRandomRange(systemSeed, 2, 2, 5);
+            else if (starType === 'blue') planetCount = seededRandomRange(systemSeed, 3, 5, 12);
+            else if (starType === 'neutron') planetCount = 0;
+            else if (starType === 'blackhole') planetCount = 0;
             
-            // Very Rare (Purple) - 5000 credits
-            { name: 'Uranium', symbol: 'U', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Thorium', symbol: 'Th', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Plutonium', symbol: 'Pu', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Radium', symbol: 'Ra', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Polonium', symbol: 'Po', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
+            console.log(`Generating ${planetCount} planets for ${starName}`); // Debug log
             
-            // Legendary (Gold) - 25000 credits
-            { name: 'Promethium', symbol: 'Pm', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Technetium', symbol: 'Tc', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Astatine', symbol: 'At', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Francium', symbol: 'Fr', rarity: 'legendary', color: '#ffaa00', value: 25000 }
-        ];
-        
-        // Map element names to full data
-        const elementMap = {};
-        elements.forEach(e => elementMap[e.name] = e);
-        
-        // ===== COLLECTION FUNCTIONS =====
-        function getCollection() {
-            const data = localStorage.getItem('voidfarer_collection');
-            return data ? JSON.parse(data) : {};
-        }
-        
-        function saveCollection(collection) {
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-        }
-        
-        function getCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
-        }
-        
-        function saveCredits(credits) {
-            localStorage.setItem('voidfarer_credits', credits.toString());
-        }
-        
-        function addCredits(amount) {
-            const current = getCredits();
-            const newTotal = current + amount;
-            saveCredits(newTotal);
-            return newTotal;
-        }
-        
-        function getAutoGatherEnabled() {
-            return localStorage.getItem('voidfarer_auto_gather') !== 'false';
-        }
-        
-        function getMissions() {
-            const data = localStorage.getItem('voidfarer_missions');
-            return data ? JSON.parse(data) : [];
-        }
-        
-        function saveMissions(missions) {
-            localStorage.setItem('voidfarer_missions', JSON.stringify(missions));
-        }
-        
-        function getColonies() {
-            const data = localStorage.getItem('voidfarer_colonies');
-            return data ? JSON.parse(data) : [];
-        }
-        
-        function saveColonies(colonies) {
-            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
-        }
-        
-        // Update mission progress
-        function updateMissionProgress(elementName) {
-            const missions = getMissions();
-            let updated = false;
+            // Planet type definitions
+            const planetTypes = [
+                { type: 'scorched', name: 'Scorched', temp: '450°C', atmos: 'Toxic', gravity: '1.2g', landable: true },
+                { type: 'barren', name: 'Barren', temp: '-50°C', atmos: 'Thin', gravity: '0.8g', landable: true },
+                { type: 'lush', name: 'Lush', temp: '22°C', atmos: 'Breathable', gravity: '0.9g', landable: true },
+                { type: 'frozen', name: 'Frozen', temp: '-80°C', atmos: 'Thin', gravity: '0.7g', landable: true },
+                { type: 'gas', name: 'Gas Giant', temp: '-120°C', atmos: 'Dense', gravity: '2.1g', landable: false }
+            ];
             
-            missions.forEach(mission => {
-                if (mission.element === elementName && mission.current < mission.target) {
-                    mission.current = (mission.current || 0) + 1;
-                    updated = true;
+            // Planet name prefixes
+            const planetPrefixes = [
+                'Verdant', 'Pyros', 'Glacier', 'Aether', 'Ignis', 'Terra', 'Aqua', 'Ventus',
+                'Saxum', 'Silva', 'Desertum', 'Lux', 'Umbra', 'Crystal', 'Feral', 'Eden',
+                'Nova', 'Prime', 'Secundus', 'Tertius'
+            ];
+            
+            // Generate each planet
+            for (let i = 0; i < planetCount; i++) {
+                const planetSeed = systemSeed + (i * 100);
+                
+                // Determine planet type
+                const typeRand = seededRandom(planetSeed, 0);
+                let planetType;
+                if (typeRand < 0.15) planetType = planetTypes[0]; // scorched
+                else if (typeRand < 0.4) planetType = planetTypes[1]; // barren
+                else if (typeRand < 0.55) planetType = planetTypes[2]; // lush
+                else if (typeRand < 0.75) planetType = planetTypes[3]; // frozen
+                else planetType = planetTypes[4]; // gas
+                
+                // Generate resources
+                const resources = [];
+                const resourceCount = seededRandomRange(planetSeed, 1, 2, 4);
+                const resourcePool = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 'Uranium', 'Promethium'];
+                
+                for (let r = 0; r < resourceCount; r++) {
+                    const resourceIndex = Math.floor(seededRandom(planetSeed, 100 + r) * resourcePool.length);
+                    const resource = resourcePool[resourceIndex];
+                    if (!resources.includes(resource)) {
+                        resources.push(resource);
+                    }
+                }
+                
+                // Generate planet name
+                const prefixIndex = Math.floor(seededRandom(planetSeed, 2) * planetPrefixes.length);
+                const planetName = planetPrefixes[prefixIndex] + '-' + (i + 1);
+                
+                // Determine moon count
+                let moonCount = 0;
+                if (planetType.type === 'gas') {
+                    moonCount = seededRandomRange(planetSeed, 3, 3, 8);
+                } else {
+                    moonCount = seededRandom(planetSeed, 4) < 0.3 ? seededRandomRange(planetSeed, 5, 1, 2) : 0;
+                }
+                
+                planets.push({
+                    index: i,
+                    name: planetName,
+                    type: planetType.type,
+                    typeName: planetType.name,
+                    temp: planetType.temp,
+                    atmos: planetType.atmos,
+                    gravity: planetType.gravity,
+                    landable: planetType.landable,
+                    resources: resources,
+                    moonCount: moonCount,
+                    orbitRadius: 70 + i * 25,
+                    orbitSpeed: 0.001 - (i * 0.0001),
+                    description: `A ${planetType.name.toLowerCase()} world orbiting ${starName}.`
+                });
+            }
+            
+            return planets;
+        }
+        
+        // ===== RENDER SYSTEM =====
+        const orbitContainer = document.getElementById('orbitContainer');
+        const planets = generatePlanets();
+        const bodyElements = new Map();
+        
+        console.log(`Rendering ${planets.length} planets`); // Debug log
+        
+        function createPlanet(planet, index) {
+            const container = document.createElement('div');
+            container.className = 'orbital-body';
+            container.style.left = '50%';
+            container.style.top = '50%';
+            
+            // Create visual element
+            const visual = document.createElement('div');
+            visual.className = `body-visual planet-${planet.type}`;
+            visual.id = `planet-${planet.index}`;
+            visual.setAttribute('onclick', `selectPlanet(${planet.index})`);
+            
+            // Add moon indicator if planet has moons
+            const moonIndicator = planet.moonCount > 0 ? ' ✦' : '';
+            
+            visual.innerHTML = `
+                <div class="body-glow"></div>
+                <div class="body-dot"></div>
+                <span class="body-label">${planet.name}${moonIndicator}</span>
+            `;
+            
+            container.appendChild(visual);
+            orbitContainer.appendChild(container);
+            
+            bodyElements.set(planet.index, {
+                element: container,
+                visual: visual,
+                planet: planet,
+                angle: index * 1.5
+            });
+            
+            // Generate moons
+            for (let m = 0; m < planet.moonCount; m++) {
+                createMoon(planet, m);
+            }
+        }
+        
+        function createMoon(planet, moonIndex) {
+            const container = document.createElement('div');
+            container.className = 'orbital-body';
+            container.style.left = '50%';
+            container.style.top = '50%';
+            
+            const visual = document.createElement('div');
+            visual.className = 'body-visual planet-barren moon';
+            visual.id = `moon-${planet.index}-${moonIndex}`;
+            
+            // Generate moon name (letter designation)
+            const moonLetter = String.fromCharCode(97 + moonIndex);
+            
+            visual.innerHTML = `
+                <div class="body-glow"></div>
+                <div class="body-dot"></div>
+                <span class="body-label">${planet.name}-${moonLetter}</span>
+            `;
+            
+            container.appendChild(visual);
+            orbitContainer.appendChild(container);
+            
+            bodyElements.set(`moon-${planet.index}-${moonIndex}`, {
+                element: container,
+                visual: visual,
+                planet: {
+                    name: `${planet.name}-${moonLetter}`,
+                    type: 'barren',
+                    landable: true
+                },
+                parentPlanet: planet,
+                moonIndex: moonIndex,
+                angle: moonIndex * 2,
+                orbitRadius: 20 + moonIndex * 5
+            });
+        }
+        
+        // Generate all planets
+        if (planets.length > 0) {
+            planets.forEach((planet, index) => createPlanet(planet, index));
+        } else {
+            // Show message if no planets
+            const noPlanetsMsg = document.createElement('div');
+            noPlanetsMsg.style.position = 'absolute';
+            noPlanetsMsg.style.top = '70%';
+            noPlanetsMsg.style.left = '50%';
+            noPlanetsMsg.style.transform = 'translateX(-50%)';
+            noPlanetsMsg.style.color = '#a0b0c0';
+            noPlanetsMsg.style.fontSize = '14px';
+            noPlanetsMsg.style.textAlign = 'center';
+            noPlanetsMsg.style.padding = '20px';
+            noPlanetsMsg.style.background = 'rgba(10,10,26,0.6)';
+            noPlanetsMsg.style.backdropFilter = 'blur(10px)';
+            noPlanetsMsg.style.borderRadius = '40px 10px 40px 10px';
+            noPlanetsMsg.style.border = '1px solid #a0b0c0';
+            noPlanetsMsg.textContent = 'No planets in this system';
+            orbitContainer.appendChild(noPlanetsMsg);
+        }
+        
+        // Animation loop
+        function animateOrbits() {
+            bodyElements.forEach((data, id) => {
+                if (data.planet.orbitRadius !== undefined) {
+                    // Planet orbiting star
+                    data.angle += data.planet.orbitSpeed || 0.0005;
+                    
+                    const x = data.planet.orbitRadius * Math.cos(data.angle);
+                    const y = data.planet.orbitRadius * Math.sin(data.angle) * 0.6;
+                    
+                    data.element.style.transform = `translate(${x}px, ${y}px)`;
+                    data.x = x;
+                    data.y = y;
+                } else if (data.parentPlanet) {
+                    // Moon orbiting planet
+                    data.angle += 0.002;
+                    
+                    const parent = bodyElements.get(data.parentPlanet.index);
+                    if (parent) {
+                        const x = parent.x + data.orbitRadius * Math.cos(data.angle);
+                        const y = parent.y + data.orbitRadius * Math.sin(data.angle) * 0.6;
+                        
+                        data.element.style.transform = `translate(${x}px, ${y}px)`;
+                    }
                 }
             });
             
-            if (updated) {
-                saveMissions(missions);
+            requestAnimationFrame(animateOrbits);
+        }
+        
+        if (planets.length > 0) {
+            animateOrbits();
+        }
+        
+        // ===== SELECTION HANDLING =====
+        let currentPlanet = null;
+        const infoPanel = document.getElementById('planetInfoPanel');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        function selectPlanet(planetIndex) {
+            document.querySelectorAll('.body-visual').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            const visual = document.getElementById(`planet-${planetIndex}`);
+            if (visual) {
+                visual.classList.add('selected');
             }
-        }
-        
-        // Add to discovered locations
-        function addDiscoveredLocation(location) {
-            const discovered = JSON.parse(localStorage.getItem('voidfarer_discovered_locations') || '[]');
             
-            const exists = discovered.some(l => 
-                l.planet === location.planet && 
-                l.star === location.star
-            );
+            const planetData = planets[planetIndex];
+            if (!planetData) return;
             
-            if (!exists) {
-                discovered.push({
-                    ...location,
-                    discoveredAt: new Date().toISOString()
-                });
-                localStorage.setItem('voidfarer_discovered_locations', JSON.stringify(discovered));
-            }
-        }
-        
-        // ===== GAME STATE =====
-        let collectedCount = 0;
-        let sessionElements = 0;
-        const resourceLog = document.getElementById('resourceLog');
-        const collectionSpan = document.getElementById('collectionCount');
-        const autoNotice = document.getElementById('autoNotice');
-        
-        // Load collection from localStorage
-        function loadCollection() {
-            const collection = getCollection();
-            collectedCount = Object.keys(collection).length;
-            collectionSpan.textContent = `✨ ${collectedCount}`;
-            return collection;
-        }
-        
-        // Save element to collection
-        function saveElement(elementName) {
-            const collection = getCollection();
+            currentPlanet = planetData;
             
-            const location = {
-                planet: planetName,
-                star: currentStar,
-                nebula: currentNebula,
-                sector: currentSector
-            };
+            document.getElementById('planetInfoName').textContent = planetData.name;
+            document.getElementById('planetInfoType').textContent = planetData.typeName;
+            document.getElementById('planetInfoTemp').textContent = planetData.temp;
+            document.getElementById('planetInfoAtmos').textContent = planetData.atmos;
+            document.getElementById('planetInfoGravity').textContent = planetData.gravity;
+            document.getElementById('planetDescription').textContent = planetData.description;
+            document.getElementById('planetResources').textContent = 'Resources: ' + planetData.resources.join(', ');
             
-            if (!collection[elementName]) {
-                collection[elementName] = {
-                    count: 1,
-                    firstFound: new Date().toISOString(),
-                    location: location
-                };
+            const travelBtn = document.getElementById('travelButton');
+            if (planetData.landable) {
+                travelBtn.textContent = '🚀 LAND';
+                travelBtn.classList.remove('disabled');
             } else {
-                collection[elementName].count = (collection[elementName].count || 1) + 1;
+                travelBtn.textContent = '⛔ CANNOT LAND';
+                travelBtn.classList.add('disabled');
             }
             
-            saveCollection(collection);
+            infoPanel.classList.add('visible');
             
-            // Update missions
-            updateMissionProgress(elementName);
-            
-            // Update credits
-            const element = elementMap[elementName];
-            if (element) {
-                addCredits(element.value);
-            }
-            
-            // Add to discovered locations
-            addDiscoveredLocation(location);
-            
-            return Object.keys(collection).length;
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
-        // Show auto notice
-        function showNotice(message) {
-            autoNotice.textContent = message;
-            autoNotice.style.animation = 'none';
-            autoNotice.offsetHeight; // Force reflow
-            autoNotice.style.animation = 'notice-fade 4s ease-out forwards';
+        function closeInfo() {
+            infoPanel.classList.remove('visible');
+            document.querySelectorAll('.body-visual').forEach(el => {
+                el.classList.remove('selected');
+            });
+            currentPlanet = null;
         }
         
-        // Extract a random resource
-        function extractResource() {
-            if (planetResources.length === 0) return null;
+        function travelToPlanet() {
+            if (!currentPlanet) return;
             
-            // Get available elements for this planet
-            const availableElements = planetResources;
-            
-            // Pick random element
-            const elementIndex = Math.floor(Math.random() * availableElements.length);
-            const elementName = availableElements[elementIndex];
-            const element = elementMap[elementName] || { 
-                name: elementName, 
-                color: '#ffffff', 
-                rarity: 'common', 
-                value: 100 
-            };
-            
-            // Save to collection
-            const newCount = saveElement(elementName);
-            
-            // Update counter
-            collectedCount = newCount;
-            sessionElements++;
-            collectionSpan.textContent = `✨ ${collectedCount}`;
-            
-            // Create color-coded log entry
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            
-            let rarityDot = '●';
-            if (element.rarity === 'common') rarityDot = '○';
-            else if (element.rarity === 'uncommon') rarityDot = '◔';
-            else if (element.rarity === 'rare') rarityDot = '◑';
-            else if (element.rarity === 'very-rare') rarityDot = '◕';
-            else if (element.rarity === 'legendary') rarityDot = '★';
-            
-            entry.innerHTML = `${rarityDot} +1 ${element.name} (${element.value}⭐)`;
-            entry.style.color = element.color || '#ffffff';
-            entry.style.textShadow = `0 0 8px ${element.color || '#ffffff'}`;
-            
-            resourceLog.appendChild(entry);
-            
-            // Keep only last 5 entries
-            while (resourceLog.children.length > 5) {
-                resourceLog.removeChild(resourceLog.firstChild);
+            if (!currentPlanet.landable) {
+                alert(`Cannot land on gas giant ${currentPlanet.name}`);
+                return;
             }
             
-            showNotice(`✨ Found ${element.name}`);
+            loadingOverlay.classList.add('active');
             
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('light');
-            }
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
-            return element;
-        }
-        
-        // Auto-gather every 4 seconds
-        let gatherInterval;
-        
-        function startAutoGather() {
-            // Clear any existing interval
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-            
-            const autoGather = getAutoGatherEnabled();
-            console.log('Auto gather enabled:', autoGather); // Debug log
-            
-            // Show initial notice
-            if (autoGather) {
-                showNotice('⚙️ Auto-extractor active');
-            } else {
-                showNotice('⚠️ Auto-extractor disabled');
-            }
-            
-            if (!autoGather) return;
-            
-            // Start new interval
-            gatherInterval = setInterval(() => {
-                console.log('Extracting resource...'); // Debug log
-                extractResource();
-            }, 4000);
-        }
-        
-        // ===== COLONY FUNCTIONS =====
-        function checkForColony() {
-            const colonies = getColonies();
-            const existingColony = colonies.find(c => 
-                c.planet === planetName && 
-                c.star === currentStar && 
-                c.nebula === currentNebula
-            );
-            
-            if (existingColony) {
-                document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
-                document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
-                document.getElementById('colonyBtn').style.borderColor = '#4affaa';
-                return true;
-            }
-            return false;
-        }
-        
-        function toggleColony() {
-            const colonies = getColonies();
-            const existingIndex = colonies.findIndex(c => 
-                c.planet === planetName && 
-                c.star === currentStar && 
-                c.nebula === currentNebula
-            );
-            
-            if (existingIndex >= 0) {
-                // Remove colony
-                if (confirm('Abandon this colony?')) {
-                    colonies.splice(existingIndex, 1);
-                    saveColonies(colonies);
-                    
-                    document.getElementById('colonyBtn').innerHTML = '🏭 ESTABLISH COLONY';
-                    document.getElementById('colonyBtn').style.background = 'rgba(10, 20, 30, 0.5)';
-                    document.getElementById('colonyBtn').style.borderColor = '#8ac0d0';
-                    
-                    showNotice('🏭 Colony abandoned');
-                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-                }
-            } else {
-                // Establish colony
-                const colonyName = prompt('Name your colony:', planetName + ' Outpost');
-                if (colonyName) {
-                    const newColony = {
-                        name: colonyName,
-                        planet: planetName,
-                        type: planetType,
-                        star: currentStar,
-                        nebula: currentNebula,
-                        sector: currentSector,
-                        resources: planetResources,
-                        established: new Date().toISOString()
-                    };
-                    
-                    colonies.push(newColony);
-                    saveColonies(colonies);
-                    
-                    document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
-                    document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
-                    document.getElementById('colonyBtn').style.borderColor = '#4affaa';
-                    
-                    showNotice(`🏭 ${colonyName} established`);
-                    
-                    // Bonus credits for establishing colony
-                    addCredits(5000);
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
-                }
-            }
-        }
-        
-        // ===== RETURN TO SHIP =====
-        function returnToShip() {
-            console.log('Return to ship button clicked'); // Debug log
-            
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
-            
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-            
-            showNotice(`✨ Collected ${sessionElements} elements`);
-            
-            // Navigate directly to ship bridge
             setTimeout(() => {
-                window.location.href = 'ship-bridge.html';
-            }, 1000);
+                loadingOverlay.classList.remove('active');
+                
+                // Save planet data for surface
+                localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
+                localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
+                
+                window.location.href = 'surface.html';
+                
+                closeInfo();
+            }, 1500);
         }
         
-        // ===== INITIALIZE =====
+        function goBackToSector() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'nebula-sector.html';
+        }
+        
+        // Generate stars background
+        function generateStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 5 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+        
+        // Initialize
         function init() {
-            console.log('Surface initializing...'); // Debug log
-            
-            // Check if player exists
-            const player = localStorage.getItem('voidfarer_player');
+            const player = getPlayer();
             if (!player) {
                 window.location.href = 'index.html';
                 return;
             }
             
-            // Load initial collection
-            loadCollection();
-            
-            // Check for existing colony
-            checkForColony();
-            
-            // Reset session counter
-            sessionElements = 0;
-            
-            // Clear any existing log entries
-            resourceLog.innerHTML = '<div class="log-entry" style="color:#aaa;">⚙️ Auto-extractor ready</div>';
-            
-            // Start auto-gather after a short delay
-            setTimeout(() => {
-                startAutoGather();
-            }, 1000);
+            generateStars();
         }
         
-        // Clean up on page unload
-        window.addEventListener('beforeunload', function() {
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-        });
-        
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', init);
+        init();
     </script>
 </body>
 </html>
