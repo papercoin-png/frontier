@@ -125,10 +125,28 @@
             text-overflow: ellipsis;
         }
         
+        /* Location Info */
+        .location-info {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0c0ff;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+            padding: 4px 16px;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #8ac0d0;
+            z-index: 10;
+            white-space: nowrap;
+            font-family: monospace;
+        }
+        
         /* Auto-extractor notice */
         .auto-notice {
             position: absolute;
-            top: 100px;
+            top: 150px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10, 20, 30, 0.7);
@@ -225,7 +243,7 @@
         /* Resource indicators */
         .resource-indicator {
             position: absolute;
-            top: 120px;
+            top: 200px;
             right: 20px;
             z-index: 15;
             background: rgba(10, 20, 30, 0.6);
@@ -243,6 +261,29 @@
         .planet-resources {
             color: #ffd966;
             font-weight: 600;
+        }
+        
+        /* Colony button */
+        .colony-btn {
+            position: absolute;
+            top: 30px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(10, 20, 30, 0.5);
+            backdrop-filter: blur(5px);
+            border: 2px solid #8ac0d0;
+            color: #e0f0f0;
+            padding: 8px 16px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+        }
+        
+        .colony-btn:active {
+            background: rgba(138, 160, 170, 0.3);
+            transform: scale(0.97);
         }
         
         /* Element colors */
@@ -264,6 +305,12 @@
             
             <!-- Planet name -->
             <div class="planet-name-overlay" id="planetName">Verdant Prime</div>
+            
+            <!-- Location Info -->
+            <div class="location-info" id="locationInfo">Sector B2 • Orion Nebula</div>
+            
+            <!-- Colony Button -->
+            <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
             
             <!-- Auto notice (appears on collection) -->
             <div class="auto-notice" id="autoNotice">⚙️ Auto-extractor active</div>
@@ -300,26 +347,60 @@
             tg.setBackgroundColor('#0a1a2a');
         }
         
-        // Loading overlay
-        const loadingOverlay = document.getElementById('loadingOverlay');
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
         
-        // Navigation function
-        function navigateTo(screen, useWarp = false) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        // ===== LOAD LOCATION DATA =====
+        const planetName = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+        const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+        const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || ['Carbon', 'Iron', 'Gold'];
+        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+        const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+        const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
+        
+        // Update UI
+        document.getElementById('planetName').textContent = planetName;
+        document.getElementById('locationInfo').textContent = `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
+        document.getElementById('planetResources').textContent = planetResources.slice(0, 5).join(', ');
+        
+        // Set background color based on planet type
+        const surfaceBg = document.getElementById('surfaceBg');
+        const typeFilters = {
+            'scorched': 'hue-rotate(20deg) saturate(1.5) brightness(1.1)',
+            'lush': 'hue-rotate(0deg) saturate(1.2) brightness(1)',
+            'frozen': 'hue-rotate(180deg) brightness(1.2) saturate(0.8)',
+            'barren': 'hue-rotate(0deg) saturate(0.7) brightness(0.9)',
+            'gas': 'hue-rotate(280deg) saturate(1.3) brightness(1.1)'
+        };
+        surfaceBg.style.filter = typeFilters[planetType] || 'none';
+        
+        // Check if planet already has colony
+        function checkForColony() {
+            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            const existingColony = colonies.find(c => 
+                c.planet === planetName && 
+                c.star === currentStar && 
+                c.nebula === currentNebula
+            );
             
-            if (useWarp) {
-                loadingOverlay.classList.add('active');
-                setTimeout(() => {
-                    window.location.href = screen;
-                }, 800);
-            } else {
-                window.location.href = screen;
+            if (existingColony) {
+                document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
+                document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
+                document.getElementById('colonyBtn').style.borderColor = '#4affaa';
+                return true;
             }
+            return false;
+        }
+        
+        // ===== SEEDED RANDOM =====
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
         }
         
         // ===== ELEMENT RARITY SYSTEM =====
         const elements = [
-            // Common (White)
+            // Common (white) - 100 credits
             { name: 'Hydrogen', symbol: 'H', rarity: 'common', color: '#ffffff', value: 100 },
             { name: 'Helium', symbol: 'He', rarity: 'common', color: '#ffffff', value: 100 },
             { name: 'Lithium', symbol: 'Li', rarity: 'common', color: '#ffffff', value: 100 },
@@ -332,7 +413,7 @@
             { name: 'Potassium', symbol: 'K', rarity: 'common', color: '#ffffff', value: 100 },
             { name: 'Calcium', symbol: 'Ca', rarity: 'common', color: '#ffffff', value: 100 },
             
-            // Uncommon (Green)
+            // Uncommon (Green) - 250 credits
             { name: 'Carbon', symbol: 'C', rarity: 'uncommon', color: '#4aff4a', value: 250 },
             { name: 'Oxygen', symbol: 'O', rarity: 'uncommon', color: '#4aff4a', value: 250 },
             { name: 'Nitrogen', symbol: 'N', rarity: 'uncommon', color: '#4aff4a', value: 250 },
@@ -344,7 +425,7 @@
             { name: 'Argon', symbol: 'Ar', rarity: 'uncommon', color: '#4aff4a', value: 250 },
             { name: 'Lead', symbol: 'Pb', rarity: 'uncommon', color: '#4aff4a', value: 250 },
             
-            // Rare (Blue)
+            // Rare (Blue) - 1000 credits
             { name: 'Gold', symbol: 'Au', rarity: 'rare', color: '#4a4aff', value: 1000 },
             { name: 'Silver', symbol: 'Ag', rarity: 'rare', color: '#4a4aff', value: 1000 },
             { name: 'Platinum', symbol: 'Pt', rarity: 'rare', color: '#4a4aff', value: 1000 },
@@ -356,14 +437,14 @@
             { name: 'Cobalt', symbol: 'Co', rarity: 'rare', color: '#4a4aff', value: 1000 },
             { name: 'Chromium', symbol: 'Cr', rarity: 'rare', color: '#4a4aff', value: 1000 },
             
-            // Very Rare (Purple)
+            // Very Rare (Purple) - 5000 credits
             { name: 'Uranium', symbol: 'U', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
             { name: 'Thorium', symbol: 'Th', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
             { name: 'Plutonium', symbol: 'Pu', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
             { name: 'Radium', symbol: 'Ra', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
             { name: 'Polonium', symbol: 'Po', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
             
-            // Legendary (Gold)
+            // Legendary (Gold) - 25000 credits
             { name: 'Promethium', symbol: 'Pm', rarity: 'legendary', color: '#ffaa00', value: 25000 },
             { name: 'Technetium', symbol: 'Tc', rarity: 'legendary', color: '#ffaa00', value: 25000 },
             { name: 'Astatine', symbol: 'At', rarity: 'legendary', color: '#ffaa00', value: 25000 },
@@ -374,55 +455,12 @@
         const elementMap = {};
         elements.forEach(e => elementMap[e.name] = e);
         
-        // Game state
+        // ===== GAME STATE =====
         let collectedCount = 0;
         let sessionElements = 0;
         const resourceLog = document.getElementById('resourceLog');
         const collectionSpan = document.getElementById('collectionCount');
         const autoNotice = document.getElementById('autoNotice');
-        const planetNameSpan = document.getElementById('planetName');
-        const planetResourcesSpan = document.getElementById('planetResources');
-        
-        // Load current planet
-        function loadCurrentPlanet() {
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-            planetNameSpan.textContent = planet;
-            
-            // Load planet-specific elements
-            const planetElements = localStorage.getItem('voidfarer_current_planet_elements');
-            let elementsList = [];
-            
-            if (planetElements) {
-                elementsList = JSON.parse(planetElements);
-            } else {
-                // Default elements based on planet name
-                if (planet.includes('Verdant')) {
-                    elementsList = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Gold'];
-                } else if (planet.includes('Pyros')) {
-                    elementsList = ['Gold', 'Silver', 'Platinum', 'Uranium'];
-                } else if (planet.includes('Glacier')) {
-                    elementsList = ['Ice', 'Methane', 'Nitrogen', 'Uranium'];
-                } else if (planet.includes('Aether')) {
-                    elementsList = ['Helium', 'Hydrogen', 'Methane'];
-                } else if (planet.includes('Titanis') || planet.includes('Europa')) {
-                    elementsList = ['Ice', 'Methane', 'Oxygen', 'Uranium'];
-                } else {
-                    elementsList = ['Carbon', 'Iron', 'Silicon'];
-                }
-            }
-            
-            planetResourcesSpan.textContent = elementsList.join(', ');
-            
-            // Update background based on planet type
-            const surfaceBg = document.getElementById('surfaceBg');
-            if (planet.includes('Pyros')) {
-                surfaceBg.style.filter = 'hue-rotate(20deg) saturate(1.5)';
-            } else if (planet.includes('Glacier')) {
-                surfaceBg.style.filter = 'hue-rotate(180deg) brightness(1.2)';
-            } else if (planet.includes('Aether')) {
-                surfaceBg.style.filter = 'hue-rotate(280deg) saturate(1.3)';
-            }
-        }
         
         // Load collection from localStorage
         function loadCollection() {
@@ -438,7 +476,13 @@
             if (!collection[elementName]) {
                 collection[elementName] = {
                     firstFound: new Date().toISOString(),
-                    count: 1
+                    count: 1,
+                    location: {
+                        planet: planetName,
+                        star: currentStar,
+                        nebula: currentNebula,
+                        sector: currentSector
+                    }
                 };
             } else {
                 collection[elementName].count = (collection[elementName].count || 1) + 1;
@@ -446,10 +490,10 @@
             
             localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
             
-            // Update missions if applicable
+            // Update missions
             updateMissions(elementName);
             
-            // Update credits (sell value)
+            // Update credits
             updateCredits(elementName);
             
             return Object.keys(collection).length;
@@ -472,7 +516,7 @@
             }
         }
         
-        // Update credits (simulate selling)
+        // Update credits
         function updateCredits(elementName) {
             const element = elementMap[elementName];
             if (!element) return;
@@ -486,7 +530,7 @@
         function showNotice(message) {
             autoNotice.textContent = message;
             autoNotice.style.animation = 'none';
-            autoNotice.offsetHeight; // Trigger reflow
+            autoNotice.offsetHeight;
             autoNotice.style.animation = 'notice-fade 4s ease-out forwards';
         }
         
@@ -494,33 +538,27 @@
         let gatherInterval;
         
         function startAutoGather() {
-            // Check if auto-gather is enabled in settings
             const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
             
             if (!autoGather) return;
             
+            // Create planet seed for deterministic gathering
+            const planetSeed = UNIVERSE_SEED + 
+                              (currentSector.charCodeAt(0) * 1000000) + 
+                              (parseInt(currentSector[1]) * 100000) +
+                              currentNebula.length * 10000 +
+                              currentStar.length * 1000 +
+                              planetName.length * 100;
+            
             gatherInterval = setInterval(() => {
-                // Get planet-specific elements
-                const planetElements = localStorage.getItem('voidfarer_current_planet_elements');
-                let availableElements = [];
+                // Get available elements for this planet
+                const availableElements = planetResources;
                 
-                if (planetElements) {
-                    availableElements = JSON.parse(planetElements);
-                } else {
-                    const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-                    if (planet.includes('Verdant')) {
-                        availableElements = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Gold'];
-                    } else if (planet.includes('Pyros')) {
-                        availableElements = ['Gold', 'Silver', 'Platinum', 'Uranium'];
-                    } else {
-                        availableElements = ['Carbon', 'Iron', 'Silicon'];
-                    }
-                }
-                
-                // Pick random element from available
-                const randomIndex = Math.floor(Math.random() * availableElements.length);
-                const elementName = availableElements[randomIndex];
-                const element = elementMap[elementName] || { name: elementName, color: '#ffffff', rarity: 'common' };
+                // Pick element based on seed + time for consistency
+                const timeSeed = Math.floor(Date.now() / 60000); // Change every minute
+                const elementIndex = Math.floor(seededRandom(planetSeed + timeSeed, 0) * availableElements.length);
+                const elementName = availableElements[elementIndex];
+                const element = elementMap[elementName] || { name: elementName, color: '#ffffff', rarity: 'common', value: 100 };
                 
                 // Save to collection
                 const newCount = saveElement(elementName);
@@ -534,7 +572,6 @@
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
                 
-                // Add rarity dot
                 let rarityDot = '●';
                 if (element.rarity === 'common') rarityDot = '○';
                 else if (element.rarity === 'uncommon') rarityDot = '◔';
@@ -542,7 +579,7 @@
                 else if (element.rarity === 'very-rare') rarityDot = '◕';
                 else if (element.rarity === 'legendary') rarityDot = '★';
                 
-                entry.innerHTML = `${rarityDot} +1 ${element.name}`;
+                entry.innerHTML = `${rarityDot} +1 ${element.name} (${element.value}⭐)`;
                 entry.style.color = element.color || '#ffffff';
                 entry.style.textShadow = `0 0 8px ${element.color || '#ffffff'}`;
                 
@@ -553,71 +590,118 @@
                     resourceLog.removeChild(resourceLog.firstChild);
                 }
                 
-                // Show notice
                 showNotice(`✨ Found ${element.name}`);
                 
-                // Subtle haptic feedback
                 if (tg?.HapticFeedback && Math.random() > 0.5) {
                     tg.HapticFeedback.impactOccurred('light');
                 }
             }, 4000);
         }
         
-        // Return to ship
+        // ===== COLONY FUNCTIONS =====
+        function toggleColony() {
+            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            const existingIndex = colonies.findIndex(c => 
+                c.planet === planetName && 
+                c.star === currentStar && 
+                c.nebula === currentNebula
+            );
+            
+            if (existingIndex >= 0) {
+                // Remove colony
+                if (confirm('Abandon this colony?')) {
+                    colonies.splice(existingIndex, 1);
+                    localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
+                    
+                    document.getElementById('colonyBtn').innerHTML = '🏭 ESTABLISH COLONY';
+                    document.getElementById('colonyBtn').style.background = 'rgba(10, 20, 30, 0.5)';
+                    document.getElementById('colonyBtn').style.borderColor = '#8ac0d0';
+                    
+                    showNotice('🏭 Colony abandoned');
+                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                }
+            } else {
+                // Establish colony
+                const colonyName = prompt('Name your colony:', planetName + ' Outpost');
+                if (colonyName) {
+                    colonies.push({
+                        name: colonyName,
+                        planet: planetName,
+                        type: planetType,
+                        star: currentStar,
+                        nebula: currentNebula,
+                        sector: currentSector,
+                        resources: planetResources,
+                        established: new Date().toISOString()
+                    });
+                    
+                    localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
+                    
+                    document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
+                    document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
+                    document.getElementById('colonyBtn').style.borderColor = '#4affaa';
+                    
+                    showNotice(`🏭 ${colonyName} established`);
+                    
+                    // Bonus credits for establishing colony
+                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
+                    credits += 5000;
+                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
+                }
+            }
+        }
+        
+        // ===== RETURN TO SHIP =====
         function returnToShip() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
-            // Clear interval
             if (gatherInterval) {
                 clearInterval(gatherInterval);
             }
             
-            // Show summary
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-            alert(`Returning to ship...\nCollected ${sessionElements} elements on ${planet}`);
+            showNotice(`✨ Collected ${sessionElements} elements`);
             
-            // Navigate to ship bridge
-            navigateTo('ship-bridge.html', true);
+            setTimeout(() => {
+                navigateTo('system-view.html');
+            }, 1000);
         }
         
-        // Initialize
+        function navigateTo(screen) {
+            window.location.href = screen;
+        }
+        
+        // ===== INITIALIZE =====
         function init() {
-            // Check if player exists
             const player = localStorage.getItem('voidfarer_player');
             if (!player) {
                 window.location.href = 'index.html';
                 return;
             }
             
-            loadCurrentPlanet();
             loadCollection();
-            
-            // Reset session counter
+            checkForColony();
             sessionElements = 0;
             
-            // Show welcome notice
             setTimeout(() => {
                 showNotice('⚙️ Auto-extractor active');
             }, 500);
             
-            // Start auto-gather
             startAutoGather();
             
-            // Check for manual collection toggle in settings
             const autoGather = localStorage.getItem('voidfarer_auto_gather');
             if (autoGather === 'false') {
                 showNotice('⚠️ Auto-extractor disabled');
             }
         }
         
-        // Clean up on page unload
         window.addEventListener('beforeunload', function() {
             if (gatherInterval) {
                 clearInterval(gatherInterval);
             }
         });
         
-        // Run initialization
         init();
     </script>
 </body>
