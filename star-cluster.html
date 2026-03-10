@@ -34,7 +34,7 @@
             overflow: hidden;
         }
         
-        /* Canvas container for pan/zoom */
+        /* Canvas container */
         .canvas-container {
             width: 100%;
             height: 100%;
@@ -66,7 +66,7 @@
             font-family: 'WindSong', cursive;
             font-size: 24px;
             text-shadow: 0 0 20px #b09aff, 0 0 40px #8a6aff;
-            background: rgba(10,10,26,0.8);
+            background: rgba(10,10,26,0.9);
             backdrop-filter: blur(8px);
             padding: 10px 25px;
             border-radius: 40px 15px 40px 15px;
@@ -165,7 +165,7 @@
             transition: all 0.3s ease;
             z-index: 21;
             pointer-events: none;
-            opacity: 0.7;
+            opacity: 0.8;
         }
         
         .star-core {
@@ -197,7 +197,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         
-        /* Star type colors - much brighter */
+        /* Star type colors */
         .star-blue .star-glow {
             background: radial-gradient(circle, rgba(100, 150, 255, 0.8), transparent 80%);
         }
@@ -287,6 +287,18 @@
             transform: scale(0.9);
         }
         
+        /* Debug info (remove after fixing) */
+        .debug-info {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            color: yellow;
+            font-size: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px;
+            z-index: 100;
+        }
+        
         /* Loading overlay */
         .loading-overlay {
             position: fixed;
@@ -341,6 +353,9 @@
 </head>
 <body>
     <div class="cluster-view">
+        <!-- Debug info (remove after fixing) -->
+        <div class="debug-info" id="debugInfo">Loading...</div>
+        
         <div class="canvas-container" id="canvasContainer">
             <canvas id="clusterCanvas"></canvas>
         </div>
@@ -354,7 +369,7 @@
         <div class="cluster-info" id="clusterInfo">
             <div class="cluster-name" id="clusterName">Loading...</div>
             <div id="starCount">0 stars</div>
-            <div id="clusterType" style="font-size:12px; margin-top:4px;">Star-forming</div>
+            <div id="clusterType" style="font-size:12px; margin-top:4px;">-</div>
         </div>
         
         <button class="back-btn" onclick="returnToSectors()">← Sectors</button>
@@ -378,6 +393,7 @@
         const container = document.getElementById('canvasContainer');
         const markersContainer = document.getElementById('starMarkersContainer');
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const debugInfo = document.getElementById('debugInfo');
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -410,34 +426,50 @@
             return Math.abs(hash);
         }
         
-        // ===== LOAD CLUSTER DATA =====
-        const clusterName = localStorage.getItem('voidfarer_current_nebula') || 'Orion Molecular Cloud';
-        const sectorType = localStorage.getItem('voidfarer_current_sector_type') || 'Star-forming';
-        const starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
-        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'Orion';
+        // ===== DEBUG: CHECK LOCALSTORAGE =====
+        debugInfo.innerHTML = 'Checking localStorage...<br>';
         
-        document.getElementById('clusterTitle').textContent = clusterName;
-        document.getElementById('clusterName').textContent = clusterName;
-        document.getElementById('starCount').textContent = starCount + ' stars';
-        document.getElementById('clusterType').textContent = sectorType;
+        // ===== LOAD CLUSTER DATA =====
+        const clusterName = localStorage.getItem('voidfarer_current_nebula');
+        const sectorType = localStorage.getItem('voidfarer_current_sector_type');
+        const starCount = localStorage.getItem('voidfarer_current_sector_stars');
+        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector');
+        
+        debugInfo.innerHTML += `clusterName: ${clusterName}<br>`;
+        debugInfo.innerHTML += `sectorType: ${sectorType}<br>`;
+        debugInfo.innerHTML += `starCount: ${starCount}<br>`;
+        debugInfo.innerHTML += `currentSector: ${currentSector}<br>`;
+        
+        // Use defaults if not found
+        const finalClusterName = clusterName || 'Orion Molecular Cloud';
+        const finalSectorType = sectorType || 'Star-forming';
+        const finalStarCount = parseInt(starCount) || 85;
+        const finalCurrentSector = currentSector || 'Orion';
+        
+        document.getElementById('clusterTitle').textContent = finalClusterName;
+        document.getElementById('clusterName').textContent = finalClusterName;
+        document.getElementById('starCount').textContent = finalStarCount + ' stars';
+        document.getElementById('clusterType').textContent = finalSectorType;
+        
+        debugInfo.innerHTML += `Using: ${finalStarCount} stars<br>`;
         
         // ===== GENERATE SEED =====
         const clusterSeed = UNIVERSE_SEED + 
-                           hashString(currentSector) * 100 + 
-                           hashString(clusterName) % 100000;
+                           hashString(finalCurrentSector) * 100 + 
+                           hashString(finalClusterName) % 100000;
+        
+        debugInfo.innerHTML += `clusterSeed: ${clusterSeed}<br>`;
         
         // ===== STAR NAME GENERATION =====
         const namePrefixes = [
             'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
             'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Rig', 'Veg', 'Sir',
-            'Ald', 'Betel', 'Rigel', 'Arc', 'Den', 'Alt', 'Poll', 'Cast', 'Ant', 'Mira'
+            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Rig', 'Veg', 'Sir'
         ];
         
         const nameSuffixes = [
             'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'Alpha', 'Beta',
-            'Gamma', 'Delta', 'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Australis', 'Borealis',
-            'Galactica', 'Nova', 'Magnus', 'Parvus', 'Prima', 'Secunda'
+            'Gamma', 'Delta', 'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Australis', 'Borealis'
         ];
         
         function generateStarName(seed, index) {
@@ -457,9 +489,9 @@
             { type: 'purple', prob: 0.05 }
         ];
         
-        console.log('Generating', starCount, 'stars with seed', clusterSeed);
+        debugInfo.innerHTML += `Generating ${finalStarCount} stars...<br>`;
         
-        for (let i = 0; i < starCount; i++) {
+        for (let i = 0; i < finalStarCount; i++) {
             const rand = seededRandom(clusterSeed, i * 10);
             let cumulative = 0;
             let starType = 'white';
@@ -500,7 +532,7 @@
             });
         }
         
-        console.log('Generated', stars.length, 'stars');
+        debugInfo.innerHTML += `Generated ${stars.length} stars<br>`;
         
         // ===== PANZOOM INITIALIZATION =====
         let panzoomInstance;
@@ -534,12 +566,12 @@
         function drawBackground() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Background stars - make them visible
-            for (let i = 0; i < 1000; i++) {
+            // Background stars
+            for (let i = 0; i < 500; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
-                const size = Math.random() * 3 + 1;
-                const opacity = Math.random() * 0.3 + 0.1;
+                const size = Math.random() * 2;
+                const opacity = Math.random() * 0.2 + 0.1;
                 
                 ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
                 ctx.beginPath();
@@ -547,22 +579,15 @@
                 ctx.fill();
             }
             
-            // Draw bright stars as large dots
+            // Draw bright dots for stars
             stars.forEach(star => {
                 const x = (star.x / 100) * canvas.width;
                 const y = (star.y / 100) * canvas.height;
                 
-                // Draw a bright dot for the star
                 ctx.beginPath();
-                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.fill();
-                
-                // Add glow
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 20;
-                ctx.fill();
-                ctx.shadowBlur = 0;
             });
         }
         
@@ -586,7 +611,7 @@
                 markersContainer.appendChild(marker);
             });
             
-            console.log('Created', stars.length, 'star markers');
+            debugInfo.innerHTML += `Created ${stars.length} markers<br>`;
         }
         
         // ===== ZOOM CONTROLS =====
@@ -646,7 +671,6 @@
                 return;
             }
             
-            console.log('Initializing star cluster...');
             initPanzoom();
             drawBackground();
             createStarMarkers();
@@ -655,7 +679,6 @@
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
                 drawBackground();
-                // Markers will reposition automatically with percentage positions
             });
         }
         
