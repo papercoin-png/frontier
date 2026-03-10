@@ -221,7 +221,6 @@
             <!-- Window with Earth view -->
             <div class="window-frame">
                 <div class="window-view">
-                    <!-- Using local image - YOU NEED TO SAVE THIS IMAGE LOCALLY -->
                     <img src="assets/images/earth-view.jpg" class="earth-image" alt="Earth view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
                     <div class="window-overlay"></div>
                     <div class="window-label">Earth • home</div>
@@ -285,13 +284,11 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             if (useWarp) {
-                // Show warp effect then navigate
                 loadingOverlay.classList.add('active');
                 setTimeout(() => {
                     window.location.href = screen;
                 }, 800);
             } else {
-                // Navigate immediately
                 window.location.href = screen;
             }
         }
@@ -299,6 +296,14 @@
         // Check if this is first time playing
         function isNewGame() {
             return !localStorage.getItem('voidfarer_player');
+        }
+        
+        // Initialize universe seed if not set
+        function initializeUniverse() {
+            if (!localStorage.getItem('voidfarer_universe_seed')) {
+                // Fixed seed - everyone gets the same universe
+                localStorage.setItem('voidfarer_universe_seed', '42793');
+            }
         }
         
         // Handle menu actions
@@ -311,6 +316,8 @@
                         localStorage.removeItem('voidfarer_collection');
                         localStorage.removeItem('voidfarer_missions');
                         localStorage.removeItem('voidfarer_credits');
+                        localStorage.removeItem('voidfarer_colonies');
+                        localStorage.removeItem('voidfarer_discovered_locations');
                         
                         // Set default values
                         localStorage.setItem('voidfarer_player', JSON.stringify({
@@ -319,6 +326,15 @@
                             credits: 1000,
                             created: new Date().toISOString()
                         }));
+                        
+                        // Initialize universe seed
+                        initializeUniverse();
+                        
+                        // Set starting location
+                        localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
+                        localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
+                        localStorage.setItem('voidfarer_current_star', 'Sol');
+                        localStorage.setItem('voidfarer_current_planet', 'Earth');
                         
                         // Navigate to Earth Hub with warp effect
                         navigateTo('earth-hub.html', true);
@@ -335,17 +351,32 @@
                             created: new Date().toISOString()
                         }));
                         
+                        // Initialize universe seed
+                        initializeUniverse();
+                        
                         // Initialize empty collection
                         localStorage.setItem('voidfarer_collection', JSON.stringify({}));
                         
+                        // Initialize empty colonies
+                        localStorage.setItem('voidfarer_colonies', JSON.stringify([]));
+                        
+                        // Initialize discovered locations
+                        localStorage.setItem('voidfarer_discovered_locations', JSON.stringify([]));
+                        
                         // Default missions
                         localStorage.setItem('voidfarer_missions', JSON.stringify([
-                            { element: 'Gold', current: 0, target: 50, planet: 'Pyros' },
-                            { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
-                            { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
+                            { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
+                            { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
+                            { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
                         ]));
                         
                         localStorage.setItem('voidfarer_credits', '12450');
+                        
+                        // Set starting location
+                        localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
+                        localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
+                        localStorage.setItem('voidfarer_current_star', 'Sol');
+                        localStorage.setItem('voidfarer_current_planet', 'Earth');
                     }
                     
                     // Navigate to Earth Hub with warp effect
@@ -358,10 +389,13 @@
                     
                 case 'credits':
                     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos');
+                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nCreated by [Your Name]\n\nVersion 1.0');
                     break;
             }
         }
+        
+        // Initialize universe seed on load
+        initializeUniverse();
         
         // Preload next screen for faster transition
         function preloadScreen(url) {
