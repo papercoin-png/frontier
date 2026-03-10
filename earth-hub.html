@@ -104,6 +104,27 @@
             letter-spacing: 2px;
         }
         
+        /* Location Bar */
+        .location-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+            font-size: 14px;
+        }
+        
+        .coordinates {
+            color: #a0d0c0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
         /* Stats Bar */
         .stats-bar {
             background: rgba(30, 60, 70, 0.7);
@@ -359,6 +380,12 @@
                 <div class="earth-subtitle">✦ home port ✦</div>
             </div>
             
+            <!-- Location Bar - New for procedural universe -->
+            <div class="location-bar" id="locationBar">
+                <span>📍 Orion Nebula</span>
+                <span class="coordinates" id="coordinates">Sector B2</span>
+            </div>
+            
             <!-- Stats Bar -->
             <div class="stats-bar" id="statsBar">
                 <div class="credits" id="creditsDisplay">
@@ -366,7 +393,7 @@
                 </div>
                 <div class="cargo-value" id="cargoDisplay">
                     Cargo: 8,200c<br>
-                    0/94 elements
+                    0/118 elements
                 </div>
             </div>
             
@@ -383,6 +410,19 @@
             
             <!-- Hub Cards -->
             <div class="hub-grid">
+                <!-- Galaxy Map - NEW -->
+                <div class="hub-card" onclick="navigateTo('galaxy-map.html')">
+                    <div class="card-icon">🌌</div>
+                    <div class="card-content">
+                        <div class="card-title">Galaxy Map</div>
+                        <div class="card-desc">Explore the Milky Way • 12 sectors</div>
+                        <div class="card-stats">
+                            <span id="sectorDisplay">Current: B2</span>
+                            <span>✨ 0 explored</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Mission Planning -->
                 <div class="hub-card" onclick="navigateTo('journal.html')">
                     <div class="card-icon">📋</div>
@@ -427,12 +467,25 @@
                     <div class="card-icon">📚</div>
                     <div class="card-content">
                         <div class="card-title">Element Library</div>
-                        <div class="card-desc" id="collectionDesc">Complete collection: 0/94</div>
+                        <div class="card-desc" id="collectionDesc">Complete collection: 0/118</div>
                         <div class="card-stats" id="rarityStats">
                             <span>🟩 0</span>
                             <span>🟦 0</span>
                             <span>🟪 0</span>
                             <span>🟨 0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colonies - NEW -->
+                <div class="hub-card" onclick="openColonies()">
+                    <div class="card-icon">🏭</div>
+                    <div class="card-content">
+                        <div class="card-title">Colonies</div>
+                        <div class="card-desc" id="colonyDesc">Your outposts across the galaxy</div>
+                        <div class="card-stats">
+                            <span id="colonyCount">0 colonies</span>
+                            <span>⚙️ manage</span>
                         </div>
                     </div>
                 </div>
@@ -501,41 +554,49 @@
             const collectedCount = Object.keys(collection).length;
             
             // Update collection display
-            document.getElementById('collectionDesc').textContent = `Complete collection: ${collectedCount}/94`;
-            
-            // Calculate rarity counts
-            const rarityCounts = { common: 0, uncommon: 0, rare: 0, 'very-rare': 0, legendary: 0 };
-            
-            // This would need the elements data to calculate properly
-            // For now, use sample data
-            document.getElementById('rarityStats').innerHTML = `
-                <span>🟩 ${Math.floor(Math.random() * 20)}</span>
-                <span>🟦 ${Math.floor(Math.random() * 10)}</span>
-                <span>🟪 ${Math.floor(Math.random() * 5)}</span>
-                <span>🟨 ${Math.floor(Math.random() * 3)}</span>
-            `;
+            document.getElementById('collectionDesc').textContent = `Complete collection: ${collectedCount}/118`;
             
             // Load cargo value (simulated)
             const cargoValue = Math.floor(Math.random() * 5000) + 5000;
-            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoValue.toLocaleString()}c<br>${collectedCount}/94 elements`;
+            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoValue.toLocaleString()}c<br>${collectedCount}/118 elements`;
             
             // Update market stats
             document.getElementById('marketCredits').innerHTML = `⭐ ${Number(credits).toLocaleString()}`;
             document.getElementById('marketCargo').innerHTML = `📦 ${cargoValue.toLocaleString()}c`;
+            
+            // Load colony count
+            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            document.getElementById('colonyCount').textContent = colonies.length + ' colonies';
+            document.getElementById('colonyDesc').textContent = colonies.length > 0 ? 
+                colonies.map(c => c.name).join(', ') : 
+                'Your outposts across the galaxy';
+        }
+        
+        // Load location data
+        function loadLocation() {
+            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+            const nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+            
+            document.getElementById('locationBar').innerHTML = `
+                <span>📍 ${nebula}</span>
+                <span class="coordinates" id="coordinates">Sector ${sector}</span>
+            `;
+            
+            document.getElementById('sectorDisplay').textContent = `Current: ${sector}`;
         }
         
         // Load missions
         function loadMissions() {
             const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [
-                { element: 'Gold', current: 0, target: 50, planet: 'Pyros' },
-                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep' },
-                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil' }
+                { element: 'Gold', current: 32, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
+                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
+                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
             ];
             
             const missionList = document.getElementById('missionList');
             missionList.innerHTML = '';
             
-            missions.forEach(mission => {
+            missions.slice(0, 3).forEach(mission => {
                 const percent = (mission.current / mission.target) * 100;
                 let icon = '🟡';
                 let iconClass = 'icon-gold';
@@ -553,7 +614,7 @@
                 item.innerHTML = `
                     <span class="item-icon ${iconClass}">${icon}</span>
                     <div class="item-details">
-                        <div class="item-name">${mission.element}</div>
+                        <div class="item-name">${mission.element} (${mission.nebula})</div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${percent}%"></div>
                         </div>
@@ -569,7 +630,7 @@
         // Edit missions
         function editMissions() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Mission Planning\n\nSet new collection targets:\n• Gold (50)\n• Uranium (20)\n• Promethium (5)\n\n(This would open a mission editor)');
+            alert('Mission Planning\n\nSet new collection targets for any nebula in the galaxy.\n\n(Full mission editor coming soon!)');
         }
         
         // Open market
@@ -584,6 +645,22 @@
             alert('Ship Hangar\n\nCurrent Ship: Prospector\nMining Bonus: +50%\nSpeed: ★★☆☆☆\nCargo: ★★★☆☆\n\nAvailable Upgrades:\n• Mining Laser (5,000c)\n• Cargo Hold (3,000c)\n• Warp Drive (10,000c)');
         }
         
+        // Open colonies
+        function openColonies() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+            
+            if (colonies.length === 0) {
+                alert('No colonies yet.\n\nExplore the galaxy and build outposts on discovered planets!');
+            } else {
+                let message = '🏭 YOUR COLONIES\n\n';
+                colonies.forEach((c, i) => {
+                    message += `${i+1}. ${c.name} (${c.type})\n   ${c.nebula} • Sector ${c.sector}\n   Output: ${c.output}\n\n`;
+                });
+                alert(message);
+            }
+        }
+        
         // Launch to ship
         function launchToShip() {
             // Save current planet
@@ -595,15 +672,16 @@
         
         // Initialize
         function init() {
-            loadPlayerData();
-            loadMissions();
-            
             // Check if player exists
             const player = localStorage.getItem('voidfarer_player');
             if (!player) {
-                // Redirect to main menu if no player data
                 window.location.href = 'index.html';
+                return;
             }
+            
+            loadLocation();
+            loadPlayerData();
+            loadMissions();
         }
         
         // Run initialization
