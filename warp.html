@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voidfarer - Warp Drive</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -17,25 +17,12 @@
         }
         
         body {
-            margin: 0;
+            background: #0a0a1a;
             overflow: hidden;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             font-family: 'Libre Baskerville', serif;
-        }
-        
-        .phone-frame {
+            position: fixed;
             width: 100%;
-            max-width: 390px;
-            height: 844px;
-            position: relative;
-            overflow: hidden;
-            border-radius: 40px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-            background: #000;
+            height: 100%;
         }
         
         .warp-container {
@@ -43,93 +30,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-        }
-        
-        #status {
-            position: absolute;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #0af;
-            font-family: 'WindSong', cursive;
-            font-size: 28px;
-            text-shadow: 0 0 20px #0af, 0 0 40px #0af;
-            z-index: 100;
-            transition: color 1s, opacity 1s;
-            white-space: nowrap;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            padding: 8px 30px;
-            border-radius: 60px 20px 60px 20px;
-            border: 2px solid #0af;
-            letter-spacing: 2px;
-        }
-        
-        #destination {
-            position: absolute;
-            bottom: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #fff;
-            font-family: 'WindSong', cursive;
-            font-size: 24px;
-            text-shadow: 0 0 15px #0af;
-            z-index: 100;
-            opacity: 0.9;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            padding: 6px 20px;
-            border-radius: 40px 10px 40px 10px;
-            border: 1px solid #6af;
-            transition: opacity 0.5s;
-            text-align: center;
-            white-space: nowrap;
-        }
-        
-        #coordinates {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #a0c0ff;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 100;
-            opacity: 0.7;
-            background: rgba(0,0,0,0.2);
-            padding: 4px 16px;
-            border-radius: 20px;
-        }
-        
-        #skip-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(30, 50, 80, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            color: #e0f0ff;
-            padding: 12px 40px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
-            z-index: 100;
-            box-shadow: 0 0 30px #2a5a8a;
-            letter-spacing: 1px;
-        }
-        
-        #skip-btn:active {
-            background: #6a8ac0;
-            transform: translateX(-50%) scale(0.97);
-            color: #fff;
-        }
-        
-        #skip-btn.hidden {
-            opacity: 0;
-            pointer-events: none;
+            background: #000;
         }
         
         canvas {
@@ -138,303 +39,404 @@
             height: 100%;
         }
         
-        .warp-stats {
+        .warp-overlay {
             position: absolute;
-            top: 100px;
-            right: 20px;
-            color: #a0c0ff;
-            font-size: 12px;
-            font-family: monospace;
-            background: rgba(0,0,0,0.3);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .destination-info {
+            position: absolute;
+            top: max(30px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8ac0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 28px;
+            text-shadow: 0 0 30px #4a8ac0, 0 0 60px #2a5a8a;
+            background: rgba(10,10,26,0.6);
+            backdrop-filter: blur(10px);
+            padding: 10px 30px;
+            border-radius: 60px 20px 60px 20px;
+            border: 2px solid #6a8ac0;
+            z-index: 20;
+            white-space: nowrap;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .warp-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffffff;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 18px;
+            text-shadow: 0 0 20px #4a8ac0;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(10px);
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            border: 2px solid #8ac0ff;
+            z-index: 20;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .warp-status.visible {
+            opacity: 1;
+        }
+        
+        .progress-container {
+            position: absolute;
+            bottom: max(100px, env(safe-area-inset-bottom) + 50px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 250px;
+            height: 6px;
+            background: rgba(30, 30, 50, 0.6);
             backdrop-filter: blur(5px);
-            padding: 6px 12px;
-            border-radius: 20px;
+            border-radius: 3px;
+            border: 1px solid #4a6a9a;
+            z-index: 20;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a8ac0, #8ac0ff, #4a8ac0);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+            transition: width 0.3s ease;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .cycle-counter {
+            position: absolute;
+            bottom: max(160px, env(safe-area-inset-bottom) + 90px);
+            left: 50%;
+            transform: translateX(-50%);
+            color: #aac8ff;
+            font-size: 14px;
+            font-family: monospace;
+            background: rgba(10,10,26,0.5);
+            backdrop-filter: blur(5px);
+            padding: 6px 18px;
+            border-radius: 40px;
+            border: 1px solid #4a6a9a;
+            z-index: 20;
+        }
+        
+        .skip-btn {
+            position: absolute;
+            bottom: max(30px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            color: #ffffff;
+            padding: 14px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+            z-index: 30;
+            min-width: 150px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        
+        .skip-btn:active {
+            background: #6a8ac0;
+            transform: translateX(-50%) scale(0.96);
+        }
+        
+        .skip-btn.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .distance-detail {
+            position: absolute;
+            top: max(120px, env(safe-area-inset-top) + 70px);
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0c0ff;
+            font-size: 14px;
+            background: rgba(10,10,26,0.4);
+            backdrop-filter: blur(5px);
+            padding: 6px 18px;
+            border-radius: 40px;
             border: 1px solid #6a8ac0;
-            z-index: 100;
-            text-align: right;
+            z-index: 20;
+            white-space: nowrap;
+        }
+        
+        @supports (padding: max(0px)) {
+            .destination-info { top: max(30px, env(safe-area-inset-top)); }
+            .distance-detail { top: max(120px, env(safe-area-inset-top) + 70px); }
+            .progress-container { bottom: max(100px, env(safe-area-inset-bottom) + 50px); }
+            .cycle-counter { bottom: max(160px, env(safe-area-inset-bottom) + 90px); }
+            .skip-btn { bottom: max(30px, env(safe-area-inset-bottom)); }
         }
     </style>
 </head>
 <body>
-    <div class="phone-frame">
-        <div class="warp-container">
-            <div id="status">WARP DRIVE ACTIVE</div>
-            <div id="destination">→ Verdant System</div>
-            <div id="coordinates">Sector B2 • Orion Nebula</div>
-            <div class="warp-stats" id="warpStats">Speed: 0.5c</div>
-            <button id="skip-btn" onclick="skipWarp()">SKIP</button>
-            <canvas id="c"></canvas>
+    <div class="warp-container">
+        <canvas id="warpCanvas"></canvas>
+        
+        <div class="warp-overlay">
+            <div class="destination-info" id="destinationName">Warping to...</div>
+            <div class="distance-detail" id="distanceDetail">2.3 LY • 1 cycle</div>
+            
+            <div class="warp-status" id="warpStatus">WARP DRIVE ACTIVE</div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="cycle-counter" id="cycleCounter">Cycle 1 of 1</div>
+            
+            <button class="skip-btn" id="skipBtn" onclick="skipWarp()">SKIP WARP</button>
         </div>
     </div>
 
     <script>
-        // Telegram Mini App
+        const canvas = document.getElementById('warpCanvas');
+        const ctx = canvas.getContext('2d');
+        const skipBtn = document.getElementById('skipBtn');
+        const warpStatus = document.getElementById('warpStatus');
+        const progressBar = document.getElementById('progressBar');
+        const cycleCounter = document.getElementById('cycleCounter');
+        const destinationName = document.getElementById('destinationName');
+        const distanceDetail = document.getElementById('distanceDetail');
+        
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#000000');
-            tg.setBackgroundColor('#000000');
         }
         
-        // ===== GET DESTINATION DATA =====
-        function getDestinationData() {
-            // Check URL parameters first
-            const urlParams = new URLSearchParams(window.location.search);
-            const dest = urlParams.get('dest');
-            const destType = urlParams.get('type') || 'system';
-            const destSector = urlParams.get('sector') || localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-            const destNebula = urlParams.get('nebula') || localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-            
-            if (dest) {
-                return {
-                    name: decodeURIComponent(dest),
-                    type: destType,
-                    sector: destSector,
-                    nebula: destNebula
-                };
-            }
-            
-            // Check localStorage for destination
-            const destName = localStorage.getItem('voidfarer_warp_destination');
-            const redirect = localStorage.getItem('voidfarer_warp_redirect');
-            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-            const nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-            
-            if (destName) {
-                return {
-                    name: destName,
-                    type: 'system',
-                    sector: sector,
-                    nebula: nebula
-                };
-            }
-            
-            // Default
-            return {
-                name: 'Verdant System',
-                type: 'system',
-                sector: 'B2',
-                nebula: 'Orion Nebula'
-            };
+        // ===== GET WARP DATA =====
+        const destination = localStorage.getItem('voidfarer_warp_destination') || 'Unknown Destination';
+        const returnPage = localStorage.getItem('voidfarer_warp_return') || 'galaxy-map.html';
+        const cycles = parseInt(localStorage.getItem('voidfarer_warp_cycles')) || 1;
+        
+        // Calculate distance (rough estimate based on cycles)
+        const distance = (cycles * 2.3).toFixed(1);
+        
+        destinationName.textContent = '→ ' + destination;
+        distanceDetail.innerHTML = `${distance} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}`;
+        cycleCounter.textContent = `Cycle 1 of ${cycles}`;
+        
+        // ===== WARP STATE =====
+        let currentCycle = 1;
+        let cycleProgress = 0;
+        let animationFrame;
+        let startTime = Date.now();
+        const CYCLE_DURATION = 2000; // 2 seconds per cycle
+        
+        // ===== STARS =====
+        const stars = [];
+        const STAR_COUNT = 400;
+        
+        for (let i = 0; i < STAR_COUNT; i++) {
+            stars.push({
+                x: (Math.random() - 0.5) * 2000,
+                y: (Math.random() - 0.5) * 2000,
+                z: Math.random() * 2000,
+                speed: 30 + Math.random() * 40
+            });
         }
         
-        // Set destination display
-        const destData = getDestinationData();
-        document.getElementById('destination').textContent = `→ ${destData.name}`;
-        document.getElementById('coordinates').textContent = `${destData.nebula} • Sector ${destData.sector}`;
-        
-        // Canvas setup
-        const canvas = document.getElementById('c');
-        const ctx = canvas.getContext('2d');
-        
+        // ===== RESIZE CANVAS =====
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
-
-        // ===== WARP STARS =====
-        const stars = [];
-        for (let i = 0; i < 500; i++) {
-            stars.push({
-                x: (Math.random() - 0.5) * 2000,
-                y: (Math.random() - 0.5) * 2000,
-                z: Math.random() * 2000,
-                baseSpeed: 40 + Math.random() * 40,
-                color: `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`
-            });
-        }
-
-        let time = 0;
-        let phase = 'warp';
-        let warpStart = Date.now();
-        let progress = 0; // 0 to 1 over 4 seconds
-        let animationFrame;
         
-        // Speed display
-        const speedDisplay = document.getElementById('warpStats');
-        
-        // Check if we should auto-redirect after warp
-        const redirectAfterWarp = localStorage.getItem('voidfarer_warp_redirect') || 'system-view.html';
-        
-        function checkPhase() {
-            const elapsed = (Date.now() - warpStart) / 1000; // seconds
-            progress = Math.min(elapsed / 4, 1); // 0 to 1 over 4 seconds
+        // ===== UPDATE CYCLE =====
+        function updateCycle() {
+            const elapsed = Date.now() - startTime;
+            const totalDuration = cycles * CYCLE_DURATION;
+            const progress = Math.min(elapsed / totalDuration, 1);
             
-            // Update speed display
-            const speedValue = (1 - progress) * 100;
-            speedDisplay.textContent = `Speed: ${speedValue.toFixed(1)}c`;
+            // Update progress bar
+            progressBar.style.width = (progress * 100) + '%';
             
-            if (elapsed >= 4 && phase === 'warp') {
-                phase = 'ripple';
-                document.getElementById('status').textContent = 'ARRIVED';
-                document.getElementById('status').style.color = '#6f6';
-                document.getElementById('status').style.borderColor = '#6f6';
-                document.getElementById('coordinates').style.opacity = '1';
-                speedDisplay.textContent = 'Speed: 0.0c';
+            // Calculate current cycle
+            const newCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
+            if (newCycle <= cycles && newCycle !== currentCycle) {
+                currentCycle = newCycle;
+                cycleCounter.textContent = `Cycle ${currentCycle} of ${cycles}`;
                 
-                // Clear warp destination from localStorage
-                localStorage.removeItem('voidfarer_warp_destination');
-                localStorage.removeItem('voidfarer_warp_redirect');
-                
-                // Auto-redirect after arrival
-                setTimeout(() => {
-                    completeWarp();
-                }, 1500);
-            }
-        }
-        
-        function completeWarp() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            
-            // Get redirect URL
-            const redirect = localStorage.getItem('voidfarer_warp_redirect') || 'system-view.html';
-            
-            // Clear warp data
-            localStorage.removeItem('voidfarer_warp_redirect');
-            localStorage.removeItem('voidfarer_warp_destination');
-            
-            // Navigate
-            window.location.href = redirect;
-        }
-        
-        function skipWarp() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            // Immediately complete warp
-            phase = 'ripple';
-            document.getElementById('status').textContent = 'ARRIVED';
-            document.getElementById('status').style.color = '#6f6';
-            document.getElementById('status').style.borderColor = '#6f6';
-            document.getElementById('skip-btn').classList.add('hidden');
-            speedDisplay.textContent = 'Speed: 0.0c';
-            
-            setTimeout(() => {
-                completeWarp();
-            }, 500);
-        }
-
-        function draw() {
-            checkPhase();
-            
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            if (phase === 'warp') {
-                // ===== WARP WITH PROGRESSIVE SLOWING & DIMMING =====
-                time += 0.02;
-                
-                // Calculate speed factor and brightness based on progress
-                const speedFactor = 1.0 - (progress * 0.9); // 1.0 → 0.1
-                const brightnessFactor = 1.0 - (progress * 0.8); // 1.0 → 0.2
-
-                stars.forEach(s => {
-                    // Apply slowed speed
-                    s.z -= s.baseSpeed * speedFactor;
-
-                    if (s.z < 1) {
-                        s.z = 2000;
-                        s.x = (Math.random() - 0.5) * 2000;
-                        s.y = (Math.random() - 0.5) * 2000;
-                    }
-
-                    const factor = 500 / s.z;
-                    const x = s.x * factor + canvas.width / 2;
-                    const y = s.y * factor + canvas.height / 2;
-                    
-                    // Skip if outside view
-                    if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;
-                    
-                    // Draw streaks
-                    if (s.z < 1200) {
-                        const streakLength = 50 * speedFactor;
-                        ctx.strokeStyle = `rgba(100, 150, 255, ${0.5 * brightnessFactor})`;
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(x, y);
-                        
-                        const streakX = (s.x / s.z) * streakLength;
-                        const streakY = (s.y / s.z) * streakLength;
-                        ctx.lineTo(x + streakX, y + streakY);
-                        ctx.stroke();
-                    }
-
-                    ctx.fillStyle = `rgba(255, 255, 255, ${brightnessFactor})`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, 2 + (2000 - s.z) * 0.02, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-
-                // Warp glow
-                const glowIntensity = 0.3 * brightnessFactor;
-                const gradient = ctx.createRadialGradient(
-                    canvas.width/2, canvas.height/2, 0,
-                    canvas.width/2, canvas.height/2, 150
-                );
-                gradient.addColorStop(0, `rgba(100, 150, 255, ${glowIntensity})`);
-                gradient.addColorStop(1, 'transparent');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            } else {
-                // ===== RIPPLE SPHERE (peaceful arrival) =====
-                time += 0.02;
-                
-                // Draw grid of rippling dots
-                for (let y = -50; y < canvas.height + 50; y += 20) {
-                    for (let x = -50; x < canvas.width + 50; x += 20) {
-                        const dx = x - canvas.width/2;
-                        const dy = y - canvas.height/2;
-                        const dist = Math.sqrt(dx*dx + dy*dy);
-                        
-                        const ripple = Math.sin(dist * 0.03 - time * 5) * 0.5 + 0.5;
-                        const angle = Math.atan2(dy, dx);
-                        
-                        const warpX = x + Math.cos(angle) * ripple * 30;
-                        const warpY = y + Math.sin(angle) * ripple * 30;
-                        
-                        // Fade out ripple effect
-                        const fadeOut = Math.max(0, 1 - (progress - 0.8) * 5);
-                        
-                        ctx.fillStyle = `rgba(100, 200, 255, ${ripple * 0.2 * fadeOut})`;
-                        ctx.fillRect(warpX, warpY, 4, 4);
-                    }
+                // Haptic feedback on cycle change
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('light');
                 }
                 
-                // Calm central glow
-                const gradient = ctx.createRadialGradient(
-                    canvas.width/2, canvas.height/2, 0,
-                    canvas.width/2, canvas.height/2, 200
-                );
-                gradient.addColorStop(0, `rgba(150, 200, 255, ${0.2 * (1 - progress)})`);
-                gradient.addColorStop(1, 'transparent');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Show skip button during ripple phase
-                document.getElementById('skip-btn').classList.remove('hidden');
+                // Flash effect
+                warpStatus.style.opacity = '1';
+                setTimeout(() => {
+                    warpStatus.style.opacity = '0';
+                }, 200);
             }
-
-            animationFrame = requestAnimationFrame(draw);
+            
+            // Check if warp complete
+            if (elapsed >= totalDuration) {
+                completeWarp();
+            }
+            
+            return progress;
         }
-
-        draw();
         
-        // Clean up
-        window.addEventListener('beforeunload', function() {
+        // ===== DRAW WARP EFFECT =====
+        function drawWarp(progress) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Calculate warp intensity based on progress within current cycle
+            const cycleElapsed = (Date.now() - startTime) % CYCLE_DURATION;
+            const cycleProgress = cycleElapsed / CYCLE_DURATION;
+            
+            // Speed factor: peak at middle of cycle
+            let speedFactor;
+            if (cycleProgress < 0.3) {
+                // Accelerating
+                speedFactor = 0.3 + (cycleProgress / 0.3) * 0.7;
+            } else if (cycleProgress > 0.7) {
+                // Decelerating
+                speedFactor = 1.0 - ((cycleProgress - 0.7) / 0.3) * 0.7;
+            } else {
+                // Full speed
+                speedFactor = 1.0;
+            }
+            
+            // Overall progress factor (slows down near end)
+            const overallProgress = (Date.now() - startTime) / (cycles * CYCLE_DURATION);
+            const finalApproach = Math.max(0, 1 - overallProgress * 1.5);
+            
+            stars.forEach(s => {
+                // Update star position
+                s.z -= s.speed * speedFactor * (0.5 + finalApproach * 0.5);
+                
+                // Reset stars that pass by
+                if (s.z < 1) {
+                    s.z = 2000;
+                    s.x = (Math.random() - 0.5) * 2000;
+                    s.y = (Math.random() - 0.5) * 2000;
+                }
+                
+                // Project to 2D
+                const factor = 500 / s.z;
+                const x = s.x * factor + centerX;
+                const y = s.y * factor + centerY;
+                
+                // Skip if outside view
+                if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;
+                
+                // Calculate brightness and size
+                const brightness = Math.min(1, 0.3 + (2000 - s.z) / 2000);
+                const size = 1 + (2000 - s.z) / 200 * speedFactor;
+                
+                // Draw star
+                ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw streak for faster stars
+                if (s.z < 800 && speedFactor > 0.5) {
+                    ctx.strokeStyle = `rgba(100, 150, 255, ${brightness * 0.3})`;
+                    ctx.lineWidth = size * 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    
+                    const streakX = (s.x / s.z) * 30 * speedFactor;
+                    const streakY = (s.y / s.z) * 30 * speedFactor;
+                    ctx.lineTo(x + streakX, y + streakY);
+                    ctx.stroke();
+                }
+            });
+            
+            // Draw central glow
+            const glowSize = 50 + Math.sin(Date.now() / 200) * 10;
+            const gradient = ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, glowSize
+            );
+            gradient.addColorStop(0, `rgba(100, 150, 255, ${0.2 * speedFactor})`);
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, glowSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // ===== ANIMATION LOOP =====
+        function animate() {
+            const progress = updateCycle();
+            drawWarp(progress);
+            
+            animationFrame = requestAnimationFrame(animate);
+        }
+        
+        // ===== COMPLETE WARP =====
+        function completeWarp() {
+            // Clear warp data
+            localStorage.removeItem('voidfarer_warp_destination');
+            localStorage.removeItem('voidfarer_warp_cycles');
+            localStorage.removeItem('voidfarer_warp_return');
+            
+            // Navigate to destination
+            window.location.href = returnPage;
+        }
+        
+        // ===== SKIP WARP =====
+        function skipWarp() {
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            
+            skipBtn.classList.add('hidden');
+            completeWarp();
+        }
+        
+        // ===== CLEANUP =====
+        window.addEventListener('beforeunload', () => {
             if (animationFrame) {
                 cancelAnimationFrame(animationFrame);
             }
         });
         
-        // Handle back button
-        window.addEventListener('popstate', function() {
-            window.location.href = 'ship-bridge.html';
-        });
+        // ===== START ANIMATION =====
+        setTimeout(() => {
+            warpStatus.classList.add('visible');
+            setTimeout(() => {
+                warpStatus.classList.remove('visible');
+            }, 2000);
+        }, 100);
         
-        history.pushState({}, '');
+        animate();
     </script>
 </body>
 </html>
