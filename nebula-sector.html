@@ -426,7 +426,7 @@
         
         @keyframes slideUp {
             from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(0%); opacity: 1; }
         }
         
         .info-title {
@@ -642,7 +642,7 @@
             
             <!-- Coordinates Display -->
             <div class="coordinates-display" id="coordinatesDisplay">
-                <span id="coordText">Sector B2 • Star 7</span>
+                <span id="coordText">Sector B2 • Orion Nebula</span>
             </div>
             
             <!-- UI Controls -->
@@ -694,6 +694,10 @@
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/procedural-universe.js"></script>
+    <script src="js/procedural-names.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -704,14 +708,13 @@
             tg.setBackgroundColor('#0a0a1a');
         }
         
-        // ===== CONSTANTS =====
-        const UNIVERSE_SEED = 42793;
-        const STARS_PER_SECTOR = 50; // 50 stars per nebula
+        // ===== LOAD DATA FROM STORAGE =====
+        const currentSector = getCurrentSector();
+        const nebulaName = getCurrentNebula();
+        const starIndex = getCurrentStarIndex();
         
-        // ===== GET SELECTED NEBULA =====
-        const nebulaName = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
         document.getElementById('sectorTitle').textContent = nebulaName;
+        document.getElementById('coordText').textContent = `Sector ${currentSector} • ${nebulaName}`;
         
         // Set nebula background color based on name
         const nebulaBg = document.getElementById('nebulaBg');
@@ -744,146 +747,45 @@
             radial-gradient(circle at 70% 60%, ${nebulaColor}60 0%, transparent 60%)
         `;
         
-        // ===== SEEDED RANDOM FUNCTION =====
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
+        // ===== GENERATE STARS FOR THIS NEBULA =====
+        const STARS_PER_NEBULA = 50;
+        const nebulaSeed = UNIVERSE_SEED + 
+                          (currentSector.charCodeAt(0) * 10000) + 
+                          (parseInt(currentSector[1]) * 1000) +
+                          hashString(nebulaName) % 10000;
+        
+        // Generate all stars
+        const stars = [];
+        for (let i = 0; i < STARS_PER_NEBULA; i++) {
+            const star = generateStar(nebulaSeed, i);
+            stars.push(star);
         }
         
-        // ===== GENERATE STAR NAME =====
-        function generateStarName(seed, index) {
-            const prefixes = ['Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 
-                             'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon'];
-            const suffixes = ['Majoris', 'Minoris', 'Prime', 'Secundus', 'A', 'B', 'C', 'Alpha', 'Beta', 'Gamma'];
-            
-            const pIndex = Math.floor(seededRandom(seed, index * 3) * prefixes.length);
-            const sIndex = Math.floor(seededRandom(seed, index * 3 + 1) * suffixes.length);
-            
-            return prefixes[pIndex] + ' ' + suffixes[sIndex];
+        // Add some anomalies (5 per sector)
+        const anomalies = [];
+        for (let i = 0; i < 5; i++) {
+            const anomaly = generateAnomaly(nebulaSeed, i + 100);
+            anomalies.push(anomaly);
         }
         
-        // ===== GENERATE STARS =====
-        function generateStars() {
-            const stars = [];
-            
-            // Create a seed for this nebula
-            const nebulaSeed = UNIVERSE_SEED + 
-                              (currentSector.charCodeAt(0) * 10000) + 
-                              (parseInt(currentSector[1]) * 1000) +
-                              nebulaName.length * 100;
-            
-            for (let i = 0; i < STARS_PER_SECTOR; i++) {
-                // Determine star type
-                const typeRand = seededRandom(nebulaSeed, i * 10);
-                let type = 'main';
-                let subtype = 'main';
-                
-                if (typeRand < 0.6) {
-                    type = 'star';
-                    subtype = 'main';
-                } else if (typeRand < 0.85) {
-                    type = 'star';
-                    subtype = 'red';
-                } else if (typeRand < 0.95) {
-                    type = 'star';
-                    subtype = 'blue';
-                } else if (typeRand < 0.98) {
-                    type = 'star';
-                    subtype = 'neutron';
-                } else {
-                    // Anomalies (2%)
-                    const anomalyRand = seededRandom(nebulaSeed, i * 10 + 5);
-                    if (anomalyRand < 0.3) {
-                        type = 'anomaly';
-                        subtype = 'blackhole';
-                    } else if (anomalyRand < 0.5) {
-                        type = 'anomaly';
-                        subtype = 'nebula';
-                    } else if (anomalyRand < 0.7) {
-                        type = 'anomaly';
-                        subtype = 'pulsar';
-                    } else if (anomalyRand < 0.85) {
-                        type = 'anomaly';
-                        subtype = 'wormhole';
-                    } else {
-                        type = 'anomaly';
-                        subtype = 'asteroid';
-                    }
-                }
-                
-                // Position in a spiral pattern
-                const angle = (i / STARS_PER_SECTOR) * Math.PI * 8;
-                const radius = 20 + (i % 15) * 3;
-                const centerX = 50 + Math.sin(angle * 2) * 15;
-                const centerY = 50 + Math.cos(angle * 3) * 15;
-                
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-                
-                // Ensure within bounds
-                const safeX = Math.min(95, Math.max(5, x));
-                const safeY = Math.min(95, Math.max(5, y));
-                
-                // Generate planet count based on star type
-                let planetCount = 0;
-                if (type === 'star') {
-                    if (subtype === 'main') planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 7) * 6) + 3; // 3-8
-                    else if (subtype === 'red') planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 8) * 4) + 2; // 2-5
-                    else if (subtype === 'blue') planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 9) * 8) + 5; // 5-12
-                    else if (subtype === 'neutron') planetCount = 0; // No planets
-                }
-                
-                stars.push({
-                    id: `star-${i}`,
-                    index: i,
-                    name: generateStarName(nebulaSeed, i),
-                    type: type,
-                    subtype: subtype,
-                    x: safeX,
-                    y: safeY,
-                    planetCount: planetCount,
-                    distance: (Math.floor(seededRandom(nebulaSeed, i * 10 + 11) * 90) + 10) / 10 + ' ly',
-                    desc: getDescription(type, subtype)
-                });
-            }
-            
-            return stars;
-        }
+        // Combine all objects
+        const allObjects = [...stars, ...anomalies];
         
-        function getDescription(type, subtype) {
-            if (type === 'star') {
-                if (subtype === 'main') return 'A stable main sequence star. Multiple planets possible.';
-                if (subtype === 'red') return 'A cool red dwarf. Ancient and stable. Rocky worlds likely.';
-                if (subtype === 'blue') return 'A hot blue giant. Young system with forming planets.';
-                if (subtype === 'neutron') return 'The collapsed core of a massive star. No planets remain.';
-            } else if (type === 'anomaly') {
-                if (subtype === 'blackhole') return 'A gravitational singularity. Extreme danger, exotic physics.';
-                if (subtype === 'nebula') return 'A dense gas cloud. New stars forming within.';
-                if (subtype === 'pulsar') return 'A rapidly rotating neutron star. Regular energy pulses.';
-                if (subtype === 'wormhole') return 'A spacetime tunnel. Unknown destination.';
-                if (subtype === 'asteroid') return 'A dense asteroid field. Rich in minerals.';
-            }
-            return 'Unknown celestial object.';
-        }
-        
-        // ===== GENERATE OBJECTS =====
-        const stars = generateStars();
-        let currentStar = null;
-        
-        function renderStars() {
+        // ===== RENDER OBJECTS =====
+        function renderObjects() {
             const mapContainer = document.getElementById('mapContainer');
             mapContainer.innerHTML = '';
             
-            // Create connection lines
+            // Create connection lines between nearby stars
             for (let i = 0; i < stars.length; i += 4) {
                 if (i + 1 < stars.length) {
                     const line = document.createElement('div');
                     line.className = 'connection-line';
                     
-                    const x1 = stars[i].x;
-                    const y1 = stars[i].y;
-                    const x2 = stars[i+1].x;
-                    const y2 = stars[i+1].y;
+                    const x1 = stars[i].position.x;
+                    const y1 = stars[i].position.y;
+                    const x2 = stars[i+1].position.x;
+                    const y2 = stars[i+1].position.y;
                     
                     const dx = x2 - x1;
                     const dy = y2 - y1;
@@ -902,11 +804,11 @@
             // Create stars
             stars.forEach(star => {
                 const el = document.createElement('div');
-                el.className = `celestial-object ${star.type}-${star.subtype}`;
-                el.id = star.id;
-                el.style.left = star.x + '%';
-                el.style.top = star.y + '%';
-                el.setAttribute('onclick', `selectStar('${star.id}')`);
+                el.className = `celestial-object star-${star.type}`;
+                el.id = `star-${star.index}`;
+                el.style.left = star.position.x + '%';
+                el.style.top = star.position.y + '%';
+                el.setAttribute('onclick', `selectObject('star', ${star.index})`);
                 
                 el.innerHTML = `
                     <div class="object-glow"></div>
@@ -917,57 +819,81 @@
                 mapContainer.appendChild(el);
             });
             
-            // Update coordinates display
-            document.getElementById('coordText').textContent = 
-                `Sector ${currentSector} • ${nebulaName} • ${STARS_PER_SECTOR} stars`;
+            // Create anomalies
+            anomalies.forEach(anomaly => {
+                const el = document.createElement('div');
+                el.className = `celestial-object anomaly-${anomaly.type}`;
+                el.id = `anomaly-${anomaly.index}`;
+                el.style.left = anomaly.position.x + '%';
+                el.style.top = anomaly.position.y + '%';
+                el.setAttribute('onclick', `selectObject('anomaly', ${anomaly.index})`);
+                
+                el.innerHTML = `
+                    <div class="object-glow"></div>
+                    <div class="object-core"></div>
+                    <span class="object-label">${anomaly.name}</span>
+                `;
+                
+                mapContainer.appendChild(el);
+            });
         }
         
         // ===== OBJECT SELECTION =====
+        let currentObject = null;
+        let currentObjectType = null;
         const infoPanel = document.getElementById('infoPanel');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
-        function selectStar(id) {
+        function selectObject(type, index) {
             // Remove previous selection
             document.querySelectorAll('.celestial-object').forEach(el => {
                 el.classList.remove('selected');
             });
             
             // Add selection
-            const element = document.getElementById(id);
+            const element = document.getElementById(`${type}-${index}`);
             if (element) {
                 element.classList.add('selected');
                 
-                // Find star data
-                const star = stars.find(s => s.id === id);
-                if (!star) return;
-                
-                currentStar = star;
-                
-                // Update info panel
-                document.getElementById('infoTitle').textContent = star.name;
-                
-                let typeText = '';
-                if (star.type === 'star') {
-                    if (star.subtype === 'main') typeText = 'Main Sequence Star';
-                    else if (star.subtype === 'red') typeText = 'Red Dwarf Star';
-                    else if (star.subtype === 'blue') typeText = 'Blue Giant Star';
-                    else if (star.subtype === 'neutron') typeText = 'Neutron Star';
+                let objData;
+                if (type === 'star') {
+                    objData = stars[index];
                 } else {
-                    if (star.subtype === 'blackhole') typeText = 'Black Hole';
-                    else if (star.subtype === 'nebula') typeText = 'Proto-Nebula';
-                    else if (star.subtype === 'pulsar') typeText = 'Pulsar';
-                    else if (star.subtype === 'wormhole') typeText = 'Wormhole';
-                    else if (star.subtype === 'asteroid') typeText = 'Asteroid Field';
+                    objData = anomalies.find(a => a.index === index);
                 }
                 
-                document.getElementById('infoType').textContent = typeText;
-                document.getElementById('infoDesc').textContent = star.desc;
-                document.getElementById('infoDistance').textContent = star.distance;
-                document.getElementById('infoPlanets').textContent = star.planetCount || 'N/A';
-                document.getElementById('infoStarType').textContent = star.subtype;
-                document.getElementById('infoIndex').textContent = '#' + star.index;
+                if (!objData) return;
                 
-                // Show panel
+                currentObject = objData;
+                currentObjectType = type;
+                
+                // Update info panel
+                document.getElementById('infoTitle').textContent = objData.name;
+                
+                if (type === 'star') {
+                    const typeNames = {
+                        'main': 'Main Sequence Star',
+                        'red': 'Red Dwarf Star',
+                        'blue': 'Blue Giant Star',
+                        'neutron': 'Neutron Star',
+                        'blackhole': 'Black Hole'
+                    };
+                    
+                    document.getElementById('infoType').textContent = typeNames[objData.type] || 'Star';
+                    document.getElementById('infoDesc').textContent = `A ${objData.typeName} with ${objData.planetCount} orbiting planets.`;
+                    document.getElementById('infoDistance').textContent = '2.3 ly';
+                    document.getElementById('infoPlanets').textContent = objData.planetCount;
+                    document.getElementById('infoStarType').textContent = objData.typeName;
+                    document.getElementById('infoIndex').textContent = `#${objData.index + 1}`;
+                } else {
+                    document.getElementById('infoType').textContent = objData.typeName;
+                    document.getElementById('infoDesc').textContent = `A mysterious ${objData.typeName} in this sector.`;
+                    document.getElementById('infoDistance').textContent = '1.7 ly';
+                    document.getElementById('infoPlanets').textContent = 'N/A';
+                    document.getElementById('infoStarType').textContent = objData.typeName;
+                    document.getElementById('infoIndex').textContent = `#${objData.index + 1}`;
+                }
+                
                 infoPanel.classList.add('visible');
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -979,12 +905,13 @@
             document.querySelectorAll('.celestial-object').forEach(el => {
                 el.classList.remove('selected');
             });
-            currentStar = null;
+            currentObject = null;
+            currentObjectType = null;
         }
         
         function travelToStar() {
-            if (!currentStar) {
-                alert('Please select a star first');
+            if (!currentObject) {
+                alert('Please select a star or anomaly first');
                 return;
             }
             
@@ -995,15 +922,19 @@
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
                 
-                // Save the selected star
-                localStorage.setItem('voidfarer_current_star', currentStar.name);
-                localStorage.setItem('voidfarer_current_star_index', currentStar.index);
-                localStorage.setItem('voidfarer_current_star_type', currentStar.subtype);
-                
-                // Navigate to system view
-                window.location.href = 'system-view.html';
-                
-                closeInfo();
+                if (currentObjectType === 'star') {
+                    // Save star data
+                    localStorage.setItem('voidfarer_current_star', currentObject.name);
+                    localStorage.setItem('voidfarer_current_star_index', currentObject.index);
+                    localStorage.setItem('voidfarer_current_star_type', currentObject.type);
+                    
+                    // Navigate to system view
+                    window.location.href = 'system-view.html';
+                } else {
+                    // For anomalies, just show info for now
+                    alert(`Exploring ${currentObject.name}...\n\nThis anomaly requires special equipment to investigate.`);
+                    closeInfo();
+                }
             }, 1500);
         }
         
@@ -1018,11 +949,11 @@
                 if (filter === 'all') {
                     el.style.display = 'block';
                 } else if (filter === 'star') {
-                    el.style.display = el.classList.contains('star-') ? 'block' : 'none';
+                    el.style.display = el.id.startsWith('star') ? 'block' : 'none';
                 } else if (filter === 'anomaly') {
-                    el.style.display = el.classList.contains('anomaly-') ? 'block' : 'none';
+                    el.style.display = el.id.startsWith('anomaly') ? 'block' : 'none';
                 } else if (filter === 'station') {
-                    el.style.display = el.classList.contains('station-') ? 'block' : 'none';
+                    el.style.display = 'none'; // No stations yet
                 }
             });
             
@@ -1082,14 +1013,14 @@
         // ===== INITIALIZE =====
         function init() {
             // Check if player exists
-            const player = localStorage.getItem('voidfarer_player');
+            const player = getPlayer();
             if (!player) {
                 window.location.href = 'index.html';
                 return;
             }
             
             generateBackgroundStars();
-            renderStars();
+            renderObjects();
         }
         
         init();
