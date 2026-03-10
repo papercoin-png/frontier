@@ -25,7 +25,7 @@
             height: 100%;
         }
         
-        .star-map-view {
+        .sector-view {
             position: relative;
             width: 100%;
             height: 100%;
@@ -33,95 +33,178 @@
             overflow: hidden;
         }
         
-        /* Canvas for star map */
-        #starMapCanvas {
+        canvas {
             display: block;
             width: 100%;
             height: 100%;
-            background: #0a0a1a;
+            object-fit: cover;
             touch-action: none;
         }
         
-        /* Very subtle grid overlay */
-        .grid-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: 
-                linear-gradient(rgba(80, 100, 180, 0.08) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(80, 100, 180, 0.08) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none;
-            z-index: 5;
-        }
-        
-        /* UI Elements */
         .ui-header {
             position: absolute;
             top: max(15px, env(safe-area-inset-top));
             left: 50%;
             transform: translateX(-50%);
-            color: #d0e0ff;
+            color: #e0f0ff;
             font-family: 'WindSong', cursive;
-            font-size: 22px;
-            text-shadow: 0 0 15px #6a8ac0;
-            background: rgba(10,10,26,0.3);
-            backdrop-filter: blur(4px);
-            padding: 6px 18px;
-            border-radius: 40px 15px 40px 15px;
-            border: 1px solid rgba(160, 176, 192, 0.3);
-            z-index: 20;
+            font-size: 24px;
+            text-shadow: 0 0 20px #8a6aff;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(8px);
+            padding: 8px 25px;
+            border-radius: 60px 20px 60px 20px;
+            border: 2px solid #a0b0c0;
+            z-index: 30;
             white-space: nowrap;
             letter-spacing: 1px;
+            pointer-events: none;
+        }
+        
+        .current-location {
+            position: absolute;
+            top: max(80px, env(safe-area-inset-top) + 50px);
+            left: 20px;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .current-dot {
+            width: 10px;
+            height: 10px;
+            background: #4affaa;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #4affaa;
         }
         
         .back-btn {
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
             left: max(15px, env(safe-area-inset-left));
-            background: rgba(10,10,26,0.4);
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(160, 176, 192, 0.3);
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(8px);
+            border: 2px solid #a0b0c0;
             color: #d0e0f0;
-            padding: 10px 20px;
-            border-radius: 40px 15px 40px 15px;
-            font-size: 14px;
+            padding: 12px 24px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
             cursor: pointer;
             font-family: 'Libre Baskerville', serif;
             transition: all 0.1s;
-            z-index: 20;
-            min-width: 90px;
+            z-index: 30;
+            min-width: 100px;
             text-align: center;
         }
         
         .back-btn:active {
-            background: rgba(160, 176, 192, 0.2);
+            background: rgba(160, 176, 192, 0.3);
             transform: scale(0.96);
         }
         
-        .region-info {
+        /* Sector Info Panel */
+        .sector-panel {
             position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom));
+            bottom: max(100px, env(safe-area-inset-bottom) + 70px);
             right: max(15px, env(safe-area-inset-right));
-            background: rgba(10,10,26,0.4);
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(160, 176, 192, 0.3);
-            color: #b0c0e0;
-            padding: 10px 14px;
-            border-radius: 30px 10px 30px 10px;
-            font-size: 12px;
-            z-index: 20;
-            text-align: center;
-            min-width: 110px;
+            background: rgba(10,10,26,0.9);
+            backdrop-filter: blur(10px);
+            border: 2px solid #a0b0c0;
+            color: white;
+            padding: 20px;
+            border-radius: 40px 15px 40px 15px;
+            z-index: 40;
+            min-width: 240px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        .region-name {
+        .sector-panel.visible {
+            display: block;
+        }
+        
+        .sector-name {
             font-family: 'WindSong', cursive;
-            font-size: 14px;
+            font-size: 22px;
             color: #ffffff;
-            margin-bottom: 2px;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding-bottom: 8px;
+        }
+        
+        .sector-type {
+            text-align: center;
+            color: #a0c0ff;
+            font-size: 14px;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .distance-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .distance-label {
+            color: #a0c0ff;
+        }
+        
+        .distance-value {
+            color: #ffaa4a;
+            font-weight: bold;
+        }
+        
+        .fuel-value {
+            color: #4affaa;
+            font-weight: bold;
+        }
+        
+        .time-value {
+            color: #8a6aff;
+            font-weight: bold;
+        }
+        
+        .stars-count {
+            text-align: center;
+            color: #ffd966;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        
+        .travel-btn {
+            width: 100%;
+            background: #4a8ac0;
+            border: none;
+            color: white;
+            padding: 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 18px;
+            font-family: 'Libre Baskerville', serif;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.1s;
+        }
+        
+        .travel-btn:active {
+            background: #6aa0e0;
+            transform: scale(0.98);
+        }
+        
+        .travel-btn:disabled {
+            background: #2a4a6a;
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         /* Sector markers */
@@ -132,7 +215,7 @@
             transform: translate(-50%, -50%);
             cursor: pointer;
             pointer-events: auto;
-            z-index: 10;
+            z-index: 20;
             transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
@@ -140,8 +223,14 @@
             justify-content: center;
         }
         
-        .sector-marker:active {
-            transform: translate(-50%, -50%) scale(0.95);
+        .sector-marker.selected .sector-glow {
+            opacity: 0.8;
+            transform: scale(1.2);
+        }
+        
+        .sector-marker.selected .sector-core {
+            transform: scale(1.3);
+            box-shadow: 0 0 40px #ffaa4a;
         }
         
         .sector-glow {
@@ -149,9 +238,10 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(100, 120, 200, 0.25), transparent 80%);
+            background: radial-gradient(circle, rgba(100, 120, 200, 0.3), transparent 80%);
             animation: breathe 4s infinite ease-in-out;
-            z-index: 11;
+            z-index: 21;
+            pointer-events: none;
         }
         
         .sector-core {
@@ -161,8 +251,9 @@
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, #ffffff, #8a9aff);
             box-shadow: 0 0 20px #8a9aff;
-            z-index: 12;
+            z-index: 22;
             border: 2px solid rgba(255,255,255,0.5);
+            transition: all 0.2s ease;
         }
         
         .sector-label {
@@ -178,15 +269,15 @@
             border-radius: 30px 8px 30px 8px;
             border: 1px solid rgba(255,255,255,0.2);
             white-space: nowrap;
-            z-index: 13;
-            letter-spacing: 0.5px;
+            z-index: 23;
+            pointer-events: none;
         }
         
-        .star-count {
+        .star-count-badge {
             position: absolute;
             bottom: -5px;
             right: -5px;
-            background: rgba(255, 170, 74, 0.9);
+            background: #ffaa4a;
             color: white;
             font-size: 10px;
             font-weight: bold;
@@ -197,15 +288,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px solid rgba(255,255,255,0.5);
-            box-shadow: 0 0 10px rgba(255, 170, 74, 0.3);
-            z-index: 14;
+            border: 2px solid white;
+            z-index: 24;
         }
         
         @keyframes breathe {
-            0% { opacity: 0.15; transform: scale(1); }
-            50% { opacity: 0.3; transform: scale(1.1); }
-            100% { opacity: 0.15; transform: scale(1); }
+            0% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.1); }
+            100% { opacity: 0.2; transform: scale(1); }
         }
         
         /* Loading overlay */
@@ -223,7 +313,7 @@
             opacity: 0;
             transition: opacity 0.3s;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -232,19 +322,19 @@
         }
         
         .loading-spinner {
-            width: 30px;
-            height: 30px;
-            border: 2px solid #8a9aff;
-            border-top: 2px solid transparent;
+            width: 50px;
+            height: 50px;
+            border: 4px solid #8a6aff;
+            border-top: 4px solid transparent;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         
         .loading-text {
-            color: #d0e0ff;
+            color: white;
             font-family: 'WindSong', cursive;
-            font-size: 18px;
-            text-shadow: 0 0 15px #8a9aff;
+            font-size: 24px;
+            text-shadow: 0 0 20px #8a6aff;
         }
         
         @keyframes spin {
@@ -254,37 +344,64 @@
         
         @supports (padding: max(0px)) {
             .ui-header { top: max(15px, env(safe-area-inset-top)); }
+            .current-location { top: max(80px, env(safe-area-inset-top) + 50px); }
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
-            .region-info { bottom: max(20px, env(safe-area-inset-bottom)); right: max(15px, env(safe-area-inset-right)); }
+            .sector-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
         }
     </style>
 </head>
 <body>
-    <div class="star-map-view">
-        <canvas id="starMapCanvas"></canvas>
-        <div class="grid-overlay"></div>
-        
+    <div class="sector-view">
         <div class="ui-header" id="regionTitle">Orion Sector</div>
-        <button class="back-btn" onclick="returnToGalaxy()">← Galaxy</button>
         
-        <div class="region-info" id="regionInfo">
-            <div class="region-name" id="regionName">Orion Arm</div>
-            <div id="sectorCount">6 sectors</div>
-            <div id="totalStars" style="font-size:10px; margin-top:2px; opacity:0.8;">calculating...</div>
+        <div class="current-location" id="currentLocation">
+            <span class="current-dot"></span>
+            <span id="currentLocationText">Orion Molecular Cloud</span>
         </div>
         
+        <button class="back-btn" onclick="returnToGalaxy()">← GALAXY</button>
+        
+        <!-- Sector markers will be added here -->
         <div id="sectorMarkers"></div>
+        
+        <!-- Sector Info Panel -->
+        <div class="sector-panel" id="sectorPanel">
+            <div class="sector-name" id="selectedSectorName">Orion Molecular Cloud</div>
+            <div class="sector-type" id="selectedSectorType">Star-forming region</div>
+            <div class="stars-count" id="selectedStarCount">⭐ 85 stars</div>
+            <div class="distance-row">
+                <span class="distance-label">Distance:</span>
+                <span class="distance-value" id="sectorDistance">2.3 LY</span>
+            </div>
+            <div class="distance-row">
+                <span class="distance-label">Warp Cycles:</span>
+                <span class="time-value" id="warpCycles">1 cycle</span>
+            </div>
+            <div class="distance-row">
+                <span class="distance-label">Travel Time:</span>
+                <span class="time-value" id="travelTime">2 sec</span>
+            </div>
+            <div class="distance-row">
+                <span class="distance-label">Fuel Required:</span>
+                <span class="fuel-value" id="fuelCost">10 ⭐</span>
+            </div>
+            <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 EXPLORE</button>
+        </div>
+        
+        <canvas id="sectorCanvas"></canvas>
         
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">entering star cluster...</div>
+            <div class="loading-text">warping...</div>
         </div>
     </div>
 
     <script>
-        const canvas = document.getElementById('starMapCanvas');
+        const canvas = document.getElementById('sectorCanvas');
         const ctx = canvas.getContext('2d');
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const sectorPanel = document.getElementById('sectorPanel');
+        const markersContainer = document.getElementById('sectorMarkers');
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -294,10 +411,14 @@
         
         // ===== LOAD REGION DATA =====
         const currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
-        document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
-        document.getElementById('regionName').textContent = currentRegion + ' Arm';
+        const currentSector = localStorage.getItem('voidfarer_current_sector_name') || 'Orion Molecular Cloud';
+        const currentSectorX = parseFloat(localStorage.getItem('voidfarer_current_sector_x')) || 30;
+        const currentSectorY = parseFloat(localStorage.getItem('voidfarer_current_sector_y')) || 40;
         
-        // ===== SECTOR POSITIONS WITH STAR COUNTS =====
+        document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
+        document.getElementById('currentLocationText').textContent = currentSector;
+        
+        // ===== SECTOR DATA =====
         const sectorData = {
             'Orion': [
                 { name: 'Orion Molecular Cloud', x: 30, y: 40, stars: 85, type: 'Star-forming' },
@@ -358,12 +479,145 @@
         };
         
         const sectors = sectorData[currentRegion] || sectorData['Orion'];
-        document.getElementById('sectorCount').textContent = sectors.length + ' sectors';
         
-        const totalStars = sectors.reduce((sum, s) => sum + s.stars, 0);
-        document.getElementById('totalStars').textContent = totalStars.toLocaleString() + ' stars';
+        // ===== SELECTED SECTOR =====
+        let selectedSector = null;
+        let selectedIndex = -1;
         
-        // ===== DRAW STAR MAP BACKGROUND =====
+        function selectSector(index) {
+            const sector = sectors[index];
+            if (!sector) return;
+            
+            // Remove previous selection
+            document.querySelectorAll('.sector-marker').forEach(m => {
+                m.classList.remove('selected');
+            });
+            
+            // Add selection
+            const marker = document.getElementById('sector-' + index);
+            if (marker) {
+                marker.classList.add('selected');
+            }
+            
+            selectedSector = sector;
+            selectedIndex = index;
+            
+            // Calculate distance from current location
+            const distance = calculateDistance(
+                currentSectorX, currentSectorY,
+                sector.x, sector.y
+            );
+            const cycles = calculateWarpCycles(distance);
+            const fuel = calculateFuel(distance);
+            const time = cycles * 2;
+            
+            // Update panel
+            document.getElementById('selectedSectorName').textContent = sector.name;
+            document.getElementById('selectedSectorType').textContent = sector.type;
+            document.getElementById('selectedStarCount').innerHTML = '⭐ ' + sector.stars + ' stars';
+            document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
+            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
+            document.getElementById('travelTime').textContent = time + ' sec';
+            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
+            
+            // Enable/disable based on whether it's current location
+            const travelBtn = document.getElementById('travelBtn');
+            if (sector.name === currentSector) {
+                travelBtn.disabled = true;
+                travelBtn.textContent = '📍 CURRENT LOCATION';
+            } else {
+                travelBtn.disabled = false;
+                travelBtn.textContent = '🚀 EXPLORE';
+            }
+            
+            sectorPanel.classList.add('visible');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // ===== DISTANCE CALCULATION =====
+        function calculateDistance(x1, y1, x2, y2) {
+            // Euclidean distance between percentage points
+            const dx = (x1 - x2) / 10;
+            const dy = (y1 - y2) / 10;
+            return Math.sqrt(dx*dx + dy*dy) * 5;
+        }
+        
+        function calculateWarpCycles(distance) {
+            if (distance <= 2) return 1;
+            if (distance <= 4) return 2;
+            if (distance <= 6) return 3;
+            if (distance <= 8) return 4;
+            return 5;
+        }
+        
+        function calculateFuel(distance) {
+            return Math.floor(distance * 3) + 5;
+        }
+        
+        // ===== TRAVEL =====
+        function travelToSector() {
+            if (!selectedSector || selectedSector.name === currentSector) return;
+            
+            loadingOverlay.classList.add('active');
+            
+            // Calculate warp details
+            const distance = calculateDistance(
+                currentSectorX, currentSectorY,
+                selectedSector.x, selectedSector.y
+            );
+            const cycles = calculateWarpCycles(distance);
+            
+            // Save destination
+            localStorage.setItem('voidfarer_current_nebula', selectedSector.name);
+            localStorage.setItem('voidfarer_current_sector_name', selectedSector.name);
+            localStorage.setItem('voidfarer_current_sector_type', selectedSector.type);
+            localStorage.setItem('voidfarer_current_sector_stars', selectedSector.stars);
+            localStorage.setItem('voidfarer_current_sector_x', selectedSector.x);
+            localStorage.setItem('voidfarer_current_sector_y', selectedSector.y);
+            
+            localStorage.setItem('voidfarer_warp_destination', selectedSector.name);
+            localStorage.setItem('voidfarer_warp_cycles', cycles);
+            localStorage.setItem('voidfarer_warp_return', 'star-sectors.html');
+            
+            setTimeout(() => {
+                window.location.href = 'warp.html';
+            }, 500);
+        }
+        
+        function returnToGalaxy() {
+            window.location.href = 'galaxy-map.html';
+        }
+        
+        // ===== CREATE SECTOR MARKERS =====
+        function createSectorMarkers() {
+            markersContainer.innerHTML = '';
+            
+            sectors.forEach((sector, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'sector-marker';
+                marker.id = 'sector-' + index;
+                marker.style.left = sector.x + '%';
+                marker.style.top = sector.y + '%';
+                marker.setAttribute('onclick', `selectSector(${index})`);
+                
+                // Highlight current location
+                if (sector.name === currentSector) {
+                    marker.classList.add('selected');
+                }
+                
+                marker.innerHTML = `
+                    <div class="sector-glow"></div>
+                    <div class="sector-core"></div>
+                    <span class="sector-label">${sector.name}</span>
+                    <span class="star-count-badge">${sector.stars}</span>
+                `;
+                
+                markersContainer.appendChild(marker);
+            });
+        }
+        
+        // ===== DRAW BACKGROUND =====
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -389,103 +643,25 @@
                 ctx.fill();
             }
             
-            // Distant nebulae - extremely faint
-            const nebulae = [
-                [30, 0.3, 60], [120, 0.35, 70], [210, 0.25, 55],
-                [300, 0.4, 65], [80, 0.3, 60], [200, 0.45, 50]
-            ];
+            // Nebula glow based on region
+            const gradient = ctx.createRadialGradient(
+                centerX, centerY, 0,
+                centerX, centerY, canvas.width * 0.4
+            );
             
-            nebulae.forEach(([angle, dist, size]) => {
-                const rad = angle * Math.PI / 180;
-                const x = centerX + Math.cos(rad) * (dist * canvas.width * 0.35);
-                const y = centerY + Math.sin(rad) * (dist * canvas.height * 0.35);
-                
-                const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
-                gradient.addColorStop(0, 'rgba(90, 100, 140, 0.03)');
-                gradient.addColorStop(0.7, 'rgba(60, 70, 110, 0.01)');
-                gradient.addColorStop(1, 'transparent');
-                
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(x, y, size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            
-            // Draw faint connection lines between sectors
-            ctx.strokeStyle = 'rgba(100, 120, 160, 0.08)';
-            ctx.lineWidth = 0.5;
-            
-            for (let i = 0; i < sectors.length; i++) {
-                for (let j = i + 1; j < sectors.length; j++) {
-                    if (Math.random() > 0.4) continue;
-                    
-                    const x1 = (sectors[i].x / 100) * canvas.width;
-                    const y1 = (sectors[i].y / 100) * canvas.height;
-                    const x2 = (sectors[j].x / 100) * canvas.width;
-                    const y2 = (sectors[j].y / 100) * canvas.height;
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
-                }
+            let color;
+            switch(currentRegion) {
+                case 'Orion': color = 'rgba(100, 80, 200, 0.1)'; break;
+                case 'Cygnus': color = 'rgba(200, 80, 150, 0.1)'; break;
+                case 'Sagittarius': color = 'rgba(200, 150, 80, 0.1)'; break;
+                default: color = 'rgba(100, 100, 150, 0.1)';
             }
-        }
-        
-        // ===== CREATE SECTOR MARKERS =====
-        function createSectorMarkers() {
-            const container = document.getElementById('sectorMarkers');
-            container.innerHTML = '';
             
-            sectors.forEach((sector, index) => {
-                const marker = document.createElement('div');
-                marker.className = 'sector-marker';
-                marker.style.left = sector.x + '%';
-                marker.style.top = sector.y + '%';
-                marker.setAttribute('onclick', `selectSector(${index})`);
-                
-                marker.innerHTML = `
-                    <div class="sector-glow"></div>
-                    <div class="sector-core"></div>
-                    <span class="sector-label">${sector.name}</span>
-                    <span class="star-count">${sector.stars}</span>
-                `;
-                
-                container.appendChild(marker);
-            });
-        }
-        
-        // ===== SECTOR SELECTION =====
-        function selectSector(index) {
-            const sector = sectors[index];
-            if (!sector) return;
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(0.7, 'transparent');
             
-            loadingOverlay.classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            // Save ALL sector data for the star cluster
-            localStorage.setItem('voidfarer_current_nebula', sector.name);
-            localStorage.setItem('voidfarer_current_sector_type', sector.type);
-            localStorage.setItem('voidfarer_current_sector_stars', sector.stars);
-            localStorage.setItem('voidfarer_current_galaxy_sector', currentRegion);
-            
-            console.log('Saving sector data:', {
-                name: sector.name,
-                type: sector.type,
-                stars: sector.stars,
-                region: currentRegion
-            });
-            
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = 'star-cluster.html';
-            }, 800);
-        }
-        
-        function returnToGalaxy() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'galaxy-map.html';
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         
         // ===== INITIALIZE =====
@@ -501,7 +677,7 @@
             
             window.addEventListener('resize', () => {
                 resizeCanvas();
-                createSectorMarkers();
+                // Markers reposition automatically with percentage
             });
         }
         
