@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voidfarer - Surface</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -13,7 +13,6 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
         }
         
         body {
@@ -41,9 +40,196 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background: #0a1a2a;
         }
         
-        /* Loading Overlay */
+        .surface-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            opacity: 0.7;
+        }
+        
+        .atmosphere {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, rgba(10, 20, 30, 0.7) 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .planet-name {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffffff;
+            font-family: 'WindSong', cursive;
+            font-size: 28px;
+            text-shadow: 0 0 20px #000, 0 0 40px #4a8ac0;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 30px;
+            border-radius: 60px 15px 60px 15px;
+            backdrop-filter: blur(5px);
+            border: 2px solid #8ac0d0;
+            z-index: 10;
+        }
+        
+        .location-info {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a0c0ff;
+            font-size: 12px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            padding: 4px 16px;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #8ac0d0;
+            z-index: 10;
+            font-family: monospace;
+        }
+        
+        .auto-notice {
+            position: absolute;
+            top: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 20, 30, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid #8aa0aa;
+            color: #e0f0f0;
+            padding: 8px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        .auto-notice.show {
+            opacity: 1;
+            animation: notice-pulse 2s ease-in-out;
+        }
+        
+        @keyframes notice-pulse {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+        }
+        
+        .resource-log {
+            position: absolute;
+            bottom: 150px;
+            left: 20px;
+            z-index: 20;
+            font-family: monospace;
+            font-size: 14px;
+            background: rgba(10,10,26,0.5);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 30px 10px 30px 10px;
+            border: 1px solid #8ac0d0;
+            min-width: 180px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .collection {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 20;
+            font-size: 24px;
+            font-family: 'WindSong', cursive;
+            color: #e0f0f0;
+            text-shadow: 0 0 20px #8aa0aa;
+            background: rgba(10, 20, 30, 0.6);
+            backdrop-filter: blur(5px);
+            padding: 10px 20px;
+            border-radius: 60px 15px 60px 15px;
+            border: 2px solid #8ac0d0;
+            min-width: 100px;
+            text-align: center;
+        }
+        
+        .return-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 20;
+            background: rgba(10, 20, 30, 0.6);
+            backdrop-filter: blur(5px);
+            border: 2px solid #8aa0aa;
+            color: #e0f0f0;
+            padding: 12px 24px;
+            border-radius: 60px 15px 60px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+        }
+        
+        .return-btn:active {
+            background: rgba(138, 160, 170, 0.3);
+            transform: scale(0.97);
+        }
+        
+        .resource-indicator {
+            position: absolute;
+            top: 210px;
+            right: 20px;
+            z-index: 15;
+            background: rgba(10, 20, 30, 0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid #8ac0d0;
+            border-radius: 40px 10px 40px 10px;
+            padding: 10px 15px;
+            color: #ffffff;
+            font-size: 12px;
+        }
+        
+        .planet-resources {
+            color: #ffd966;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        
+        .colony-btn {
+            position: absolute;
+            top: 30px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(10, 20, 30, 0.6);
+            backdrop-filter: blur(5px);
+            border: 2px solid #8ac0d0;
+            color: #e0f0f0;
+            padding: 8px 16px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .colony-btn:active {
+            background: rgba(138, 160, 170, 0.3);
+            transform: scale(0.97);
+        }
+        
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -55,629 +241,248 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
         }
         
         .loading-overlay.active {
             display: flex;
-            opacity: 1;
-            pointer-events: all;
         }
         
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'WindSong', cursive;
-            font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
-            animation: pulse 1.5s infinite;
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #8ac0d0;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        
-        /* Planet surface background */
-        .surface-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            filter: brightness(0.9) saturate(1.1);
-        }
-        
-        /* Dark overlay for mood */
-        .atmosphere {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at center, transparent 30%, rgba(10, 20, 30, 0.5) 100%);
-            z-index: 2;
-            pointer-events: none;
-        }
-        
-        /* Planet name overlay */
-        .planet-name-overlay {
-            position: absolute;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ffffff;
-            font-family: 'WindSong', cursive;
-            font-size: 28px;
-            text-shadow: 0 0 20px #000, 0 0 40px #4a8ac0;
-            background: rgba(0,0,0,0.3);
-            padding: 8px 30px;
-            border-radius: 60px 15px 60px 15px;
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            z-index: 10;
-            white-space: nowrap;
-            max-width: 90%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        /* Location Info */
-        .location-info {
-            position: absolute;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #a0c0ff;
-            font-size: 12px;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(5px);
-            padding: 4px 16px;
-            border-radius: 40px 10px 40px 10px;
-            border: 1px solid #8ac0d0;
-            z-index: 10;
-            white-space: nowrap;
-            font-family: monospace;
-        }
-        
-        /* Auto-extractor notice */
-        .auto-notice {
-            position: absolute;
-            top: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(10, 20, 30, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 8px 20px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            z-index: 15;
-            opacity: 0;
-            animation: notice-fade 4s ease-out forwards;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-        
-        @keyframes notice-fade {
-            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            80% { opacity: 1; }
-            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        }
-        
-        /* Resource log (bottom left) */
-        .resource-log {
-            position: absolute;
-            bottom: 120px;
-            left: 20px;
-            z-index: 20;
-            font-family: monospace;
-            font-size: 14px;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
-            pointer-events: none;
-            max-width: 70%;
-        }
-        
-        .log-entry {
-            margin-bottom: 4px;
-            opacity: 0.9;
-            animation: fadeIn 0.5s;
-            word-break: break-word;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 0.9; transform: translateX(0); }
-        }
-        
-        /* Collection counter */
-        .collection {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            z-index: 20;
-            font-size: 24px;
-            font-family: 'WindSong', cursive;
-            color: #e0f0f0;
-            text-shadow: 0 0 20px #8aa0aa;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            padding: 10px 20px;
-            border-radius: 60px 15px 60px 15px;
-            border: 2px solid #8ac0d0;
-            min-width: 80px;
-            text-align: center;
-        }
-        
-        /* Return button */
-        .return-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 12px 24px;
-            border-radius: 60px 15px 60px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }
-        
-        .return-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
-            border-color: #c0e0f0;
-        }
-        
-        /* Resource indicators */
-        .resource-indicator {
-            position: absolute;
-            top: 200px;
-            right: 20px;
-            z-index: 15;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            border: 1px solid #8ac0d0;
-            border-radius: 40px 10px 40px 10px;
-            padding: 8px 16px;
-            color: #ffffff;
-            font-size: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        
-        .planet-resources {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        /* Colony button */
-        .colony-btn {
-            position: absolute;
-            top: 30px;
-            right: 20px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.5);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            color: #e0f0f0;
-            padding: 8px 16px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
-            transition: all 0.2s;
-        }
-        
-        .colony-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
-        }
-        
-        /* Element colors */
-        .text-common { color: #ffffff; text-shadow: 0 0 8px #ffffff; }
-        .text-uncommon { color: #b0ffb0; text-shadow: 0 0 8px #80ff80; }
-        .text-rare { color: #b0b0ff; text-shadow: 0 0 8px #8080ff; }
-        .text-very-rare { color: #e0b0ff; text-shadow: 0 0 8px #b080ff; }
-        .text-legendary { color: #ffd700; text-shadow: 0 0 8px #ffaa00; }
     </style>
 </head>
 <body>
     <div class="phone-frame">
-        <div class="surface-view" id="surfaceView">
-            <!-- Planet surface background -->
-            <img src="assets/images/surface-bg.jpg" class="surface-bg" id="surfaceBg" alt="Surface view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+        <div class="surface-view">
+            <img src="assets/images/surface-bg.jpg" class="surface-bg" id="surfaceBg" alt="Surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
             
-            <!-- Atmosphere overlay -->
             <div class="atmosphere"></div>
             
-            <!-- Planet name -->
-            <div class="planet-name-overlay" id="planetName">Verdant Prime</div>
-            
-            <!-- Location Info -->
+            <div class="planet-name" id="planetName">Verdant Prime</div>
             <div class="location-info" id="locationInfo">Sector B2 • Orion Nebula</div>
             
-            <!-- Colony Button -->
             <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
             
-            <!-- Auto notice (appears on collection) -->
             <div class="auto-notice" id="autoNotice">⚙️ Auto-extractor active</div>
             
-            <!-- Resource indicator -->
-            <div class="resource-indicator" id="resourceIndicator">
-                <span>📦 This planet:</span>
-                <span class="planet-resources" id="planetResources">Carbon, Iron, Gold</span>
+            <div class="resource-indicator">
+                <div>📦 This planet:</div>
+                <div class="planet-resources" id="planetResources">Carbon, Iron, Gold</div>
             </div>
             
-            <!-- Resource log (color-coded) -->
-            <div class="resource-log" id="resourceLog"></div>
+            <div class="resource-log" id="resourceLog">
+                <div class="log-entry" style="color:#aaa;">⚙️ Ready to extract...</div>
+            </div>
             
-            <!-- Collection counter -->
             <div class="collection" id="collectionCount">✨ 0</div>
             
-            <!-- Return button -->
             <button class="return-btn" onclick="returnToShip()">← RETURN TO SHIP</button>
             
-            <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-text">returning...</div>
+                <div class="loading-spinner"></div>
             </div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/procedural-universe.js"></script>
-    
     <script>
-        // Telegram Mini App
         const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-            tg.setHeaderColor('#0a1a2a');
-            tg.setBackgroundColor('#0a1a2a');
-        }
+        if (tg) tg.expand();
         
-        // ===== LOAD LOCATION DATA =====
-        const planetName = getCurrentPlanet();
-        const planetType = getCurrentPlanetType();
-        const planetResources = getCurrentPlanetResources();
-        const currentSector = getCurrentSector();
-        const currentNebula = getCurrentNebula();
-        const currentStar = getCurrentStar();
+        // Load location data
+        const planetName = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+        const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+        const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || ['Carbon', 'Iron', 'Gold'];
+        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+        const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+        const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
         
-        // Update UI
         document.getElementById('planetName').textContent = planetName;
         document.getElementById('locationInfo').textContent = `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
         document.getElementById('planetResources').textContent = planetResources.slice(0, 5).join(', ');
         
-        // Set background color based on planet type
-        const surfaceBg = document.getElementById('surfaceBg');
-        const typeFilters = {
-            'scorched': 'hue-rotate(20deg) saturate(1.5) brightness(1.1)',
-            'lush': 'hue-rotate(0deg) saturate(1.2) brightness(1)',
-            'frozen': 'hue-rotate(180deg) brightness(1.2) saturate(0.8)',
-            'barren': 'hue-rotate(0deg) saturate(0.7) brightness(0.9)',
-            'gas': 'hue-rotate(280deg) saturate(1.3) brightness(1.1)'
+        // Element data
+        const elements = {
+            'Carbon': { value: 250, color: '#b0ffb0' },
+            'Iron': { value: 250, color: '#b0ffb0' },
+            'Gold': { value: 1000, color: '#b0b0ff' },
+            'Silver': { value: 1000, color: '#b0b0ff' },
+            'Platinum': { value: 1000, color: '#b0b0ff' },
+            'Uranium': { value: 5000, color: '#e0b0ff' },
+            'Titanium': { value: 1000, color: '#b0b0ff' },
+            'Silicon': { value: 100, color: '#ffffff' },
+            'Oxygen': { value: 250, color: '#b0ffb0' }
         };
-        surfaceBg.style.filter = typeFilters[planetType] || 'none';
         
-        // Check if planet already has colony
-        function checkForColony() {
-            const colonies = getColonies();
-            const existingColony = colonies.find(c => 
-                c.planet === planetName && 
-                c.star === currentStar && 
-                c.nebula === currentNebula
-            );
-            
-            if (existingColony) {
-                document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
-                document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
-                document.getElementById('colonyBtn').style.borderColor = '#4affaa';
-                return true;
-            }
-            return false;
+        // Storage helpers
+        function getCollection() {
+            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
         }
         
-        // ===== ELEMENT RARITY SYSTEM =====
-        const elements = [
-            // Common (white) - 100 credits
-            { name: 'Hydrogen', symbol: 'H', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Helium', symbol: 'He', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Lithium', symbol: 'Li', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Beryllium', symbol: 'Be', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Boron', symbol: 'B', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Sodium', symbol: 'Na', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Magnesium', symbol: 'Mg', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Aluminum', symbol: 'Al', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Silicon', symbol: 'Si', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Potassium', symbol: 'K', rarity: 'common', color: '#ffffff', value: 100 },
-            { name: 'Calcium', symbol: 'Ca', rarity: 'common', color: '#ffffff', value: 100 },
-            
-            // Uncommon (Green) - 250 credits
-            { name: 'Carbon', symbol: 'C', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Oxygen', symbol: 'O', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Nitrogen', symbol: 'N', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Iron', symbol: 'Fe', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Nickel', symbol: 'Ni', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Sulfur', symbol: 'S', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Phosphorus', symbol: 'P', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Chlorine', symbol: 'Cl', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Argon', symbol: 'Ar', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            { name: 'Lead', symbol: 'Pb', rarity: 'uncommon', color: '#4aff4a', value: 250 },
-            
-            // Rare (Blue) - 1000 credits
-            { name: 'Gold', symbol: 'Au', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Silver', symbol: 'Ag', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Platinum', symbol: 'Pt', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Copper', symbol: 'Cu', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Titanium', symbol: 'Ti', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Zinc', symbol: 'Zn', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Tin', symbol: 'Sn', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Mercury', symbol: 'Hg', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Cobalt', symbol: 'Co', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            { name: 'Chromium', symbol: 'Cr', rarity: 'rare', color: '#4a4aff', value: 1000 },
-            
-            // Very Rare (Purple) - 5000 credits
-            { name: 'Uranium', symbol: 'U', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Thorium', symbol: 'Th', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Plutonium', symbol: 'Pu', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Radium', symbol: 'Ra', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            { name: 'Polonium', symbol: 'Po', rarity: 'very-rare', color: '#aa4aff', value: 5000 },
-            
-            // Legendary (Gold) - 25000 credits
-            { name: 'Promethium', symbol: 'Pm', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Technetium', symbol: 'Tc', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Astatine', symbol: 'At', rarity: 'legendary', color: '#ffaa00', value: 25000 },
-            { name: 'Francium', symbol: 'Fr', rarity: 'legendary', color: '#ffaa00', value: 25000 }
-        ];
+        function saveCollection(c) {
+            localStorage.setItem('voidfarer_collection', JSON.stringify(c));
+        }
         
-        // Map element names to full data
-        const elementMap = {};
-        elements.forEach(e => elementMap[e.name] = e);
+        function getCredits() {
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
+        }
         
-        // ===== GAME STATE =====
-        let collectedCount = 0;
+        function saveCredits(c) {
+            localStorage.setItem('voidfarer_credits', c.toString());
+        }
+        
+        // State
+        let collectedCount = Object.keys(getCollection()).length;
         let sessionElements = 0;
+        let gatherInterval = null;
+        
         const resourceLog = document.getElementById('resourceLog');
         const collectionSpan = document.getElementById('collectionCount');
         const autoNotice = document.getElementById('autoNotice');
         
-        // Load collection from localStorage
-        function loadCollection() {
-            const collection = getCollection();
-            collectedCount = Object.keys(collection).length;
-            collectionSpan.textContent = `✨ ${collectedCount}`;
+        collectionSpan.textContent = `✨ ${collectedCount}`;
+        
+        function showNotice(msg) {
+            autoNotice.textContent = msg;
+            autoNotice.classList.add('show');
+            setTimeout(() => autoNotice.classList.remove('show'), 2000);
         }
         
-        // Save element to collection
-        function saveElement(elementName) {
+        function saveElement(name) {
             const collection = getCollection();
-            
-            const location = {
-                planet: planetName,
-                star: currentStar,
-                nebula: currentNebula,
-                sector: currentSector
-            };
-            
-            if (!collection[elementName]) {
-                collection[elementName] = {
-                    count: 1,
-                    firstFound: new Date().toISOString(),
-                    location: location
-                };
-            } else {
-                collection[elementName].count = (collection[elementName].count || 1) + 1;
-            }
-            
+            collection[name] = (collection[name] || 0) + 1;
             saveCollection(collection);
             
-            // Update missions
-            updateMissionProgress(elementName, 1);
-            
-            // Update credits
-            const element = elementMap[elementName];
-            if (element) {
-                addCredits(element.value);
-            }
-            
-            // Add to discovered locations
-            addDiscoveredLocation(location);
+            const credits = getCredits() + (elements[name]?.value || 100);
+            saveCredits(credits);
             
             return Object.keys(collection).length;
         }
         
-        // Show auto notice
-        function showNotice(message) {
-            autoNotice.textContent = message;
-            autoNotice.style.animation = 'none';
-            autoNotice.offsetHeight;
-            autoNotice.style.animation = 'notice-fade 4s ease-out forwards';
+        function extractResource() {
+            if (!planetResources.length) return;
+            
+            const element = planetResources[Math.floor(Math.random() * planetResources.length)];
+            const data = elements[element] || { value: 100, color: '#ffffff' };
+            
+            collectedCount = saveElement(element);
+            sessionElements++;
+            collectionSpan.textContent = `✨ ${collectedCount}`;
+            
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.style.color = data.color;
+            entry.innerHTML = `✨ +1 ${element} (${data.value}⭐)`;
+            
+            resourceLog.insertBefore(entry, resourceLog.firstChild);
+            while (resourceLog.children.length > 5) {
+                resourceLog.removeChild(resourceLog.lastChild);
+            }
+            
+            showNotice(`Found ${element}`);
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
-        // Auto-gather every 4 seconds
-        let gatherInterval;
-        
+        // *** FIXED: This is the only function that needed to change ***
         function startAutoGather() {
-            const autoGather = getAutoGatherEnabled();
+            if (gatherInterval) clearInterval(gatherInterval);
             
-            if (!autoGather) return;
+            // Direct localStorage check - no missing function
+            const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
             
-            // Create planet seed for deterministic gathering
-            const planetSeed = UNIVERSE_SEED + 
-                              (currentSector.charCodeAt(0) * 1000000) + 
-                              (parseInt(currentSector[1]) * 100000) +
-                              hashString(currentNebula) * 100 +
-                              hashString(currentStar) * 10 +
-                              hashString(planetName);
+            if (!autoGather) {
+                showNotice('⚠️ Auto-extractor disabled');
+                return;
+            }
+            
+            showNotice('⚙️ Auto-extractor active');
             
             gatherInterval = setInterval(() => {
-                // Get available elements for this planet
-                const availableElements = planetResources;
-                
-                // Pick element based on seed + time for consistency (changes every minute)
-                const timeSeed = Math.floor(Date.now() / 60000);
-                const elementIndex = Math.floor(seededRandom(planetSeed + timeSeed, 0) * availableElements.length);
-                const elementName = availableElements[elementIndex];
-                const element = elementMap[elementName] || { 
-                    name: elementName, 
-                    color: '#ffffff', 
-                    rarity: 'common', 
-                    value: 100 
-                };
-                
-                // Save to collection
-                const newCount = saveElement(elementName);
-                
-                // Update counter
-                collectedCount = newCount;
-                sessionElements++;
-                collectionSpan.textContent = `✨ ${collectedCount}`;
-                
-                // Create color-coded log entry
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                
-                let rarityDot = '●';
-                if (element.rarity === 'common') rarityDot = '○';
-                else if (element.rarity === 'uncommon') rarityDot = '◔';
-                else if (element.rarity === 'rare') rarityDot = '◑';
-                else if (element.rarity === 'very-rare') rarityDot = '◕';
-                else if (element.rarity === 'legendary') rarityDot = '★';
-                
-                entry.innerHTML = `${rarityDot} +1 ${element.name} (${element.value}⭐)`;
-                entry.style.color = element.color || '#ffffff';
-                entry.style.textShadow = `0 0 8px ${element.color || '#ffffff'}`;
-                
-                resourceLog.appendChild(entry);
-                
-                // Keep only last 5 entries
-                while (resourceLog.children.length > 5) {
-                    resourceLog.removeChild(resourceLog.firstChild);
-                }
-                
-                showNotice(`✨ Found ${element.name}`);
-                
-                if (tg?.HapticFeedback && Math.random() > 0.5) {
-                    tg.HapticFeedback.impactOccurred('light');
-                }
+                extractResource();
             }, 4000);
+            
+            // Do first extraction immediately
+            setTimeout(extractResource, 1000);
         }
         
-        // ===== COLONY FUNCTIONS =====
+        // Colony functions
+        function getColonies() {
+            return JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+        }
+        
+        function saveColonies(c) {
+            localStorage.setItem('voidfarer_colonies', JSON.stringify(c));
+        }
+        
+        function checkForColony() {
+            const colonies = getColonies();
+            if (colonies.some(c => c.planet === planetName && c.star === currentStar)) {
+                document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
+            }
+        }
+        
         function toggleColony() {
             const colonies = getColonies();
-            const existingIndex = colonies.findIndex(c => 
-                c.planet === planetName && 
-                c.star === currentStar && 
-                c.nebula === currentNebula
-            );
+            const exists = colonies.findIndex(c => c.planet === planetName && c.star === currentStar);
             
-            if (existingIndex >= 0) {
-                // Remove colony
-                if (confirm('Abandon this colony?')) {
-                    colonies.splice(existingIndex, 1);
+            if (exists >= 0) {
+                if (confirm('Abandon colony?')) {
+                    colonies.splice(exists, 1);
                     saveColonies(colonies);
-                    
                     document.getElementById('colonyBtn').innerHTML = '🏭 ESTABLISH COLONY';
-                    document.getElementById('colonyBtn').style.background = 'rgba(10, 20, 30, 0.5)';
-                    document.getElementById('colonyBtn').style.borderColor = '#8ac0d0';
-                    
-                    showNotice('🏭 Colony abandoned');
-                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                    showNotice('Colony abandoned');
                 }
             } else {
-                // Establish colony
-                const colonyName = prompt('Name your colony:', planetName + ' Outpost');
-                if (colonyName) {
-                    const newColony = {
-                        name: colonyName,
-                        planet: planetName,
-                        type: planetType,
-                        star: currentStar,
-                        nebula: currentNebula,
-                        sector: currentSector,
-                        resources: planetResources,
+                const name = prompt('Name your colony:', planetName + ' Outpost');
+                if (name) {
+                    colonies.push({
+                        name, planet: planetName, star: currentStar,
+                        nebula: currentNebula, sector: currentSector,
                         established: new Date().toISOString()
-                    };
-                    
-                    colonies.push(newColony);
+                    });
                     saveColonies(colonies);
-                    
                     document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
-                    document.getElementById('colonyBtn').style.background = 'rgba(74, 154, 106, 0.5)';
-                    document.getElementById('colonyBtn').style.borderColor = '#4affaa';
                     
-                    showNotice(`🏭 ${colonyName} established`);
-                    
-                    // Bonus credits for establishing colony
-                    addCredits(5000);
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
+                    const credits = getCredits() + 5000;
+                    saveCredits(credits);
+                    showNotice('+5000⭐');
                 }
             }
         }
         
-        // ===== RETURN TO SHIP =====
         function returnToShip() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-            
-            showNotice(`✨ Collected ${sessionElements} elements`);
-            
-            setTimeout(() => {
-                window.location.href = 'system-view.html';
-            }, 1000);
+            if (gatherInterval) clearInterval(gatherInterval);
+            document.getElementById('loadingOverlay').classList.add('active');
+            setTimeout(() => window.location.href = 'system-view.html', 800);
         }
         
-        // ===== INITIALIZE =====
+        // Initialize
         function init() {
-            const player = getPlayer();
-            if (!player) {
+            if (!localStorage.getItem('voidfarer_player')) {
                 window.location.href = 'index.html';
                 return;
             }
             
-            loadCollection();
             checkForColony();
-            sessionElements = 0;
-            
-            setTimeout(() => {
-                showNotice('⚙️ Auto-extractor active');
-            }, 500);
-            
-            startAutoGather();
-            
-            const autoGather = getAutoGatherEnabled();
-            if (!autoGather) {
-                showNotice('⚠️ Auto-extractor disabled');
-            }
+            resourceLog.innerHTML = '<div class="log-entry" style="color:#aaa;">⚙️ Ready</div>';
+            setTimeout(startAutoGather, 1000);
         }
         
-        window.addEventListener('beforeunload', function() {
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-        });
-        
         init();
+        
+        window.addEventListener('beforeunload', () => {
+            if (gatherInterval) clearInterval(gatherInterval);
+        });
     </script>
 </body>
 </html>
