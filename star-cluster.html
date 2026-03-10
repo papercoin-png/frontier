@@ -69,8 +69,8 @@
         
         .star-marker {
             position: absolute;
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             transform: translate(-50%, -50%);
             cursor: pointer;
             pointer-events: auto;
@@ -80,6 +80,8 @@
             align-items: center;
             justify-content: center;
             z-index: 25;
+            /* Bright border for debugging - remove later */
+            border: 2px solid rgba(255, 0, 0, 0.5);
         }
         
         .star-marker:active {
@@ -94,13 +96,17 @@
             transition: all 0.3s ease;
             z-index: 26;
             pointer-events: none;
-            opacity: 0.9;
+            opacity: 1;
+            background: radial-gradient(circle, rgba(255, 255, 0, 1), transparent 80%);
         }
         
         .star-core {
             position: absolute;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
-            box-shadow: 0 0 50px currentColor;
+            background: radial-gradient(circle at 30% 30%, #ffffff, #ffaa00);
+            box-shadow: 0 0 50px #ffaa00;
             z-index: 27;
             border: 4px solid rgba(255,255,255,0.9);
             transition: all 0.3s ease;
@@ -109,75 +115,20 @@
         
         .star-label {
             position: absolute;
-            top: 70px;
+            top: 60px;
             color: white;
             font-family: 'WindSong', cursive;
-            font-size: 18px;
-            text-shadow: 0 0 20px #000;
-            background: rgba(10,10,26,0.95);
+            font-size: 16px;
+            text-shadow: 0 0 10px #000;
+            background: rgba(0,0,0,0.8);
             backdrop-filter: blur(4px);
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 40px 10px 40px 10px;
             border: 2px solid rgba(255,255,255,0.5);
             white-space: nowrap;
             z-index: 28;
             pointer-events: none;
             font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-        
-        .star-blue .star-glow {
-            background: radial-gradient(circle, rgba(100, 150, 255, 1), transparent 80%);
-        }
-        .star-blue .star-core {
-            width: 32px;
-            height: 32px;
-            background: radial-gradient(circle at 30% 30%, #ffffff, #4a8aff);
-        }
-        
-        .star-white .star-glow {
-            background: radial-gradient(circle, rgba(255, 255, 255, 1), transparent 80%);
-        }
-        .star-white .star-core {
-            width: 30px;
-            height: 30px;
-            background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0ff);
-        }
-        
-        .star-yellow .star-glow {
-            background: radial-gradient(circle, rgba(255, 220, 100, 1), transparent 80%);
-        }
-        .star-yellow .star-core {
-            width: 34px;
-            height: 34px;
-            background: radial-gradient(circle at 30% 30%, #ffffc0, #ffaa00);
-        }
-        
-        .star-orange .star-glow {
-            background: radial-gradient(circle, rgba(255, 160, 80, 0.9), transparent 80%);
-        }
-        .star-orange .star-core {
-            width: 32px;
-            height: 32px;
-            background: radial-gradient(circle at 30% 30%, #ffcc99, #ff8c42);
-        }
-        
-        .star-red .star-glow {
-            background: radial-gradient(circle, rgba(255, 100, 100, 0.8), transparent 80%);
-        }
-        .star-red .star-core {
-            width: 28px;
-            height: 28px;
-            background: radial-gradient(circle at 30% 30%, #ffb6b6, #ff4d4d);
-        }
-        
-        .star-purple .star-glow {
-            background: radial-gradient(circle, rgba(180, 100, 255, 0.9), transparent 80%);
-        }
-        .star-purple .star-core {
-            width: 32px;
-            height: 32px;
-            background: radial-gradient(circle at 30% 30%, #e0b0ff, #a06aff);
         }
         
         .ui-header {
@@ -188,7 +139,7 @@
             color: #ffffff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
-            text-shadow: 0 0 20px #b09aff, 0 0 40px #8a6aff;
+            text-shadow: 0 0 20px #b09aff;
             background: rgba(10,10,26,0.9);
             backdrop-filter: blur(8px);
             padding: 10px 25px;
@@ -329,16 +280,25 @@
             100% { transform: rotate(360deg); }
         }
         
-        @supports (padding: max(0px)) {
-            .ui-header { top: max(15px, env(safe-area-inset-top)); }
-            .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
-            .cluster-info { bottom: max(20px, env(safe-area-inset-bottom)); right: max(15px, env(safe-area-inset-right)); }
-            .zoom-controls { right: max(15px, env(safe-area-inset-right)); }
+        .debug-info {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            color: yellow;
+            font-size: 14px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            z-index: 100;
+            border-radius: 10px;
+            border: 2px solid yellow;
+            max-width: 80%;
         }
     </style>
 </head>
 <body>
     <div class="cluster-view">
+        <div class="debug-info" id="debugInfo">Loading...</div>
+        
         <div class="canvas-container" id="canvasContainer">
             <canvas id="clusterCanvas"></canvas>
         </div>
@@ -373,6 +333,7 @@
         const container = document.getElementById('canvasContainer');
         const markersContainer = document.getElementById('starMarkersContainer');
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const debugInfo = document.getElementById('debugInfo');
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -404,9 +365,10 @@
             return Math.abs(hash);
         }
         
-        const clusterName = localStorage.getItem('voidfarer_current_nebula') || 'Unknown Cluster';
-        const sectorType = localStorage.getItem('voidfarer_current_sector_type') || 'Unknown';
-        const starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 40;
+        // Load cluster data
+        const clusterName = localStorage.getItem('voidfarer_current_nebula') || 'Test Cluster';
+        const sectorType = localStorage.getItem('voidfarer_current_sector_type') || 'Test';
+        const starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 20;
         const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'Orion';
         
         document.getElementById('clusterTitle').textContent = clusterName;
@@ -418,73 +380,53 @@
                            hashString(currentSector) * 100 + 
                            hashString(clusterName) % 100000;
         
-        const namePrefixes = [
-            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
-            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Rig', 'Veg', 'Sir'
-        ];
+        debugInfo.innerHTML = `
+            <b>Debug Info:</b><br>
+            Cluster: ${clusterName}<br>
+            Type: ${sectorType}<br>
+            Star Count: ${starCount}<br>
+            Region: ${currentSector}<br>
+            Seed: ${clusterSeed}<br>
+        `;
         
-        const nameSuffixes = [
-            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'Alpha', 'Beta',
-            'Gamma', 'Delta', 'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Australis', 'Borealis'
-        ];
-        
-        function generateStarName(seed, index) {
-            const prefix = seededRandomChoice(seed, index * 2, namePrefixes);
-            const suffix = seededRandomChoice(seed, index * 2 + 1, nameSuffixes);
-            return prefix + ' ' + suffix;
-        }
-        
+        // Generate stars
         const stars = [];
-        const typeProbabilities = [
-            { type: 'white', prob: 0.35 },
-            { type: 'yellow', prob: 0.20 },
-            { type: 'blue', prob: 0.15 },
-            { type: 'orange', prob: 0.15 },
-            { type: 'red', prob: 0.10 },
-            { type: 'purple', prob: 0.05 }
-        ];
         
-        for (let i = 0; i < starCount; i++) {
-            const rand = seededRandom(clusterSeed, i * 10);
-            let cumulative = 0;
-            let starType = 'white';
+        // Add a TEST STAR at 50%,50% to verify visibility
+        stars.push({
+            name: '★ TEST STAR ★',
+            type: 'yellow',
+            x: 50,
+            y: 50,
+            size: 40,
+            planets: 5
+        });
+        
+        // Generate random stars
+        const namePrefixes = ['Al', 'Bet', 'Gamma', 'Delta', 'Epsilon'];
+        const nameSuffixes = ['Majoris', 'Minoris', 'Prime', 'A', 'B'];
+        
+        for (let i = 1; i < starCount; i++) {
+            const prefix = namePrefixes[Math.floor(Math.random() * namePrefixes.length)];
+            const suffix = nameSuffixes[Math.floor(Math.random() * nameSuffixes.length)];
+            const name = prefix + ' ' + suffix;
             
-            for (const t of typeProbabilities) {
-                cumulative += t.prob;
-                if (rand < cumulative) {
-                    starType = t.type;
-                    break;
-                }
-            }
-            
-            const name = generateStarName(clusterSeed, i * 100);
-            
-            const x = seededRandomRange(clusterSeed, i * 10 + 1, 10, 90);
-            const y = seededRandomRange(clusterSeed, i * 10 + 2, 10, 90);
-            
-            const sizeMap = {
-                'blue': 32, 'yellow': 34, 'white': 30, 'orange': 30, 'red': 28, 'purple': 32
-            };
-            
-            let planetCount;
-            if (starType === 'blue') planetCount = seededRandomRange(clusterSeed, i * 10 + 3, 5, 12);
-            else if (starType === 'yellow') planetCount = seededRandomRange(clusterSeed, i * 10 + 4, 3, 8);
-            else if (starType === 'orange') planetCount = seededRandomRange(clusterSeed, i * 10 + 5, 2, 6);
-            else if (starType === 'red') planetCount = seededRandomRange(clusterSeed, i * 10 + 6, 2, 5);
-            else if (starType === 'white') planetCount = seededRandomRange(clusterSeed, i * 10 + 7, 3, 7);
-            else planetCount = seededRandomRange(clusterSeed, i * 10 + 8, 4, 9);
+            const x = 20 + Math.random() * 60;
+            const y = 20 + Math.random() * 60;
             
             stars.push({
                 name: name,
-                type: starType,
+                type: 'yellow',
                 x: x,
                 y: y,
-                size: sizeMap[starType],
-                planets: planetCount
+                size: 35,
+                planets: 3
             });
         }
         
+        debugInfo.innerHTML += `Generated ${stars.length} stars<br>`;
+        
+        // Initialize Panzoom
         let panzoomInstance;
         
         function initPanzoom() {
@@ -512,28 +454,28 @@
             });
         }
         
+        // Draw background
         function drawBackground() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            for (let i = 0; i < 500; i++) {
+            // Background stars
+            for (let i = 0; i < 200; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
-                const size = Math.random() * 2;
-                const opacity = Math.random() * 0.2 + 0.1;
-                
-                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.fillStyle = `rgba(255, 255, 255, 0.3)`;
                 ctx.beginPath();
-                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
         
+        // Create star markers
         function createStarMarkers() {
             markersContainer.innerHTML = '';
             
             stars.forEach((star, index) => {
                 const marker = document.createElement('div');
-                marker.className = `star-marker star-${star.type}`;
+                marker.className = 'star-marker';
                 marker.style.left = star.x + '%';
                 marker.style.top = star.y + '%';
                 marker.setAttribute('onclick', `selectStar(${index})`);
@@ -546,21 +488,18 @@
                 
                 markersContainer.appendChild(marker);
             });
+            
+            debugInfo.innerHTML += `Created ${stars.length} markers<br>`;
+            debugInfo.innerHTML += `<b style="color:lime;">✓ Stars should be visible!</b>`;
         }
         
         function zoomIn() {
-            if (panzoomInstance) {
-                const scale = panzoomInstance.getScale();
-                panzoomInstance.zoomTo(scale + 0.5);
-            }
+            if (panzoomInstance) panzoomInstance.zoomTo(panzoomInstance.getScale() + 0.5);
         }
         
         function zoomOut() {
-            if (panzoomInstance) {
-                const scale = panzoomInstance.getScale();
-                if (scale > 1) {
-                    panzoomInstance.zoomTo(scale - 0.5);
-                }
+            if (panzoomInstance && panzoomInstance.getScale() > 1) {
+                panzoomInstance.zoomTo(panzoomInstance.getScale() - 0.5);
             }
         }
         
@@ -574,24 +513,23 @@
         
         function selectStar(index) {
             const star = stars[index];
-            if (!star) return;
-            
-            loadingOverlay.classList.add('active');
+            alert(`Selected: ${star.name}\nPlanets: ${star.planets}`);
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
+            // Uncomment to enable navigation
+            /*
+            loadingOverlay.classList.add('active');
             localStorage.setItem('voidfarer_current_star', star.name);
-            localStorage.setItem('voidfarer_current_star_type', star.type);
             localStorage.setItem('voidfarer_current_star_planets', star.planets);
-            
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
                 window.location.href = 'system-view.html';
             }, 800);
+            */
         }
         
         function returnToSectors() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'star-sectors.html';
         }
         
@@ -605,12 +543,6 @@
             initPanzoom();
             drawBackground();
             createStarMarkers();
-            
-            window.addEventListener('resize', () => {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                drawBackground();
-            });
         }
         
         init();
