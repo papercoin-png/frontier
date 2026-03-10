@@ -3,19 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voidfarer - Nebula Sector Map</title>
+    <title>Voidfarer - Nebula Sector</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
-        /* ... (keep all existing styles) ... */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .sector-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a051a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #8a6aff;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .sector-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .sector-title {
+            font-family: 'WindSong', cursive;
+            font-size: 32px;
+            color: #e0f0ff;
+            text-shadow: 0 0 30px #8a6aff, 0 0 60px #4a2a8a;
+            margin-bottom: 5px;
+        }
+        
+        .sector-subtitle {
+            color: #b0a0ff;
+            font-size: 14px;
+            letter-spacing: 3px;
+        }
+        
+        /* Location Bar */
+        .location-bar {
+            background: rgba(30, 20, 50, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #8a6aff;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .coordinates {
+            color: #a0c0ff;
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid #8a6aff;
+        }
+        
+        /* Stats */
+        .sector-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(30, 20, 50, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #8a6aff;
+            border-radius: 30% 10% 30% 10%;
+            padding: 12px 4px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .stat-label {
+            color: #b0a0ff;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+        
+        /* Stars Grid */
+        .stars-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .star-card {
+            background: rgba(30, 20, 50, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #8a6aff;
+            border-radius: 40px 12px 40px 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .star-card:active {
+            transform: scale(0.98);
+            background: rgba(60, 40, 90, 0.8);
+            border-color: #b08aff;
+        }
+        
+        .star-icon {
+            font-size: 36px;
+            min-width: 50px;
+            text-align: center;
+            filter: drop-shadow(0 0 15px #8a6aff);
+        }
+        
+        .star-info {
+            flex: 1;
+        }
+        
+        .star-name {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .star-details {
+            display: flex;
+            gap: 15px;
+            color: #b0a0ff;
+            font-size: 12px;
+        }
+        
+        .star-type-badge {
+            background: rgba(138, 106, 255, 0.3);
+            border: 1px solid #8a6aff;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 10px;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 20, 50, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #8a6aff;
+            color: #ffffff;
+            padding: 14px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+            width: fit-content;
+            box-shadow: 0 0 30px #4a2a8a;
+            z-index: 100;
+            margin-top: 10px;
+        }
+        
+        .back-button:active {
+            background: #6a4aff;
+            transform: translateX(-50%) scale(0.96);
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0a0c0;
+            background: rgba(30, 20, 50, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #8a6aff;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="phone-frame">
-        <div class="sector-map" id="sectorMap">
-            <!-- ... (keep all existing HTML) ... -->
+        <div class="sector-view" id="sectorView">
+            <!-- Header -->
+            <div class="sector-header">
+                <div class="sector-title" id="sectorTitle">Orion Nebula</div>
+                <div class="sector-subtitle" id="sectorSubtitle">50 star systems</div>
+            </div>
+            
+            <!-- Location Bar -->
+            <div class="location-bar">
+                <span>📍 <span id="nebulaName">Orion Nebula</span></span>
+                <span class="coordinates" id="sectorCoord">Sector B2</span>
+            </div>
+            
+            <!-- Stats -->
+            <div class="sector-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="starCount">50</div>
+                    <div class="stat-label">STARS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="exploredCount">0</div>
+                    <div class="stat-label">EXPLORED</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="anomalyCount">5</div>
+                    <div class="stat-label">ANOMALIES</div>
+                </div>
+            </div>
+            
+            <!-- Stars Grid -->
+            <div class="stars-grid" id="starsGrid">
+                <!-- Stars will be loaded here -->
+                <div class="empty-state">Loading stars...</div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToNebulae()">← BACK TO NEBULAE</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">warping to star...</div>
+            </div>
         </div>
     </div>
 
@@ -25,8 +310,8 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a0a1a');
-            tg.setBackgroundColor('#0a0a1a');
+            tg.setHeaderColor('#0a051a');
+            tg.setBackgroundColor('#0a051a');
         }
         
         // ===== SIMPLE SEEDED RANDOM =====
@@ -47,57 +332,17 @@
         }
         
         // ===== LOAD DATA FROM STORAGE =====
-        function getCurrentSector() {
-            return localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-        }
+        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+        const nebulaName = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
         
-        function getCurrentNebula() {
-            return localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-        }
-        
-        const currentSector = getCurrentSector();
-        const nebulaName = getCurrentNebula();
-        
+        document.getElementById('nebulaName').textContent = nebulaName;
         document.getElementById('sectorTitle').textContent = nebulaName;
-        document.getElementById('coordText').textContent = `Sector ${currentSector} • ${nebulaName}`;
-        
-        // Set nebula background color based on name
-        const nebulaBg = document.getElementById('nebulaBg');
-        const nebulaColors = {
-            'Orion': '#8a6aff',
-            'Cygnus': '#ff6a9a',
-            'Sagittarius': '#ffaa4a',
-            'Perseus': '#4affaa',
-            'Carina': '#c06aff',
-            'Eagle': '#6a8aff',
-            'Omega': '#ff8a6a',
-            'Trifid': '#ff6aff',
-            'Lagoon': '#6aff8a',
-            'Veil': '#8a8aff',
-            'Crab': '#ff8a8a',
-            'Helix': '#8aff8a'
-        };
-        
-        // Find which color to use
-        let nebulaColor = '#8a6aff';
-        for (const [name, color] of Object.entries(nebulaColors)) {
-            if (nebulaName.includes(name)) {
-                nebulaColor = color;
-                break;
-            }
-        }
-        
-        nebulaBg.style.background = `
-            radial-gradient(circle at 30% 40%, ${nebulaColor}40 0%, transparent 60%),
-            radial-gradient(circle at 70% 60%, ${nebulaColor}60 0%, transparent 60%)
-        `;
+        document.getElementById('sectorCoord').textContent = `Sector ${currentSector}`;
         
         // ===== GENERATE STARS =====
-        const STARS_PER_NEBULA = 50;
-        
-        // Generate stars
         function generateStars() {
             const stars = [];
+            const STARS_PER_NEBULA = 50;
             
             // Create seed for this nebula
             const nebulaSeed = UNIVERSE_SEED + 
@@ -105,41 +350,43 @@
                               (parseInt(currentSector[1]) * 1000) +
                               hashString(nebulaName) % 10000;
             
-            const starPrefixes = ['Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa'];
-            const starSuffixes = ['Majoris', 'Minoris', 'Prime', 'Secundus', 'A', 'B', 'C', 'Alpha', 'Beta', 'Gamma'];
+            const starPrefixes = ['Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
+                                 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon'];
+            const starSuffixes = ['Majoris', 'Minoris', 'Prime', 'Secundus', 'A', 'B', 'C', 'Alpha', 'Beta', 'Gamma',
+                                 'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'];
             
             for (let i = 0; i < STARS_PER_NEBULA; i++) {
                 // Determine star type
                 const typeRand = seededRandom(nebulaSeed, i * 10);
                 let type = 'main';
                 let typeName = 'Main Sequence';
-                let color = '#ffd700';
+                let icon = '⭐';
                 let planetCount = 0;
                 
                 if (typeRand < 0.6) {
                     type = 'main';
                     typeName = 'Main Sequence';
-                    color = '#ffd700';
+                    icon = '⭐';
                     planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 1) * 6) + 3; // 3-8
                 } else if (typeRand < 0.85) {
                     type = 'red';
                     typeName = 'Red Dwarf';
-                    color = '#ff6b6b';
+                    icon = '🔴';
                     planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 2) * 4) + 2; // 2-5
                 } else if (typeRand < 0.95) {
                     type = 'blue';
                     typeName = 'Blue Giant';
-                    color = '#6ba5ff';
+                    icon = '🔵';
                     planetCount = Math.floor(seededRandom(nebulaSeed, i * 10 + 3) * 8) + 5; // 5-12
                 } else if (typeRand < 0.98) {
                     type = 'neutron';
                     typeName = 'Neutron Star';
-                    color = '#ffffff';
+                    icon = '⚪';
                     planetCount = 0;
                 } else {
                     type = 'blackhole';
                     typeName = 'Black Hole';
-                    color = '#000000';
+                    icon = '⚫';
                     planetCount = 0;
                 }
                 
@@ -148,27 +395,13 @@
                 const suffixIndex = Math.floor(seededRandom(nebulaSeed, i * 10 + 5) * starSuffixes.length);
                 const name = starPrefixes[prefixIndex] + ' ' + starSuffixes[suffixIndex];
                 
-                // Calculate position in a spiral pattern
-                const angle = (i / STARS_PER_NEBULA) * Math.PI * 8;
-                const radius = 20 + (i % 15) * 3;
-                const centerX = 50 + Math.sin(angle * 2) * 15;
-                const centerY = 50 + Math.cos(angle * 3) * 15;
-                
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-                
-                // Ensure within bounds
-                const safeX = Math.min(95, Math.max(5, x));
-                const safeY = Math.min(95, Math.max(5, y));
-                
                 stars.push({
                     index: i,
                     name: name,
                     type: type,
                     typeName: typeName,
-                    color: color,
-                    planetCount: planetCount,
-                    position: { x: safeX, y: safeY }
+                    icon: icon,
+                    planetCount: planetCount
                 });
             }
             
@@ -177,107 +410,41 @@
         
         // Generate stars
         const stars = generateStars();
+        document.getElementById('starCount').textContent = stars.length;
         
         // ===== RENDER STARS =====
         function renderStars() {
-            const mapContainer = document.getElementById('mapContainer');
-            mapContainer.innerHTML = '';
+            const starsGrid = document.getElementById('starsGrid');
+            starsGrid.innerHTML = '';
             
-            // Create connection lines between nearby stars
-            for (let i = 0; i < stars.length; i += 4) {
-                if (i + 1 < stars.length) {
-                    const line = document.createElement('div');
-                    line.className = 'connection-line';
-                    
-                    const x1 = stars[i].position.x;
-                    const y1 = stars[i].position.y;
-                    const x2 = stars[i+1].position.x;
-                    const y2 = stars[i+1].position.y;
-                    
-                    const dx = x2 - x1;
-                    const dy = y2 - y1;
-                    const length = Math.sqrt(dx*dx + dy*dy);
-                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                    
-                    line.style.left = x1 + '%';
-                    line.style.top = y1 + '%';
-                    line.style.width = length + '%';
-                    line.style.transform = `rotate(${angle}deg)`;
-                    
-                    mapContainer.appendChild(line);
-                }
-            }
-            
-            // Create stars
             stars.forEach(star => {
-                const el = document.createElement('div');
-                el.className = `celestial-object star-${star.type}`;
-                el.id = `star-${star.index}`;
-                el.style.left = star.position.x + '%';
-                el.style.top = star.position.y + '%';
-                el.setAttribute('onclick', `selectStar(${star.index})`);
+                const card = document.createElement('div');
+                card.className = 'star-card';
+                card.setAttribute('onclick', `selectStar(${star.index})`);
                 
-                el.innerHTML = `
-                    <div class="object-glow"></div>
-                    <div class="object-core"></div>
-                    <span class="object-label">${star.name}</span>
+                card.innerHTML = `
+                    <div class="star-icon">${star.icon}</div>
+                    <div class="star-info">
+                        <div class="star-name">${star.name}</div>
+                        <div class="star-details">
+                            <span>${star.typeName}</span>
+                            <span>•</span>
+                            <span>${star.planetCount} planets</span>
+                        </div>
+                    </div>
+                    <span class="star-type-badge">${star.type}</span>
                 `;
                 
-                mapContainer.appendChild(el);
+                starsGrid.appendChild(card);
             });
-            
-            console.log(`Rendered ${stars.length} stars`); // Debug log
         }
         
         // ===== STAR SELECTION =====
-        let currentStar = null;
-        const infoPanel = document.getElementById('infoPanel');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
         function selectStar(index) {
-            // Remove previous selection
-            document.querySelectorAll('.celestial-object').forEach(el => {
-                el.classList.remove('selected');
-            });
-            
-            // Add selection
-            const element = document.getElementById(`star-${index}`);
-            if (element) {
-                element.classList.add('selected');
-                
-                const star = stars[index];
-                if (!star) return;
-                
-                currentStar = star;
-                
-                // Update info panel
-                document.getElementById('infoTitle').textContent = star.name;
-                document.getElementById('infoType').textContent = star.typeName;
-                document.getElementById('infoDesc').textContent = `A ${star.typeName} with ${star.planetCount} orbiting planets.`;
-                document.getElementById('infoDistance').textContent = '2.3 ly';
-                document.getElementById('infoPlanets').textContent = star.planetCount;
-                document.getElementById('infoStarType').textContent = star.typeName;
-                document.getElementById('infoIndex').textContent = `#${star.index + 1}`;
-                
-                infoPanel.classList.add('visible');
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            }
-        }
-        
-        function closeInfo() {
-            infoPanel.classList.remove('visible');
-            document.querySelectorAll('.celestial-object').forEach(el => {
-                el.classList.remove('selected');
-            });
-            currentStar = null;
-        }
-        
-        function travelToStar() {
-            if (!currentStar) {
-                alert('Please select a star first');
-                return;
-            }
+            const star = stars[index];
+            if (!star) return;
             
             loadingOverlay.classList.add('active');
             
@@ -287,92 +454,24 @@
                 loadingOverlay.classList.remove('active');
                 
                 // Save star data
-                localStorage.setItem('voidfarer_current_star', currentStar.name);
-                localStorage.setItem('voidfarer_current_star_index', currentStar.index);
-                localStorage.setItem('voidfarer_current_star_type', currentStar.type);
+                localStorage.setItem('voidfarer_current_star', star.name);
+                localStorage.setItem('voidfarer_current_star_index', star.index);
+                localStorage.setItem('voidfarer_current_star_type', star.type);
                 
-                // IMPORTANT: Clear any existing planet data to prevent auto-surface
+                // Clear any existing planet data
                 localStorage.removeItem('voidfarer_current_planet');
                 localStorage.removeItem('voidfarer_current_planet_type');
                 localStorage.removeItem('voidfarer_current_planet_resources');
                 
-                console.log('Navigating to system view for star:', currentStar.name);
-                
                 // Navigate to system view
                 window.location.href = 'system-view.html';
-                
-                closeInfo();
-            }, 1500);
-        }
-        
-        // ===== FILTERING =====
-        function filterObjects(filter) {
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            document.querySelectorAll('.celestial-object').forEach(el => {
-                if (filter === 'all') {
-                    el.style.display = 'block';
-                } else if (filter === 'star') {
-                    el.style.display = 'block'; // All objects are stars in this version
-                } else {
-                    el.style.display = 'none';
-                }
-            });
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            }, 1000);
         }
         
         // ===== NAVIGATION =====
         function returnToNebulae() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'nebulae-map.html';
-        }
-        
-        // ===== ZOOM CONTROLS =====
-        let scale = 1;
-        const mapContainer = document.getElementById('mapContainer');
-        
-        function zoomIn() {
-            scale = Math.min(scale + 0.2, 2);
-            mapContainer.style.transform = `scale(${scale})`;
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function zoomOut() {
-            scale = Math.max(scale - 0.2, 0.5);
-            mapContainer.style.transform = `scale(${scale})`;
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function resetView() {
-            scale = 1;
-            mapContainer.style.transform = `scale(1)`;
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        // ===== STAR FIELD GENERATION =====
-        function generateBackgroundStars() {
-            const starField = document.getElementById('starField');
-            starField.innerHTML = '';
-            
-            for (let i = 0; i < 150; i++) {
-                const star = document.createElement('div');
-                star.className = 'star';
-                star.style.left = Math.random() * 100 + '%';
-                star.style.top = Math.random() * 100 + '%';
-                
-                const size = Math.random() * 2 + 1;
-                star.style.width = size + 'px';
-                star.style.height = size + 'px';
-                
-                star.style.animationDelay = Math.random() * 5 + 's';
-                star.style.animationDuration = (Math.random() * 3 + 2) + 's';
-                
-                starField.appendChild(star);
-            }
         }
         
         // ===== INITIALIZE =====
@@ -384,7 +483,6 @@
                 return;
             }
             
-            generateBackgroundStars();
             renderStars();
         }
         
