@@ -34,7 +34,6 @@
             overflow: hidden;
         }
         
-        /* Canvas container */
         .canvas-container {
             width: 100%;
             height: 100%;
@@ -58,7 +57,6 @@
             cursor: grabbing;
         }
         
-        /* Star markers container - ABOVE canvas */
         .star-markers-container {
             position: absolute;
             top: 0;
@@ -128,7 +126,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         
-        /* Star type colors - MUCH BRIGHTER */
         .star-blue .star-glow {
             background: radial-gradient(circle, rgba(100, 150, 255, 1), transparent 80%);
         }
@@ -183,7 +180,6 @@
             background: radial-gradient(circle at 30% 30%, #e0b0ff, #a06aff);
         }
         
-        /* UI Elements - above everything */
         .ui-header {
             position: absolute;
             top: max(15px, env(safe-area-inset-top));
@@ -255,7 +251,6 @@
             margin-bottom: 5px;
         }
         
-        /* Zoom controls */
         .zoom-controls {
             position: absolute;
             top: 50%;
@@ -291,23 +286,6 @@
             transform: scale(0.9);
         }
         
-        /* Debug info */
-        .debug-info {
-            position: absolute;
-            top: 100px;
-            left: 20px;
-            color: yellow;
-            font-size: 12px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            z-index: 100;
-            border-radius: 10px;
-            border: 1px solid yellow;
-            max-width: 80%;
-            word-break: break-word;
-        }
-        
-        /* Loading overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -361,17 +339,12 @@
 </head>
 <body>
     <div class="cluster-view">
-        <!-- Debug info -->
-        <div class="debug-info" id="debugInfo">Loading...</div>
-        
         <div class="canvas-container" id="canvasContainer">
             <canvas id="clusterCanvas"></canvas>
         </div>
         
-        <!-- Star markers container -->
         <div class="star-markers-container" id="starMarkersContainer"></div>
         
-        <!-- UI Elements -->
         <div class="ui-header" id="clusterTitle">Star Cluster</div>
         
         <div class="cluster-info" id="clusterInfo">
@@ -382,7 +355,6 @@
         
         <button class="back-btn" onclick="returnToSectors()">← Sectors</button>
         
-        <!-- Zoom controls -->
         <div class="zoom-controls">
             <button class="zoom-btn" onclick="zoomIn()">+</button>
             <button class="zoom-btn" onclick="zoomOut()">−</button>
@@ -401,7 +373,6 @@
         const container = document.getElementById('canvasContainer');
         const markersContainer = document.getElementById('starMarkersContainer');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const debugInfo = document.getElementById('debugInfo');
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -409,7 +380,6 @@
             tg.expand();
         }
         
-        // ===== SEEDED RANDOM =====
         const UNIVERSE_SEED = 42793;
         
         function seededRandom(seed, index = 0) {
@@ -434,7 +404,6 @@
             return Math.abs(hash);
         }
         
-        // ===== LOAD CLUSTER DATA =====
         const clusterName = localStorage.getItem('voidfarer_current_nebula') || 'Unknown Cluster';
         const sectorType = localStorage.getItem('voidfarer_current_sector_type') || 'Unknown';
         const starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 40;
@@ -445,19 +414,10 @@
         document.getElementById('starCount').textContent = starCount + ' stars';
         document.getElementById('clusterType').textContent = sectorType;
         
-        debugInfo.innerHTML = 
-            `clusterName: ${clusterName}<br>` +
-            `sectorType: ${sectorType}<br>` +
-            `starCount: ${starCount}<br>` +
-            `currentSector: ${currentSector}<br>` +
-            `Generating ${starCount} stars...<br>`;
-        
-        // ===== GENERATE SEED =====
         const clusterSeed = UNIVERSE_SEED + 
                            hashString(currentSector) * 100 + 
                            hashString(clusterName) % 100000;
         
-        // ===== STAR NAME GENERATION =====
         const namePrefixes = [
             'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
             'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
@@ -475,7 +435,6 @@
             return prefix + ' ' + suffix;
         }
         
-        // ===== GENERATE STARS =====
         const stars = [];
         const typeProbabilities = [
             { type: 'white', prob: 0.35 },
@@ -501,7 +460,6 @@
             
             const name = generateStarName(clusterSeed, i * 100);
             
-            // Spread stars across the canvas
             const x = seededRandomRange(clusterSeed, i * 10 + 1, 10, 90);
             const y = seededRandomRange(clusterSeed, i * 10 + 2, 10, 90);
             
@@ -527,9 +485,6 @@
             });
         }
         
-        debugInfo.innerHTML += `Generated ${stars.length} stars<br>`;
-        
-        // ===== PANZOOM INITIALIZATION =====
         let panzoomInstance;
         
         function initPanzoom() {
@@ -557,11 +512,9 @@
             });
         }
         
-        // ===== DRAW BACKGROUND =====
         function drawBackground() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Background stars
             for (let i = 0; i < 500; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
@@ -575,7 +528,6 @@
             }
         }
         
-        // ===== CREATE STAR MARKERS =====
         function createStarMarkers() {
             markersContainer.innerHTML = '';
             
@@ -594,12 +546,8 @@
                 
                 markersContainer.appendChild(marker);
             });
-            
-            debugInfo.innerHTML += `Created ${stars.length} markers<br>`;
-            debugInfo.innerHTML += `Stars should be visible now!`;
         }
         
-        // ===== ZOOM CONTROLS =====
         function zoomIn() {
             if (panzoomInstance) {
                 const scale = panzoomInstance.getScale();
@@ -624,7 +572,6 @@
             }
         }
         
-        // ===== STAR SELECTION =====
         function selectStar(index) {
             const star = stars[index];
             if (!star) return;
@@ -648,7 +595,6 @@
             window.location.href = 'star-sectors.html';
         }
         
-        // ===== INITIALIZE =====
         function init() {
             const player = localStorage.getItem('voidfarer_player');
             if (!player) {
