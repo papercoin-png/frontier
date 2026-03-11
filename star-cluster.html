@@ -6,6 +6,8 @@
     <title>Voidfarer - Star Cluster</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -220,12 +222,26 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="cluster-view">
         <div class="ui-header">
-            <h1 id="clusterTitle">Star Cluster</h1>
+            <h1 id="clusterTitle">Loading Cluster...</h1>
         </div>
         
         <div class="current-location" id="currentLocation">
@@ -234,35 +250,109 @@
         </div>
         
         <div class="stars-grid" id="starsGrid">
-            <!-- Stars will be loaded here -->
+            <div style="color: white; text-align: center; padding: 50px;">Loading stars...</div>
         </div>
         
         <button class="back-btn" onclick="returnToSectors()">← SECTORS</button>
         
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">warping to system...</div>
+            <div class="loading-text" id="loadingText">warping to system...</div>
         </div>
+
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const starsGrid = document.getElementById('starsGrid');
-        
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCurrentStar,
+            setCurrentStar,
+            getCurrentNebula,
+            getCurrentSector,
+            getCurrentSectorType,
+            getCurrentSectorStars,
+            getCredits,
+            setWarpData
+        } from './js/storage.js';
+        import { 
+            UNIVERSE_SEED,
+            generateStar,
+            getNebulaSeed,
+            getSectorSeed
+        } from './js/procedural-universe.js';
+        import { isMigrationComplete } from './js/db.js';
+        import { calculateStarTrip } from './js/warp-calculator.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
-        
-        // ===== SEEDED RANDOM =====
-        const UNIVERSE_SEED = 42793;
-        
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+        const starsGrid = document.getElementById('starsGrid');
+
+        // ===== STATE =====
+        let stars = [];
+        let currentStarName = '';
+        let clusterName = 'Unknown Cluster';
+        let sectorType = 'Unknown';
+        let starCount = 50;
+        let currentSector = 'B2';
+        let clusterSeed = UNIVERSE_SEED;
+
+        // ===== LOAD CLUSTER DATA =====
+        async function loadClusterData() {
+            try {
+                // Load all data in parallel
+                const [
+                    star,
+                    nebula,
+                    sector,
+                    type,
+                    count
+                ] = await Promise.all([
+                    getCurrentStar(),
+                    getCurrentNebula(),
+                    getCurrentSector(),
+                    getCurrentSectorType(),
+                    getCurrentSectorStars()
+                ]);
+
+                currentStarName = star || '';
+                clusterName = nebula || 'Orion Molecular Cloud';
+                sectorType = type || 'Star-forming';
+                starCount = count || 85;
+                currentSector = sector || 'Orion';
+
+                // Update UI
+                document.getElementById('clusterTitle').textContent = clusterName;
+                document.getElementById('currentLocationText').textContent = 
+                    currentStarName || 'No star selected';
+
+                // Generate cluster seed
+                clusterSeed = UNIVERSE_SEED + 
+                             hashString(currentSector) * 100 + 
+                             hashString(clusterName) % 100000;
+
+                return true;
+
+            } catch (error) {
+                console.error('Error loading cluster data:', error);
+                // Use defaults
+                clusterName = 'Orion Molecular Cloud';
+                document.getElementById('clusterTitle').textContent = clusterName;
+                return false;
+            }
         }
-        
+
+        // ===== HASH FUNCTION =====
         function hashString(str) {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
@@ -271,160 +361,193 @@
             }
             return Math.abs(hash);
         }
-        
-        // ===== LOAD CLUSTER DATA =====
-        const clusterName = localStorage.getItem('voidfarer_current_nebula') || 'Orion Molecular Cloud';
-        const sectorType = localStorage.getItem('voidfarer_current_sector_type') || 'Star-forming';
-        const starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
-        const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'Orion';
-        
-        // Current star location (if any)
-        let currentStarName = localStorage.getItem('voidfarer_current_star') || '';
-        
-        document.getElementById('clusterTitle').textContent = clusterName;
-        document.getElementById('currentLocationText').textContent = currentStarName || 'No star selected';
-        
-        // ===== GENERATE SEED =====
-        const clusterSeed = UNIVERSE_SEED + 
-                           hashString(currentSector) * 100 + 
-                           hashString(clusterName) % 100000;
-        
-        // ===== STAR DATA =====
-        const starTypes = [
-            { type: 'Blue Giant', icon: '🔵', color: '#6ba5ff', prob: 0.15, planets: '5-12' },
-            { type: 'White Star', icon: '⚪', color: '#ffffff', prob: 0.35, planets: '3-7' },
-            { type: 'Yellow Star', icon: '🟡', color: '#ffd700', prob: 0.20, planets: '3-8' },
-            { type: 'Orange Star', icon: '🟠', color: '#ff8c42', prob: 0.15, planets: '2-6' },
-            { type: 'Red Dwarf', icon: '🔴', color: '#ff6b6b', prob: 0.10, planets: '2-5' },
-            { type: 'Neutron Star', icon: '💫', color: '#b0b0ff', prob: 0.03, planets: '0' },
-            { type: 'Black Hole', icon: '⚫', color: '#4a4a4a', prob: 0.02, planets: '0' }
-        ];
-        
-        const namePrefixes = [
-            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
-            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Rig', 'Veg', 'Sir',
-            'Arc', 'Den', 'Alt', 'Poll', 'Cast', 'Ant', 'Mira', 'Algol'
-        ];
-        
-        const nameSuffixes = [
-            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'Alpha', 'Beta',
-            'Gamma', 'Delta', 'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Australis', 'Borealis',
-            'Galactica', 'Nova', 'Magnus', 'Parvus'
-        ];
-        
-        function getStarType() {
-            const rand = seededRandom(clusterSeed, Math.floor(Math.random() * 1000));
-            let cumulative = 0;
-            for (const t of starTypes) {
-                cumulative += t.prob;
-                if (rand < cumulative) return t;
-            }
-            return starTypes[1]; // Default to white star
-        }
-        
-        function generateStarName(index) {
-            const prefix = namePrefixes[Math.floor(seededRandom(clusterSeed, index) * namePrefixes.length)];
-            const suffix = nameSuffixes[Math.floor(seededRandom(clusterSeed, index + 100) * nameSuffixes.length)];
-            return prefix + ' ' + suffix;
-        }
-        
-        // Generate stars
-        const stars = [];
-        for (let i = 0; i < starCount; i++) {
-            const type = getStarType();
-            const name = generateStarName(i);
+
+        // ===== GENERATE STARS =====
+        function generateStars() {
+            stars = [];
             
-            stars.push({
-                name: name,
-                type: type.type,
-                icon: type.icon,
-                color: type.color,
-                planets: type.planets,
-                index: i
+            // Generate stars using procedural generation
+            for (let i = 0; i < starCount; i++) {
+                const star = generateStar(clusterSeed, i);
+                stars.push({
+                    name: star.name,
+                    type: star.typeName,
+                    icon: getStarIcon(star.type),
+                    color: star.color,
+                    planets: star.planetCount,
+                    index: i,
+                    seed: star.seed,
+                    position: star.position
+                });
+            }
+
+            // Sort stars: Current star first, then alphabetically
+            stars.sort((a, b) => {
+                if (a.name === currentStarName) return -1;
+                if (b.name === currentStarName) return 1;
+                return a.name.localeCompare(b.name);
             });
         }
-        
-        // Sort stars: Current star first, then alphabetically
-        stars.sort((a, b) => {
-            if (a.name === currentStarName) return -1;
-            if (b.name === currentStarName) return 1;
-            return a.name.localeCompare(b.name);
-        });
-        
+
+        // ===== GET STAR ICON =====
+        function getStarIcon(starType) {
+            const icons = {
+                'main': '🟡',
+                'red': '🔴',
+                'blue': '🔵',
+                'neutron': '💫',
+                'blackhole': '⚫'
+            };
+            return icons[starType] || '⭐';
+        }
+
         // ===== RENDER STARS =====
-        stars.forEach((star, index) => {
-            const card = document.createElement('div');
-            card.className = 'star-card';
-            if (star.name === currentStarName) {
-                card.classList.add('current');
-            }
-            card.setAttribute('onclick', `selectStar(${star.index})`);
-            
-            // Calculate distance from current star (if any)
-            let distanceDisplay = '';
-            if (currentStarName && star.name !== currentStarName) {
-                // Random distance for demo - in real implementation, this would be calculated
-                const dist = (Math.floor(Math.random() * 30) + 5) / 10;
-                const cycles = dist < 1 ? 1 : dist < 2 ? 2 : dist < 3 ? 3 : 4;
-                distanceDisplay = `<div class="distance-badge">${dist.toFixed(1)} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}</div>`;
-            } else if (star.name === currentStarName) {
-                distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
-            }
-            
-            card.innerHTML = `
-                ${distanceDisplay}
-                <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
-                <div class="star-info">
-                    <div class="star-name" style="color: ${star.color}">${star.name}</div>
-                    <div class="star-type">${star.type}</div>
-                    <div class="star-details">⏺️ ${star.planets} planets</div>
-                </div>
-            `;
-            
-            starsGrid.appendChild(card);
-        });
-        
-        // ===== STAR SELECTION =====
-        function selectStar(index) {
-            const star = stars.find(s => s.index === index);
-            if (!star) return;
-            
-            loadingOverlay.classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            // Save star data
-            localStorage.setItem('voidfarer_current_star', star.name);
-            localStorage.setItem('voidfarer_current_star_type', star.type);
-            localStorage.setItem('voidfarer_current_star_index', star.index);
-            
-            // For warp calculation (simplified - would be real distance in full version)
-            const warpCycles = 1; // Default to 1 cycle for star-to-star
-            localStorage.setItem('voidfarer_warp_cycles', warpCycles);
-            localStorage.setItem('voidfarer_warp_destination', star.name);
-            localStorage.setItem('voidfarer_warp_return', 'star-cluster.html');
-            
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = 'system-view.html';
-            }, 500);
-        }
-        
-        // ===== NAVIGATION =====
-        function returnToSectors() {
-            window.location.href = 'star-sectors.html';
-        }
-        
-        // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
+        function renderStars() {
+            starsGrid.innerHTML = '';
+
+            if (stars.length === 0) {
+                starsGrid.innerHTML = '<div style="color: white; text-align: center; padding: 50px;">No stars found in this cluster</div>';
                 return;
             }
+
+            stars.forEach((star, index) => {
+                const card = document.createElement('div');
+                card.className = 'star-card';
+                if (star.name === currentStarName) {
+                    card.classList.add('current');
+                }
+                card.setAttribute('onclick', `selectStar(${star.index})`);
+                
+                // Calculate distance from current star (if any)
+                let distanceDisplay = '';
+                if (currentStarName && star.name !== currentStarName) {
+                    // Generate deterministic distance based on star seeds
+                    const distance = generateStarDistance(star.index);
+                    const trip = calculateStarTrip(0, 0, distance, distance);
+                    distanceDisplay = `<div class="distance-badge">${trip.distanceFormatted} • ${trip.cyclesFormatted}</div>`;
+                } else if (star.name === currentStarName) {
+                    distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
+                }
+                
+                card.innerHTML = `
+                    ${distanceDisplay}
+                    <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
+                    <div class="star-info">
+                        <div class="star-name" style="color: ${star.color}">${star.name}</div>
+                        <div class="star-type">${star.type}</div>
+                        <div class="star-details">⏺️ ${star.planets} planets</div>
+                    </div>
+                `;
+                
+                starsGrid.appendChild(card);
+            });
         }
-        
+
+        // ===== GENERATE STAR DISTANCE =====
+        function generateStarDistance(starIndex) {
+            // Deterministic "random" distance based on star index
+            const seed = clusterSeed + starIndex * 1000;
+            const rand = Math.sin(seed) * 10000;
+            return (Math.abs(rand) % 30 + 5) / 10; // 0.5 to 3.5 LY
+        }
+
+        // ===== SELECT STAR =====
+        window.selectStar = async function(index) {
+            const star = stars.find(s => s.index === index);
+            if (!star) return;
+
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'calculating warp...';
+
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+            try {
+                // Calculate warp data
+                const distance = generateStarDistance(star.index);
+                const trip = calculateStarTrip(0, 0, distance, distance);
+
+                // Save star data
+                await setCurrentStar(
+                    star.name,
+                    star.type,
+                    star.index,
+                    star.planets + ' planets',
+                    star.position.x,
+                    star.position.y
+                );
+
+                // Save warp data
+                setWarpData(
+                    star.name,
+                    'star-cluster.html',
+                    trip.cycles,
+                    trip.distance,
+                    trip.fuel
+                );
+
+                // Navigate to system view
+                setTimeout(() => {
+                    window.location.href = 'system-view.html';
+                }, 500);
+
+            } catch (error) {
+                console.error('Error selecting star:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to select star. Please try again.');
+            }
+        };
+
+        // ===== NAVIGATION =====
+        window.returnToSectors = function() {
+            window.location.href = 'star-sectors.html';
+        };
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading star cluster...';
+
+                // Check for player data
+                const credits = await getCredits();
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load cluster data
+                await loadClusterData();
+
+                // Generate stars
+                generateStars();
+
+                // Render stars
+                renderStars();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
         init();
     </script>
 </body>
