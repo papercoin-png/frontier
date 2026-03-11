@@ -13,6 +13,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
         
         body {
@@ -43,6 +44,7 @@
             background: #0a1a2a;
         }
         
+        /* Planet surface background */
         .surface-bg {
             position: absolute;
             top: 0;
@@ -54,6 +56,7 @@
             opacity: 0.7;
         }
         
+        /* Dark overlay for mood */
         .atmosphere {
             position: absolute;
             top: 0;
@@ -65,6 +68,7 @@
             pointer-events: none;
         }
         
+        /* Planet name overlay */
         .planet-name {
             position: absolute;
             top: 30px;
@@ -82,6 +86,7 @@
             z-index: 10;
         }
         
+        /* Location Info */
         .location-info {
             position: absolute;
             top: 100px;
@@ -98,6 +103,7 @@
             font-family: monospace;
         }
         
+        /* Auto-extractor notice */
         .auto-notice {
             position: absolute;
             top: 160px;
@@ -129,6 +135,7 @@
             100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
         
+        /* Resource log */
         .resource-log {
             position: absolute;
             bottom: 150px;
@@ -142,14 +149,21 @@
             border-radius: 30px 10px 30px 10px;
             border: 1px solid #8ac0d0;
             min-width: 180px;
+            max-width: 220px;
         }
         
         .log-entry {
             margin-bottom: 5px;
             padding: 3px 0;
             border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
         }
         
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        /* Collection counter */
         .collection {
             position: absolute;
             bottom: 30px;
@@ -168,6 +182,7 @@
             text-align: center;
         }
         
+        /* Return button */
         .return-btn {
             position: absolute;
             bottom: 30px;
@@ -190,6 +205,7 @@
             transform: scale(0.97);
         }
         
+        /* Resource indicator */
         .resource-indicator {
             position: absolute;
             top: 210px;
@@ -210,6 +226,7 @@
             margin-top: 5px;
         }
         
+        /* Colony button */
         .colony-btn {
             position: absolute;
             top: 30px;
@@ -230,6 +247,12 @@
             transform: scale(0.97);
         }
         
+        .colony-btn.established {
+            background: rgba(74, 154, 106, 0.5);
+            border-color: #4affaa;
+        }
+        
+        /* Loading overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -256,148 +279,237 @@
             animation: spin 1s linear infinite;
         }
         
+        .loading-text {
+            color: #ffffff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 15px #8ac0d0;
+            margin-top: 15px;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Element colors */
+        .text-common { color: #ffffff; }
+        .text-uncommon { color: #b0ffb0; }
+        .text-rare { color: #b0b0ff; }
+        .text-very-rare { color: #e0b0ff; }
+        .text-legendary { color: #ffd700; }
     </style>
 </head>
 <body>
     <div class="phone-frame">
         <div class="surface-view">
+            <!-- Planet surface background -->
             <img src="assets/images/surface-bg.jpg" class="surface-bg" id="surfaceBg" alt="Surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
             
+            <!-- Atmosphere overlay -->
             <div class="atmosphere"></div>
             
+            <!-- Planet name -->
             <div class="planet-name" id="planetName">Verdant Prime</div>
+            
+            <!-- Location Info -->
             <div class="location-info" id="locationInfo">Sector B2 • Orion Nebula</div>
             
+            <!-- Colony Button -->
             <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
             
+            <!-- Auto notice -->
             <div class="auto-notice" id="autoNotice">⚙️ Auto-extractor active</div>
             
+            <!-- Resource indicator -->
             <div class="resource-indicator">
                 <div>📦 This planet:</div>
                 <div class="planet-resources" id="planetResources">Carbon, Iron, Gold</div>
             </div>
             
+            <!-- Resource log -->
             <div class="resource-log" id="resourceLog">
                 <div class="log-entry" style="color:#aaa;">⚙️ Ready to extract...</div>
             </div>
             
+            <!-- Collection counter -->
             <div class="collection" id="collectionCount">✨ 0</div>
             
+            <!-- Return button -->
             <button class="return-btn" onclick="returnToShip()">← RETURN TO SHIP</button>
             
+            <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
+                <div class="loading-text">extracting...</div>
             </div>
         </div>
     </div>
 
     <script>
+        // Telegram Mini App
         const tg = window.Telegram?.WebApp;
-        if (tg) tg.expand();
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
         
-        // Load location data
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // ===== ELEMENT DATABASE =====
+        const elementDatabase = {
+            // Common
+            'Carbon': { value: 100, rarity: 'common', color: '#ffffff' },
+            'Silicon': { value: 100, rarity: 'common', color: '#ffffff' },
+            'Hydrogen': { value: 100, rarity: 'common', color: '#ffffff' },
+            'Helium': { value: 100, rarity: 'common', color: '#ffffff' },
+            
+            // Uncommon
+            'Iron': { value: 250, rarity: 'uncommon', color: '#b0ffb0' },
+            'Oxygen': { value: 250, rarity: 'uncommon', color: '#b0ffb0' },
+            'Nickel': { value: 250, rarity: 'uncommon', color: '#b0ffb0' },
+            
+            // Rare
+            'Gold': { value: 1000, rarity: 'rare', color: '#b0b0ff' },
+            'Silver': { value: 1000, rarity: 'rare', color: '#b0b0ff' },
+            'Platinum': { value: 1000, rarity: 'rare', color: '#b0b0ff' },
+            
+            // Very Rare
+            'Uranium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff' },
+            
+            // Legendary
+            'Promethium': { value: 25000, rarity: 'legendary', color: '#ffd700' }
+        };
+        
+        // ===== LOAD LOCATION DATA =====
         const planetName = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
         const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-        const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || ['Carbon', 'Iron', 'Gold'];
         const currentSector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
         const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
         const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
         
-        document.getElementById('planetName').textContent = planetName;
-        document.getElementById('locationInfo').textContent = `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
-        document.getElementById('planetResources').textContent = planetResources.slice(0, 5).join(', ');
-        
-        // Element data
-        const elements = {
-            'Carbon': { value: 250, color: '#b0ffb0' },
-            'Iron': { value: 250, color: '#b0ffb0' },
-            'Gold': { value: 1000, color: '#b0b0ff' },
-            'Silver': { value: 1000, color: '#b0b0ff' },
-            'Platinum': { value: 1000, color: '#b0b0ff' },
-            'Uranium': { value: 5000, color: '#e0b0ff' },
-            'Titanium': { value: 1000, color: '#b0b0ff' },
-            'Silicon': { value: 100, color: '#ffffff' },
-            'Oxygen': { value: 250, color: '#b0ffb0' }
+        // Planet-specific resources (in real game, these would come from the planet data)
+        const planetResources = {
+            'Verdant Prime': ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen'],
+            'Pyros': ['Iron', 'Gold', 'Silver', 'Uranium'],
+            'Glacier-7': ['Hydrogen', 'Helium', 'Ice'],
+            'Aether': ['Hydrogen', 'Helium', 'Methane']
         };
         
-        // Storage helpers
+        const availableResources = planetResources[planetName] || ['Carbon', 'Iron', 'Silicon'];
+        
+        // Update UI
+        document.getElementById('planetName').textContent = planetName;
+        document.getElementById('locationInfo').textContent = `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
+        document.getElementById('planetResources').textContent = availableResources.slice(0, 5).join(', ');
+        
+        // Set background based on planet type
+        const filters = {
+            'scorched': 'hue-rotate(20deg) saturate(1.3)',
+            'lush': 'hue-rotate(0deg) saturate(1.1)',
+            'frozen': 'hue-rotate(180deg) brightness(1.1)',
+            'barren': 'grayscale(0.5) brightness(0.9)',
+            'gas': 'hue-rotate(280deg) saturate(1.2)'
+        };
+        document.getElementById('surfaceBg').style.filter = filters[planetType] || 'none';
+        
+        // ===== STORAGE HELPERS =====
         function getCollection() {
             return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
         }
         
-        function saveCollection(c) {
-            localStorage.setItem('voidfarer_collection', JSON.stringify(c));
+        function saveCollection(collection) {
+            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
         }
         
         function getCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
         }
         
-        function saveCredits(c) {
-            localStorage.setItem('voidfarer_credits', c.toString());
+        function saveCredits(credits) {
+            localStorage.setItem('voidfarer_credits', credits.toString());
         }
         
-        // State
-        let collectedCount = Object.keys(getCollection()).length;
-        let sessionElements = 0;
-        let gatherInterval = null;
-        
-        const resourceLog = document.getElementById('resourceLog');
-        const collectionSpan = document.getElementById('collectionCount');
-        const autoNotice = document.getElementById('autoNotice');
-        
-        collectionSpan.textContent = `✨ ${collectedCount}`;
-        
-        function showNotice(msg) {
-            autoNotice.textContent = msg;
-            autoNotice.classList.add('show');
-            setTimeout(() => autoNotice.classList.remove('show'), 2000);
+        function getColonies() {
+            return JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
         }
         
-        function saveElement(name) {
+        function saveColonies(colonies) {
+            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
+        }
+        
+        // ===== UPDATE DISPLAY =====
+        function updateDisplay() {
             const collection = getCollection();
-            collection[name] = (collection[name] || 0) + 1;
-            saveCollection(collection);
-            
-            const credits = getCredits() + (elements[name]?.value || 100);
-            saveCredits(credits);
-            
-            return Object.keys(collection).length;
+            const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
+            document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
         }
         
+        // ===== SHOW NOTICE =====
+        function showNotice(message) {
+            const notice = document.getElementById('autoNotice');
+            notice.textContent = message;
+            notice.classList.add('show');
+            setTimeout(() => notice.classList.remove('show'), 2000);
+        }
+        
+        // ===== EXTRACT RESOURCE =====
         function extractResource() {
-            if (!planetResources.length) return;
+            // Pick random resource from available
+            const elementName = availableResources[Math.floor(Math.random() * availableResources.length)];
+            const elementData = elementDatabase[elementName] || { value: 100, rarity: 'common', color: '#ffffff' };
             
-            const element = planetResources[Math.floor(Math.random() * planetResources.length)];
-            const data = elements[element] || { value: 100, color: '#ffffff' };
+            // Get current collection (FRESH from localStorage)
+            let collection = getCollection();
             
-            collectedCount = saveElement(element);
-            sessionElements++;
-            collectionSpan.textContent = `✨ ${collectedCount}`;
-            
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.style.color = data.color;
-            entry.innerHTML = `✨ +1 ${element} (${data.value}⭐)`;
-            
-            resourceLog.insertBefore(entry, resourceLog.firstChild);
-            while (resourceLog.children.length > 5) {
-                resourceLog.removeChild(resourceLog.lastChild);
+            // Add element to collection
+            if (!collection[elementName]) {
+                collection[elementName] = { count: 1, firstFound: new Date().toISOString() };
+            } else {
+                collection[elementName].count++;
             }
             
-            showNotice(`Found ${element}`);
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            // Save collection
+            saveCollection(collection);
+            
+            // Add credits
+            let credits = getCredits();
+            credits += elementData.value;
+            saveCredits(credits);
+            
+            // Update display
+            updateDisplay();
+            sessionElements++;
+            
+            // Add to log
+            const log = document.getElementById('resourceLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.style.color = elementData.color;
+            entry.innerHTML = `✨ +1 ${elementName} (${elementData.value}⭐)`;
+            
+            log.insertBefore(entry, log.firstChild);
+            while (log.children.length > 5) {
+                log.removeChild(log.lastChild);
+            }
+            
+            showNotice(`Found ${elementName}`);
+            
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+            
+            console.log('Extracted:', elementName, 'Total:', collection[elementName]?.count);
         }
         
-        // *** FIXED: This is the only function that needed to change ***
-        function startAutoGather() {
+        // ===== AUTO-EXTRACT =====
+        let gatherInterval = null;
+        let sessionElements = 0;
+        
+        function startAutoExtract() {
             if (gatherInterval) clearInterval(gatherInterval);
             
-            // Direct localStorage check - no missing function
             const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
             
             if (!autoGather) {
@@ -407,79 +519,108 @@
             
             showNotice('⚙️ Auto-extractor active');
             
+            // Extract every 4 seconds
             gatherInterval = setInterval(() => {
                 extractResource();
             }, 4000);
             
             // Do first extraction immediately
-            setTimeout(extractResource, 1000);
+            setTimeout(() => extractResource(), 1000);
         }
         
-        // Colony functions
-        function getColonies() {
-            return JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
-        }
-        
-        function saveColonies(c) {
-            localStorage.setItem('voidfarer_colonies', JSON.stringify(c));
-        }
-        
+        // ===== COLONY FUNCTIONS =====
         function checkForColony() {
             const colonies = getColonies();
-            if (colonies.some(c => c.planet === planetName && c.star === currentStar)) {
-                document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
+            const exists = colonies.some(c => 
+                c.planet === planetName && 
+                c.star === currentStar
+            );
+            
+            const btn = document.getElementById('colonyBtn');
+            if (exists) {
+                btn.innerHTML = '🏭 COLONY ESTABLISHED';
+                btn.classList.add('established');
+            } else {
+                btn.innerHTML = '🏭 ESTABLISH COLONY';
+                btn.classList.remove('established');
             }
         }
         
         function toggleColony() {
             const colonies = getColonies();
-            const exists = colonies.findIndex(c => c.planet === planetName && c.star === currentStar);
+            const existingIndex = colonies.findIndex(c => 
+                c.planet === planetName && 
+                c.star === currentStar
+            );
             
-            if (exists >= 0) {
-                if (confirm('Abandon colony?')) {
-                    colonies.splice(exists, 1);
+            if (existingIndex >= 0) {
+                // Remove colony
+                if (confirm('Abandon this colony?')) {
+                    colonies.splice(existingIndex, 1);
                     saveColonies(colonies);
-                    document.getElementById('colonyBtn').innerHTML = '🏭 ESTABLISH COLONY';
+                    checkForColony();
                     showNotice('Colony abandoned');
                 }
             } else {
+                // Establish colony
                 const name = prompt('Name your colony:', planetName + ' Outpost');
                 if (name) {
                     colonies.push({
-                        name, planet: planetName, star: currentStar,
-                        nebula: currentNebula, sector: currentSector,
+                        name: name,
+                        planet: planetName,
+                        star: currentStar,
+                        nebula: currentNebula,
+                        sector: currentSector,
                         established: new Date().toISOString()
                     });
                     saveColonies(colonies);
-                    document.getElementById('colonyBtn').innerHTML = '🏭 COLONY ESTABLISHED';
+                    checkForColony();
                     
-                    const credits = getCredits() + 5000;
+                    // Bonus credits
+                    let credits = getCredits();
+                    credits += 5000;
                     saveCredits(credits);
-                    showNotice('+5000⭐');
+                    updateDisplay();
+                    
+                    showNotice('Colony established! +5000⭐');
                 }
             }
         }
         
+        // ===== RETURN TO SHIP =====
         function returnToShip() {
-            if (gatherInterval) clearInterval(gatherInterval);
-            document.getElementById('loadingOverlay').classList.add('active');
-            setTimeout(() => window.location.href = 'system-view.html', 800);
+            if (gatherInterval) {
+                clearInterval(gatherInterval);
+            }
+            
+            loadingOverlay.classList.add('active');
+            setTimeout(() => {
+                window.location.href = 'system-view.html';
+            }, 800);
         }
         
-        // Initialize
+        // ===== INITIALIZE =====
         function init() {
-            if (!localStorage.getItem('voidfarer_player')) {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
                 window.location.href = 'index.html';
                 return;
             }
             
+            updateDisplay();
             checkForColony();
-            resourceLog.innerHTML = '<div class="log-entry" style="color:#aaa;">⚙️ Ready</div>';
-            setTimeout(startAutoGather, 1000);
+            sessionElements = 0;
+            
+            // Clear log
+            document.getElementById('resourceLog').innerHTML = '<div class="log-entry" style="color:#aaa;">⚙️ Ready</div>';
+            
+            // Start auto-extract
+            setTimeout(startAutoExtract, 1000);
         }
         
         init();
         
+        // Cleanup
         window.addEventListener('beforeunload', () => {
             if (gatherInterval) clearInterval(gatherInterval);
         });
