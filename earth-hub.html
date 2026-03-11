@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voidfarer - Earth Hub</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -79,6 +79,20 @@
             animation: pulse 1.5s infinite;
         }
         
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #4a9a8a;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
@@ -104,27 +118,6 @@
             letter-spacing: 2px;
         }
         
-        /* Location Bar */
-        .location-bar {
-            background: rgba(30, 60, 70, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 60px 20px 60px 20px;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #ffffff;
-            font-size: 14px;
-        }
-        
-        .coordinates {
-            color: #a0d0c0;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
         /* Stats Bar */
         .stats-bar {
             background: rgba(30, 60, 70, 0.7);
@@ -132,7 +125,7 @@
             border: 2px solid #4a9a8a;
             border-radius: 60px 20px 60px 20px;
             padding: 16px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -156,6 +149,273 @@
             font-size: 14px;
             color: #a0d0c0;
             text-align: right;
+        }
+        
+        /* Location Bar */
+        .location-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+            font-size: 14px;
+        }
+        
+        /* ===== MARKET CARD ===== */
+        .market-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px #2a5a5a;
+        }
+        
+        .market-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .market-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .market-title span {
+            font-size: 24px;
+        }
+        
+        .market-value {
+            color: #ffd966;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        /* Rarity Groups */
+        .rarity-group {
+            margin-bottom: 12px;
+            border: 1px solid #4a9a8a;
+            border-radius: 40px 10px 40px 10px;
+            overflow: hidden;
+        }
+        
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(30, 70, 80, 0.5);
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .group-header:active {
+            background: rgba(50, 110, 120, 0.7);
+        }
+        
+        .group-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .group-name {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 80px;
+        }
+        
+        .group-count {
+            color: #ffd966;
+            font-size: 14px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 30px;
+        }
+        
+        .group-price {
+            color: #4affaa;
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        
+        .group-arrow {
+            color: #a0d0c0;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        
+        .group-header.expanded .group-arrow {
+            transform: rotate(90deg);
+        }
+        
+        /* Expanded Items */
+        .group-items {
+            display: none;
+            padding: 10px;
+            background: rgba(20, 50, 60, 0.4);
+            border-top: 1px solid #4a9a8a;
+        }
+        
+        .group-items.show {
+            display: block;
+        }
+        
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid rgba(74, 154, 138, 0.3);
+        }
+        
+        .item-row:last-child {
+            border-bottom: none;
+        }
+        
+        .item-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .item-icon {
+            font-size: 24px;
+            min-width: 30px;
+        }
+        
+        .item-name {
+            color: #ffffff;
+            font-size: 16px;
+        }
+        
+        .item-quantity {
+            color: #ffd966;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .item-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .item-price {
+            color: #4affaa;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+        
+        .sell-btn {
+            background: rgba(74, 154, 138, 0.3);
+            border: 1px solid #4a9a8a;
+            color: #ffffff;
+            padding: 6px 12px;
+            border-radius: 30px 8px 30px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .sell-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.95);
+        }
+        
+        .sell-btn.small {
+            padding: 4px 8px;
+            font-size: 11px;
+            min-width: 40px;
+        }
+        
+        /* Group Actions */
+        .group-actions {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            justify-content: flex-end;
+        }
+        
+        .group-action-btn {
+            background: rgba(74, 154, 138, 0.2);
+            border: 1px solid #4a9a8a;
+            color: #ffffff;
+            padding: 8px 15px;
+            border-radius: 30px 8px 30px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .group-action-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.95);
+        }
+        
+        /* Quick Sell Bar */
+        .quick-sell {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #4a9a8a;
+        }
+        
+        .quick-sell-btn {
+            flex: 1;
+            background: rgba(255, 170, 74, 0.2);
+            border: 1px solid #ffaa4a;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: center;
+        }
+        
+        .quick-sell-btn:active {
+            background: #ffaa4a;
+            transform: scale(0.96);
+        }
+        
+        /* Total Value Row */
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            color: #ffffff;
+        }
+        
+        .total-label {
+            color: #a0d0c0;
+        }
+        
+        .total-amount {
+            color: #ffd966;
+            font-weight: 600;
         }
         
         /* Hub Cards */
@@ -210,134 +470,6 @@
             line-height: 1.3;
         }
         
-        .card-stats {
-            display: flex;
-            gap: 16px;
-            margin-top: 8px;
-            font-size: 13px;
-            color: #c0e0ff;
-        }
-        
-        /* Mission Card - Special Highlight */
-        .mission-card {
-            background: rgba(40, 80, 90, 0.8);
-            backdrop-filter: blur(10px);
-            border: 3px solid #7ac0b0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 20px;
-            margin-bottom: 25px;
-            box-shadow: 0 0 30px #3a7a6a;
-        }
-        
-        .mission-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .mission-title {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        
-        .edit-mission {
-            color: #a0d0c0;
-            font-size: 13px;
-            padding: 4px 12px;
-            border: 1px solid #7ac0b0;
-            border-radius: 30px;
-            cursor: pointer;
-        }
-        
-        .edit-mission:active {
-            background: #7ac0b0;
-            color: #0a2a3a;
-        }
-        
-        .mission-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .mission-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .item-icon {
-            font-size: 20px;
-            width: 30px;
-        }
-        
-        .item-details {
-            flex: 1;
-        }
-        
-        .item-name {
-            color: #ffffff;
-            font-size: 15px;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 5px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 3px;
-            margin-top: 4px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #7ac0b0, #b0e0d0);
-            border-radius: 3px;
-            transition: width 0.3s;
-        }
-        
-        .item-target {
-            color: #a0d0c0;
-            font-size: 13px;
-            min-width: 50px;
-            text-align: right;
-        }
-        
-        /* Launch Button */
-        .launch-button {
-            background: rgba(40, 100, 90, 0.9);
-            backdrop-filter: blur(15px);
-            border: 3px solid #9ad0c0;
-            color: #ffffff;
-            padding: 18px 20px;
-            border-radius: 80px 25px 80px 25px;
-            font-size: 22px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            margin: 10px 0 20px 0;
-            transition: all 0.2s;
-            box-shadow: 0 0 40px #2a7a6a;
-            font-family: 'WindSong', cursive;
-            letter-spacing: 2px;
-        }
-        
-        .launch-button:active {
-            background: rgba(60, 140, 120, 0.9);
-            transform: scale(0.98);
-            border-color: #c0f0e0;
-        }
-        
-        /* Footer */
-        .footer {
-            text-align: center;
-            color: #608080;
-            font-size: 12px;
-            padding: 10px;
-        }
-        
         /* Back button */
         .back-button {
             position: sticky;
@@ -365,10 +497,12 @@
             transform: translateX(-50%) scale(0.98);
         }
         
-        /* Element colors for mission icons */
-        .icon-gold { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
-        .icon-uranium { color: #7ac0b0; text-shadow: 0 0 10px #7ac0b0; }
-        .icon-promethium { color: #ff9e5e; text-shadow: 0 0 10px #ff9e5e; }
+        /* Rarity colors */
+        .rarity-common { color: #ffffff; }
+        .rarity-uncommon { color: #b0ffb0; }
+        .rarity-rare { color: #b0b0ff; }
+        .rarity-very-rare { color: #e0b0ff; }
+        .rarity-legendary { color: #ffd700; }
     </style>
 </head>
 <body>
@@ -380,125 +514,75 @@
                 <div class="earth-subtitle">✦ home port ✦</div>
             </div>
             
-            <!-- Location Bar - New for procedural universe -->
-            <div class="location-bar" id="locationBar">
-                <span>📍 Orion Nebula</span>
-                <span class="coordinates" id="coordinates">Sector B2</span>
-            </div>
-            
             <!-- Stats Bar -->
             <div class="stats-bar" id="statsBar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> 12,450
                 </div>
                 <div class="cargo-value" id="cargoDisplay">
-                    Cargo: 8,200c<br>
-                    0/118 elements
+                    Cargo: 45/100<br>
+                    47 items
                 </div>
             </div>
             
-            <!-- Active Mission Card -->
-            <div class="mission-card" id="missionCard">
-                <div class="mission-header">
-                    <span class="mission-title">Active Mission</span>
-                    <span class="edit-mission" onclick="editMissions()">EDIT</span>
+            <!-- Location Bar -->
+            <div class="location-bar">
+                <span>📍 Earth • Sol System</span>
+                <span class="coordinates">Sector B2</span>
+            </div>
+            
+            <!-- MARKET CARD -->
+            <div class="market-card">
+                <div class="market-header">
+                    <div class="market-title">
+                        <span>🏪</span> Element Market
+                    </div>
+                    <div class="market-value" id="totalMarketValue">0⭐</div>
                 </div>
-                <div class="mission-list" id="missionList">
-                    <!-- Filled by JavaScript -->
+                
+                <!-- Rarity Groups Container -->
+                <div id="marketGroups"></div>
+                
+                <!-- Quick Sell Bar -->
+                <div class="quick-sell">
+                    <button class="quick-sell-btn" onclick="quickSell(100)">100⭐</button>
+                    <button class="quick-sell-btn" onclick="quickSell(500)">500⭐</button>
+                    <button class="quick-sell-btn" onclick="quickSell(1000)">1000⭐</button>
+                    <button class="quick-sell-btn" onclick="quickSell('all')">ALL</button>
+                </div>
+                
+                <!-- Total Value Row -->
+                <div class="total-row">
+                    <span class="total-label">Your Credits:</span>
+                    <span class="total-amount" id="creditsAmount">12,450⭐</span>
                 </div>
             </div>
             
-            <!-- Hub Cards -->
+            <!-- Other Hub Cards -->
             <div class="hub-grid">
-                <!-- Galaxy Map - NEW -->
-                <div class="hub-card" onclick="navigateTo('galaxy-map.html')">
-                    <div class="card-icon">🌌</div>
+                <div class="hub-card" onclick="navigateTo('ship-bridge.html')">
+                    <div class="card-icon">🚀</div>
                     <div class="card-content">
-                        <div class="card-title">Galaxy Map</div>
-                        <div class="card-desc">Explore the Milky Way • 12 sectors</div>
-                        <div class="card-stats">
-                            <span id="sectorDisplay">Current: B2</span>
-                            <span>✨ 0 explored</span>
-                        </div>
+                        <div class="card-title">Return to Ship</div>
+                        <div class="card-desc">Back to the bridge</div>
                     </div>
                 </div>
                 
-                <!-- Mission Planning -->
-                <div class="hub-card" onclick="navigateTo('journal.html')">
-                    <div class="card-icon">📋</div>
+                <div class="hub-card" onclick="navigateTo('cargo.html')">
+                    <div class="card-icon">📦</div>
                     <div class="card-content">
-                        <div class="card-title">Mission Planning</div>
-                        <div class="card-desc">Create shopping lists, set targets</div>
-                        <div class="card-stats">
-                            <span id="missionCount">3 items</span>
-                            <span>✎ edit</span>
-                        </div>
+                        <div class="card-title">Cargo Hold</div>
+                        <div class="card-desc">Manage inventory</div>
                     </div>
                 </div>
                 
-                <!-- Market -->
-                <div class="hub-card" onclick="openMarket()">
-                    <div class="card-icon">🏪</div>
+                <div class="hub-card" onclick="navigateTo('settings.html')">
+                    <div class="card-icon">⚙️</div>
                     <div class="card-content">
-                        <div class="card-title">Market</div>
-                        <div class="card-desc">Sell elements, buy fuel & upgrades</div>
-                        <div class="card-stats">
-                            <span id="marketCredits">⭐ 12,450</span>
-                            <span id="marketCargo">📦 8,200c</span>
-                        </div>
+                        <div class="card-title">Settings</div>
+                        <div class="card-desc">Game options</div>
                     </div>
                 </div>
-                
-                <!-- Ship Hangar -->
-                <div class="hub-card" onclick="openHangar()">
-                    <div class="card-icon">🚢</div>
-                    <div class="card-content">
-                        <div class="card-title">Ship Hangar</div>
-                        <div class="card-desc" id="shipDesc">Current: Prospector (Mining +50%)</div>
-                        <div class="card-stats">
-                            <span id="shipSpeed">⚡ Speed ★★</span>
-                            <span id="shipMining">🪨 Mining ★★★★★</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Element Library -->
-                <div class="hub-card" onclick="navigateTo('journal.html')">
-                    <div class="card-icon">📚</div>
-                    <div class="card-content">
-                        <div class="card-title">Element Library</div>
-                        <div class="card-desc" id="collectionDesc">Complete collection: 0/118</div>
-                        <div class="card-stats" id="rarityStats">
-                            <span>🟩 0</span>
-                            <span>🟦 0</span>
-                            <span>🟪 0</span>
-                            <span>🟨 0</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Colonies - NEW -->
-                <div class="hub-card" onclick="openColonies()">
-                    <div class="card-icon">🏭</div>
-                    <div class="card-content">
-                        <div class="card-title">Colonies</div>
-                        <div class="card-desc" id="colonyDesc">Your outposts across the galaxy</div>
-                        <div class="card-stats">
-                            <span id="colonyCount">0 colonies</span>
-                            <span>⚙️ manage</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Launch Button -->
-            <div class="launch-button" onclick="launchToShip()">
-                🚀 LAUNCH TO SHIP
-            </div>
-            
-            <!-- Footer -->
-            <div class="footer">
-                Earth Central Station • Home Port
             </div>
             
             <!-- Back button to main menu -->
@@ -506,7 +590,8 @@
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-text">warping...</div>
+                <div class="loading-spinner"></div>
+                <div class="loading-text">trading...</div>
             </div>
         </div>
     </div>
@@ -524,167 +609,339 @@
         // Loading overlay
         const loadingOverlay = document.getElementById('loadingOverlay');
         
-        // Navigation function
-        function navigateTo(screen, useWarp = false) {
+        // Navigation
+        function navigateTo(screen) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            if (useWarp) {
-                loadingOverlay.classList.add('active');
-                setTimeout(() => {
-                    window.location.href = screen;
-                }, 800);
-            } else {
+            loadingOverlay.classList.add('active');
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
                 window.location.href = screen;
-            }
+            }, 300);
         }
         
-        // Return to main menu
         function returnToMenu() {
             navigateTo('index.html');
         }
         
-        // Load player data
-        function loadPlayerData() {
-            // Load credits
-            const credits = localStorage.getItem('voidfarer_credits') || '12450';
-            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${Number(credits).toLocaleString()}`;
+        // ===== ELEMENT DATABASE =====
+        const elementDatabase = {
+            // Common
+            'Carbon': { icon: '⚫', rarity: 'common', value: 100 },
+            'Silicon': { icon: '💎', rarity: 'common', value: 100 },
+            'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
+            'Helium': { icon: '🎈', rarity: 'common', value: 100 },
+            'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
             
-            // Load collection
-            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-            const collectedCount = Object.keys(collection).length;
+            // Uncommon
+            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
             
-            // Update collection display
-            document.getElementById('collectionDesc').textContent = `Complete collection: ${collectedCount}/118`;
+            // Rare
+            'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
+            'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
+            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
             
-            // Load cargo value (simulated)
-            const cargoValue = Math.floor(Math.random() * 5000) + 5000;
-            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoValue.toLocaleString()}c<br>${collectedCount}/118 elements`;
+            // Very Rare
+            'Uranium': { icon: '🟣', rarity: 'very-rare', value: 5000 },
+            'Thorium': { icon: '🔮', rarity: 'very-rare', value: 5000 },
+            'Plutonium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
             
-            // Update market stats
-            document.getElementById('marketCredits').innerHTML = `⭐ ${Number(credits).toLocaleString()}`;
-            document.getElementById('marketCargo').innerHTML = `📦 ${cargoValue.toLocaleString()}c`;
+            // Legendary
+            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
+            'Technetium': { icon: '🧪', rarity: 'legendary', value: 25000 }
+        };
+        
+        // State
+        let expandedGroup = null;
+        let collection = {};
+        let credits = 0;
+        
+        // Load data
+        function loadData() {
+            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+            credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
             
-            // Load colony count
-            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
-            document.getElementById('colonyCount').textContent = colonies.length + ' colonies';
-            document.getElementById('colonyDesc').textContent = colonies.length > 0 ? 
-                colonies.map(c => c.name).join(', ') : 
-                'Your outposts across the galaxy';
+            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+            document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
+            
+            const itemCount = Object.keys(collection).length;
+            const cargoUsed = Math.min(itemCount * 2, 100);
+            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoUsed}/100<br>${itemCount} items`;
+            
+            renderMarket();
         }
         
-        // Load location data
-        function loadLocation() {
-            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-            const nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+        // Group elements by rarity
+        function groupElements() {
+            const groups = {
+                common: { name: 'Common', elements: [], totalCount: 0, totalValue: 0 },
+                uncommon: { name: 'Uncommon', elements: [], totalCount: 0, totalValue: 0 },
+                rare: { name: 'Rare', elements: [], totalCount: 0, totalValue: 0 },
+                'very-rare': { name: 'Very Rare', elements: [], totalCount: 0, totalValue: 0 },
+                legendary: { name: 'Legendary', elements: [], totalCount: 0, totalValue: 0 }
+            };
             
-            document.getElementById('locationBar').innerHTML = `
-                <span>📍 ${nebula}</span>
-                <span class="coordinates" id="coordinates">Sector ${sector}</span>
-            `;
-            
-            document.getElementById('sectorDisplay').textContent = `Current: ${sector}`;
-        }
-        
-        // Load missions
-        function loadMissions() {
-            const missions = JSON.parse(localStorage.getItem('voidfarer_missions')) || [
-                { element: 'Gold', current: 32, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
-                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
-                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
-            ];
-            
-            const missionList = document.getElementById('missionList');
-            missionList.innerHTML = '';
-            
-            missions.slice(0, 3).forEach(mission => {
-                const percent = (mission.current / mission.target) * 100;
-                let icon = '🟡';
-                let iconClass = 'icon-gold';
+            Object.keys(collection).forEach(elementName => {
+                const elementData = elementDatabase[elementName] || { 
+                    icon: '🔹', 
+                    rarity: 'common', 
+                    value: 100 
+                };
+                const count = collection[elementName].count || 1;
                 
-                if (mission.element === 'Uranium') {
-                    icon = '🟣';
-                    iconClass = 'icon-uranium';
-                } else if (mission.element === 'Promethium') {
-                    icon = '✨';
-                    iconClass = 'icon-promethium';
+                if (groups[elementData.rarity]) {
+                    groups[elementData.rarity].elements.push({
+                        name: elementName,
+                        count: count,
+                        icon: elementData.icon,
+                        value: elementData.value,
+                        totalValue: count * elementData.value
+                    });
+                    groups[elementData.rarity].totalCount += count;
+                    groups[elementData.rarity].totalValue += count * elementData.value;
                 }
-                
-                const item = document.createElement('div');
-                item.className = 'mission-item';
-                item.innerHTML = `
-                    <span class="item-icon ${iconClass}">${icon}</span>
-                    <div class="item-details">
-                        <div class="item-name">${mission.element} (${mission.nebula})</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${percent}%"></div>
-                        </div>
-                    </div>
-                    <span class="item-target">${mission.current}/${mission.target}</span>
-                `;
-                missionList.appendChild(item);
             });
             
-            document.getElementById('missionCount').textContent = `${missions.length} items`;
+            return groups;
         }
         
-        // Edit missions
-        function editMissions() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Mission Planning\n\nSet new collection targets for any nebula in the galaxy.\n\n(Full mission editor coming soon!)');
-        }
-        
-        // Open market
-        function openMarket() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Earth Market\n\nSell Elements:\n• Common: 100c each\n• Uncommon: 250c each\n• Rare: 1,000c each\n• Very Rare: 5,000c each\n• Legendary: 25,000c each\n\nFuel: 500c/unit\nShield recharge: 1,000c');
-        }
-        
-        // Open hangar
-        function openHangar() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Ship Hangar\n\nCurrent Ship: Prospector\nMining Bonus: +50%\nSpeed: ★★☆☆☆\nCargo: ★★★☆☆\n\nAvailable Upgrades:\n• Mining Laser (5,000c)\n• Cargo Hold (3,000c)\n• Warp Drive (10,000c)');
-        }
-        
-        // Open colonies
-        function openColonies() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+        // Render market
+        function renderMarket() {
+            const groups = groupElements();
+            const container = document.getElementById('marketGroups');
+            container.innerHTML = '';
             
-            if (colonies.length === 0) {
-                alert('No colonies yet.\n\nExplore the galaxy and build outposts on discovered planets!');
-            } else {
-                let message = '🏭 YOUR COLONIES\n\n';
-                colonies.forEach((c, i) => {
-                    message += `${i+1}. ${c.name} (${c.type})\n   ${c.nebula} • Sector ${c.sector}\n   Output: ${c.output}\n\n`;
+            let totalMarketValue = 0;
+            const rarityOrder = ['legendary', 'very-rare', 'rare', 'uncommon', 'common'];
+            
+            rarityOrder.forEach(rarity => {
+                const group = groups[rarity];
+                if (group.elements.length === 0) return;
+                
+                totalMarketValue += group.totalValue;
+                
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'rarity-group';
+                groupDiv.id = `group-${rarity}`;
+                
+                // Group Header
+                const header = document.createElement('div');
+                header.className = `group-header ${expandedGroup === rarity ? 'expanded' : ''}`;
+                header.onclick = () => toggleGroup(rarity);
+                
+                let rarityColor = 'rarity-common';
+                if (rarity === 'uncommon') rarityColor = 'rarity-uncommon';
+                else if (rarity === 'rare') rarityColor = 'rarity-rare';
+                else if (rarity === 'very-rare') rarityColor = 'rarity-very-rare';
+                else if (rarity === 'legendary') rarityColor = 'rarity-legendary';
+                
+                header.innerHTML = `
+                    <div class="group-info">
+                        <span class="group-name ${rarityColor}">${group.name}</span>
+                        <span class="group-count">${group.totalCount}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="group-price">${group.totalValue.toLocaleString()}⭐</span>
+                        <span class="group-arrow">▶</span>
+                    </div>
+                `;
+                
+                groupDiv.appendChild(header);
+                
+                // Group Items (expanded)
+                const itemsDiv = document.createElement('div');
+                itemsDiv.className = `group-items ${expandedGroup === rarity ? 'show' : ''}`;
+                
+                group.elements.forEach(element => {
+                    const itemRow = document.createElement('div');
+                    itemRow.className = 'item-row';
+                    itemRow.innerHTML = `
+                        <div class="item-info">
+                            <span class="item-icon">${element.icon}</span>
+                            <span class="item-name">${element.name}</span>
+                            <span class="item-quantity">x${element.count}</span>
+                        </div>
+                        <div class="item-actions">
+                            <span class="item-price">${element.value}⭐</span>
+                            <button class="sell-btn small" onclick="sellElement('${element.name}', 1, event)">SELL</button>
+                        </div>
+                    `;
+                    itemsDiv.appendChild(itemRow);
                 });
-                alert(message);
-            }
+                
+                // Group Actions
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'group-actions';
+                actionsDiv.innerHTML = `
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 1, event)">SELL 1</button>
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'half', event)">SELL HALF</button>
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'all', event)">SELL ALL</button>
+                `;
+                itemsDiv.appendChild(actionsDiv);
+                
+                groupDiv.appendChild(itemsDiv);
+                container.appendChild(groupDiv);
+            });
+            
+            document.getElementById('totalMarketValue').textContent = totalMarketValue.toLocaleString() + '⭐';
         }
         
-        // Launch to ship
-        function launchToShip() {
-            // Save current planet
-            localStorage.setItem('voidfarer_current_planet', 'Verdant Prime');
+        // Toggle group expansion
+        function toggleGroup(rarity) {
+            if (expandedGroup === rarity) {
+                expandedGroup = null;
+            } else {
+                expandedGroup = rarity;
+            }
+            renderMarket();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // Sell single element
+        function sellElement(elementName, quantity, event) {
+            if (event) event.stopPropagation();
             
-            // Navigate to ship bridge with warp effect
-            navigateTo('ship-bridge.html', true);
+            const element = collection[elementName];
+            if (!element) return;
+            
+            const elementData = elementDatabase[elementName] || { value: 100 };
+            const available = element.count || 1;
+            const sellQuantity = Math.min(quantity, available);
+            
+            if (sellQuantity <= 0) return;
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                // Update collection
+                element.count -= sellQuantity;
+                if (element.count <= 0) {
+                    delete collection[elementName];
+                }
+                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                
+                // Update credits
+                const earnings = sellQuantity * elementData.value;
+                credits += earnings;
+                localStorage.setItem('voidfarer_credits', credits.toString());
+                
+                // Refresh display
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+            }, 300);
+        }
+        
+        // Sell entire group
+        function sellGroup(rarity, quantity, event) {
+            if (event) event.stopPropagation();
+            
+            const groups = groupElements();
+            const group = groups[rarity];
+            if (!group || group.elements.length === 0) return;
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                group.elements.forEach(element => {
+                    let sellQuantity = 0;
+                    if (quantity === 'all') {
+                        sellQuantity = element.count;
+                    } else if (quantity === 'half') {
+                        sellQuantity = Math.floor(element.count / 2);
+                    } else {
+                        sellQuantity = Math.min(quantity, element.count);
+                    }
+                    
+                    if (sellQuantity > 0) {
+                        collection[element.name].count -= sellQuantity;
+                        if (collection[element.name].count <= 0) {
+                            delete collection[element.name];
+                        }
+                        credits += sellQuantity * element.value;
+                    }
+                });
+                
+                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                localStorage.setItem('voidfarer_credits', credits.toString());
+                
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+            }, 300);
+        }
+        
+        // Quick sell by credit amount
+        function quickSell(amount) {
+            const groups = groupElements();
+            let totalEarned = 0;
+            let itemsToRemove = [];
+            
+            // Flatten all elements
+            const allElements = [];
+            Object.values(groups).forEach(group => {
+                group.elements.forEach(element => {
+                    allElements.push(element);
+                });
+            });
+            
+            // Sort by value (lowest first) to sell cheapest first
+            allElements.sort((a, b) => a.value - b.value);
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                for (let element of allElements) {
+                    if (amount === 'all') {
+                        // Sell everything
+                        totalEarned += element.totalValue;
+                        delete collection[element.name];
+                    } else {
+                        // Sell until we reach the amount
+                        const maxCanSell = Math.floor(amount / element.value);
+                        const sellQuantity = Math.min(maxCanSell, element.count);
+                        
+                        if (sellQuantity > 0) {
+                            totalEarned += sellQuantity * element.value;
+                            collection[element.name].count -= sellQuantity;
+                            if (collection[element.name].count <= 0) {
+                                delete collection[element.name];
+                            }
+                            amount -= sellQuantity * element.value;
+                        }
+                        
+                        if (amount <= 0) break;
+                    }
+                }
+                
+                credits += totalEarned;
+                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                localStorage.setItem('voidfarer_credits', credits.toString());
+                
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+            }, 300);
         }
         
         // Initialize
         function init() {
-            // Check if player exists
             const player = localStorage.getItem('voidfarer_player');
             if (!player) {
                 window.location.href = 'index.html';
                 return;
             }
             
-            loadLocation();
-            loadPlayerData();
-            loadMissions();
+            loadData();
         }
         
-        // Run initialization
         init();
     </script>
 </body>
