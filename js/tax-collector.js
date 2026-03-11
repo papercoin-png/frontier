@@ -1,11 +1,25 @@
-// tax-collector.js - Automatic tax collection system for Voidfarer
+// js/tax-collector.js - Automatic tax collection system for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Handles deduction of taxes from transactions, properties, and income
 
-// ===== DEPENDENCIES =====
-// Requires tax-system.js and economic-metrics.js to be loaded first
+import {
+    payTax,
+    getCurrentRates,
+    getTaxHistory,
+    addTaxRecord,
+    getCommunityFund,
+    addToCommunityFund,
+    allocateFromCommunityFund,
+    getPlayer,
+    getProperties,
+    updateProperty,
+    getCollection,
+    addCredits,
+    spendCredits
+} from './storage.js';
 
 // ===== COLLECTION INTERVALS =====
-const COLLECTION_INTERVALS = {
+export const COLLECTION_INTERVALS = {
     TRANSACTION: 'instant',      // Collected immediately
     PROPERTY: 'monthly',         // Collected once per month
     INCOME: 'weekly',            // Collected weekly from pool earnings
@@ -13,7 +27,7 @@ const COLLECTION_INTERVALS = {
     REGISTRATION: 'one-time'     // Collected once when joining pool
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (keep in localStorage) =====
 const COLLECTOR_STORAGE_KEYS = {
     LAST_PROPERTY_TAX: 'voidfarer_last_property_tax',
     LAST_LUXURY_TAX: 'voidfarer_last_luxury_tax',
@@ -23,7 +37,7 @@ const COLLECTOR_STORAGE_KEYS = {
 };
 
 // ===== INITIALIZE COLLECTOR =====
-function initializeCollector() {
+export function initializeCollector() {
     // Set last collection dates if not set
     if (!localStorage.getItem(COLLECTOR_STORAGE_KEYS.LAST_PROPERTY_TAX)) {
         localStorage.setItem(COLLECTOR_STORAGE_KEYS.LAST_PROPERTY_TAX, Date.now().toString());
@@ -44,16 +58,18 @@ function initializeCollector() {
     if (!localStorage.getItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS)) {
         localStorage.setItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS, JSON.stringify([]));
     }
+    
+    console.log('Tax collector initialized');
 }
 
-// ===== COLLECTION LOG =====
-function getCollectionLog(limit = 100) {
+// ===== COLLECTION LOG (keep in localStorage) =====
+export function getCollectionLog(limit = 100) {
     const log = localStorage.getItem(COLLECTOR_STORAGE_KEYS.COLLECTION_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     return allLogs.slice(-limit);
 }
 
-function addToCollectionLog(entry) {
+export function addToCollectionLog(entry) {
     const log = localStorage.getItem(COLLECTOR_STORAGE_KEYS.COLLECTION_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     
@@ -71,8 +87,8 @@ function addToCollectionLog(entry) {
     localStorage.setItem(COLLECTOR_STORAGE_KEYS.COLLECTION_LOG, JSON.stringify(allLogs));
 }
 
-// ===== NOTIFICATION SYSTEM =====
-function addTaxNotification(playerId, title, message, amount, taxType) {
+// ===== NOTIFICATION SYSTEM (keep in localStorage) =====
+export function addTaxNotification(playerId, title, message, amount, taxType) {
     const notifications = localStorage.getItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS);
     const allNotifications = notifications ? JSON.parse(notifications) : [];
     
@@ -92,7 +108,7 @@ function addTaxNotification(playerId, title, message, amount, taxType) {
     localStorage.setItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS, JSON.stringify(allNotifications));
 }
 
-function getPlayerTaxNotifications(playerId, unreadOnly = false) {
+export function getPlayerTaxNotifications(playerId, unreadOnly = false) {
     const notifications = localStorage.getItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS);
     const allNotifications = notifications ? JSON.parse(notifications) : [];
     
@@ -105,7 +121,7 @@ function getPlayerTaxNotifications(playerId, unreadOnly = false) {
     return playerNotes.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-function markNotificationAsRead(notificationId) {
+export function markNotificationAsRead(notificationId) {
     const notifications = localStorage.getItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS);
     const allNotifications = notifications ? JSON.parse(notifications) : [];
     
@@ -119,7 +135,7 @@ function markNotificationAsRead(notificationId) {
     localStorage.setItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS, JSON.stringify(updated));
 }
 
-function markAllPlayerNotificationsRead(playerId) {
+export function markAllPlayerNotificationsRead(playerId) {
     const notifications = localStorage.getItem(COLLECTOR_STORAGE_KEYS.TAX_NOTIFICATIONS);
     const allNotifications = notifications ? JSON.parse(notifications) : [];
     
@@ -134,16 +150,16 @@ function markAllPlayerNotificationsRead(playerId) {
 }
 
 // ===== TRANSACTION TAX COLLECTION =====
-function collectTransactionTax(sellerId, sellerName, amount, itemDescription) {
+export async function collectTransactionTax(sellerId, sellerName, amount, itemDescription) {
     // Calculate tax
-    const taxResult = payTax(sellerId, sellerName, TAX_TYPES.TRANSACTION, amount, 
+    const taxResult = await payTax(sellerId, sellerName, 'transaction', amount, 
         `Tax on sale: ${itemDescription}`);
     
     if (!taxResult) return { success: false, reason: 'tax_calculation_failed' };
     
     // Log the collection
     addToCollectionLog({
-        type: TAX_TYPES.TRANSACTION,
+        type: 'transaction',
         playerId: sellerId,
         playerName: sellerName,
         amount: taxResult.paid,
@@ -159,7 +175,7 @@ function collectTransactionTax(sellerId, sellerName, amount, itemDescription) {
             'Transaction Tax Paid',
             `You paid ${formatMoney(taxResult.paid)} in taxes on your sale of ${itemDescription}`,
             taxResult.paid,
-            TAX_TYPES.TRANSACTION
+            'transaction'
         );
     }
     
@@ -172,7 +188,7 @@ function collectTransactionTax(sellerId, sellerName, amount, itemDescription) {
 }
 
 // ===== PROPERTY TAX COLLECTION =====
-function collectPropertyTax(playerId, playerName, properties) {
+export async function collectPropertyTax(playerId, playerName, properties) {
     if (!properties || properties.length === 0) {
         return { success: true, taxPaid: 0, message: 'No properties' };
     }
@@ -184,23 +200,26 @@ function collectPropertyTax(playerId, playerName, properties) {
     });
     
     // Calculate tax
-    const taxAmount = calculateMonthlyPropertyTax(properties);
+    const taxAmount = await calculateMonthlyPropertyTax(properties);
     
     if (taxAmount <= 0) {
         return { success: true, taxPaid: 0 };
     }
     
-    // Check if player has enough credits (would be handled by calling function)
-    // Here we just calculate and return the amount
+    // Check if player has enough credits
+    const player = await getPlayer();
+    if (!player || (player.credits || 0) < taxAmount) {
+        return { success: false, reason: 'insufficient_funds', required: taxAmount };
+    }
     
-    const taxResult = payTax(playerId, playerName, TAX_TYPES.PROPERTY, totalValue,
+    const taxResult = await payTax(playerId, playerName, 'property', totalValue,
         `Monthly property tax on ${properties.length} properties`);
     
     if (!taxResult) return { success: false, reason: 'tax_calculation_failed' };
     
     // Log the collection
     addToCollectionLog({
-        type: TAX_TYPES.PROPERTY,
+        type: 'property',
         playerId,
         playerName,
         amount: taxResult.paid,
@@ -216,7 +235,7 @@ function collectPropertyTax(playerId, playerName, properties) {
         'Property Tax Collected',
         `Monthly property tax: ${formatMoney(taxResult.paid)} on ${properties.length} properties`,
         taxResult.paid,
-        TAX_TYPES.PROPERTY
+        'property'
     );
     
     return {
@@ -228,17 +247,17 @@ function collectPropertyTax(playerId, playerName, properties) {
 }
 
 // ===== INCOME TAX COLLECTION =====
-function collectIncomeTax(playerId, playerName, income, source) {
+export async function collectIncomeTax(playerId, playerName, income, source) {
     if (income <= 0) return { success: true, taxPaid: 0 };
     
-    const taxResult = payTax(playerId, playerName, TAX_TYPES.INCOME, income,
+    const taxResult = await payTax(playerId, playerName, 'income', income,
         `Income tax from ${source}`);
     
     if (!taxResult) return { success: false, reason: 'tax_calculation_failed' };
     
     // Log the collection
     addToCollectionLog({
-        type: TAX_TYPES.INCOME,
+        type: 'income',
         playerId,
         playerName,
         amount: taxResult.paid,
@@ -255,7 +274,7 @@ function collectIncomeTax(playerId, playerName, income, source) {
             'Income Tax Withheld',
             `${formatMoney(taxResult.paid)} withheld from your ${source} earnings`,
             taxResult.paid,
-            TAX_TYPES.INCOME
+            'income'
         );
     }
     
@@ -268,12 +287,12 @@ function collectIncomeTax(playerId, playerName, income, source) {
 }
 
 // ===== LUXURY TAX COLLECTION =====
-function collectLuxuryTax(playerId, playerName, totalWealth) {
+export async function collectLuxuryTax(playerId, playerName, totalWealth) {
     if (totalWealth < 1000000) { // Below 1M threshold
         return { success: true, taxPaid: 0, message: 'Below luxury tax threshold' };
     }
     
-    const taxResult = payTax(playerId, playerName, TAX_TYPES.LUXURY, totalWealth,
+    const taxResult = await payTax(playerId, playerName, 'luxury', totalWealth,
         'Monthly luxury tax on wealth');
     
     if (!taxResult) return { success: false, reason: 'tax_calculation_failed' };
@@ -284,7 +303,7 @@ function collectLuxuryTax(playerId, playerName, totalWealth) {
     
     // Log the collection
     addToCollectionLog({
-        type: TAX_TYPES.LUXURY,
+        type: 'luxury',
         playerId,
         playerName,
         amount: taxResult.paid,
@@ -299,7 +318,7 @@ function collectLuxuryTax(playerId, playerName, totalWealth) {
         'Luxury Tax Assessed',
         `Monthly luxury tax: ${formatMoney(taxResult.paid)} on wealth of ${formatMoney(totalWealth)}`,
         taxResult.paid,
-        TAX_TYPES.LUXURY
+        'luxury'
     );
     
     return {
@@ -310,17 +329,18 @@ function collectLuxuryTax(playerId, playerName, totalWealth) {
 }
 
 // ===== REGISTRATION FEE COLLECTION =====
-function collectRegistrationFee(playerId, playerName, profession) {
-    const fee = getRegistrationFee();
+export async function collectRegistrationFee(playerId, playerName, profession) {
+    const rates = getCurrentRates();
+    const fee = rates.registration || 5000;
     
-    const taxResult = payTax(playerId, playerName, TAX_TYPES.REGISTRATION, fee,
+    const taxResult = await payTax(playerId, playerName, 'registration', fee,
         `Professional registration for ${profession}`);
     
     if (!taxResult) return { success: false, reason: 'tax_calculation_failed' };
     
     // Log the collection
     addToCollectionLog({
-        type: TAX_TYPES.REGISTRATION,
+        type: 'registration',
         playerId,
         playerName,
         amount: taxResult.paid,
@@ -333,7 +353,7 @@ function collectRegistrationFee(playerId, playerName, profession) {
         'Professional Registration',
         `You paid the ${formatMoney(taxResult.paid)} registration fee for ${profession}`,
         taxResult.paid,
-        TAX_TYPES.REGISTRATION
+        'registration'
     );
     
     return {
@@ -346,7 +366,7 @@ function collectRegistrationFee(playerId, playerName, profession) {
 // ===== BULK COLLECTION FUNCTIONS =====
 
 // Collect all taxes for a player (called periodically)
-function collectAllTaxes(playerId, playerName, playerData) {
+export async function collectAllTaxes(playerId, playerName, playerData) {
     const results = {
         transaction: { collected: 0, count: 0 },
         property: { collected: 0, count: 0 },
@@ -357,7 +377,7 @@ function collectAllTaxes(playerId, playerName, playerData) {
     
     // Property tax
     if (playerData.properties && playerData.properties.length > 0) {
-        const propResult = collectPropertyTax(playerId, playerName, playerData.properties);
+        const propResult = await collectPropertyTax(playerId, playerName, playerData.properties);
         if (propResult.success) {
             results.property.collected = propResult.taxPaid;
             results.property.count = propResult.propertyCount || 0;
@@ -367,7 +387,7 @@ function collectAllTaxes(playerId, playerName, playerData) {
     
     // Luxury tax
     if (playerData.totalWealth) {
-        const luxResult = collectLuxuryTax(playerId, playerName, playerData.totalWealth);
+        const luxResult = await collectLuxuryTax(playerId, playerName, playerData.totalWealth);
         if (luxResult.success) {
             results.luxury.amount = luxResult.taxPaid;
             results.total += luxResult.taxPaid;
@@ -380,7 +400,7 @@ function collectAllTaxes(playerId, playerName, playerData) {
 // ===== SCHEDULED COLLECTION CHECKS =====
 
 // Check if monthly taxes are due
-function isMonthlyTaxDue(lastCollectionKey) {
+export function isMonthlyTaxDue(lastCollectionKey) {
     const lastCollection = parseInt(localStorage.getItem(lastCollectionKey)) || 0;
     const now = Date.now();
     const msInMonth = 30 * 24 * 60 * 60 * 1000;
@@ -389,7 +409,7 @@ function isMonthlyTaxDue(lastCollectionKey) {
 }
 
 // Run monthly property tax collection for all players
-function runMonthlyPropertyTaxCollection(allPlayers) {
+export async function runMonthlyPropertyTaxCollection(allPlayers) {
     if (!isMonthlyTaxDue(COLLECTOR_STORAGE_KEYS.LAST_PROPERTY_TAX)) {
         return { success: true, message: 'Not yet due', collected: 0 };
     }
@@ -397,9 +417,10 @@ function runMonthlyPropertyTaxCollection(allPlayers) {
     let totalCollected = 0;
     const results = [];
     
-    allPlayers.forEach(player => {
-        if (player.properties && player.properties.length > 0) {
-            const result = collectPropertyTax(player.id, player.name, player.properties);
+    for (const player of allPlayers) {
+        const properties = await getProperties(player.id);
+        if (properties && properties.length > 0) {
+            const result = await collectPropertyTax(player.id, player.name, properties);
             if (result.success) {
                 totalCollected += result.taxPaid;
                 results.push({
@@ -408,7 +429,7 @@ function runMonthlyPropertyTaxCollection(allPlayers) {
                 });
             }
         }
-    });
+    }
     
     // Update last collection time
     localStorage.setItem(COLLECTOR_STORAGE_KEYS.LAST_PROPERTY_TAX, Date.now().toString());
@@ -428,7 +449,7 @@ function runMonthlyPropertyTaxCollection(allPlayers) {
 }
 
 // Run monthly luxury tax collection for all players
-function runMonthlyLuxuryTaxCollection(allPlayers) {
+export async function runMonthlyLuxuryTaxCollection(allPlayers) {
     if (!isMonthlyTaxDue(COLLECTOR_STORAGE_KEYS.LAST_LUXURY_TAX)) {
         return { success: true, message: 'Not yet due', collected: 0 };
     }
@@ -436,9 +457,9 @@ function runMonthlyLuxuryTaxCollection(allPlayers) {
     let totalCollected = 0;
     const results = [];
     
-    allPlayers.forEach(player => {
+    for (const player of allPlayers) {
         if (player.totalWealth && player.totalWealth > 1000000) {
-            const result = collectLuxuryTax(player.id, player.name, player.totalWealth);
+            const result = await collectLuxuryTax(player.id, player.name, player.totalWealth);
             if (result.success) {
                 totalCollected += result.taxPaid;
                 results.push({
@@ -447,7 +468,7 @@ function runMonthlyLuxuryTaxCollection(allPlayers) {
                 });
             }
         }
-    });
+    }
     
     // Update last collection time
     localStorage.setItem(COLLECTOR_STORAGE_KEYS.LAST_LUXURY_TAX, Date.now().toString());
@@ -467,27 +488,30 @@ function runMonthlyLuxuryTaxCollection(allPlayers) {
 }
 
 // ===== TAX REFUNDS =====
-function issueTaxRefund(playerId, playerName, amount, reason, originalTaxRecordId) {
+export async function issueTaxRefund(playerId, playerName, amount, reason, originalTaxRecordId) {
     // This would need to interact with community fund
-    const fund = getCommunityFund();
+    const fund = await getCommunityFund();
     
-    if (fund.balance < amount) {
+    if (!fund || fund.balance < amount) {
         return { success: false, reason: 'insufficient_funds' };
     }
     
     // Allocate from community fund
-    const allocated = allocateFromCommunityFund(amount, 'tax_refund', 
+    const allocated = await allocateFromCommunityFund(amount, 'tax_refund', 
         `Refund to ${playerName}: ${reason}`);
     
     if (!allocated) {
         return { success: false, reason: 'allocation_failed' };
     }
     
+    // Add credits to player
+    await addCredits(amount);
+    
     // Record the refund (negative tax)
-    const refundRecord = addTaxRecord({
+    const refundRecord = await addTaxRecord({
         playerId,
         playerName,
-        taxType: 'REFUND',
+        taxType: 'refund',
         amount: -amount,
         rate: 0,
         baseAmount: amount,
@@ -509,7 +533,7 @@ function issueTaxRefund(playerId, playerName, amount, reason, originalTaxRecordI
         'Tax Refund Issued',
         `You received a tax refund of ${formatMoney(amount)}: ${reason}`,
         amount,
-        'REFUND'
+        'refund'
     );
     
     return {
@@ -520,11 +544,11 @@ function issueTaxRefund(playerId, playerName, amount, reason, originalTaxRecordI
 }
 
 // ===== TAX SUMMARY FOR PLAYER =====
-function getPlayerTaxSummary(playerId, playerName) {
-    const history = getTaxHistory(playerId, 1000);
+export async function getPlayerTaxSummary(playerId, playerName) {
+    const history = await getTaxHistory(playerId, 1000);
     
     let totalPaid = 0;
-    let byType = {};
+    const byType = {};
     let monthlyAverage = 0;
     
     const now = Date.now();
@@ -544,7 +568,6 @@ function getPlayerTaxSummary(playerId, playerName) {
     }
     
     // Get upcoming taxes
-    const now_date = new Date();
     const nextPropertyDate = new Date(parseInt(localStorage.getItem(COLLECTOR_STORAGE_KEYS.LAST_PROPERTY_TAX)) + (30 * 24 * 60 * 60 * 1000));
     const nextLuxuryDate = new Date(parseInt(localStorage.getItem(COLLECTOR_STORAGE_KEYS.LAST_LUXURY_TAX)) + (30 * 24 * 60 * 60 * 1000));
     
@@ -561,8 +584,22 @@ function getPlayerTaxSummary(playerId, playerName) {
     };
 }
 
+// ===== HELPER: Calculate monthly property tax =====
+export async function calculateMonthlyPropertyTax(properties) {
+    const rates = getCurrentRates();
+    const rate = rates.property || 0.005;
+    
+    let totalTax = 0;
+    for (const prop of properties) {
+        const value = prop.cost || prop.value || 0;
+        totalTax += Math.floor(value * rate);
+    }
+    
+    return totalTax;
+}
+
 // ===== FORMATTING =====
-function formatMoney(amount) {
+export function formatMoney(amount) {
     if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B⭐';
     if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M⭐';
     if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K⭐';
@@ -570,27 +607,22 @@ function formatMoney(amount) {
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        COLLECTION_INTERVALS,
-        initializeCollector,
-        getCollectionLog,
-        getPlayerTaxNotifications,
-        markNotificationAsRead,
-        markAllPlayerNotificationsRead,
-        collectTransactionTax,
-        collectPropertyTax,
-        collectIncomeTax,
-        collectLuxuryTax,
-        collectRegistrationFee,
-        collectAllTaxes,
-        runMonthlyPropertyTaxCollection,
-        runMonthlyLuxuryTaxCollection,
-        issueTaxRefund,
-        getPlayerTaxSummary,
-        formatMoney
-    };
-}
-
-// Initialize on load
-initializeCollector();
+export default {
+    COLLECTION_INTERVALS,
+    initializeCollector,
+    getCollectionLog,
+    getPlayerTaxNotifications,
+    markNotificationAsRead,
+    markAllPlayerNotificationsRead,
+    collectTransactionTax,
+    collectPropertyTax,
+    collectIncomeTax,
+    collectLuxuryTax,
+    collectRegistrationFee,
+    collectAllTaxes,
+    runMonthlyPropertyTaxCollection,
+    runMonthlyLuxuryTaxCollection,
+    issueTaxRefund,
+    getPlayerTaxSummary,
+    formatMoney
+};
