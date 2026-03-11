@@ -260,13 +260,6 @@ function getTotalElementCount() {
     return total;
 }
 
-function getCargoValue() {
-    const collection = getCollection();
-    let total = 0;
-    // Note: This requires element database - will be passed from UI
-    return total;
-}
-
 // ===== CREDITS =====
 function getCredits() {
     const credits = localStorage.getItem(STORAGE_KEYS.CREDITS);
