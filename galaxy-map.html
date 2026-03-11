@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -49,7 +49,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
             background: rgba(10,10,26,0.7);
@@ -61,6 +61,8 @@
             white-space: nowrap;
             letter-spacing: 1px;
             pointer-events: none;
+            font-weight: 600;
+            text-transform: uppercase;
         }
         
         .current-location {
@@ -100,7 +102,7 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             z-index: 30;
             min-width: 100px;
@@ -134,13 +136,14 @@
         }
         
         .region-name {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 22px;
             color: #ffffff;
             margin-bottom: 15px;
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.2);
             padding-bottom: 8px;
+            font-weight: 600;
         }
         
         .distance-row {
@@ -177,10 +180,11 @@
             padding: 15px;
             border-radius: 40px 10px 40px 10px;
             font-size: 18px;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             cursor: pointer;
             margin-top: 15px;
             transition: all 0.1s;
+            font-weight: 600;
         }
         
         .travel-btn:active {
@@ -222,7 +226,7 @@
         
         .region-label {
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: clamp(14px, 4vw, 18px);
             text-shadow: 0 0 15px #ffffff;
             background: rgba(10,10,26,0.3);
@@ -232,6 +236,7 @@
             border: 1px solid rgba(255,255,255,0.3);
             white-space: nowrap;
             pointer-events: none;
+            font-weight: 500;
         }
         
         .region-count {
@@ -286,9 +291,10 @@
         
         .loading-text {
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -365,17 +371,9 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCurrentSector,
-            getCurrentRegion,
-            setCurrentSector,
-            setWarpData,
-            getCredits
-        } from './js/storage.js';
-        import { calculateSectorTrip } from './js/warp-calculator.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -434,10 +432,8 @@
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                const [sector, region] = await Promise.all([
-                    getCurrentSector(),
-                    getCurrentRegion()
-                ]);
+                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
+                const region = typeof getCurrentRegion === 'function' ? await getCurrentRegion() : 'Orion';
 
                 currentSector = sector || 'B2';
                 currentRegion = region || 'Orion';
@@ -447,9 +443,6 @@
 
             } catch (error) {
                 console.error('Error loading location:', error);
-                // Use defaults
-                currentSector = 'B2';
-                currentRegion = 'Orion';
                 document.getElementById('currentLocationText').textContent = 'Orion Arm';
             }
         }
@@ -469,7 +462,9 @@
                 box.style.top = pos.top;
                 box.style.width = pos.width;
                 box.style.height = pos.height;
-                box.setAttribute('onclick', `selectRegion('${data.name}', '${sectorId}')`);
+                
+                // Use onclick directly
+                box.onclick = function() { selectRegion(data.name, sectorId); };
 
                 // Highlight current sector
                 if (sectorId === currentSector) {
@@ -487,7 +482,7 @@
         }
 
         // ===== SELECT REGION =====
-        window.selectRegion = function(region, sector) {
+        function selectRegion(region, sector) {
             // Remove previous selection
             document.querySelectorAll('.region-box').forEach(box => {
                 box.classList.remove('selected');
@@ -504,15 +499,19 @@
             
             // Calculate distance from current location
             const distance = calculateSectorDistance(currentSector, sector);
-            const trip = calculateSectorTrip(currentSector, sector);
             
             // Update panel
             document.getElementById('selectedRegionName').textContent = 
                 sectorCoordinates[sector]?.displayName || region + ' Arm';
-            document.getElementById('regionDistance').textContent = trip.distanceFormatted;
-            document.getElementById('warpCycles').textContent = trip.cyclesFormatted;
-            document.getElementById('travelTime').textContent = trip.timeFormatted;
-            document.getElementById('fuelCost').innerHTML = trip.fuelFormatted;
+            document.getElementById('regionDistance').textContent = distance.toFixed(1) + ' LY';
+            
+            const cycles = calculateWarpCycles(distance);
+            const fuel = calculateFuel(distance);
+            const time = cycles * 2;
+            
+            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
+            document.getElementById('travelTime').textContent = time + ' sec';
+            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
             
             // Enable/disable travel button based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
@@ -527,7 +526,7 @@
             regionPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== DISTANCE CALCULATION =====
         function calculateSectorDistance(sector1, sector2) {
@@ -541,8 +540,20 @@
             return gridDistance * 2.5;
         }
 
+        function calculateWarpCycles(distance) {
+            if (distance <= 2.5) return 1;
+            if (distance <= 5) return 2;
+            if (distance <= 7.5) return 3;
+            if (distance <= 10) return 4;
+            return 5;
+        }
+
+        function calculateFuel(distance) {
+            return Math.floor(distance * 4) + 5;
+        }
+
         // ===== TRAVEL =====
-        window.travelToRegion = async function() {
+        async function travelToRegion() {
             if (!selectedRegion || !selectedSector) return;
             if (selectedSector === currentSector) return;
             
@@ -551,19 +562,26 @@
             
             try {
                 // Calculate warp details
-                const trip = calculateSectorTrip(currentSector, selectedSector);
+                const distance = calculateSectorDistance(currentSector, selectedSector);
+                const cycles = calculateWarpCycles(distance);
+                const fuel = calculateFuel(distance);
                 
                 // Save destination
-                await setCurrentSector(selectedSector, selectedRegion);
+                if (typeof setCurrentSector === 'function') {
+                    await setCurrentSector(selectedSector, selectedRegion);
+                } else {
+                    localStorage.setItem('voidfarer_current_sector', selectedSector);
+                    localStorage.setItem('voidfarer_current_region', selectedRegion);
+                }
                 
                 // Save warp data
-                setWarpData(
-                    selectedRegion,
-                    'galaxy-map.html',
-                    trip.cycles,
-                    trip.distance,
-                    trip.fuel
-                );
+                if (typeof setWarpData === 'function') {
+                    setWarpData(selectedRegion, 'galaxy-map.html', cycles, distance, fuel);
+                } else {
+                    localStorage.setItem('voidfarer_warp_destination', selectedRegion);
+                    localStorage.setItem('voidfarer_warp_return', 'galaxy-map.html');
+                    localStorage.setItem('voidfarer_warp_cycles', cycles);
+                }
                 
                 // Navigate to warp
                 setTimeout(() => {
@@ -575,12 +593,12 @@
                 loadingOverlay.classList.remove('active');
                 alert('Failed to travel. Please try again.');
             }
-        };
+        }
 
         // ===== RETURN TO SHIP =====
-        window.returnToShip = function() {
+        function returnToShip() {
             window.location.href = 'ship-bridge.html';
-        };
+        }
 
         // ===== DRAW GALAXY BACKGROUND =====
         function resizeCanvas() {
@@ -650,7 +668,7 @@
                 loadingText.textContent = 'loading galaxy map...';
 
                 // Check for player data
-                const credits = await getCredits();
+                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -665,14 +683,6 @@
 
                 // Create region boxes
                 createRegionBoxes();
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 // Hide loading
                 setTimeout(() => {
@@ -691,5 +701,11 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/warp-calculator.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
