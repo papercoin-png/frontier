@@ -6,6 +6,8 @@
     <title>Voidfarer - Main Menu</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -193,12 +195,23 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
             display: flex;
             opacity: 1;
             pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8a9a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
         
         .loading-text {
@@ -209,9 +222,37 @@
             animation: pulse 1.5s infinite;
         }
         
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* Progress bar for migration */
+        .migration-progress {
+            width: 250px;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .migration-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a8a9a, #8ac0d0);
+            transition: width 0.3s;
+        }
+        
+        .migration-status {
+            color: #a0c0d0;
+            font-size: 14px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -232,22 +273,22 @@
             
             <!-- Menu Buttons -->
             <div class="menu-buttons">
-                <div class="menu-button" onclick="handleMenu('new')">
+                <div class="menu-button" onclick="handleMenu('new')" id="newGameBtn">
                     <span class="button-icon">🌙</span>
                     <span class="button-text">New Journey</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('continue')">
+                <div class="menu-button" onclick="handleMenu('continue')" id="continueBtn">
                     <span class="button-icon">🚀</span>
                     <span class="button-text">Continue</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('settings')">
+                <div class="menu-button" onclick="handleMenu('settings')" id="settingsBtn">
                     <span class="button-icon">⚙️</span>
                     <span class="button-text">Settings</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('credits')">
+                <div class="menu-button" onclick="handleMenu('credits')" id="creditsBtn">
                     <span class="button-icon">✨</span>
                     <span class="button-text">Credits</span>
                 </div>
@@ -261,13 +302,30 @@
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-text">warping...</div>
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">initializing...</div>
+                <div class="migration-progress" id="migrationProgress">
+                    <div class="migration-progress-fill" id="migrationProgressFill"></div>
+                </div>
+                <div class="migration-status" id="migrationStatus"></div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { initializeDatabase } from './js/db.js';
+        import { migrateFromLocalStorage, getMigrationProgress } from './js/migration.js';
+        import { initializeStorage, getPlayer } from './js/storage.js';
+        import { initializeTaxSystem } from './js/tax-system.js';
+        import { initializeTaxHistory } from './js/tax-history.js';
+        import { initializeCommunityFund } from './js/community-fund.js';
+        import { initializeMetrics } from './js/economic-metrics.js';
+        import { initializeAdjuster } from './js/economic-adjuster.js';
+        import { initializeEventSystem } from './js/economic-events.js';
+        import { initializeCollector } from './js/tax-collector.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -275,16 +333,113 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Navigation function
+        const loadingText = document.getElementById('loadingText');
+        const migrationProgressFill = document.getElementById('migrationProgressFill');
+        const migrationStatus = document.getElementById('migrationStatus');
+        const menuButtons = {
+            new: document.getElementById('newGameBtn'),
+            continue: document.getElementById('continueBtn'),
+            settings: document.getElementById('settingsBtn'),
+            credits: document.getElementById('creditsBtn')
+        };
+
+        // ===== INITIALIZATION =====
+        async function initializeGame() {
+            try {
+                // Show loading overlay
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'initializing database...';
+                
+                // Step 1: Initialize database
+                await initializeDatabase();
+                loadingText.textContent = 'database ready...';
+                
+                // Step 2: Run migration (if needed)
+                loadingText.textContent = 'checking for saved data...';
+                migrationProgressFill.style.width = '10%';
+                
+                const migrationResult = await migrateFromLocalStorage();
+                
+                if (migrationResult.success) {
+                    if (migrationResult.reason === 'ALREADY_COMPLETED') {
+                        migrationStatus.textContent = '✓ Save data loaded';
+                    } else if (migrationResult.results) {
+                        const { collection, missions, realEstate, taxTransactions } = migrationResult.results;
+                        migrationStatus.textContent = `✓ Migrated: ${collection} elements, ${missions} missions, ${realEstate} properties`;
+                    }
+                } else if (migrationResult.error) {
+                    console.warn('Migration warning:', migrationResult.error);
+                    migrationStatus.textContent = '⚠ Using new save';
+                }
+                
+                migrationProgressFill.style.width = '50%';
+                loadingText.textContent = 'initializing systems...';
+                
+                // Step 3: Initialize all game systems
+                await Promise.all([
+                    initializeStorage(),
+                    initializeTaxSystem(),
+                    initializeTaxHistory(),
+                    initializeCommunityFund(),
+                    initializeMetrics(),
+                    initializeAdjuster(),
+                    initializeEventSystem(),
+                    initializeCollector()
+                ]);
+                
+                migrationProgressFill.style.width = '100%';
+                loadingText.textContent = 'welcome back, voidfarer...';
+                
+                // Step 4: Small delay for visual feedback
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Hide loading overlay
+                loadingOverlay.classList.remove('active');
+                
+                // Enable menu buttons
+                enableMenuButtons();
+                
+            } catch (error) {
+                console.error('Failed to initialize game:', error);
+                loadingText.textContent = 'error loading game';
+                migrationStatus.textContent = 'Please refresh and try again';
+                
+                // Still enable buttons but with caution
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                    enableMenuButtons();
+                }, 2000);
+            }
+        }
+
+        // ===== MENU BUTTON STATES =====
+        function enableMenuButtons() {
+            menuButtons.new.style.pointerEvents = 'auto';
+            menuButtons.continue.style.pointerEvents = 'auto';
+            menuButtons.settings.style.pointerEvents = 'auto';
+            menuButtons.credits.style.pointerEvents = 'auto';
+        }
+
+        function disableMenuButtons() {
+            menuButtons.new.style.pointerEvents = 'none';
+            menuButtons.continue.style.pointerEvents = 'none';
+            menuButtons.settings.style.pointerEvents = 'none';
+            menuButtons.credits.style.pointerEvents = 'none';
+        }
+
+        // ===== NAVIGATION =====
         function navigateTo(screen, useWarp = false) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             if (useWarp) {
                 loadingOverlay.classList.add('active');
+                loadingText.textContent = 'warping...';
+                migrationProgressFill.style.width = '0%';
+                migrationStatus.textContent = '';
+                
                 setTimeout(() => {
                     window.location.href = screen;
                 }, 800);
@@ -292,92 +447,94 @@
                 window.location.href = screen;
             }
         }
-        
-        // Check if this is first time playing
-        function isNewGame() {
-            return !localStorage.getItem('voidfarer_player');
+
+        // ===== CHECK FOR EXISTING PLAYER =====
+        async function hasExistingSave() {
+            try {
+                const player = await getPlayer();
+                return player !== null;
+            } catch (e) {
+                return false;
+            }
         }
-        
-        // Initialize universe seed if not set
+
+        // ===== UNIVERSE SEED =====
         function initializeUniverse() {
             if (!localStorage.getItem('voidfarer_universe_seed')) {
                 // Fixed seed - everyone gets the same universe
                 localStorage.setItem('voidfarer_universe_seed', '42793');
             }
         }
-        
-        // Handle menu actions
-        function handleMenu(action) {
+
+        // ===== CREATE NEW SAVE =====
+        async function createNewSave() {
+            // Clear all IndexedDB data (handled by migration system)
+            // Set default values in localStorage for location data
+            localStorage.setItem('voidfarer_player', JSON.stringify({
+                name: 'Voidfarer',
+                ship: 'Prospector',
+                credits: 1000,
+                created: new Date().toISOString()
+            }));
+            
+            // Initialize universe seed
+            initializeUniverse();
+            
+            // Set starting location
+            localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
+            localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
+            localStorage.setItem('voidfarer_current_star', 'Sol');
+            localStorage.setItem('voidfarer_current_planet', 'Earth');
+            
+            // Default missions in localStorage (will be migrated)
+            localStorage.setItem('voidfarer_missions', JSON.stringify([
+                { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
+                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
+                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
+            ]));
+            
+            localStorage.setItem('voidfarer_credits', '12450');
+        }
+
+        // ===== HANDLE MENU ACTIONS =====
+        window.handleMenu = async function(action) {
+            // Disable buttons during processing
+            disableMenuButtons();
+            
             switch(action) {
                 case 'new':
                     if (confirm('Start a new journey? This will erase all progress.')) {
-                        // Clear all saved data
-                        localStorage.removeItem('voidfarer_player');
-                        localStorage.removeItem('voidfarer_collection');
-                        localStorage.removeItem('voidfarer_missions');
-                        localStorage.removeItem('voidfarer_credits');
-                        localStorage.removeItem('voidfarer_colonies');
-                        localStorage.removeItem('voidfarer_discovered_locations');
+                        loadingOverlay.classList.add('active');
+                        loadingText.textContent = 'creating new universe...';
+                        migrationProgressFill.style.width = '0%';
+                        migrationStatus.textContent = '';
                         
-                        // Set default values
-                        localStorage.setItem('voidfarer_player', JSON.stringify({
-                            name: 'Voidfarer',
-                            ship: 'Prospector',
-                            credits: 1000,
-                            created: new Date().toISOString()
-                        }));
+                        // Small delay for visual feedback
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
-                        // Initialize universe seed
-                        initializeUniverse();
-                        
-                        // Set starting location
-                        localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
-                        localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
-                        localStorage.setItem('voidfarer_current_star', 'Sol');
-                        localStorage.setItem('voidfarer_current_planet', 'Earth');
+                        await createNewSave();
                         
                         // Navigate to Earth Hub with warp effect
                         navigateTo('earth-hub.html', true);
+                    } else {
+                        enableMenuButtons();
                     }
                     break;
                     
                 case 'continue':
-                    if (isNewGame()) {
+                    loadingOverlay.classList.add('active');
+                    loadingText.textContent = 'loading your journey...';
+                    migrationProgressFill.style.width = '50%';
+                    
+                    const hasSave = await hasExistingSave();
+                    
+                    if (!hasSave) {
                         // First time playing - create default save
-                        localStorage.setItem('voidfarer_player', JSON.stringify({
-                            name: 'Voidfarer',
-                            ship: 'Prospector',
-                            credits: 1000,
-                            created: new Date().toISOString()
-                        }));
-                        
-                        // Initialize universe seed
-                        initializeUniverse();
-                        
-                        // Initialize empty collection
-                        localStorage.setItem('voidfarer_collection', JSON.stringify({}));
-                        
-                        // Initialize empty colonies
-                        localStorage.setItem('voidfarer_colonies', JSON.stringify([]));
-                        
-                        // Initialize discovered locations
-                        localStorage.setItem('voidfarer_discovered_locations', JSON.stringify([]));
-                        
-                        // Default missions
-                        localStorage.setItem('voidfarer_missions', JSON.stringify([
-                            { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
-                            { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
-                            { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
-                        ]));
-                        
-                        localStorage.setItem('voidfarer_credits', '12450');
-                        
-                        // Set starting location
-                        localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
-                        localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
-                        localStorage.setItem('voidfarer_current_star', 'Sol');
-                        localStorage.setItem('voidfarer_current_planet', 'Earth');
+                        loadingText.textContent = 'creating new save...';
+                        await createNewSave();
                     }
+                    
+                    migrationProgressFill.style.width = '100%';
                     
                     // Navigate to Earth Hub with warp effect
                     navigateTo('earth-hub.html', true);
@@ -389,15 +546,13 @@
                     
                 case 'credits':
                     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nCreated by [Your Name]\n\nVersion 1.0');
+                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
+                    enableMenuButtons();
                     break;
             }
-        }
-        
-        // Initialize universe seed on load
-        initializeUniverse();
-        
-        // Preload next screen for faster transition
+        };
+
+        // ===== PRELOAD SCREENS =====
         function preloadScreen(url) {
             const link = document.createElement('link');
             link.rel = 'preload';
@@ -405,9 +560,21 @@
             link.as = 'document';
             document.head.appendChild(link);
         }
-        
-        // Preload Earth Hub for faster continue
-        preloadScreen('earth-hub.html');
+
+        // ===== START THE GAME =====
+        window.addEventListener('load', async () => {
+            // Disable menu buttons during initialization
+            disableMenuButtons();
+            
+            // Preload next screen for faster transition
+            preloadScreen('earth-hub.html');
+            
+            // Initialize universe seed
+            initializeUniverse();
+            
+            // Start game initialization
+            await initializeGame();
+        });
     </script>
 </body>
 </html>
