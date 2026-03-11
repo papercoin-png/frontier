@@ -49,6 +49,56 @@
             -webkit-overflow-scrolling: touch;
         }
         
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #6a8ac0;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
         /* Header */
         .status-header {
             margin-bottom: 20px;
@@ -380,6 +430,7 @@
             gap: 15px;
             color: #a0c0ff;
             font-size: 13px;
+            flex-wrap: wrap;
         }
         
         .element-count {
@@ -406,7 +457,36 @@
         .rarity-very-rare { color: #e0b0ff; }
         .rarity-legendary { color: #ffd700; }
         
-        /* Market Value Summary */
+        /* Property Summary */
+        .property-summary {
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 30px 10px 30px 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #6a8ac0;
+        }
+        
+        .property-summary-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .property-summary-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 14px;
+        }
+        
+        .property-summary-value {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        /* Value Summary */
         .value-summary {
             background: rgba(30, 45, 70, 0.4);
             border-radius: 30px 10px 30px 10px;
@@ -470,51 +550,6 @@
         .back-button:active {
             background: #6a8ac0;
             transform: translateX(-50%) scale(0.96);
-        }
-        
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-            opacity: 1;
-            pointer-events: all;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #6a8ac0;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'WindSong', cursive;
-            font-size: 24px;
-            text-shadow: 0 0 30px #6a8ac0;
-            margin-top: 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -593,6 +628,15 @@
                     </div>
                 </div>
                 
+                <!-- Property Summary -->
+                <div class="property-summary">
+                    <div class="property-summary-title">🏢 Real Estate Summary</div>
+                    <div class="property-summary-stats">
+                        <span>Properties Owned: <span class="property-summary-value" id="propertyCount">0</span></span>
+                        <span>Total Storage: <span class="property-summary-value" id="totalPropertyStorage">0</span></span>
+                    </div>
+                </div>
+                
                 <!-- Ship Upgrades -->
                 <div class="upgrades-grid">
                     <div class="upgrade-card">
@@ -639,7 +683,7 @@
                     <div class="journal-stats-grid">
                         <div class="journal-stat">
                             <div class="journal-stat-value" id="totalElements">0</div>
-                            <div class="journal-stat-label">COLLECTED</div>
+                            <div class="journal-stat-label">TOTAL</div>
                         </div>
                         <div class="journal-stat">
                             <div class="journal-stat-value" id="uniqueElements">0</div>
@@ -675,16 +719,16 @@
                 <!-- Value Summary -->
                 <div class="value-summary">
                     <div class="value-row">
-                        <span class="value-label">Total Market Value:</span>
-                        <span class="value-amount" id="totalMarketValue">0⭐</span>
+                        <span class="value-label">Ship Cargo Value:</span>
+                        <span class="value-amount" id="shipValue">0⭐</span>
                     </div>
                     <div class="value-row">
-                        <span class="value-label">Best Performer:</span>
-                        <span class="value-amount" id="bestPerformer">-</span>
+                        <span class="value-label">Property Value:</span>
+                        <span class="value-amount" id="propertyValue">0⭐</span>
                     </div>
                     <div class="value-row">
-                        <span class="value-label">Portfolio Growth:</span>
-                        <span class="value-amount" id="portfolioGrowth">0%</span>
+                        <span class="value-label">Total Net Worth:</span>
+                        <span class="value-amount" id="netWorth">0⭐</span>
                     </div>
                 </div>
             </div>
@@ -726,6 +770,7 @@
             if (tabName === 'status') {
                 document.getElementById('tabStatus').classList.add('active');
                 document.getElementById('statusTab').classList.add('active');
+                loadShipData();
             } else {
                 document.getElementById('tabJournal').classList.add('active');
                 document.getElementById('journalTab').classList.add('active');
@@ -768,11 +813,15 @@
             // Collection stats
             const collection = getCollection();
             const totalItems = getTotalElementCount();
-            const uniqueItems = getUniqueElementsCount();
             
-            // Calculate cargo usage (each item size 1 for simplicity)
-            const cargoUsed = Math.min(totalItems, 100);
-            document.getElementById('cargoValue').textContent = cargoUsed;
+            // Calculate cargo usage (using size from database)
+            let cargoUsed = 0;
+            Object.keys(collection).forEach(name => {
+                const size = getElementSize(name);
+                cargoUsed += (collection[name].count || 1) * size;
+            });
+            
+            document.getElementById('cargoValue').textContent = Math.min(cargoUsed, 100);
             
             // Calculate portfolio value
             let portfolioValue = 0;
@@ -783,10 +832,39 @@
             });
             document.getElementById('portfolioValue').textContent = portfolioValue.toLocaleString();
             
+            // Load real estate summary
+            loadPropertySummary();
+            
             // Enable/disable buttons based on credits
             const credits = getCredits();
             document.getElementById('refuelBtn').disabled = credits < 50 || fuel >= 100;
             document.getElementById('repairBtn').disabled = credits < 100 || power >= 100;
+        }
+        
+        // Get element size from database
+        function getElementSize(elementName) {
+            const elementDatabase = {
+                'Carbon': 1, 'Silicon': 1, 'Hydrogen': 1, 'Helium': 1,
+                'Iron': 1, 'Oxygen': 1, 'Nickel': 1,
+                'Gold': 2, 'Silver': 2, 'Platinum': 2, 'Titanium': 2,
+                'Uranium': 3, 'Thorium': 3, 'Plutonium': 3,
+                'Promethium': 5, 'Technetium': 5, 'Astatine': 5
+            };
+            return elementDatabase[elementName] || 1;
+        }
+        
+        // Load property summary
+        function loadPropertySummary() {
+            const realEstate = getRealEstate();
+            const properties = realEstate.properties || [];
+            
+            document.getElementById('propertyCount').textContent = properties.length;
+            
+            let totalCapacity = 0;
+            properties.forEach(prop => {
+                totalCapacity += prop.capacity || 0;
+            });
+            document.getElementById('totalPropertyStorage').textContent = totalCapacity.toLocaleString();
         }
         
         // Refuel ship
@@ -886,20 +964,19 @@
         // Load journal data
         function loadJournalData() {
             const collection = getCollection();
-            const elements = [];
-            let totalValue = 0;
-            let bestPerformer = { name: '-', change: -100 };
+            const realEstate = getRealEstate();
+            const properties = realEstate.properties || [];
             
+            const elements = [];
+            let shipValue = 0;
+            let propertyValue = 0;
+            
+            // Calculate ship cargo value
             Object.keys(collection).forEach(name => {
                 const count = collection[name].count || 1;
                 const marketPrice = getLatestPrice(name);
-                const priceChange = calculatePriceChange(name, 7);
                 const elementValue = count * marketPrice;
-                totalValue += elementValue;
-                
-                if (priceChange > bestPerformer.change) {
-                    bestPerformer = { name, change: priceChange };
-                }
+                shipValue += elementValue;
                 
                 elements.push({
                     name: name,
@@ -907,10 +984,12 @@
                     icon: elementDatabase[name]?.icon || '🔹',
                     rarity: elementDatabase[name]?.rarity || 'common',
                     marketPrice: marketPrice,
-                    priceChange: priceChange,
                     value: elementValue
                 });
             });
+            
+            // Calculate property value (estimate)
+            propertyValue = properties.length * 10000; // Rough estimate
             
             // Calculate stats
             const totalElements = getTotalElementCount();
@@ -920,15 +999,10 @@
             document.getElementById('totalElements').textContent = totalElements;
             document.getElementById('uniqueElements').textContent = uniqueElements;
             document.getElementById('completionPct').textContent = completionPct + '%';
-            document.getElementById('totalMarketValue').textContent = totalValue.toLocaleString() + '⭐';
-            document.getElementById('bestPerformer').textContent = bestPerformer.name !== '-' ? 
-                `${bestPerformer.name} (+${bestPerformer.change.toFixed(1)}%)` : '-';
             
-            // Calculate portfolio growth (average of top 5 elements)
-            const topElements = elements.sort((a, b) => b.value - a.value).slice(0, 5);
-            const avgGrowth = topElements.reduce((sum, e) => sum + e.priceChange, 0) / topElements.length;
-            document.getElementById('portfolioGrowth').textContent = avgGrowth.toFixed(1) + '%';
-            document.getElementById('portfolioGrowth').style.color = avgGrowth >= 0 ? '#4affaa' : '#ff6b6b';
+            document.getElementById('shipValue').textContent = shipValue.toLocaleString() + '⭐';
+            document.getElementById('propertyValue').textContent = propertyValue.toLocaleString() + '⭐';
+            document.getElementById('netWorth').textContent = (shipValue + propertyValue).toLocaleString() + '⭐';
             
             // Update portfolio chart
             updatePortfolioChart(elements);
@@ -1019,9 +1093,6 @@
                 else if (element.rarity === 'very-rare') rarityClass = 'rarity-very-rare';
                 else if (element.rarity === 'legendary') rarityClass = 'rarity-legendary';
                 
-                const changeClass = element.priceChange >= 0 ? 'price-up' : 'price-down';
-                const changeSymbol = element.priceChange >= 0 ? '▲' : '▼';
-                
                 item.innerHTML = `
                     <div class="element-icon">${element.icon}</div>
                     <div class="element-info">
@@ -1029,7 +1100,6 @@
                         <div class="element-details">
                             <span class="element-count">📦 ${element.count}</span>
                             <span class="element-value">💰 ${element.marketPrice}⭐</span>
-                            <span class="${changeClass}">${changeSymbol} ${Math.abs(element.priceChange)}%</span>
                         </div>
                     </div>
                     <div class="element-rarity-badge ${rarityClass}">${element.rarity}</div>
