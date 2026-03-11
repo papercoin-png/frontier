@@ -1,6 +1,7 @@
-// elements-data.js - Complete 118-element database for Voidfarer
+// js/elements-data.js - Complete 118-element database for Voidfarer
+// Static data module - no storage dependencies
 
-const ELEMENTS = [
+export const ELEMENTS = [
     // Common (white) - 100 credits each
     { name: 'Hydrogen', symbol: 'H', atomic: 1, mass: '1.008', rarity: 'common', planets: 843, value: 100 },
     { name: 'Helium', symbol: 'He', atomic: 2, mass: '4.003', rarity: 'common', planets: 612, value: 100 },
@@ -131,8 +132,8 @@ const ELEMENTS = [
 // Sort elements alphabetically by name
 ELEMENTS.sort((a, b) => a.name.localeCompare(b.name));
 
-// Planet locations for key elements
-const ELEMENT_LOCATIONS = {
+// ===== PLANET LOCATIONS FOR KEY ELEMENTS =====
+export const ELEMENT_LOCATIONS = {
     'Gold': ['Pyros', 'Verdant Prime', 'Aether Moons'],
     'Silver': ['Pyros', 'Aether Moons'],
     'Platinum': ['Pyros', 'Aether Core'],
@@ -176,34 +177,36 @@ const ELEMENT_LOCATIONS = {
     'Oganesson': ['Unknown Location']
 };
 
-// Helper function to get element by name
-function getElementByName(name) {
+// ===== HELPER FUNCTIONS =====
+
+// Get element by name
+export function getElementByName(name) {
     return ELEMENTS.find(e => e.name === name) || null;
 }
 
-// Helper function to get element by symbol
-function getElementBySymbol(symbol) {
+// Get element by symbol
+export function getElementBySymbol(symbol) {
     return ELEMENTS.find(e => e.symbol === symbol) || null;
 }
 
-// Helper function to get elements by rarity
-function getElementsByRarity(rarity) {
+// Get elements by rarity
+export function getElementsByRarity(rarity) {
     return ELEMENTS.filter(e => e.rarity === rarity);
 }
 
-// Helper function to get location for element
-function getElementLocation(elementName) {
+// Get location for element
+export function getElementLocation(elementName) {
     return ELEMENT_LOCATIONS[elementName] || ['Unknown Location', 'Undiscovered'];
 }
 
-// Helper function to get element value
-function getElementValue(elementName) {
+// Get element value
+export function getElementValue(elementName) {
     const element = getElementByName(elementName);
     return element ? element.value : 100;
 }
 
-// Helper function to get element color class
-function getElementColorClass(elementName) {
+// Get element color class
+export function getElementColorClass(elementName) {
     const element = getElementByName(elementName);
     if (!element) return 'text-common';
     
@@ -211,8 +214,38 @@ function getElementColorClass(elementName) {
     return `text-${rarity}`;
 }
 
-// Helper function to get rarity counts
-function getRarityCounts() {
+// Get element icon (for UI display)
+export function getElementIcon(elementName) {
+    const icons = {
+        'Gold': '🟡',
+        'Silver': '⚪',
+        'Platinum': '⬜',
+        'Uranium': '🟣',
+        'Promethium': '✨',
+        'Carbon': '⚫',
+        'Iron': '⚙️',
+        'Titanium': '🔷',
+        'Hydrogen': '💧',
+        'Helium': '🎈',
+        'Oxygen': '💨',
+        'Silicon': '💎',
+        'Copper': '🔴',
+        'Lead': '🔘',
+        'Mercury': '💧',
+        'Neptunium': '☢️',
+        'Plutonium': '☢️'
+    };
+    return icons[elementName] || '🔹';
+}
+
+// Get element rarity
+export function getElementRarity(elementName) {
+    const element = getElementByName(elementName);
+    return element ? element.rarity : 'common';
+}
+
+// Get rarity counts
+export function getRarityCounts() {
     return {
         common: ELEMENTS.filter(e => e.rarity === 'common').length,
         uncommon: ELEMENTS.filter(e => e.rarity === 'uncommon').length,
@@ -222,17 +255,88 @@ function getRarityCounts() {
     };
 }
 
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        ELEMENTS,
-        ELEMENT_LOCATIONS,
-        getElementByName,
-        getElementBySymbol,
-        getElementsByRarity,
-        getElementLocation,
-        getElementValue,
-        getElementColorClass,
-        getRarityCounts
-    };
+// Get all elements
+export function getAllElements() {
+    return [...ELEMENTS];
 }
+
+// Get elements by planet
+export function getElementsByPlanet(planetName) {
+    const elements = [];
+    for (const [elementName, locations] of Object.entries(ELEMENT_LOCATIONS)) {
+        if (locations.some(loc => loc.includes(planetName) || loc === 'Everywhere')) {
+            const element = getElementByName(elementName);
+            if (element) elements.push(element);
+        }
+    }
+    return elements;
+}
+
+// Search elements by name or symbol
+export function searchElements(query) {
+    const lowerQuery = query.toLowerCase();
+    return ELEMENTS.filter(e => 
+        e.name.toLowerCase().includes(lowerQuery) || 
+        e.symbol.toLowerCase().includes(lowerQuery)
+    );
+}
+
+// Get random element by rarity
+export function getRandomElementByRarity(rarity) {
+    const elements = getElementsByRarity(rarity);
+    if (elements.length === 0) return null;
+    return elements[Math.floor(Math.random() * elements.length)];
+}
+
+// Get random element (any rarity)
+export function getRandomElement() {
+    return ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
+}
+
+// Get total number of elements
+export function getTotalElementCount() {
+    return ELEMENTS.length;
+}
+
+// Get elements discovered by player (compares with collection)
+export function getDiscoveredElements(collection) {
+    if (!collection) return [];
+    return ELEMENTS.filter(e => collection[e.name]);
+}
+
+// Get undiscovered elements
+export function getUndiscoveredElements(collection) {
+    if (!collection) return [...ELEMENTS];
+    return ELEMENTS.filter(e => !collection[e.name]);
+}
+
+// Get discovery percentage
+export function getDiscoveryPercentage(collection) {
+    if (!collection) return 0;
+    const discovered = Object.keys(collection).length;
+    return (discovered / ELEMENTS.length) * 100;
+}
+
+// ===== EXPORT =====
+export default {
+    ELEMENTS,
+    ELEMENT_LOCATIONS,
+    getElementByName,
+    getElementBySymbol,
+    getElementsByRarity,
+    getElementLocation,
+    getElementValue,
+    getElementColorClass,
+    getElementIcon,
+    getElementRarity,
+    getRarityCounts,
+    getAllElements,
+    getElementsByPlanet,
+    searchElements,
+    getRandomElementByRarity,
+    getRandomElement,
+    getTotalElementCount,
+    getDiscoveredElements,
+    getUndiscoveredElements,
+    getDiscoveryPercentage
+};
