@@ -1,1 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Real Estate</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .estate-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #4a9a8a;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .estate-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .estate-title {
+            font-family: 'WindSong', cursive;
+            font-size: 36px;
+            color: #c0e0ff;
+            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
+            margin-bottom: 4px;
+        }
+        
+        .estate-subtitle {
+            color: #a0d0c0;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .total-capacity {
+            font-size: 14px;
+            color: #a0d0c0;
+            text-align: right;
+        }
+        
+        /* Properties Section */
+        .section-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-family: 'WindSong', cursive;
+            border-bottom: 1px solid #4a9a8a;
+            padding-bottom: 8px;
+        }
+        
+        .properties-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .property-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 18px;
+            box-shadow: 0 0 20px #2a5a5a;
+        }
+        
+        .property-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .property-name {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .property-type {
+            color: #a0d0c0;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 30px;
+        }
+        
+        .property-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            color: #a0d0c0;
+            font-size: 14px;
+        }
+        
+        .property-capacity {
+            color: #ffd966;
+        }
+        
+        .property-date {
+            color: #4a9a8a;
+        }
+        
+        .capacity-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            border: 1px solid #4a9a8a;
+        }
+        
+        .capacity-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a9a8a, #7ac0b0);
+            transition: width 0.3s;
+        }
+        
+        .property-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .property-btn {
+            flex: 1;
+            background: rgba(74, 154, 138, 0.2);
+            border: 1px solid #4a9a8a;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .property-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.96);
+        }
+        
+        .property-btn.primary {
+            background: rgba(74, 154, 138, 0.4);
+            border-color: #7ac0b0;
+        }
+        
+        /* Available Properties */
+        .market-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .market-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .market-card:active {
+            background: rgba(50, 100, 110, 0.7);
+            transform: scale(0.99);
+        }
+        
+        .market-card.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        .market-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .market-name {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .market-price {
+            color: #ffd966;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .market-details {
+            display: flex;
+            gap: 20px;
+            color: #a0d0c0;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .market-capacity {
+            color: #4affaa;
+        }
+        
+        .market-desc {
+            color: #a0d0c0;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        
+        .purchase-btn {
+            width: 100%;
+            background: rgba(255, 170, 74, 0.2);
+            border: 1px solid #ffaa4a;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .purchase-btn:active {
+            background: #ffaa4a;
+            transform: scale(0.97);
+        }
+        
+        .purchase-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 60, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a9a8a;
+            font-style: italic;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 60, 70, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #6aa0a0;
+            color: #ffffff;
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #2a5a5a;
+            z-index: 100;
+            margin-top: 10px;
+        }
+        
+        .back-button:active {
+            background: #4a9a8a;
+            transform: translateX(-50%) scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="estate-view" id="estateView">
+            <!-- Header -->
+            <div class="estate-header">
+                <div class="estate-title">Real Estate</div>
+                <div class="estate-subtitle">✦ own your space ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> 5,000
+                </div>
+                <div class="total-capacity" id="totalCapacity">
+                    Total: 0/0
+                </div>
+            </div>
+            
+            <!-- Your Properties Section -->
+            <div class="section-title">✦ Your Properties</div>
+            <div class="properties-grid" id="propertiesContainer">
+                <!-- Filled by JavaScript -->
+            </div>
+            
+            <!-- Available Properties Section -->
+            <div class="section-title">✦ Available for Purchase</div>
+            <div class="market-grid" id="marketContainer">
+                <!-- Filled by JavaScript -->
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">processing...</div>
+            </div>
+        </div>
+    </div>
 
+    <script src="js/storage.js"></script>
+    
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a2a3a');
+            tg.setBackgroundColor('#0a2a3a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Navigation
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+        
+        function navigateTo(screen) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            loadingOverlay.classList.add('active');
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = screen;
+            }, 300);
+        }
+        
+        // ===== PROPERTY TYPES =====
+        const PROPERTY_TYPES = {
+            'storage_locker': {
+                name: 'Storage Locker',
+                capacity: 100,
+                price: 10000,
+                icon: '🔐',
+                desc: 'Basic personal storage unit. Perfect for getting started.'
+            },
+            'small_warehouse': {
+                name: 'Small Warehouse',
+                capacity: 500,
+                price: 50000,
+                icon: '🏢',
+                desc: 'Secure storage facility with climate control.'
+            },
+            'commercial_depot': {
+                name: 'Commercial Depot',
+                capacity: 2000,
+                price: 200000,
+                icon: '🏭',
+                desc: 'Industrial-sized warehouse for bulk storage.'
+            },
+            'orbital_platform': {
+                name: 'Orbital Platform',
+                capacity: 10000,
+                price: 1000000,
+                icon: '🛰️',
+                desc: 'Zero-G storage in orbit. Maximum capacity.'
+            }
+        };
+        
+        // ===== STORAGE HELPERS (if not in storage.js) =====
+        function getCredits() {
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+        }
+        
+        function saveCredits(credits) {
+            localStorage.setItem('voidfarer_credits', credits.toString());
+        }
+        
+        function getProperties() {
+            const data = localStorage.getItem('voidfarer_real_estate');
+            return data ? JSON.parse(data) : { properties: [] };
+        }
+        
+        function saveProperties(propertyData) {
+            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
+        }
+        
+        // ===== LOAD DATA =====
+        function loadData() {
+            const credits = getCredits();
+            const propertyData = getProperties();
+            
+            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+            
+            renderProperties(propertyData);
+            renderMarket(propertyData, credits);
+            updateTotalCapacity(propertyData);
+        }
+        
+        // ===== RENDER PROPERTIES =====
+        function renderProperties(propertyData) {
+            const container = document.getElementById('propertiesContainer');
+            container.innerHTML = '';
+            
+            if (!propertyData.properties || propertyData.properties.length === 0) {
+                container.innerHTML = '<div class="empty-state">You don\'t own any properties yet</div>';
+                return;
+            }
+            
+            propertyData.properties.forEach(prop => {
+                const propType = PROPERTY_TYPES[prop.type];
+                const usedPercent = (prop.used / prop.capacity) * 100;
+                
+                const card = document.createElement('div');
+                card.className = 'property-card';
+                card.innerHTML = `
+                    <div class="property-header">
+                        <span class="property-name">${prop.name}</span>
+                        <span class="property-type">${propType.icon} ${propType.name}</span>
+                    </div>
+                    <div class="property-details">
+                        <span>Capacity: <span class="property-capacity">${prop.used}/${prop.capacity}</span></span>
+                        <span class="property-date">Purchased: ${new Date(prop.purchaseDate).toLocaleDateString()}</span>
+                    </div>
+                    <div class="capacity-bar-bg">
+                        <div class="capacity-bar-fill" style="width: ${usedPercent}%"></div>
+                    </div>
+                    <div class="property-actions">
+                        <button class="property-btn" onclick="viewProperty('${prop.id}')">VIEW ITEMS</button>
+                        <button class="property-btn primary" onclick="transferToProperty('${prop.id}')">TRANSFER</button>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        // ===== RENDER MARKET =====
+        function renderMarket(propertyData, credits) {
+            const container = document.getElementById('marketContainer');
+            container.innerHTML = '';
+            
+            const ownedTypes = new Set((propertyData.properties || []).map(p => p.type));
+            
+            Object.keys(PROPERTY_TYPES).forEach(type => {
+                const prop = PROPERTY_TYPES[type];
+                const alreadyOwned = ownedTypes.has(type);
+                
+                const card = document.createElement('div');
+                card.className = `market-card ${alreadyOwned ? 'disabled' : ''}`;
+                
+                card.innerHTML = `
+                    <div class="market-header">
+                        <span class="market-name">${prop.icon} ${prop.name}</span>
+                        <span class="market-price">${prop.price.toLocaleString()}⭐</span>
+                    </div>
+                    <div class="market-details">
+                        <span class="market-capacity">📦 ${prop.capacity} units</span>
+                    </div>
+                    <div class="market-desc">${prop.desc}</div>
+                    <button class="purchase-btn" 
+                        onclick="purchaseProperty('${type}')" 
+                        ${alreadyOwned || credits < prop.price ? 'disabled' : ''}>
+                        ${alreadyOwned ? '✓ OWNED' : 'PURCHASE'}
+                    </button>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        // ===== UPDATE TOTAL CAPACITY =====
+        function updateTotalCapacity(propertyData) {
+            let totalCapacity = 0;
+            let totalUsed = 0;
+            
+            (propertyData.properties || []).forEach(prop => {
+                totalCapacity += prop.capacity;
+                totalUsed += prop.used || 0;
+            });
+            
+            document.getElementById('totalCapacity').textContent = `Total: ${totalUsed}/${totalCapacity}`;
+        }
+        
+        // ===== PURCHASE PROPERTY =====
+        function purchaseProperty(type) {
+            const propType = PROPERTY_TYPES[type];
+            if (!propType) return;
+            
+            let credits = getCredits();
+            
+            if (credits < propType.price) {
+                alert('Not enough credits!');
+                return;
+            }
+            
+            let propertyData = getProperties();
+            
+            // Check if already own this type
+            if (propertyData.properties?.some(p => p.type === type)) {
+                alert('You already own this type of property!');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                // Create new property
+                const newProp = {
+                    id: 'prop_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                    type: type,
+                    name: propType.name,
+                    capacity: propType.capacity,
+                    used: 0,
+                    purchaseDate: new Date().toISOString(),
+                    cost: propType.price,
+                    items: {}
+                };
+                
+                if (!propertyData.properties) {
+                    propertyData.properties = [];
+                }
+                
+                propertyData.properties.push(newProp);
+                saveProperties(propertyData);
+                
+                // Deduct credits
+                credits -= propType.price;
+                saveCredits(credits);
+                
+                // Reload
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+                
+                alert(`Successfully purchased ${propType.name}!`);
+            }, 500);
+        }
+        
+        // ===== PROPERTY ACTIONS =====
+        function viewProperty(propertyId) {
+            // Navigate to property detail view (could be a separate page)
+            alert(`View items in property ${propertyId}\n(This would show stored items)`);
+        }
+        
+        function transferToProperty(propertyId) {
+            // Navigate to transfer page
+            navigateTo(`property-transfer.html?property=${propertyId}`);
+        }
+        
+        // ===== INITIALIZE =====
+        function init() {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadData();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
