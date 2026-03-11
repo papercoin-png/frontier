@@ -9,7 +9,7 @@
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -87,10 +87,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #6a8ac0;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -110,11 +111,12 @@
         }
         
         .status-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 36px;
             color: #e0f0ff;
             text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
             margin-bottom: 5px;
+            font-weight: 600;
         }
         
         .status-subtitle {
@@ -173,11 +175,12 @@
         }
         
         .ship-name {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             color: #ffffff;
             margin-bottom: 15px;
             text-align: center;
+            font-weight: 600;
         }
         
         /* Stats Grid */
@@ -207,7 +210,7 @@
             color: #ffffff;
             font-size: 24px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .stat-unit {
@@ -306,7 +309,7 @@
             border-radius: 40px 15px 40px 15px;
             font-size: 18px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             margin-bottom: 15px;
         }
@@ -346,7 +349,7 @@
             color: #ffffff;
             font-size: 28px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .journal-stat-label {
@@ -475,7 +478,7 @@
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 10px;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .property-summary-stats {
@@ -543,7 +546,7 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 18px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             width: fit-content;
             box-shadow: 0 0 30px #3a5a8a;
@@ -736,24 +739,9 @@
         </div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getPlayer,
-            getShipFuel,
-            getShipPower,
-            getCredits,
-            getCollection,
-            getRealEstate,
-            getShipUpgrades,
-            spendCredits,
-            saveShipFuel,
-            setShipPower,
-            getTotalElementCount,
-            getUniqueElementsCount,
-            getLatestPrice
-        } from './js/storage.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -775,7 +763,7 @@
         let elements = [];
 
         // ===== TAB SWITCHING =====
-        window.switchTab = function(tabName) {
+        function switchTab(tabName) {
             document.getElementById('tabStatus').classList.remove('active');
             document.getElementById('tabJournal').classList.remove('active');
             document.getElementById('statusTab').classList.remove('active');
@@ -792,27 +780,27 @@
             }
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== NAVIGATION =====
-        window.returnToBridge = function() {
+        function returnToBridge() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
-        };
+        }
 
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
             try {
-                // Load all ship data in parallel
-                const [player, fuel, power, credits, collection, realEstate, upgrades] = await Promise.all([
-                    getPlayer(),
-                    getShipFuel(),
-                    getShipPower(),
-                    getCredits(),
-                    getCollection(),
-                    getRealEstate(),
-                    getShipUpgrades()
-                ]);
+                // Load all ship data
+                const player = typeof getPlayer === 'function' ? await getPlayer() : { ship: 'Prospector' };
+                const fuel = typeof getShipFuel === 'function' ? await getShipFuel() : 100;
+                const power = typeof getShipPower === 'function' ? await getShipPower() : 100;
+                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+                const collection = typeof getCollection === 'function' ? await getCollection() : {};
+                const realEstate = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
+                const upgrades = typeof getShipUpgrades === 'function' ? await getShipUpgrades() : {
+                    engine: 1, shields: 1, miningLaser: 1, cargoHold: 1, warpDrive: 1, scanner: 1
+                };
 
                 // Ship name
                 document.getElementById('shipName').textContent = player?.ship || 'Prospector';
@@ -847,7 +835,7 @@
                 let portfolioValue = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
-                    const marketPrice = await getLatestPrice(name) || 100;
+                    const marketPrice = typeof getLatestPrice === 'function' ? await getLatestPrice(name) : 100;
                     portfolioValue += count * marketPrice;
                 }
                 document.getElementById('portfolioValue').textContent = portfolioValue.toLocaleString();
@@ -928,9 +916,9 @@
         }
 
         // ===== REFUEL SHIP =====
-        window.refuelShip = async function() {
-            const credits = await getCredits();
-            const fuel = await getShipFuel();
+        async function refuelShip() {
+            const credits = typeof getCredits === 'function' ? await getCredits() : 0;
+            const fuel = typeof getShipFuel === 'function' ? await getShipFuel() : 100;
 
             if (fuel >= 100) {
                 alert('Fuel tank already full!');
@@ -946,9 +934,11 @@
             loadingText.textContent = 'refueling...';
 
             try {
-                const spent = await spendCredits(50);
+                const spent = typeof spendCredits === 'function' ? await spendCredits(50) : false;
                 if (spent) {
-                    await saveShipFuel(100);
+                    if (typeof saveShipFuel === 'function') {
+                        await saveShipFuel(100);
+                    }
                     await loadShipData();
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 }
@@ -958,12 +948,12 @@
             }
 
             loadingOverlay.classList.remove('active');
-        };
+        }
 
         // ===== REPAIR SHIP =====
-        window.repairShip = async function() {
-            const credits = await getCredits();
-            const power = await getShipPower();
+        async function repairShip() {
+            const credits = typeof getCredits === 'function' ? await getCredits() : 0;
+            const power = typeof getShipPower === 'function' ? await getShipPower() : 100;
 
             if (power >= 100) {
                 alert('Ship already at full power!');
@@ -979,9 +969,11 @@
             loadingText.textContent = 'repairing...';
 
             try {
-                const spent = await spendCredits(100);
+                const spent = typeof spendCredits === 'function' ? await spendCredits(100) : false;
                 if (spent) {
-                    await setShipPower(100);
+                    if (typeof setShipPower === 'function') {
+                        await setShipPower(100);
+                    }
                     await loadShipData();
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 }
@@ -991,7 +983,7 @@
             }
 
             loadingOverlay.classList.remove('active');
-        };
+        }
 
         // ===== JOURNAL TAB FUNCTIONS =====
         
@@ -1033,10 +1025,8 @@
         // Load journal data
         async function loadJournalData() {
             try {
-                const [collection, realEstate] = await Promise.all([
-                    getCollection(),
-                    getRealEstate()
-                ]);
+                const collection = typeof getCollection === 'function' ? await getCollection() : {};
+                const realEstate = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
 
                 const properties = realEstate.properties || [];
 
@@ -1047,7 +1037,7 @@
                 // Calculate ship cargo value
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
-                    const marketPrice = await getLatestPrice(name) || 100;
+                    const marketPrice = typeof getLatestPrice === 'function' ? await getLatestPrice(name) : 100;
                     const elementValue = count * marketPrice;
                     shipValue += elementValue;
 
@@ -1065,8 +1055,8 @@
                 propertyValue = properties.length * 10000; // Rough estimate
 
                 // Calculate stats
-                const totalElements = await getTotalElementCount();
-                const uniqueElements = await getUniqueElementsCount();
+                const totalElements = typeof getTotalElementCount === 'function' ? await getTotalElementCount() : 0;
+                const uniqueElements = typeof getUniqueElementsCount === 'function' ? await getUniqueElementsCount() : 0;
                 const completionPct = Math.round((uniqueElements / 118) * 100);
 
                 document.getElementById('totalElements').textContent = totalElements;
@@ -1187,7 +1177,7 @@
         }
 
         // Filter journal
-        window.filterJournal = function(rarity) {
+        function filterJournal(rarity) {
             // Update active filter pill
             document.querySelectorAll('.filter-pill').forEach(pill => {
                 pill.classList.remove('active');
@@ -1198,7 +1188,7 @@
             renderElements(elements);
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== INITIALIZE =====
         async function init() {
@@ -1208,22 +1198,14 @@
                 loadingText.textContent = 'loading ship systems...';
 
                 // Check for player data
-                const player = await getPlayer();
-                if (!player) {
+                const credits = typeof getCredits === 'function' ? await getCredits() : 0;
+                if (!credits) {
                     window.location.href = 'index.html';
                     return;
                 }
 
                 // Load ship data for status tab
                 await loadShipData();
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 // Hide loading
                 setTimeout(() => {
@@ -1242,5 +1224,11 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/market-dynamics.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
