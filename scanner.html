@@ -6,6 +6,8 @@
     <title>Voidfarer - Scanner</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -314,6 +316,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -369,6 +373,20 @@
             0% { left: -30%; }
             100% { left: 100%; }
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -384,7 +402,7 @@
             <div class="location-card">
                 <div class="location-info">
                     <div class="location-label">CURRENT LOCATION</div>
-                    <div class="location-name" id="currentLocation">Verdant Prime</div>
+                    <div class="location-name" id="currentLocation">Loading...</div>
                 </div>
                 <div class="scan-animation"></div>
             </div>
@@ -435,13 +453,27 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">scanning...</div>
+                <div class="loading-text" id="loadingText">scanning...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCurrentPlanet,
+            getCurrentStar,
+            getCurrentSector,
+            getPlayer,
+            addScan,
+            getScanHistory
+        } from './js/storage.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -449,31 +481,45 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
         const scanBtn = document.getElementById('scanBtn');
         const scannerSweep = document.getElementById('scannerSweep');
         const scanResults = document.getElementById('scanResults');
         const emptyState = document.getElementById('emptyState');
-        
-        // Navigation
-        function returnToBridge() {
+
+        // ===== STATE =====
+        let scanHistory = [];
+
+        // ===== NAVIGATION =====
+        window.returnToBridge = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
+        };
+
+        // ===== LOAD CURRENT LOCATION =====
+        async function loadCurrentLocation() {
+            try {
+                const [planet, star, sector] = await Promise.all([
+                    getCurrentPlanet(),
+                    getCurrentStar(),
+                    getCurrentSector()
+                ]);
+
+                document.getElementById('currentLocation').innerHTML = 
+                    `${planet || 'Verdant Prime'}<br><span style="font-size:12px; color:#a0c0ff;">${star || 'Sol'} • Sector ${sector || 'B2'}</span>`;
+
+            } catch (error) {
+                console.error('Error loading location:', error);
+                document.getElementById('currentLocation').innerHTML = 
+                    `Verdant Prime<br><span style="font-size:12px; color:#a0c0ff;">Sol • Sector B2</span>`;
+            }
         }
-        
-        // Load current location
-        function loadCurrentLocation() {
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-            const star = localStorage.getItem('voidfarer_current_star') || 'Sol';
-            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
-            
-            document.getElementById('currentLocation').innerHTML = 
-                `${planet}<br><span style="font-size:12px; color:#a0c0ff;">${star} • Sector ${sector}</span>`;
-        }
-        
-        // Resource database
+
+        // ===== RESOURCE DATABASE =====
         const resourceDatabase = {
             'Verdant Prime': [
                 { name: 'Carbon', icon: '⚫', chance: '85%', rarity: 'uncommon' },
@@ -489,145 +535,185 @@
                 { name: 'Uranium', icon: '🟣', chance: '8%', rarity: 'very-rare' },
                 { name: 'Iron', icon: '⚙️', chance: '62%', rarity: 'uncommon' }
             ],
+            'Pyros-Deep': [
+                { name: 'Uranium', icon: '🟣', chance: '35%', rarity: 'very-rare' },
+                { name: 'Plutonium', icon: '☢️', chance: '12%', rarity: 'very-rare' },
+                { name: 'Thorium', icon: '🔮', chance: '18%', rarity: 'very-rare' },
+                { name: 'Gold', icon: '🟡', chance: '25%', rarity: 'rare' },
+                { name: 'Copper', icon: '🔴', chance: '45%', rarity: 'rare' }
+            ],
             'Glacier-7': [
                 { name: 'Ice', icon: '❄️', chance: '95%', rarity: 'common' },
                 { name: 'Methane', icon: '💨', chance: '45%', rarity: 'uncommon' },
                 { name: 'Nitrogen', icon: '🌬️', chance: '38%', rarity: 'uncommon' },
-                { name: 'Uranium', icon: '🟣', chance: '5%', rarity: 'very-rare' }
+                { name: 'Uranium', icon: '🟣', chance: '5%', rarity: 'very-rare' },
+                { name: 'Hydrogen', icon: '💧', chance: '72%', rarity: 'common' }
             ],
             'Aether': [
                 { name: 'Helium', icon: '🎈', chance: '78%', rarity: 'common' },
                 { name: 'Hydrogen', icon: '💧', chance: '72%', rarity: 'common' },
-                { name: 'Methane', icon: '💨', chance: '34%', rarity: 'uncommon' }
+                { name: 'Methane', icon: '💨', chance: '34%', rarity: 'uncommon' },
+                { name: 'Promethium', icon: '✨', chance: '3%', rarity: 'legendary' }
+            ],
+            'Aether-Veil': [
+                { name: 'Promethium', icon: '✨', chance: '15%', rarity: 'legendary' },
+                { name: 'Technetium', icon: '🧪', chance: '8%', rarity: 'legendary' },
+                { name: 'Helium', icon: '🎈', chance: '65%', rarity: 'common' },
+                { name: 'Hydrogen', icon: '💧', chance: '60%', rarity: 'common' }
+            ],
+            'Europa': [
+                { name: 'Uranium', icon: '🟣', chance: '22%', rarity: 'very-rare' },
+                { name: 'Ice', icon: '❄️', chance: '88%', rarity: 'common' },
+                { name: 'Hydrogen', icon: '💧', chance: '75%', rarity: 'common' },
+                { name: 'Oxygen', icon: '💨', chance: '45%', rarity: 'uncommon' }
+            ],
+            'Titanis': [
+                { name: 'Promethium', icon: '✨', chance: '12%', rarity: 'legendary' },
+                { name: 'Titanium', icon: '🔷', chance: '55%', rarity: 'rare' },
+                { name: 'Iron', icon: '⚙️', chance: '68%', rarity: 'uncommon' },
+                { name: 'Nickel', icon: '🔩', chance: '42%', rarity: 'uncommon' }
             ]
         };
-        
-        // Anomaly database
+
+        // Default resources for unknown planets
+        const defaultResources = [
+            { name: 'Carbon', icon: '⚫', chance: '75%', rarity: 'uncommon' },
+            { name: 'Iron', icon: '⚙️', chance: '65%', rarity: 'uncommon' },
+            { name: 'Silicon', icon: '💎', chance: '60%', rarity: 'common' },
+            { name: 'Gold', icon: '🟡', chance: '15%', rarity: 'rare' }
+        ];
+
+        // ===== ANOMALY DATABASE =====
         const anomalyDatabase = [
             { name: 'Gravitational Distortion', icon: '🌀', desc: 'Unstable spacetime', distance: '0.8 LY' },
             { name: 'Energy Reading', icon: '⚡', desc: 'Unknown power source', distance: '1.2 LY' },
             { name: 'Derelict Vessel', icon: '🚀', desc: 'Ancient wreckage', distance: '2.5 LY' },
             { name: 'Magnetic Storm', icon: '🌪️', desc: 'Interference detected', distance: '0.3 LY' },
-            { name: 'Wormhole Signature', icon: '🌌', desc: 'Spatial anomaly', distance: '3.1 LY' }
+            { name: 'Wormhole Signature', icon: '🌌', desc: 'Spatial anomaly', distance: '3.1 LY' },
+            { name: 'Quantum Fluctuation', icon: '⚛️', desc: 'Reality不稳定', distance: '1.7 LY' },
+            { name: 'Dark Matter Cluster', icon: '⬛', desc: 'Invisible mass concentration', distance: '2.8 LY' },
+            { name: 'Neutrino Burst', icon: '💫', desc: 'High-energy particle emission', distance: '0.5 LY' }
         ];
-        
-        // Scan history
-        let scanHistory = JSON.parse(localStorage.getItem('voidfarer_scan_history')) || [];
-        
-        // Perform scan
-        function performScan() {
+
+        // ===== PERFORM SCAN =====
+        window.performScan = async function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            
+
             // Disable button during scan
             scanBtn.disabled = true;
             scanBtn.style.opacity = '0.5';
-            
+
             // Show scanner sweep
             scannerSweep.style.display = 'block';
-            
+
             // Hide empty state
             emptyState.style.display = 'none';
-            
+
             // Show loading
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
-                // Hide loading
-                loadingOverlay.classList.remove('active');
-                
+            loadingText.textContent = 'scanning...';
+
+            try {
+                // Simulate scan delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
                 // Get current planet
-                const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-                
+                const planet = await getCurrentPlanet();
+
                 // Get resources for this planet
-                const resources = resourceDatabase[planet] || resourceDatabase['Verdant Prime'];
-                
+                const resources = resourceDatabase[planet] || defaultResources;
+
                 // Get random anomalies (2-3 of them)
                 const anomalyCount = Math.floor(Math.random() * 2) + 2;
                 const anomalies = [];
                 const usedIndices = new Set();
-                
+
                 for (let i = 0; i < anomalyCount; i++) {
                     let index;
                     do {
                         index = Math.floor(Math.random() * anomalyDatabase.length);
-                    } while (usedIndices.has(index));
+                    } while (usedIndices.has(index) && usedIndices.size < anomalyDatabase.length);
                     usedIndices.add(index);
                     anomalies.push(anomalyDatabase[index]);
                 }
-                
+
                 // Render resources
                 renderResources(resources);
-                
+
                 // Render anomalies
                 renderAnomalies(anomalies);
-                
+
                 // Add to scan history
                 const scanTime = new Date().toLocaleTimeString();
-                scanHistory.unshift({
+                const scanRecord = {
+                    timestamp: Date.now(),
                     time: scanTime,
                     location: planet,
-                    resources: resources.length
-                });
-                
-                // Keep only last 5 scans
-                if (scanHistory.length > 5) {
-                    scanHistory = scanHistory.slice(0, 5);
-                }
-                
-                localStorage.setItem('voidfarer_scan_history', JSON.stringify(scanHistory));
-                
-                // Render history
-                renderHistory();
-                
+                    resources: resources.length,
+                    anomalies: anomalies.length
+                };
+
+                await addScan(scanRecord);
+
+                // Load updated history
+                await loadScanHistory();
+
                 // Show results
                 scanResults.style.display = 'block';
-                
-                // Hide scanner sweep
-                scannerSweep.style.display = 'none';
-                
-                // Re-enable button
-                scanBtn.disabled = false;
-                scanBtn.style.opacity = '1';
-                
+
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            }, 2000);
-        }
-        
-        // Render resources
+
+            } catch (error) {
+                console.error('Scan error:', error);
+                alert('Scan failed. Please try again.');
+            }
+
+            // Hide scanner sweep
+            scannerSweep.style.display = 'none';
+
+            // Re-enable button
+            scanBtn.disabled = false;
+            scanBtn.style.opacity = '1';
+
+            // Hide loading
+            loadingOverlay.classList.remove('active');
+        };
+
+        // ===== RENDER RESOURCES =====
         function renderResources(resources) {
             const grid = document.getElementById('resourcesGrid');
             grid.innerHTML = '';
-            
+
             resources.forEach(resource => {
                 const card = document.createElement('div');
                 card.className = 'resource-card';
-                
+
                 let rarityClass = 'rarity-common';
                 if (resource.rarity === 'uncommon') rarityClass = 'rarity-uncommon';
                 else if (resource.rarity === 'rare') rarityClass = 'rarity-rare';
                 else if (resource.rarity === 'very-rare') rarityClass = 'rarity-very-rare';
                 else if (resource.rarity === 'legendary') rarityClass = 'rarity-legendary';
-                
+
                 card.innerHTML = `
                     <div class="resource-icon">${resource.icon}</div>
                     <div class="resource-name">${resource.name}</div>
                     <div class="resource-chance">${resource.chance}</div>
                     <div class="resource-rarity ${rarityClass}">${resource.rarity}</div>
                 `;
-                
+
                 grid.appendChild(card);
             });
         }
-        
-        // Render anomalies
+
+        // ===== RENDER ANOMALIES =====
         function renderAnomalies(anomalies) {
             const list = document.getElementById('anomaliesList');
             list.innerHTML = '';
-            
+
             anomalies.forEach(anomaly => {
                 const card = document.createElement('div');
                 card.className = 'anomaly-card';
-                
+
                 card.innerHTML = `
                     <div class="anomaly-icon">${anomaly.icon}</div>
                     <div class="anomaly-info">
@@ -636,69 +722,115 @@
                     </div>
                     <div class="anomaly-distance">${anomaly.distance}</div>
                 `;
-                
+
                 list.appendChild(card);
             });
         }
-        
-        // Render scan history
+
+        // ===== LOAD SCAN HISTORY =====
+        async function loadScanHistory() {
+            try {
+                const history = await getScanHistory();
+                scanHistory = history;
+
+                renderHistory();
+            } catch (error) {
+                console.error('Error loading scan history:', error);
+            }
+        }
+
+        // ===== RENDER SCAN HISTORY =====
         function renderHistory() {
             const list = document.getElementById('historyList');
             list.innerHTML = '';
-            
+
             if (scanHistory.length === 0) {
                 list.innerHTML = '<div style="color:#a0c0ff; text-align:center; padding:15px;">No previous scans</div>';
                 return;
             }
-            
-            scanHistory.forEach(scan => {
+
+            scanHistory.slice(0, 5).forEach(scan => {
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 item.innerHTML = `
-                    <span>${scan.location}</span>
-                    <span>${scan.resources} resources</span>
-                    <span class="history-time">${scan.time}</span>
+                    <span>${scan.location || 'Unknown'}</span>
+                    <span>${scan.resources || 0} resources</span>
+                    <span class="history-time">${scan.time || ''}</span>
                 `;
                 list.appendChild(item);
             });
         }
-        
-        // Check for existing scan history on load
-        function checkExistingHistory() {
+
+        // ===== CHECK FOR EXISTING SCAN HISTORY =====
+        async function checkExistingHistory() {
+            await loadScanHistory();
+
             if (scanHistory.length > 0) {
                 // Show the last scan results
                 const lastScan = scanHistory[0];
                 const planet = lastScan.location;
-                const resources = resourceDatabase[planet] || resourceDatabase['Verdant Prime'];
-                
+                const resources = resourceDatabase[planet] || defaultResources;
+
                 renderResources(resources);
-                
+
                 // Generate some anomalies for demo
                 const anomalies = [
                     anomalyDatabase[0],
                     anomalyDatabase[2]
                 ];
                 renderAnomalies(anomalies);
-                
-                renderHistory();
-                
+
                 scanResults.style.display = 'block';
                 emptyState.style.display = 'none';
             }
         }
-        
-        // Initialize
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'calibrating scanner...';
+
+                // Check for player data
+                const player = await getPlayer();
+                if (!player) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load current location
+                await loadCurrentLocation();
+
+                // Load scan history
+                await loadScanHistory();
+
+                // Check for existing history
+                await checkExistingHistory();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            loadCurrentLocation();
-            checkExistingHistory();
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
