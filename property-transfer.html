@@ -6,6 +6,8 @@
     <title>Voidfarer - Transfer Items</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -63,6 +65,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -71,21 +75,21 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a9a8a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
+            text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #4a9a8a;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
         
         @keyframes spin {
@@ -326,6 +330,20 @@
             background: #4a9a8a;
             transform: translateX(-50%) scale(0.98);
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -354,7 +372,7 @@
             
             <!-- Items Grid -->
             <div class="items-grid" id="itemsGrid">
-                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading items...</div>
             </div>
             
             <!-- Quick Actions -->
@@ -369,15 +387,26 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">transferring...</div>
+                <div class="loading-text" id="loadingText">transferring...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCollection,
+            getRealEstate,
+            getPlayer,
+            transferToProperty as storageTransferToProperty,
+            transferFromProperty as storageTransferFromProperty
+        } from './js/storage.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -385,132 +414,147 @@
             tg.setHeaderColor('#0a2a3a');
             tg.setBackgroundColor('#0a2a3a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Get property ID from URL
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
+        // ===== GET PROPERTY ID FROM URL =====
         const urlParams = new URLSearchParams(window.location.search);
         const propertyId = urlParams.get('property');
-        
-        // State
+
+        // ===== STATE =====
         let currentProperty = null;
         let shipItems = [];
         let propertyItems = [];
         let currentDirection = 'toProperty'; // 'toProperty' or 'toShip'
-        
-        // Element icons database
+        let propertyData = null;
+
+        // ===== ELEMENT ICONS DATABASE =====
         const elementIcons = {
             'Carbon': '⚫', 'Silicon': '💎', 'Hydrogen': '💧', 'Helium': '🎈',
             'Iron': '⚙️', 'Oxygen': '💨', 'Nickel': '🔩', 'Gold': '🟡',
             'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷', 'Uranium': '🟣',
-            'Promethium': '✨', 'Technetium': '🧪', 'Astatine': '☣️'
+            'Promethium': '✨', 'Technetium': '🧪', 'Astatine': '☣️',
+            'Sodium': '🧂', 'Lithium': '🔋', 'Magnesium': '✨',
+            'Sulfur': '🟡', 'Copper': '🔴', 'Lead': '🔘', 'Mercury': '💧',
+            'Thorium': '🔮', 'Plutonium': '☢️'
         };
-        
-        // Navigation
-        function returnToRealEstate() {
+
+        // ===== NAVIGATION =====
+        window.returnToRealEstate = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'real-estate.html';
-        }
-        
-        // ===== STORAGE HELPERS =====
-        function getCollection() {
-            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-        }
-        
-        function saveCollection(collection) {
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-        }
-        
-        function getProperties() {
-            const data = localStorage.getItem('voidfarer_real_estate');
-            return data ? JSON.parse(data) : { properties: [] };
-        }
-        
-        function saveProperties(propertyData) {
-            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
-        }
-        
+        };
+
         // ===== LOAD DATA =====
-        function loadData() {
-            if (!propertyId) {
-                alert('No property selected');
-                returnToRealEstate();
-                return;
+        async function loadData() {
+            try {
+                if (!propertyId) {
+                    alert('No property selected');
+                    returnToRealEstate();
+                    return;
+                }
+
+                // Load all data in parallel
+                const [collection, propertyDataResult] = await Promise.all([
+                    getCollection(),
+                    getRealEstate()
+                ]);
+
+                propertyData = propertyDataResult;
+                currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+
+                if (!currentProperty) {
+                    alert('Property not found');
+                    returnToRealEstate();
+                    return;
+                }
+
+                // Initialize items if not exists
+                if (!currentProperty.items) {
+                    currentProperty.items = {};
+                }
+
+                // Calculate used space
+                const propertyUsed = Object.values(currentProperty.items).reduce((sum, item) => sum + (item.count || 0), 0);
+                currentProperty.used = propertyUsed;
+
+                // Update UI
+                document.getElementById('propertyName').textContent = currentProperty.name;
+                document.getElementById('propertyUsed').textContent = propertyUsed;
+                document.getElementById('propertyCapacity').textContent = currentProperty.capacity;
+
+                // Load items
+                loadItems(collection);
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('itemsGrid').innerHTML = 
+                    '<div class="empty-state">Error loading items</div>';
             }
-            
-            const propertyData = getProperties();
-            currentProperty = propertyData.properties?.find(p => p.id === propertyId);
-            
-            if (!currentProperty) {
-                alert('Property not found');
-                returnToRealEstate();
-                return;
-            }
-            
-            // Initialize items if not exists
-            if (!currentProperty.items) {
-                currentProperty.items = {};
-            }
-            
-            // Calculate used space
-            const propertyUsed = Object.values(currentProperty.items).reduce((sum, item) => sum + (item.count || 0), 0);
-            currentProperty.used = propertyUsed;
-            
-            // Update UI
-            document.getElementById('propertyName').textContent = currentProperty.name;
-            document.getElementById('propertyUsed').textContent = propertyUsed;
-            document.getElementById('propertyCapacity').textContent = currentProperty.capacity;
-            
-            // Load items
-            loadItems();
         }
-        
+
         // ===== LOAD ITEMS =====
-        function loadItems() {
-            const collection = getCollection();
-            
+        function loadItems(collection) {
             shipItems = Object.keys(collection).map(name => ({
                 name: name,
                 count: collection[name].count || 1,
                 icon: elementIcons[name] || '🔹'
             }));
-            
+
             propertyItems = Object.keys(currentProperty.items || {}).map(name => ({
                 name: name,
                 count: currentProperty.items[name].count || 1,
                 icon: elementIcons[name] || '🔹'
             }));
-            
+
             renderItems();
         }
-        
+
         // ===== RENDER ITEMS =====
         function renderItems() {
             const grid = document.getElementById('itemsGrid');
             grid.innerHTML = '';
-            
+
             const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
             const targetItems = currentDirection === 'toProperty' ? propertyItems : shipItems;
-            const targetCapacity = currentDirection === 'toProperty' ? currentProperty.capacity : Infinity;
+            
+            const collection = currentDirection === 'toProperty' ? 
+                shipItems.reduce((acc, item) => ({ ...acc, [item.name]: item }), {}) :
+                propertyItems.reduce((acc, item) => ({ ...acc, [item.name]: item }), {});
+
             const targetUsed = currentDirection === 'toProperty' ? 
                 (currentProperty.used || 0) : 
-                Object.values(getCollection()).reduce((sum, item) => sum + (item.count || 0), 0);
-            
+                shipItems.reduce((sum, item) => sum + item.count, 0);
+
+            const targetCapacity = currentDirection === 'toProperty' ? 
+                currentProperty.capacity : 
+                Infinity; // Ship has no capacity limit in this view
+
             if (sourceItems.length === 0) {
                 grid.innerHTML = '<div class="empty-state">No items available to transfer</div>';
                 return;
             }
-            
+
             sourceItems.sort((a, b) => a.name.localeCompare(b.name));
-            
+
             sourceItems.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'item-card';
-                
+
                 const availableSpace = targetCapacity - targetUsed;
                 const maxTransfer = Math.min(item.count, availableSpace);
-                
+
                 card.innerHTML = `
                     <div class="item-icon">${item.icon}</div>
                     <div class="item-info">
@@ -518,7 +562,7 @@
                         <div class="item-quantity">Available: ${item.count}</div>
                     </div>
                     <div class="item-controls">
-                        <input type="number" class="quantity-input" id="qty_${item.name}" value="1" min="1" max="${item.count}" ${maxTransfer <= 0 ? 'disabled' : ''}>
+                        <input type="number" class="quantity-input" id="qty_${item.name.replace(/\s/g, '_')}" value="1" min="1" max="${item.count}" ${maxTransfer <= 0 ? 'disabled' : ''}>
                         <button class="transfer-item-btn" 
                             onclick="transferItem('${item.name}')"
                             ${maxTransfer <= 0 ? 'disabled' : ''}>
@@ -526,237 +570,204 @@
                         </button>
                     </div>
                 `;
-                
+
                 grid.appendChild(card);
             });
         }
-        
+
         // ===== SET TRANSFER DIRECTION =====
-        function setDirection(direction) {
+        window.setDirection = async function(direction) {
             currentDirection = direction;
-            
+
             document.getElementById('toPropertyBtn').classList.remove('active');
             document.getElementById('toShipBtn').classList.remove('active');
-            
+
             if (direction === 'toProperty') {
                 document.getElementById('toPropertyBtn').classList.add('active');
             } else {
                 document.getElementById('toShipBtn').classList.add('active');
             }
-            
-            loadItems();
-            
+
+            // Reload data to refresh items
+            const collection = await getCollection();
+            loadItems(collection);
+
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== TRANSFER ITEM =====
-        function transferItem(itemName) {
-            const qtyInput = document.getElementById(`qty_${itemName}`);
-            const quantity = parseInt(qtyInput.value);
+        window.transferItem = async function(itemName) {
+            const safeName = itemName.replace(/\s/g, '_');
+            const qtyInput = document.getElementById(`qty_${safeName}`);
             
+            if (!qtyInput) {
+                console.error('Input not found for:', itemName);
+                return;
+            }
+
+            const quantity = parseInt(qtyInput.value);
+
             if (!quantity || quantity < 1) {
                 alert('Please enter a valid quantity');
                 return;
             }
-            
+
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
+            loadingText.textContent = 'transferring...';
+
+            try {
+                let result;
+                
                 if (currentDirection === 'toProperty') {
-                    transferToProperty(itemName, quantity);
+                    result = await storageTransferToProperty(propertyId, itemName, quantity);
                 } else {
-                    transferToShip(itemName, quantity);
+                    result = await storageTransferFromProperty(propertyId, itemName, quantity);
                 }
-                
-                // Reload data
-                loadData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-            }, 300);
-        }
-        
-        // ===== TRANSFER TO PROPERTY =====
-        function transferToProperty(itemName, quantity) {
-            const collection = getCollection();
-            const propertyData = getProperties();
-            const property = propertyData.properties.find(p => p.id === propertyId);
-            
-            if (!property) return;
-            
-            // Check if ship has enough
-            if (!collection[itemName] || collection[itemName].count < quantity) {
-                alert('Not enough items in ship cargo');
-                return;
+
+                if (result.success) {
+                    // Reload data
+                    const collection = await getCollection();
+                    const propertyDataResult = await getRealEstate();
+                    
+                    propertyData = propertyDataResult;
+                    currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+                    
+                    if (currentProperty) {
+                        const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                        currentProperty.used = propertyUsed;
+                        
+                        document.getElementById('propertyUsed').textContent = propertyUsed;
+                    }
+
+                    loadItems(collection);
+
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Transfer failed: ' + (result.reason || 'unknown error'));
+                }
+
+            } catch (error) {
+                console.error('Transfer error:', error);
+                alert('Error during transfer');
             }
-            
-            // Check property capacity
-            const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-            if (currentUsed + quantity > property.capacity) {
-                alert('Not enough space in property');
-                return;
-            }
-            
-            // Remove from ship
-            collection[itemName].count -= quantity;
-            if (collection[itemName].count <= 0) {
-                delete collection[itemName];
-            }
-            saveCollection(collection);
-            
-            // Add to property
-            if (!property.items) property.items = {};
-            if (!property.items[itemName]) {
-                property.items[itemName] = { count: quantity };
-            } else {
-                property.items[itemName].count += quantity;
-            }
-            
-            // Update used space
-            property.used = (property.used || 0) + quantity;
-            
-            saveProperties(propertyData);
-        }
-        
-        // ===== TRANSFER TO SHIP =====
-        function transferToShip(itemName, quantity) {
-            const collection = getCollection();
-            const propertyData = getProperties();
-            const property = propertyData.properties.find(p => p.id === propertyId);
-            
-            if (!property) return;
-            
-            // Check if property has enough
-            if (!property.items[itemName] || property.items[itemName].count < quantity) {
-                alert('Not enough items in property');
-                return;
-            }
-            
-            // Add to ship
-            if (!collection[itemName]) {
-                collection[itemName] = { count: quantity, firstFound: new Date().toISOString() };
-            } else {
-                collection[itemName].count += quantity;
-            }
-            saveCollection(collection);
-            
-            // Remove from property
-            property.items[itemName].count -= quantity;
-            if (property.items[itemName].count <= 0) {
-                delete property.items[itemName];
-            }
-            
-            // Update used space
-            property.used = (property.used || 0) - quantity;
-            
-            saveProperties(propertyData);
-        }
-        
+
+            loadingOverlay.classList.remove('active');
+        };
+
         // ===== MOVE ALL ITEMS =====
-        function moveAll() {
+        window.moveAll = async function() {
             const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
-            
+
             if (sourceItems.length === 0) {
                 alert('No items to move');
                 return;
             }
-            
+
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
-                if (currentDirection === 'toProperty') {
-                    // Move all ship items to property
-                    const collection = getCollection();
-                    const propertyData = getProperties();
-                    const property = propertyData.properties.find(p => p.id === propertyId);
+            loadingText.textContent = 'moving all items...';
+
+            try {
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const item of sourceItems) {
+                    const quantity = item.count;
                     
-                    if (!property) return;
-                    
-                    let totalToMove = Object.values(collection).reduce((sum, item) => sum + (item.count || 0), 0);
-                    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-                    
-                    if (currentUsed + totalToMove > property.capacity) {
-                        alert('Not enough space in property');
-                        loadingOverlay.classList.remove('active');
-                        return;
+                    let result;
+                    if (currentDirection === 'toProperty') {
+                        result = await storageTransferToProperty(propertyId, item.name, quantity);
+                    } else {
+                        result = await storageTransferFromProperty(propertyId, item.name, quantity);
                     }
-                    
-                    // Move all items
-                    Object.keys(collection).forEach(itemName => {
-                        const quantity = collection[itemName].count;
-                        
-                        if (!property.items) property.items = {};
-                        if (!property.items[itemName]) {
-                            property.items[itemName] = { count: quantity };
-                        } else {
-                            property.items[itemName].count += quantity;
-                        }
-                    });
-                    
-                    // Clear ship
-                    saveCollection({});
-                    
-                    // Update property used space
-                    property.used = (property.used || 0) + totalToMove;
-                    
-                    saveProperties(propertyData);
-                    
-                } else {
-                    // Move all property items to ship
-                    const collection = getCollection();
-                    const propertyData = getProperties();
-                    const property = propertyData.properties.find(p => p.id === propertyId);
-                    
-                    if (!property) return;
-                    
-                    // Move all items
-                    Object.keys(property.items || {}).forEach(itemName => {
-                        const quantity = property.items[itemName].count;
-                        
-                        if (!collection[itemName]) {
-                            collection[itemName] = { count: quantity, firstFound: new Date().toISOString() };
-                        } else {
-                            collection[itemName].count += quantity;
-                        }
-                    });
-                    
-                    saveCollection(collection);
-                    
-                    // Clear property
-                    property.items = {};
-                    property.used = 0;
-                    
-                    saveProperties(propertyData);
+
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                        console.warn(`Failed to transfer ${item.name}:`, result.reason);
+                    }
                 }
-                
-                loadData();
-                
+
+                // Reload data
+                const collection = await getCollection();
+                const propertyDataResult = await getRealEstate();
+
+                propertyData = propertyDataResult;
+                currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+
+                if (currentProperty) {
+                    const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                    currentProperty.used = propertyUsed;
+                    document.getElementById('propertyUsed').textContent = propertyUsed;
+                }
+
+                loadItems(collection);
+
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-            }, 500);
-        }
-        
+                
+                if (failCount > 0) {
+                    alert(`Moved ${successCount} items, ${failCount} failed`);
+                } else {
+                    alert(`Successfully moved ${successCount} items`);
+                }
+
+            } catch (error) {
+                console.error('Move all error:', error);
+                alert('Error during bulk transfer');
+            }
+
+            loadingOverlay.classList.remove('active');
+        };
+
         // ===== RESET QUANTITIES =====
-        function resetQuantities() {
+        window.resetQuantities = function() {
             const inputs = document.querySelectorAll('.quantity-input');
             inputs.forEach(input => {
                 input.value = '1';
             });
-            
+
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading transfer interface...';
+
+                // Check for player data
+                const player = await getPlayer();
+                if (!player) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Check if property ID exists
+                if (!propertyId) {
+                    alert('No property selected');
+                    window.location.href = 'real-estate.html';
+                    return;
+                }
+
+                // Load data
+                await loadData();
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'real-estate.html';
+                }, 2000);
             }
-            
-            loadData();
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
