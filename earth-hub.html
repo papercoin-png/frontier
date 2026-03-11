@@ -371,6 +371,11 @@
             transform: scale(0.95);
         }
         
+        .group-action-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
         /* Quick Sell Bar */
         .quick-sell {
             display: flex;
@@ -396,6 +401,11 @@
         .quick-sell-btn:active {
             background: #ffaa4a;
             transform: scale(0.96);
+        }
+        
+        .quick-sell-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
         }
         
         /* Total Value Row */
@@ -517,11 +527,11 @@
             <!-- Stats Bar -->
             <div class="stats-bar" id="statsBar">
                 <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> 12,450
+                    <span>⭐</span> 5,000
                 </div>
                 <div class="cargo-value" id="cargoDisplay">
-                    Cargo: 45/100<br>
-                    47 items
+                    Cargo: 0/100<br>
+                    0 items
                 </div>
             </div>
             
@@ -545,16 +555,16 @@
                 
                 <!-- Quick Sell Bar -->
                 <div class="quick-sell">
-                    <button class="quick-sell-btn" onclick="quickSell(100)">100⭐</button>
-                    <button class="quick-sell-btn" onclick="quickSell(500)">500⭐</button>
-                    <button class="quick-sell-btn" onclick="quickSell(1000)">1000⭐</button>
-                    <button class="quick-sell-btn" onclick="quickSell('all')">ALL</button>
+                    <button class="quick-sell-btn" id="quickSell100" onclick="quickSell(100)">100⭐</button>
+                    <button class="quick-sell-btn" id="quickSell500" onclick="quickSell(500)">500⭐</button>
+                    <button class="quick-sell-btn" id="quickSell1000" onclick="quickSell(1000)">1000⭐</button>
+                    <button class="quick-sell-btn" id="quickSellAll" onclick="quickSell('all')">ALL</button>
                 </div>
                 
                 <!-- Total Value Row -->
                 <div class="total-row">
                     <span class="total-label">Your Credits:</span>
-                    <span class="total-amount" id="creditsAmount">12,450⭐</span>
+                    <span class="total-amount" id="creditsAmount">5,000⭐</span>
                 </div>
             </div>
             
@@ -631,12 +641,14 @@
             'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
             'Helium': { icon: '🎈', rarity: 'common', value: 100 },
             'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
+            'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
             
             // Uncommon
             'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
             'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
             'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
             'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
+            'Magnesium': { icon: '✨', rarity: 'uncommon', value: 250 },
             
             // Rare
             'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
@@ -652,31 +664,48 @@
             
             // Legendary
             'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
-            'Technetium': { icon: '🧪', rarity: 'legendary', value: 25000 }
+            'Technetium': { icon: '🧪', rarity: 'legendary', value: 25000 },
+            'Astatine': { icon: '☣️', rarity: 'legendary', value: 25000 }
         };
         
         // State
         let expandedGroup = null;
-        let collection = {};
-        let credits = 0;
         
-        // Load data
+        // ===== STORAGE HELPERS =====
+        function getCollection() {
+            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+        }
+        
+        function saveCollection(collection) {
+            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+        }
+        
+        function getCredits() {
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+        }
+        
+        function saveCredits(credits) {
+            localStorage.setItem('voidfarer_credits', credits.toString());
+        }
+        
+        // ===== LOAD DATA =====
         function loadData() {
-            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-            credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
+            const collection = getCollection();
+            const credits = getCredits();
             
+            // Update header
             document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
             document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
             
             const itemCount = Object.keys(collection).length;
-            const cargoUsed = Math.min(itemCount * 2, 100);
-            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${cargoUsed}/100<br>${itemCount} items`;
+            const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
+            document.getElementById('cargoDisplay').innerHTML = `Cargo: ${totalItems}/100<br>${itemCount} items`;
             
-            renderMarket();
+            renderMarket(collection);
         }
         
-        // Group elements by rarity
-        function groupElements() {
+        // ===== GROUP ELEMENTS BY RARITY =====
+        function groupElements(collection) {
             const groups = {
                 common: { name: 'Common', elements: [], totalCount: 0, totalValue: 0 },
                 uncommon: { name: 'Uncommon', elements: [], totalCount: 0, totalValue: 0 },
@@ -709,9 +738,9 @@
             return groups;
         }
         
-        // Render market
-        function renderMarket() {
-            const groups = groupElements();
+        // ===== RENDER MARKET =====
+        function renderMarket(collection) {
+            const groups = groupElements(collection);
             const container = document.getElementById('marketGroups');
             container.innerHTML = '';
             
@@ -731,7 +760,10 @@
                 // Group Header
                 const header = document.createElement('div');
                 header.className = `group-header ${expandedGroup === rarity ? 'expanded' : ''}`;
-                header.onclick = () => toggleGroup(rarity);
+                header.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleGroup(rarity);
+                };
                 
                 let rarityColor = 'rarity-common';
                 if (rarity === 'uncommon') rarityColor = 'rarity-uncommon';
@@ -767,7 +799,7 @@
                         </div>
                         <div class="item-actions">
                             <span class="item-price">${element.value}⭐</span>
-                            <button class="sell-btn small" onclick="sellElement('${element.name}', 1, event)">SELL</button>
+                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, event)">SELL</button>
                         </div>
                     `;
                     itemsDiv.appendChild(itemRow);
@@ -776,10 +808,14 @@
                 // Group Actions
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'group-actions';
+                
+                // Check if group has items to enable/disable buttons
+                const hasItems = group.totalCount > 0;
+                
                 actionsDiv.innerHTML = `
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 1, event)">SELL 1</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'half', event)">SELL HALF</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'all', event)">SELL ALL</button>
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 1, event)" ${!hasItems ? 'disabled' : ''}>SELL 1</button>
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'half', event)" ${!hasItems ? 'disabled' : ''}>SELL HALF</button>
+                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'all', event)" ${!hasItems ? 'disabled' : ''}>SELL ALL</button>
                 `;
                 itemsDiv.appendChild(actionsDiv);
                 
@@ -788,48 +824,58 @@
             });
             
             document.getElementById('totalMarketValue').textContent = totalMarketValue.toLocaleString() + '⭐';
+            
+            // Enable/disable quick sell buttons based on total value
+            const hasAnyItems = totalMarketValue > 0;
+            document.getElementById('quickSell100').disabled = !hasAnyItems;
+            document.getElementById('quickSell500').disabled = !hasAnyItems;
+            document.getElementById('quickSell1000').disabled = !hasAnyItems;
+            document.getElementById('quickSellAll').disabled = !hasAnyItems;
         }
         
-        // Toggle group expansion
+        // ===== TOGGLE GROUP =====
         function toggleGroup(rarity) {
             if (expandedGroup === rarity) {
                 expandedGroup = null;
             } else {
                 expandedGroup = rarity;
             }
-            renderMarket();
+            loadData(); // Reload to reflect expanded state
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
-        // Sell single element
-        function sellElement(elementName, quantity, event) {
+        // ===== SELL SINGLE ITEM =====
+        function sellItem(elementName, quantity, event) {
             if (event) event.stopPropagation();
             
-            const element = collection[elementName];
-            if (!element) return;
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
+            
+            // Check if player actually has the item
+            if (!collection[elementName] || collection[elementName].count < quantity) {
+                alert('Not enough items to sell!');
+                return;
+            }
             
             const elementData = elementDatabase[elementName] || { value: 100 };
-            const available = element.count || 1;
-            const sellQuantity = Math.min(quantity, available);
-            
-            if (sellQuantity <= 0) return;
+            const earnings = quantity * elementData.value;
             
             loadingOverlay.classList.add('active');
             
             setTimeout(() => {
-                // Update collection
-                element.count -= sellQuantity;
-                if (element.count <= 0) {
+                // Remove from collection
+                collection[elementName].count -= quantity;
+                if (collection[elementName].count <= 0) {
                     delete collection[elementName];
                 }
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                saveCollection(collection);
                 
-                // Update credits
-                const earnings = sellQuantity * elementData.value;
+                // Add credits
                 credits += earnings;
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                saveCredits(credits);
                 
-                // Refresh display
+                // Reload display
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -837,19 +883,31 @@
             }, 300);
         }
         
-        // Sell entire group
+        // ===== SELL ENTIRE GROUP =====
         function sellGroup(rarity, quantity, event) {
             if (event) event.stopPropagation();
             
-            const groups = groupElements();
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
+            
+            const groups = groupElements(collection);
             const group = groups[rarity];
-            if (!group || group.elements.length === 0) return;
+            
+            if (!group || group.elements.length === 0) {
+                alert('No items to sell');
+                return;
+            }
+            
+            let totalEarnings = 0;
+            let itemsToRemove = [];
             
             loadingOverlay.classList.add('active');
             
             setTimeout(() => {
                 group.elements.forEach(element => {
                     let sellQuantity = 0;
+                    
                     if (quantity === 'all') {
                         sellQuantity = element.count;
                     } else if (quantity === 'half') {
@@ -860,78 +918,108 @@
                     
                     if (sellQuantity > 0) {
                         collection[element.name].count -= sellQuantity;
+                        totalEarnings += sellQuantity * element.value;
+                        
                         if (collection[element.name].count <= 0) {
                             delete collection[element.name];
                         }
-                        credits += sellQuantity * element.value;
                     }
                 });
                 
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                // Save changes
+                saveCollection(collection);
+                credits += totalEarnings;
+                saveCredits(credits);
                 
+                // Reload display
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
+                
+                if (totalEarnings > 0) {
+                    alert(`Sold for ${totalEarnings}⭐`);
+                }
             }, 300);
         }
         
-        // Quick sell by credit amount
+        // ===== QUICK SELL =====
         function quickSell(amount) {
-            const groups = groupElements();
-            let totalEarned = 0;
-            let itemsToRemove = [];
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
             
             // Flatten all elements
             const allElements = [];
-            Object.values(groups).forEach(group => {
-                group.elements.forEach(element => {
-                    allElements.push(element);
+            Object.keys(collection).forEach(name => {
+                const elementData = elementDatabase[name] || { value: 100 };
+                allElements.push({
+                    name: name,
+                    count: collection[name].count,
+                    value: elementData.value
                 });
             });
             
+            if (allElements.length === 0) {
+                alert('No items to sell');
+                return;
+            }
+            
             // Sort by value (lowest first) to sell cheapest first
             allElements.sort((a, b) => a.value - b.value);
+            
+            let remaining = amount === 'all' ? Infinity : amount;
+            let totalEarned = 0;
             
             loadingOverlay.classList.add('active');
             
             setTimeout(() => {
                 for (let element of allElements) {
+                    if (remaining <= 0) break;
+                    
                     if (amount === 'all') {
                         // Sell everything
-                        totalEarned += element.totalValue;
+                        totalEarned += element.count * element.value;
                         delete collection[element.name];
                     } else {
                         // Sell until we reach the amount
-                        const maxCanSell = Math.floor(amount / element.value);
+                        const maxCanSell = Math.floor(remaining / element.value);
                         const sellQuantity = Math.min(maxCanSell, element.count);
                         
                         if (sellQuantity > 0) {
                             totalEarned += sellQuantity * element.value;
                             collection[element.name].count -= sellQuantity;
+                            remaining -= sellQuantity * element.value;
+                            
                             if (collection[element.name].count <= 0) {
                                 delete collection[element.name];
                             }
-                            amount -= sellQuantity * element.value;
                         }
-                        
-                        if (amount <= 0) break;
                     }
                 }
                 
-                credits += totalEarned;
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                if (totalEarned === 0) {
+                    alert('Not enough items to reach that amount');
+                    loadingOverlay.classList.remove('active');
+                    return;
+                }
                 
+                // Save changes
+                saveCollection(collection);
+                credits += totalEarned;
+                saveCredits(credits);
+                
+                // Reload display
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
+                
+                alert(`Sold for ${totalEarned}⭐`);
             }, 300);
         }
         
-        // Initialize
+        // ===== INITIALIZE =====
         function init() {
             const player = localStorage.getItem('voidfarer_player');
             if (!player) {
