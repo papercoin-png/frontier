@@ -1,1 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Scanner</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .scanner-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Header */
+        .scanner-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .scanner-title {
+            font-family: 'WindSong', cursive;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #4a8ac0, 0 0 40px #2a5a8a;
+            margin-bottom: 5px;
+        }
+        
+        .scanner-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Location Card */
+        .location-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .location-info {
+            flex: 1;
+        }
+        
+        .location-label {
+            color: #a0c0ff;
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        
+        .location-name {
+            color: #ffffff;
+            font-size: 18px;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .scan-animation {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #4a8ac0, transparent 80%);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
+        
+        /* Scan Button */
+        .scan-button {
+            width: 100%;
+            background: rgba(74, 138, 192, 0.5);
+            border: 2px solid #4a8ac0;
+            color: #ffffff;
+            padding: 18px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 22px;
+            cursor: pointer;
+            font-family: 'WindSong', cursive;
+            transition: all 0.1s;
+            margin-bottom: 25px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        
+        .scan-button:active {
+            background: #4a8ac0;
+            transform: scale(0.97);
+        }
+        
+        .scan-button:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /* Results Section */
+        .results-section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-family: 'WindSong', cursive;
+            border-bottom: 1px solid #4a8ac0;
+            padding-bottom: 8px;
+        }
+        
+        /* Resources Grid */
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .resource-card {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid #4a8ac0;
+            border-radius: 30% 10% 30% 10%;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .resource-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 10px #4a8ac0);
+        }
+        
+        .resource-name {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .resource-chance {
+            color: #ffd966;
+            font-size: 14px;
+        }
+        
+        .resource-rarity {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        
+        .rarity-common { background: rgba(255,255,255,0.2); color: #ffffff; }
+        .rarity-uncommon { background: rgba(100,255,100,0.2); color: #b0ffb0; }
+        .rarity-rare { background: rgba(100,100,255,0.2); color: #b0b0ff; }
+        .rarity-very-rare { background: rgba(200,100,255,0.2); color: #e0b0ff; }
+        .rarity-legendary { background: rgba(255,215,0,0.2); color: #ffd700; }
+        
+        /* Anomalies List */
+        .anomalies-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .anomaly-card {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid #ff6b6b;
+            border-radius: 40px 12px 40px 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .anomaly-icon {
+            font-size: 32px;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .anomaly-info {
+            flex: 1;
+        }
+        
+        .anomaly-name {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .anomaly-desc {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .anomaly-distance {
+            color: #ffaa4a;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        /* Scan History */
+        .history-list {
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 30px 10px 30px 10px;
+            padding: 15px;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(74, 138, 192, 0.3);
+            color: #a0c0ff;
+            font-size: 13px;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-time {
+            color: #6a8ac0;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #9ac0ff;
+            color: #ffffff;
+            padding: 14px 40px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+            width: fit-content;
+            box-shadow: 0 0 30px #3a5a8a;
+            z-index: 100;
+            margin-top: 20px;
+        }
+        
+        .back-button:active {
+            background: #6a8ac0;
+            transform: translateX(-50%) scale(0.96);
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8ac0;
+            margin-top: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Scanner sweep animation */
+        .scanner-sweep {
+            position: relative;
+            height: 4px;
+            background: rgba(74, 138, 192, 0.2);
+            margin: 20px 0;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        
+        .scanner-sweep::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, #4a8ac0, transparent);
+            animation: sweep 3s infinite;
+        }
+        
+        @keyframes sweep {
+            0% { left: -30%; }
+            100% { left: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="scanner-view" id="scannerView">
+            <!-- Header -->
+            <div class="scanner-header">
+                <div class="scanner-title">Scanner Array</div>
+                <div class="scanner-subtitle">✦ active scan ✦</div>
+            </div>
+            
+            <!-- Location Card -->
+            <div class="location-card">
+                <div class="location-info">
+                    <div class="location-label">CURRENT LOCATION</div>
+                    <div class="location-name" id="currentLocation">Verdant Prime</div>
+                </div>
+                <div class="scan-animation"></div>
+            </div>
+            
+            <!-- Scan Button -->
+            <button class="scan-button" id="scanBtn" onclick="performScan()">🔍 INITIATE SCAN</button>
+            
+            <!-- Scanner Sweep Animation (visible during scan) -->
+            <div class="scanner-sweep" id="scannerSweep" style="display: none;"></div>
+            
+            <!-- Scan Results -->
+            <div id="scanResults" style="display: none;">
+                <!-- Resources Section -->
+                <div class="results-section">
+                    <div class="section-title">✦ Detected Resources ✦</div>
+                    <div class="resources-grid" id="resourcesGrid">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Anomalies Section -->
+                <div class="results-section">
+                    <div class="section-title">✦ Nearby Anomalies ✦</div>
+                    <div class="anomalies-list" id="anomaliesList">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Scan History -->
+                <div class="results-section">
+                    <div class="section-title">✦ Recent Scans ✦</div>
+                    <div class="history-list" id="historyList">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Empty State (no scan yet) -->
+            <div id="emptyState" style="text-align: center; padding: 40px 20px; color: #a0c0ff;">
+                <span style="font-size: 48px; display: block; margin-bottom: 20px;">📡</span>
+                <p style="font-size: 16px; margin-bottom: 10px;">No scan data available</p>
+                <p style="font-size: 14px; opacity: 0.7;">Press the scan button to analyze the current area</p>
+            </div>
+            
+            <!-- Back Button -->
+            <button class="back-button" onclick="returnToBridge()">← RETURN TO BRIDGE</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">scanning...</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const scanBtn = document.getElementById('scanBtn');
+        const scannerSweep = document.getElementById('scannerSweep');
+        const scanResults = document.getElementById('scanResults');
+        const emptyState = document.getElementById('emptyState');
+        
+        // Navigation
+        function returnToBridge() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        }
+        
+        // Load current location
+        function loadCurrentLocation() {
+            const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+            const star = localStorage.getItem('voidfarer_current_star') || 'Sol';
+            const sector = localStorage.getItem('voidfarer_current_galaxy_sector') || 'B2';
+            
+            document.getElementById('currentLocation').innerHTML = 
+                `${planet}<br><span style="font-size:12px; color:#a0c0ff;">${star} • Sector ${sector}</span>`;
+        }
+        
+        // Resource database
+        const resourceDatabase = {
+            'Verdant Prime': [
+                { name: 'Carbon', icon: '⚫', chance: '85%', rarity: 'uncommon' },
+                { name: 'Iron', icon: '⚙️', chance: '72%', rarity: 'uncommon' },
+                { name: 'Silicon', icon: '💎', chance: '68%', rarity: 'common' },
+                { name: 'Gold', icon: '🟡', chance: '23%', rarity: 'rare' },
+                { name: 'Titanium', icon: '🔷', chance: '15%', rarity: 'rare' }
+            ],
+            'Pyros': [
+                { name: 'Gold', icon: '🟡', chance: '45%', rarity: 'rare' },
+                { name: 'Silver', icon: '⚪', chance: '38%', rarity: 'rare' },
+                { name: 'Platinum', icon: '⬜', chance: '12%', rarity: 'rare' },
+                { name: 'Uranium', icon: '🟣', chance: '8%', rarity: 'very-rare' },
+                { name: 'Iron', icon: '⚙️', chance: '62%', rarity: 'uncommon' }
+            ],
+            'Glacier-7': [
+                { name: 'Ice', icon: '❄️', chance: '95%', rarity: 'common' },
+                { name: 'Methane', icon: '💨', chance: '45%', rarity: 'uncommon' },
+                { name: 'Nitrogen', icon: '🌬️', chance: '38%', rarity: 'uncommon' },
+                { name: 'Uranium', icon: '🟣', chance: '5%', rarity: 'very-rare' }
+            ],
+            'Aether': [
+                { name: 'Helium', icon: '🎈', chance: '78%', rarity: 'common' },
+                { name: 'Hydrogen', icon: '💧', chance: '72%', rarity: 'common' },
+                { name: 'Methane', icon: '💨', chance: '34%', rarity: 'uncommon' }
+            ]
+        };
+        
+        // Anomaly database
+        const anomalyDatabase = [
+            { name: 'Gravitational Distortion', icon: '🌀', desc: 'Unstable spacetime', distance: '0.8 LY' },
+            { name: 'Energy Reading', icon: '⚡', desc: 'Unknown power source', distance: '1.2 LY' },
+            { name: 'Derelict Vessel', icon: '🚀', desc: 'Ancient wreckage', distance: '2.5 LY' },
+            { name: 'Magnetic Storm', icon: '🌪️', desc: 'Interference detected', distance: '0.3 LY' },
+            { name: 'Wormhole Signature', icon: '🌌', desc: 'Spatial anomaly', distance: '3.1 LY' }
+        ];
+        
+        // Scan history
+        let scanHistory = JSON.parse(localStorage.getItem('voidfarer_scan_history')) || [];
+        
+        // Perform scan
+        function performScan() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            
+            // Disable button during scan
+            scanBtn.disabled = true;
+            scanBtn.style.opacity = '0.5';
+            
+            // Show scanner sweep
+            scannerSweep.style.display = 'block';
+            
+            // Hide empty state
+            emptyState.style.display = 'none';
+            
+            // Show loading
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                // Hide loading
+                loadingOverlay.classList.remove('active');
+                
+                // Get current planet
+                const planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+                
+                // Get resources for this planet
+                const resources = resourceDatabase[planet] || resourceDatabase['Verdant Prime'];
+                
+                // Get random anomalies (2-3 of them)
+                const anomalyCount = Math.floor(Math.random() * 2) + 2;
+                const anomalies = [];
+                const usedIndices = new Set();
+                
+                for (let i = 0; i < anomalyCount; i++) {
+                    let index;
+                    do {
+                        index = Math.floor(Math.random() * anomalyDatabase.length);
+                    } while (usedIndices.has(index));
+                    usedIndices.add(index);
+                    anomalies.push(anomalyDatabase[index]);
+                }
+                
+                // Render resources
+                renderResources(resources);
+                
+                // Render anomalies
+                renderAnomalies(anomalies);
+                
+                // Add to scan history
+                const scanTime = new Date().toLocaleTimeString();
+                scanHistory.unshift({
+                    time: scanTime,
+                    location: planet,
+                    resources: resources.length
+                });
+                
+                // Keep only last 5 scans
+                if (scanHistory.length > 5) {
+                    scanHistory = scanHistory.slice(0, 5);
+                }
+                
+                localStorage.setItem('voidfarer_scan_history', JSON.stringify(scanHistory));
+                
+                // Render history
+                renderHistory();
+                
+                // Show results
+                scanResults.style.display = 'block';
+                
+                // Hide scanner sweep
+                scannerSweep.style.display = 'none';
+                
+                // Re-enable button
+                scanBtn.disabled = false;
+                scanBtn.style.opacity = '1';
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            }, 2000);
+        }
+        
+        // Render resources
+        function renderResources(resources) {
+            const grid = document.getElementById('resourcesGrid');
+            grid.innerHTML = '';
+            
+            resources.forEach(resource => {
+                const card = document.createElement('div');
+                card.className = 'resource-card';
+                
+                let rarityClass = 'rarity-common';
+                if (resource.rarity === 'uncommon') rarityClass = 'rarity-uncommon';
+                else if (resource.rarity === 'rare') rarityClass = 'rarity-rare';
+                else if (resource.rarity === 'very-rare') rarityClass = 'rarity-very-rare';
+                else if (resource.rarity === 'legendary') rarityClass = 'rarity-legendary';
+                
+                card.innerHTML = `
+                    <div class="resource-icon">${resource.icon}</div>
+                    <div class="resource-name">${resource.name}</div>
+                    <div class="resource-chance">${resource.chance}</div>
+                    <div class="resource-rarity ${rarityClass}">${resource.rarity}</div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        // Render anomalies
+        function renderAnomalies(anomalies) {
+            const list = document.getElementById('anomaliesList');
+            list.innerHTML = '';
+            
+            anomalies.forEach(anomaly => {
+                const card = document.createElement('div');
+                card.className = 'anomaly-card';
+                
+                card.innerHTML = `
+                    <div class="anomaly-icon">${anomaly.icon}</div>
+                    <div class="anomaly-info">
+                        <div class="anomaly-name">${anomaly.name}</div>
+                        <div class="anomaly-desc">${anomaly.desc}</div>
+                    </div>
+                    <div class="anomaly-distance">${anomaly.distance}</div>
+                `;
+                
+                list.appendChild(card);
+            });
+        }
+        
+        // Render scan history
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            
+            if (scanHistory.length === 0) {
+                list.innerHTML = '<div style="color:#a0c0ff; text-align:center; padding:15px;">No previous scans</div>';
+                return;
+            }
+            
+            scanHistory.forEach(scan => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = `
+                    <span>${scan.location}</span>
+                    <span>${scan.resources} resources</span>
+                    <span class="history-time">${scan.time}</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+        
+        // Check for existing scan history on load
+        function checkExistingHistory() {
+            if (scanHistory.length > 0) {
+                // Show the last scan results
+                const lastScan = scanHistory[0];
+                const planet = lastScan.location;
+                const resources = resourceDatabase[planet] || resourceDatabase['Verdant Prime'];
+                
+                renderResources(resources);
+                
+                // Generate some anomalies for demo
+                const anomalies = [
+                    anomalyDatabase[0],
+                    anomalyDatabase[2]
+                ];
+                renderAnomalies(anomalies);
+                
+                renderHistory();
+                
+                scanResults.style.display = 'block';
+                emptyState.style.display = 'none';
+            }
+        }
+        
+        // Initialize
+        function init() {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadCurrentLocation();
+            checkExistingHistory();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
