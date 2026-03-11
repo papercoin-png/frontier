@@ -1,11 +1,21 @@
-// economic-adjuster.js - Automatic economic tuning system for Voidfarer
+// js/economic-adjuster.js - Automatic economic tuning system for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Runs daily to adjust tax rates based on economic metrics
 
-// ===== DEPENDENCIES =====
-// Requires economic-metrics.js and tax-system.js to be loaded first
+import {
+    getCurrentRates,
+    adjustAllRates,
+    calculateInflationRate,
+    calculateGiniCoefficient,
+    calculateMoneyVelocity,
+    assessEconomicHealth,
+    getWealthPercentiles,
+    getDailyMetrics,
+    recordDailyMetrics
+} from './storage.js';
 
 // ===== ADJUSTMENT CONFIGURATION =====
-const ADJUSTMENT_CONFIG = {
+export const ADJUSTMENT_CONFIG = {
     MAX_DAILY_CHANGE: 0.002,           // Maximum 0.2% change per day
     SAFETY_THRESHOLD: 0.10,             // 10% - emergency measures trigger
     IDEAL_INFLATION: 0.035,             // 3.5% target
@@ -16,7 +26,7 @@ const ADJUSTMENT_CONFIG = {
     EMERGENCY_COOLDOWN: 0.5                // 12 hours for emergency
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (keep in localStorage) =====
 const ADJUSTER_STORAGE_KEYS = {
     LAST_ADJUSTMENT: 'voidfarer_last_adjustment',
     ADJUSTMENT_HISTORY: 'voidfarer_adjustment_history',
@@ -26,7 +36,7 @@ const ADJUSTER_STORAGE_KEYS = {
 };
 
 // ===== INITIALIZE ADJUSTER =====
-function initializeAdjuster() {
+export function initializeAdjuster() {
     // Set last adjustment if not set
     if (!localStorage.getItem(ADJUSTER_STORAGE_KEYS.LAST_ADJUSTMENT)) {
         localStorage.setItem(ADJUSTER_STORAGE_KEYS.LAST_ADJUSTMENT, Date.now().toString());
@@ -46,16 +56,18 @@ function initializeAdjuster() {
     if (!localStorage.getItem(ADJUSTER_STORAGE_KEYS.EMERGENCY_MODE)) {
         localStorage.setItem(ADJUSTER_STORAGE_KEYS.EMERGENCY_MODE, 'false');
     }
+    
+    console.log('Economic adjuster initialized');
 }
 
-// ===== ADJUSTMENT LOG =====
-function getAdjustmentLog(limit = 100) {
+// ===== ADJUSTMENT LOG (keep in localStorage) =====
+export function getAdjustmentLog(limit = 100) {
     const log = localStorage.getItem(ADJUSTER_STORAGE_KEYS.ADJUSTMENT_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     return allLogs.slice(-limit);
 }
 
-function addToAdjustmentLog(entry) {
+export function addToAdjustmentLog(entry) {
     const log = localStorage.getItem(ADJUSTER_STORAGE_KEYS.ADJUSTMENT_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     
@@ -73,14 +85,14 @@ function addToAdjustmentLog(entry) {
     localStorage.setItem(ADJUSTER_STORAGE_KEYS.ADJUSTMENT_LOG, JSON.stringify(allLogs));
 }
 
-// ===== ADJUSTMENT HISTORY =====
-function getAdjustmentHistory(limit = 30) {
+// ===== ADJUSTMENT HISTORY (keep in localStorage) =====
+export function getAdjustmentHistory(limit = 30) {
     const history = localStorage.getItem(ADJUSTER_STORAGE_KEYS.ADJUSTMENT_HISTORY);
     const allHistory = history ? JSON.parse(history) : [];
     return allHistory.slice(-limit);
 }
 
-function addToAdjustmentHistory(entry) {
+export function addToAdjustmentHistory(entry) {
     const history = localStorage.getItem(ADJUSTER_STORAGE_KEYS.ADJUSTMENT_HISTORY);
     const allHistory = history ? JSON.parse(history) : [];
     
@@ -99,11 +111,11 @@ function addToAdjustmentHistory(entry) {
 }
 
 // ===== EMERGENCY MODE =====
-function isEmergencyMode() {
+export function isEmergencyMode() {
     return localStorage.getItem(ADJUSTER_STORAGE_KEYS.EMERGENCY_MODE) === 'true';
 }
 
-function setEmergencyMode(enabled, reason) {
+export function setEmergencyMode(enabled, reason) {
     localStorage.setItem(ADJUSTER_STORAGE_KEYS.EMERGENCY_MODE, enabled.toString());
     
     addToAdjustmentLog({
@@ -115,11 +127,11 @@ function setEmergencyMode(enabled, reason) {
 }
 
 // ===== MANUAL OVERRIDE =====
-function isManualOverride() {
+export function isManualOverride() {
     return localStorage.getItem(ADJUSTER_STORAGE_KEYS.MANUAL_OVERRIDE) === 'true';
 }
 
-function setManualOverride(enabled, reason) {
+export function setManualOverride(enabled, reason) {
     localStorage.setItem(ADJUSTER_STORAGE_KEYS.MANUAL_OVERRIDE, enabled.toString());
     
     addToAdjustmentLog({
@@ -131,7 +143,7 @@ function setManualOverride(enabled, reason) {
 }
 
 // ===== SHOULD ADJUST? =====
-function shouldAdjust() {
+export function shouldAdjust() {
     if (isManualOverride()) {
         return false;
     }
@@ -147,7 +159,7 @@ function shouldAdjust() {
 }
 
 // ===== CALCULATE ADJUSTMENTS =====
-function calculateInflationAdjustment(currentInflation) {
+export function calculateInflationAdjustment(currentInflation) {
     const target = ADJUSTMENT_CONFIG.IDEAL_INFLATION;
     const diff = currentInflation - target;
     
@@ -174,7 +186,7 @@ function calculateInflationAdjustment(currentInflation) {
     };
 }
 
-function calculateInequalityAdjustment(currentGini) {
+export function calculateInequalityAdjustment(currentGini) {
     const target = ADJUSTMENT_CONFIG.IDEAL_GINI;
     const diff = currentGini - target;
     
@@ -195,7 +207,7 @@ function calculateInequalityAdjustment(currentGini) {
     return { luxury: 0 };
 }
 
-function calculatePoolAdjustment(poolEfficiency) {
+export function calculatePoolAdjustment(poolEfficiency) {
     // poolEfficiency < 0.8 = too many professionals (lower fees to discourage)
     // poolEfficiency > 1.2 = not enough professionals (raise fees to encourage)
     const target = 1.0;
@@ -214,7 +226,7 @@ function calculatePoolAdjustment(poolEfficiency) {
     return { poolFee: adjustment };
 }
 
-function calculateGrowthAdjustment(newPlayerRate) {
+export function calculateGrowthAdjustment(newPlayerRate) {
     const target = 0.10; // 10% monthly growth target
     const diff = newPlayerRate - target;
     
@@ -230,17 +242,17 @@ function calculateGrowthAdjustment(newPlayerRate) {
 }
 
 // ===== PERFORM ADJUSTMENT =====
-function performEconomicAdjustment() {
+export async function performEconomicAdjustment() {
     if (!shouldAdjust()) {
         return { success: false, reason: 'Cooldown period not elapsed' };
     }
     
-    // Get current metrics
-    const inflation = calculateInflationRate();
-    const gini = calculateGiniCoefficient();
-    const wealth = getWealthPercentiles();
-    const velocity = calculateMoneyVelocity();
-    const health = assessEconomicHealth();
+    // Get current metrics (now async)
+    const inflation = await calculateInflationRate();
+    const gini = await calculateGiniCoefficient();
+    const wealth = await getWealthPercentiles();
+    const velocity = await calculateMoneyVelocity();
+    const health = await assessEconomicHealth();
     
     // Get current tax rates
     const currentRates = getCurrentRates();
@@ -253,16 +265,16 @@ function performEconomicAdjustment() {
     
     // Combine adjustments
     if (inflationAdj.transaction) {
-        adjustments[TAX_TYPES.TRANSACTION] = inflationAdj.transaction;
+        adjustments.transaction = inflationAdj.transaction;
     }
     if (inflationAdj.property) {
-        adjustments[TAX_TYPES.PROPERTY] = inflationAdj.property;
+        adjustments.property = inflationAdj.property;
     }
     if (inflationAdj.income) {
-        adjustments[TAX_TYPES.INCOME] = inflationAdj.income;
+        adjustments.income = inflationAdj.income;
     }
     if (inequalityAdj.luxury) {
-        adjustments[TAX_TYPES.LUXURY] = inequalityAdj.luxury;
+        adjustments.luxury = inequalityAdj.luxury;
     }
     
     // Apply adjustments
@@ -310,7 +322,7 @@ function performEconomicAdjustment() {
 }
 
 // ===== EMERGENCY ADJUSTMENT =====
-function performEmergencyAdjustment(reason) {
+export async function performEmergencyAdjustment(reason) {
     setEmergencyMode(true, reason);
     
     // More aggressive adjustments
@@ -318,10 +330,10 @@ function performEmergencyAdjustment(reason) {
     const emergencyAdjustments = {};
     
     // Raise all taxes by 0.5%
-    emergencyAdjustments[TAX_TYPES.TRANSACTION] = 0.005;
-    emergencyAdjustments[TAX_TYPES.PROPERTY] = 0.005;
-    emergencyAdjustments[TAX_TYPES.INCOME] = 0.005;
-    emergencyAdjustments[TAX_TYPES.LUXURY] = 0.005;
+    emergencyAdjustments.transaction = 0.005;
+    emergencyAdjustments.property = 0.005;
+    emergencyAdjustments.income = 0.005;
+    emergencyAdjustments.luxury = 0.005;
     
     adjustAllRates(emergencyAdjustments);
     
@@ -347,7 +359,7 @@ function performEmergencyAdjustment(reason) {
 }
 
 // ===== GET ADJUSTMENT SUMMARY =====
-function getAdjustmentSummary(days = 30) {
+export async function getAdjustmentSummary(days = 30) {
     const history = getAdjustmentHistory(days);
     const log = getAdjustmentLog(100);
     
@@ -359,17 +371,17 @@ function getAdjustmentSummary(days = 30) {
     let totalLuxuryChange = 0;
     
     adjustments.forEach(adj => {
-        if (adj.adjustments[TAX_TYPES.TRANSACTION]) {
-            totalTransactionChange += adj.adjustments[TAX_TYPES.TRANSACTION];
+        if (adj.adjustments.transaction) {
+            totalTransactionChange += adj.adjustments.transaction;
         }
-        if (adj.adjustments[TAX_TYPES.PROPERTY]) {
-            totalPropertyChange += adj.adjustments[TAX_TYPES.PROPERTY];
+        if (adj.adjustments.property) {
+            totalPropertyChange += adj.adjustments.property;
         }
-        if (adj.adjustments[TAX_TYPES.INCOME]) {
-            totalIncomeChange += adj.adjustments[TAX_TYPES.INCOME];
+        if (adj.adjustments.income) {
+            totalIncomeChange += adj.adjustments.income;
         }
-        if (adj.adjustments[TAX_TYPES.LUXURY]) {
-            totalLuxuryChange += adj.adjustments[TAX_TYPES.LUXURY];
+        if (adj.adjustments.luxury) {
+            totalLuxuryChange += adj.adjustments.luxury;
         }
     });
     
@@ -394,11 +406,11 @@ function getAdjustmentSummary(days = 30) {
 }
 
 // ===== FORECAST NEXT ADJUSTMENT =====
-function forecastNextAdjustment() {
+export async function forecastNextAdjustment() {
     const metrics = {
-        inflation: calculateInflationRate(),
-        gini: calculateGiniCoefficient(),
-        velocity: calculateMoneyVelocity()
+        inflation: await calculateInflationRate(),
+        gini: await calculateGiniCoefficient(),
+        velocity: await calculateMoneyVelocity()
     };
     
     const inflationAdj = calculateInflationAdjustment(metrics.inflation);
@@ -417,7 +429,7 @@ function forecastNextAdjustment() {
     };
 }
 
-function getTimeUntilNextAdjustment() {
+export function getTimeUntilNextAdjustment() {
     const lastAdjustment = parseInt(localStorage.getItem(ADJUSTER_STORAGE_KEYS.LAST_ADJUSTMENT)) || 0;
     const now = Date.now();
     const hoursSince = (now - lastAdjustment) / (1000 * 60 * 60);
@@ -435,32 +447,35 @@ function getTimeUntilNextAdjustment() {
 }
 
 // ===== SIMULATE ADJUSTMENT (for preview) =====
-function simulateAdjustment(inflation, gini, velocity) {
-    const inflationAdj = calculateInflationAdjustment(inflation || calculateInflationRate());
-    const inequalityAdj = calculateInequalityAdjustment(gini || calculateGiniCoefficient());
+export async function simulateAdjustment(inflation, gini, velocity) {
+    const inflationRate = inflation || await calculateInflationRate();
+    const giniRate = gini || await calculateGiniCoefficient();
+    
+    const inflationAdj = calculateInflationAdjustment(inflationRate);
+    const inequalityAdj = calculateInequalityAdjustment(giniRate);
     
     const currentRates = getCurrentRates();
     const simulatedRates = { ...currentRates };
     
     if (inflationAdj.transaction) {
-        simulatedRates[TAX_TYPES.TRANSACTION] = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
+        simulatedRates.transaction = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
             Math.min(ADJUSTMENT_CONFIG.MAX_TAX_RATE,
-                currentRates[TAX_TYPES.TRANSACTION] + inflationAdj.transaction));
+                currentRates.transaction + inflationAdj.transaction));
     }
     if (inflationAdj.property) {
-        simulatedRates[TAX_TYPES.PROPERTY] = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
+        simulatedRates.property = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
             Math.min(ADJUSTMENT_CONFIG.MAX_TAX_RATE,
-                currentRates[TAX_TYPES.PROPERTY] + inflationAdj.property));
+                currentRates.property + inflationAdj.property));
     }
     if (inflationAdj.income) {
-        simulatedRates[TAX_TYPES.INCOME] = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
+        simulatedRates.income = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
             Math.min(ADJUSTMENT_CONFIG.MAX_TAX_RATE,
-                currentRates[TAX_TYPES.INCOME] + inflationAdj.income));
+                currentRates.income + inflationAdj.income));
     }
     if (inequalityAdj.luxury) {
-        simulatedRates[TAX_TYPES.LUXURY] = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
+        simulatedRates.luxury = Math.max(ADJUSTMENT_CONFIG.MIN_TAX_RATE,
             Math.min(ADJUSTMENT_CONFIG.MAX_TAX_RATE,
-                currentRates[TAX_TYPES.LUXURY] + inequalityAdj.luxury));
+                currentRates.luxury + inequalityAdj.luxury));
     }
     
     return {
@@ -473,36 +488,56 @@ function simulateAdjustment(inflation, gini, velocity) {
             luxury: inequalityAdj.luxury || 0
         },
         basedOn: {
-            inflation: inflation || calculateInflationRate(),
-            gini: gini || calculateGiniCoefficient()
+            inflation: inflationRate,
+            gini: giniRate
         }
     };
 }
 
+// ===== DAILY MAINTENANCE =====
+export async function runDailyMaintenance() {
+    console.log('Running daily economic maintenance...');
+    
+    // Record daily metrics
+    await recordDailyMetrics();
+    
+    // Perform economic adjustment
+    const adjustment = await performEconomicAdjustment();
+    
+    // Log the maintenance run
+    addToAdjustmentLog({
+        type: 'DAILY_MAINTENANCE',
+        metricsRecorded: true,
+        adjustmentPerformed: adjustment.success,
+        timestamp: Date.now()
+    });
+    
+    return {
+        success: true,
+        adjustment
+    };
+}
+
 // ===== FORMATTING =====
-function formatPercent(value) {
+export function formatPercent(value) {
     return (value * 100).toFixed(2) + '%';
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        ADJUSTMENT_CONFIG,
-        initializeAdjuster,
-        getAdjustmentLog,
-        getAdjustmentHistory,
-        isEmergencyMode,
-        isManualOverride,
-        setManualOverride,
-        shouldAdjust,
-        performEconomicAdjustment,
-        performEmergencyAdjustment,
-        getAdjustmentSummary,
-        forecastNextAdjustment,
-        simulateAdjustment,
-        formatPercent
-    };
-}
-
-// Initialize on load
-initializeAdjuster();
+export default {
+    ADJUSTMENT_CONFIG,
+    initializeAdjuster,
+    getAdjustmentLog,
+    getAdjustmentHistory,
+    isEmergencyMode,
+    isManualOverride,
+    setManualOverride,
+    shouldAdjust,
+    performEconomicAdjustment,
+    performEmergencyAdjustment,
+    getAdjustmentSummary,
+    forecastNextAdjustment,
+    simulateAdjustment,
+    runDailyMaintenance,
+    formatPercent
+};
