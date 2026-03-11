@@ -8,9 +8,10 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* ... keep your existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -49,9 +50,10 @@
         
         .ui-header h1 {
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
+            font-weight: 600;
         }
         
         .current-location {
@@ -95,6 +97,8 @@
             min-width: 120px;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 500;
         }
         
         .back-btn:active {
@@ -149,7 +153,7 @@
             color: #ffffff;
             font-size: 22px;
             font-weight: 600;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             margin-bottom: 5px;
         }
         
@@ -213,9 +217,10 @@
         
         .loading-text {
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -264,26 +269,9 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCurrentStar,
-            setCurrentStar,
-            getCurrentNebula,
-            getCurrentSector,
-            getCurrentSectorType,
-            getCurrentSectorStars,
-            getCredits,
-            setWarpData
-        } from './js/storage.js';
-        import { 
-            UNIVERSE_SEED,
-            generateStar,
-            getNebulaSeed,
-            getSectorSeed
-        } from './js/procedural-universe.js';
-        import { isMigrationComplete } from './js/db.js';
-        import { calculateStarTrip } from './js/warp-calculator.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -298,6 +286,9 @@
         const migrationStatus = document.getElementById('migrationStatus');
         const starsGrid = document.getElementById('starsGrid');
 
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
+
         // ===== STATE =====
         let stars = [];
         let currentStarName = '';
@@ -307,23 +298,25 @@
         let currentSector = 'B2';
         let clusterSeed = UNIVERSE_SEED;
 
+        // ===== HASH FUNCTION =====
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
-                // Load all data in parallel
-                const [
-                    star,
-                    nebula,
-                    sector,
-                    type,
-                    count
-                ] = await Promise.all([
-                    getCurrentStar(),
-                    getCurrentNebula(),
-                    getCurrentSector(),
-                    getCurrentSectorType(),
-                    getCurrentSectorStars()
-                ]);
+                // Load data
+                const star = typeof getCurrentStar === 'function' ? await getCurrentStar() : '';
+                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Molecular Cloud';
+                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'Orion';
+                const type = typeof getCurrentSectorType === 'function' ? await getCurrentSectorType() : 'Star-forming';
+                const count = typeof getCurrentSectorStars === 'function' ? await getCurrentSectorStars() : 85;
 
                 currentStarName = star || '';
                 clusterName = nebula || 'Orion Molecular Cloud';
@@ -352,32 +345,110 @@
             }
         }
 
-        // ===== HASH FUNCTION =====
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
+        // ===== STAR TYPES =====
+        const starTypes = [
+            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
+            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
+            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
+            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0 },
+            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
+        ];
+
+        // ===== GET STAR TYPE =====
+        function getStarType(seed, index) {
+            const rand = seededRandom(seed, index);
+            let cumulative = 0;
+            
+            for (const type of starTypes) {
+                cumulative += type.prob;
+                if (rand < cumulative) {
+                    return { ...type };
+                }
             }
-            return Math.abs(hash);
+            
+            return { ...starTypes[0] };
+        }
+
+        // ===== SEEDED RANDOM =====
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function seededRandomRange(seed, index, min, max) {
+            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+        }
+
+        function seededRandomChoice(seed, index, array) {
+            const choice = Math.floor(seededRandom(seed, index) * array.length);
+            return array[choice];
+        }
+
+        // ===== NAME GENERATION =====
+        const namePrefixes = [
+            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
+            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
+            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
+        ];
+
+        const nameSuffixes = [
+            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
+            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
+            'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
+        ];
+
+        function generateStarName(seed, index) {
+            const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
+            const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
+            return prefix + ' ' + suffix;
+        }
+
+        // ===== GENERATE STAR =====
+        function generateStar(seed, index) {
+            const starType = getStarType(seed, index);
+            
+            // Calculate planet count based on star type
+            let planetCount = 0;
+            if (starType.maxPlanets > 0) {
+                planetCount = seededRandomRange(seed, index + 10, starType.minPlanets, starType.maxPlanets);
+            }
+            
+            return {
+                index: index,
+                name: generateStarName(seed, index + 20),
+                type: starType.type,
+                typeName: starType.name,
+                color: starType.color,
+                planetCount: planetCount,
+                seed: seed + index * 1000
+            };
         }
 
         // ===== GENERATE STARS =====
         function generateStars() {
             stars = [];
             
-            // Generate stars using procedural generation
+            // Generate stars
             for (let i = 0; i < starCount; i++) {
-                const star = generateStar(clusterSeed, i);
+                const starSeed = clusterSeed + i * 1000;
+                const star = generateStar(starSeed, i);
+                
+                // Get icon based on type
+                let icon = '⭐';
+                if (star.type === 'main') icon = '🟡';
+                else if (star.type === 'red') icon = '🔴';
+                else if (star.type === 'blue') icon = '🔵';
+                else if (star.type === 'neutron') icon = '💫';
+                else if (star.type === 'blackhole') icon = '⚫';
+                
                 stars.push({
                     name: star.name,
                     type: star.typeName,
-                    icon: getStarIcon(star.type),
+                    icon: icon,
                     color: star.color,
                     planets: star.planetCount,
                     index: i,
-                    seed: star.seed,
-                    position: star.position
+                    seed: star.seed
                 });
             }
 
@@ -389,16 +460,12 @@
             });
         }
 
-        // ===== GET STAR ICON =====
-        function getStarIcon(starType) {
-            const icons = {
-                'main': '🟡',
-                'red': '🔴',
-                'blue': '🔵',
-                'neutron': '💫',
-                'blackhole': '⚫'
-            };
-            return icons[starType] || '⭐';
+        // ===== GENERATE STAR DISTANCE =====
+        function generateStarDistance(starIndex) {
+            // Deterministic "random" distance based on star index
+            const seed = clusterSeed + starIndex * 1000;
+            const rand = Math.sin(seed) * 10000;
+            return (Math.abs(rand) % 30 + 5) / 10; // 0.5 to 3.5 LY
         }
 
         // ===== RENDER STARS =====
@@ -416,15 +483,14 @@
                 if (star.name === currentStarName) {
                     card.classList.add('current');
                 }
-                card.setAttribute('onclick', `selectStar(${star.index})`);
+                card.onclick = function() { selectStar(star.index); };
                 
                 // Calculate distance from current star (if any)
                 let distanceDisplay = '';
                 if (currentStarName && star.name !== currentStarName) {
-                    // Generate deterministic distance based on star seeds
                     const distance = generateStarDistance(star.index);
-                    const trip = calculateStarTrip(0, 0, distance, distance);
-                    distanceDisplay = `<div class="distance-badge">${trip.distanceFormatted} • ${trip.cyclesFormatted}</div>`;
+                    const cycles = distance < 1 ? 1 : distance < 2 ? 2 : distance < 3 ? 3 : 4;
+                    distanceDisplay = `<div class="distance-badge">${distance.toFixed(1)} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}</div>`;
                 } else if (star.name === currentStarName) {
                     distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
                 }
@@ -443,16 +509,8 @@
             });
         }
 
-        // ===== GENERATE STAR DISTANCE =====
-        function generateStarDistance(starIndex) {
-            // Deterministic "random" distance based on star index
-            const seed = clusterSeed + starIndex * 1000;
-            const rand = Math.sin(seed) * 10000;
-            return (Math.abs(rand) % 30 + 5) / 10; // 0.5 to 3.5 LY
-        }
-
         // ===== SELECT STAR =====
-        window.selectStar = async function(index) {
+        async function selectStar(index) {
             const star = stars.find(s => s.index === index);
             if (!star) return;
 
@@ -464,30 +522,37 @@
             try {
                 // Calculate warp data
                 const distance = generateStarDistance(star.index);
-                const trip = calculateStarTrip(0, 0, distance, distance);
+                const cycles = distance < 1 ? 1 : distance < 2 ? 2 : distance < 3 ? 3 : 4;
+                const fuel = Math.floor(distance * 4) + 5;
 
                 // Save star data
-                await setCurrentStar(
-                    star.name,
-                    star.type,
-                    star.index,
-                    star.planets + ' planets',
-                    star.position.x,
-                    star.position.y
-                );
+                if (typeof setCurrentStar === 'function') {
+                    await setCurrentStar(
+                        star.name,
+                        star.type,
+                        star.index,
+                        star.planets + ' planets'
+                    );
+                } else {
+                    localStorage.setItem('voidfarer_current_star', star.name);
+                    localStorage.setItem('voidfarer_current_star_type', star.type);
+                    localStorage.setItem('voidfarer_current_star_index', star.index);
+                }
 
-                // Save warp data
-                setWarpData(
-                    star.name,
-                    'star-cluster.html',
-                    trip.cycles,
-                    trip.distance,
-                    trip.fuel
-                );
+                // Save warp data - FIXED: Now goes to system-view.html
+                if (typeof setWarpData === 'function') {
+                    setWarpData(star.name, 'system-view.html', cycles, distance, fuel);
+                } else {
+                    localStorage.setItem('voidfarer_warp_destination', star.name);
+                    localStorage.setItem('voidfarer_warp_return', 'system-view.html');  // FIXED HERE
+                    localStorage.setItem('voidfarer_warp_cycles', cycles);
+                    localStorage.setItem('voidfarer_warp_distance', distance);
+                    localStorage.setItem('voidfarer_warp_fuel', fuel);
+                }
 
-                // Navigate to system view
+                // Navigate to warp
                 setTimeout(() => {
-                    window.location.href = 'system-view.html';
+                    window.location.href = 'warp.html';
                 }, 500);
 
             } catch (error) {
@@ -495,12 +560,12 @@
                 loadingOverlay.classList.remove('active');
                 alert('Failed to select star. Please try again.');
             }
-        };
+        }
 
-        // ===== NAVIGATION =====
-        window.returnToSectors = function() {
+        // ===== RETURN TO SECTORS =====
+        function returnToSectors() {
             window.location.href = 'star-sectors.html';
-        };
+        }
 
         // ===== INITIALIZE =====
         async function init() {
@@ -510,7 +575,7 @@
                 loadingText.textContent = 'loading star cluster...';
 
                 // Check for player data
-                const credits = await getCredits();
+                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -524,14 +589,6 @@
 
                 // Render stars
                 renderStars();
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 // Hide loading
                 setTimeout(() => {
@@ -550,5 +607,11 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/warp-calculator.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
