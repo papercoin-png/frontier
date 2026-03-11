@@ -6,6 +6,8 @@
     <title>Voidfarer - Galaxy Map</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -300,6 +302,20 @@
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
             .region-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -308,65 +324,32 @@
         
         <div class="current-location" id="currentLocation">
             <span class="current-dot"></span>
-            <span id="currentLocationText">Orion Arm (B2)</span>
+            <span id="currentLocationText">Loading location...</span>
         </div>
         
         <button class="back-btn" onclick="returnToShip()">← SHIP</button>
         
-        <!-- Region boxes -->
-        <div class="region-box" id="regionOrion" style="left: 35%; top: 40%; width: 130px; height: 90px;" onclick="selectRegion('Orion', 'B2')">
-            <span class="region-label">Orion Arm</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionCygnus" style="left: 60%; top: 30%; width: 120px; height: 80px;" onclick="selectRegion('Cygnus', 'A1')">
-            <span class="region-label">Cygnus Arm</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionSagittarius" style="left: 45%; top: 60%; width: 140px; height: 100px;" onclick="selectRegion('Sagittarius', 'C2')">
-            <span class="region-label">Sagittarius</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionPerseus" style="left: 65%; top: 55%; width: 130px; height: 90px;" onclick="selectRegion('Perseus', 'B1')">
-            <span class="region-label">Perseus Arm</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionCarina" style="left: 30%; top: 65%; width: 110px; height: 80px;" onclick="selectRegion('Carina', 'C3')">
-            <span class="region-label">Carina Arm</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionOuter" style="left: 70%; top: 70%; width: 120px; height: 80px;" onclick="selectRegion('Outer', 'A4')">
-            <span class="region-label">Outer Arm</span>
-            <span class="region-count">6</span>
-        </div>
-        
-        <div class="region-box" id="regionCore" style="left: 50%; top: 50%; width: 180px; height: 120px;" onclick="selectRegion('Core', 'C1')">
-            <span class="region-label">Galactic Core</span>
-            <span class="region-count">6</span>
-        </div>
+        <!-- Region boxes will be dynamically created -->
+        <div id="regionBoxes"></div>
         
         <!-- Region Info Panel -->
         <div class="region-panel" id="regionPanel">
-            <div class="region-name" id="selectedRegionName">Orion Arm</div>
+            <div class="region-name" id="selectedRegionName">Loading...</div>
             <div class="distance-row">
                 <span class="distance-label">Distance:</span>
-                <span class="distance-value" id="regionDistance">2.3 LY</span>
+                <span class="distance-value" id="regionDistance">-- LY</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Warp Cycles:</span>
-                <span class="time-value" id="warpCycles">1 cycle</span>
+                <span class="time-value" id="warpCycles">-- cycle</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Travel Time:</span>
-                <span class="time-value" id="travelTime">2 sec</span>
+                <span class="time-value" id="travelTime">-- sec</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Fuel Required:</span>
-                <span class="fuel-value" id="fuelCost">10 ⭐</span>
+                <span class="fuel-value" id="fuelCost">-- ⭐</span>
             </div>
             <button class="travel-btn" id="travelBtn" onclick="travelToRegion()">🚀 TRAVEL</button>
         </div>
@@ -375,58 +358,143 @@
         
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">warping...</div>
+            <div class="loading-text" id="loadingText">loading galaxy...</div>
         </div>
+
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('galaxyCanvas');
-        const ctx = canvas.getContext('2d');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const regionPanel = document.getElementById('regionPanel');
-        
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCurrentSector,
+            getCurrentRegion,
+            setCurrentSector,
+            setWarpData,
+            getCredits
+        } from './js/storage.js';
+        import { calculateSectorTrip } from './js/warp-calculator.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
-        
-        // ===== CURRENT LOCATION =====
-        // Default to Orion Arm (B2) if not set
-        let currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
-        let currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
-        
-        document.getElementById('currentLocationText').textContent = 
-            currentRegion + ' Arm (' + currentSector + ')';
-        
-        // ===== SECTOR COORDINATES =====
-        const sectorCoordinates = {
-            'A1': { x: 0, y: 0, name: 'Cygnus' },
-            'B1': { x: 1, y: 0, name: 'Perseus' },
-            'C1': { x: 2, y: 0, name: 'Core' },
-            'A2': { x: 0, y: 1, name: 'Outer' },
-            'B2': { x: 1, y: 1, name: 'Orion' },
-            'C2': { x: 2, y: 1, name: 'Sagittarius' },
-            'A3': { x: 0, y: 2, name: 'Carina' },
-            'B3': { x: 1, y: 2, name: 'Norma' },
-            'C3': { x: 2, y: 2, name: 'Scutum' },
-            'A4': { x: 0, y: 3, name: 'Far' },
-            'B4': { x: 1, y: 3, name: 'Reach' },
-            'C4': { x: 2, y: 3, name: 'Fringe' }
-        };
-        
-        // ===== SELECTED REGION =====
+
+        // ===== DOM ELEMENTS =====
+        const canvas = document.getElementById('galaxyCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+        const regionPanel = document.getElementById('regionPanel');
+        const regionBoxes = document.getElementById('regionBoxes');
+
+        // ===== STATE =====
+        let currentSector = 'B2';
+        let currentRegion = 'Orion';
         let selectedRegion = null;
         let selectedSector = null;
-        
-        function selectRegion(region, sector) {
+
+        // ===== SECTOR COORDINATES =====
+        const sectorCoordinates = {
+            'A1': { x: 0, y: 0, name: 'Cygnus', displayName: 'Cygnus Arm', color: '#ff6a9a' },
+            'B1': { x: 1, y: 0, name: 'Perseus', displayName: 'Perseus Arm', color: '#4affaa' },
+            'C1': { x: 2, y: 0, name: 'Core', displayName: 'Galactic Core', color: '#8a8aaa' },
+            'A2': { x: 0, y: 1, name: 'Outer', displayName: 'Outer Arm', color: '#ffaa4a' },
+            'B2': { x: 1, y: 1, name: 'Orion', displayName: 'Orion Arm', color: '#8a6aff' },
+            'C2': { x: 2, y: 1, name: 'Sagittarius', displayName: 'Sagittarius Arm', color: '#c06aff' },
+            'A3': { x: 0, y: 2, name: 'Carina', displayName: 'Carina Arm', color: '#6a8aff' },
+            'B3': { x: 1, y: 2, name: 'Norma', displayName: 'Norma Arm', color: '#ff8a6a' },
+            'C3': { x: 2, y: 2, name: 'Scutum', displayName: 'Scutum Arm', color: '#6aff8a' },
+            'A4': { x: 0, y: 3, name: 'Far', displayName: 'Far Arm', color: '#ff6aff' },
+            'B4': { x: 1, y: 3, name: 'Reach', displayName: 'Outer Reach', color: '#8aff6a' },
+            'C4': { x: 2, y: 3, name: 'Fringe', displayName: 'The Fringe', color: '#ff8a8a' }
+        };
+
+        // ===== REGION BOX POSITIONS =====
+        const regionPositions = {
+            'Cygnus': { left: '60%', top: '30%', width: '120px', height: '80px' },
+            'Perseus': { left: '65%', top: '55%', width: '130px', height: '90px' },
+            'Core': { left: '50%', top: '50%', width: '180px', height: '120px' },
+            'Outer': { left: '70%', top: '70%', width: '120px', height: '80px' },
+            'Orion': { left: '35%', top: '40%', width: '130px', height: '90px' },
+            'Sagittarius': { left: '45%', top: '60%', width: '140px', height: '100px' },
+            'Carina': { left: '30%', top: '65%', width: '110px', height: '80px' },
+            'Norma': { left: '20%', top: '55%', width: '120px', height: '80px' },
+            'Scutum': { left: '25%', top: '45%', width: '120px', height: '80px' },
+            'Far': { left: '15%', top: '70%', width: '110px', height: '80px' },
+            'Reach': { left: '10%', top: '30%', width: '120px', height: '80px' },
+            'Fringe': { left: '75%', top: '20%', width: '120px', height: '80px' }
+        };
+
+        // ===== LOAD CURRENT LOCATION =====
+        async function loadCurrentLocation() {
+            try {
+                const [sector, region] = await Promise.all([
+                    getCurrentSector(),
+                    getCurrentRegion()
+                ]);
+
+                currentSector = sector || 'B2';
+                currentRegion = region || 'Orion';
+
+                document.getElementById('currentLocationText').textContent = 
+                    sectorCoordinates[currentSector]?.displayName || 'Orion Arm';
+
+            } catch (error) {
+                console.error('Error loading location:', error);
+                // Use defaults
+                currentSector = 'B2';
+                currentRegion = 'Orion';
+                document.getElementById('currentLocationText').textContent = 'Orion Arm';
+            }
+        }
+
+        // ===== CREATE REGION BOXES =====
+        function createRegionBoxes() {
+            regionBoxes.innerHTML = '';
+
+            Object.entries(sectorCoordinates).forEach(([sectorId, data]) => {
+                const pos = regionPositions[data.name];
+                if (!pos) return;
+
+                const box = document.createElement('div');
+                box.className = 'region-box';
+                box.id = `region-${data.name}`;
+                box.style.left = pos.left;
+                box.style.top = pos.top;
+                box.style.width = pos.width;
+                box.style.height = pos.height;
+                box.setAttribute('onclick', `selectRegion('${data.name}', '${sectorId}')`);
+
+                // Highlight current sector
+                if (sectorId === currentSector) {
+                    box.style.borderColor = '#4affaa';
+                    box.style.boxShadow = '0 0 30px #4affaa';
+                }
+
+                box.innerHTML = `
+                    <span class="region-label">${data.displayName}</span>
+                    <span class="region-count">6</span>
+                `;
+
+                regionBoxes.appendChild(box);
+            });
+        }
+
+        // ===== SELECT REGION =====
+        window.selectRegion = function(region, sector) {
             // Remove previous selection
             document.querySelectorAll('.region-box').forEach(box => {
                 box.classList.remove('selected');
             });
             
             // Add selection to clicked box
-            const box = document.getElementById('region' + region);
+            const box = document.getElementById('region-' + region);
             if (box) {
                 box.classList.add('selected');
             }
@@ -436,16 +504,15 @@
             
             // Calculate distance from current location
             const distance = calculateSectorDistance(currentSector, sector);
-            const cycles = calculateWarpCycles(distance);
-            const fuel = calculateFuel(distance);
-            const time = cycles * 2; // 2 seconds per cycle
+            const trip = calculateSectorTrip(currentSector, sector);
             
             // Update panel
-            document.getElementById('selectedRegionName').textContent = region + ' Arm';
-            document.getElementById('regionDistance').textContent = distance.toFixed(1) + ' LY';
-            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
-            document.getElementById('travelTime').textContent = time + ' sec';
-            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
+            document.getElementById('selectedRegionName').textContent = 
+                sectorCoordinates[sector]?.displayName || region + ' Arm';
+            document.getElementById('regionDistance').textContent = trip.distanceFormatted;
+            document.getElementById('warpCycles').textContent = trip.cyclesFormatted;
+            document.getElementById('travelTime').textContent = trip.timeFormatted;
+            document.getElementById('fuelCost').innerHTML = trip.fuelFormatted;
             
             // Enable/disable travel button based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
@@ -460,8 +527,8 @@
             regionPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== DISTANCE CALCULATION =====
         function calculateSectorDistance(sector1, sector2) {
             const s1 = sectorCoordinates[sector1] || { x: 1, y: 1 };
@@ -473,53 +540,55 @@
             // Convert to "light years" (abstract)
             return gridDistance * 2.5;
         }
-        
-        function calculateWarpCycles(distance) {
-            if (distance <= 2.5) return 1;      // Same or adjacent sector
-            if (distance <= 5) return 2;         // 2 sectors away
-            if (distance <= 7.5) return 3;       // 3 sectors away
-            if (distance <= 10) return 4;         // 4 sectors away
-            return 5;                              // Max
-        }
-        
-        function calculateFuel(distance) {
-            return Math.floor(distance * 4) + 5;
-        }
-        
+
         // ===== TRAVEL =====
-        function travelToRegion() {
+        window.travelToRegion = async function() {
             if (!selectedRegion || !selectedSector) return;
             if (selectedSector === currentSector) return;
             
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'calculating warp...';
             
-            // Calculate warp details
-            const distance = calculateSectorDistance(currentSector, selectedSector);
-            const cycles = calculateWarpCycles(distance);
-            
-            // Save destination
-            localStorage.setItem('voidfarer_warp_destination', selectedRegion);
-            localStorage.setItem('voidfarer_warp_destination_sector', selectedSector);
-            localStorage.setItem('voidfarer_warp_cycles', cycles);
-            localStorage.setItem('voidfarer_warp_return', 'galaxy-map.html');
-            
-            // Navigate to warp
-            setTimeout(() => {
-                window.location.href = 'warp.html';
-            }, 500);
-        }
-        
-        function returnToShip() {
+            try {
+                // Calculate warp details
+                const trip = calculateSectorTrip(currentSector, selectedSector);
+                
+                // Save destination
+                await setCurrentSector(selectedSector, selectedRegion);
+                
+                // Save warp data
+                setWarpData(
+                    selectedRegion,
+                    'galaxy-map.html',
+                    trip.cycles,
+                    trip.distance,
+                    trip.fuel
+                );
+                
+                // Navigate to warp
+                setTimeout(() => {
+                    window.location.href = 'warp.html';
+                }, 500);
+
+            } catch (error) {
+                console.error('Error traveling:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to travel. Please try again.');
+            }
+        };
+
+        // ===== RETURN TO SHIP =====
+        window.returnToShip = function() {
             window.location.href = 'ship-bridge.html';
-        }
-        
+        };
+
         // ===== DRAW GALAXY BACKGROUND =====
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             drawGalaxy();
         }
-        
+
         function drawGalaxy() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -550,10 +619,77 @@
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw spiral arm hints
+            ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)';
+            ctx.lineWidth = 2;
+            
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                ctx.beginPath();
+                for (let r = 0.1; r < 0.9; r += 0.1) {
+                    const spiralAngle = angle + r * 10;
+                    const x = centerX + Math.cos(spiralAngle) * r * canvas.width * 0.4;
+                    const y = centerY + Math.sin(spiralAngle) * r * canvas.height * 0.4;
+                    
+                    if (r === 0.1) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
         }
-        
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading galaxy map...';
+
+                // Check for player data
+                const credits = await getCredits();
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load current location
+                await loadCurrentLocation();
+
+                // Resize canvas and draw background
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                // Create region boxes
+                createRegionBoxes();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
     </script>
 </body>
 </html>
