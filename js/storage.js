@@ -113,6 +113,11 @@ function initializeStorage() {
         localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
     }
     
+    // Initialize empty colonies if none exists
+    if (!localStorage.getItem(STORAGE_KEYS.COLONIES)) {
+        localStorage.setItem(STORAGE_KEYS.COLONIES, JSON.stringify([]));
+    }
+    
     // Initialize default location if none exists
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion', 'B2', 'Orion Molecular Cloud');
@@ -179,18 +184,18 @@ function addElementToCollection(elementName, count = 1) {
         savePlayer(player);
     }
     
-    return Object.keys(collection).length;
+    return { success: true, newCount: collection[elementName].count };
 }
 
 function removeElementFromCollection(elementName, count = 1) {
     const collection = getCollection();
     
     if (!collection[elementName]) {
-        return false;
+        return { success: false, reason: 'not_found' };
     }
     
     if (collection[elementName].count < count) {
-        return false;
+        return { success: false, reason: 'insufficient', available: collection[elementName].count };
     }
     
     collection[elementName].count -= count;
@@ -200,7 +205,40 @@ function removeElementFromCollection(elementName, count = 1) {
     }
     
     saveCollection(collection);
-    return true;
+    return { success: true };
+}
+
+function safeSellElement(elementName, quantity, pricePerUnit) {
+    const collection = getCollection();
+    const credits = getCredits();
+    
+    if (!collection[elementName]) {
+        return { success: false, reason: 'not_found' };
+    }
+    
+    if (collection[elementName].count < quantity) {
+        return { success: false, reason: 'insufficient', available: collection[elementName].count };
+    }
+    
+    // Remove from collection
+    collection[elementName].count -= quantity;
+    if (collection[elementName].count <= 0) {
+        delete collection[elementName];
+    }
+    
+    // Add credits
+    const earnings = quantity * pricePerUnit;
+    const newCredits = credits + earnings;
+    
+    // Save both atomically
+    saveCollection(collection);
+    saveCredits(newCredits);
+    
+    return { 
+        success: true, 
+        earnings: earnings,
+        newCredits: newCredits
+    };
 }
 
 function getElementCount(elementName) {
@@ -219,6 +257,13 @@ function getTotalElementCount() {
     Object.values(collection).forEach(item => {
         total += item.count || 1;
     });
+    return total;
+}
+
+function getCargoValue() {
+    const collection = getCollection();
+    let total = 0;
+    // Note: This requires element database - will be passed from UI
     return total;
 }
 
@@ -278,7 +323,7 @@ function useFuel(amount) {
 
 function refuelShip(amount) {
     const current = getShipFuel();
-    saveShipFuel(current + amount);
+    saveShipFuel(Math.min(100, current + amount));
 }
 
 // ===== SHIP POWER =====
@@ -682,6 +727,7 @@ if (typeof module !== 'undefined' && module.exports) {
         saveCollection,
         addElementToCollection,
         removeElementFromCollection,
+        safeSellElement,
         getElementCount,
         getUniqueElementsCount,
         getTotalElementCount,
