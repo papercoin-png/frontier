@@ -76,7 +76,7 @@
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
+            text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
         }
         
@@ -165,6 +165,44 @@
             align-items: center;
             color: #ffffff;
             font-size: 14px;
+        }
+        
+        /* Economic Alert Banner */
+        .alert-banner {
+            background: rgba(255, 170, 74, 0.15);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: glow 2s infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { box-shadow: 0 0 5px #ffaa4a; }
+            to { box-shadow: 0 0 15px #ffaa4a; }
+        }
+        
+        .alert-icon {
+            font-size: 24px;
+        }
+        
+        .alert-content {
+            flex: 1;
+        }
+        
+        .alert-title {
+            color: #ffaa4a;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .alert-message {
+            color: #ffffff;
+            font-size: 12px;
         }
         
         /* ===== MARKET CARD ===== */
@@ -322,13 +360,6 @@
             font-size: 14px;
             font-weight: 600;
         }
-        
-        .item-price-change {
-            font-size: 11px;
-        }
-        
-        .price-up { color: #4affaa; }
-        .price-down { color: #ff6b6b; }
         
         .item-actions {
             display: flex;
@@ -511,7 +542,7 @@
         /* Hub Cards Grid */
         .hub-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 25px;
         }
@@ -548,6 +579,50 @@
             color: #a0d0c0;
             font-size: 11px;
             margin-top: 4px;
+        }
+        
+        /* Tax Banner */
+        .tax-banner {
+            background: rgba(74, 138, 192, 0.15);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        
+        .tax-banner:active {
+            background: rgba(74, 138, 192, 0.3);
+            transform: scale(0.99);
+        }
+        
+        .tax-icon {
+            font-size: 24px;
+        }
+        
+        .tax-content {
+            flex: 1;
+        }
+        
+        .tax-title {
+            color: #4a8ac0;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .tax-stats {
+            color: #ffffff;
+            font-size: 12px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .tax-amount {
+            color: #ffd966;
         }
         
         /* Back button */
@@ -610,6 +685,15 @@
                 <span class="coordinates">Sector B2</span>
             </div>
             
+            <!-- Economic Alert Banner (dynamic) -->
+            <div class="alert-banner" id="alertBanner" style="display: none;">
+                <div class="alert-icon">📈</div>
+                <div class="alert-content">
+                    <div class="alert-title" id="alertTitle">Economic Alert</div>
+                    <div class="alert-message" id="alertMessage">Loading...</div>
+                </div>
+            </div>
+            
             <!-- MARKET CARD -->
             <div class="market-card">
                 <div class="market-header">
@@ -635,6 +719,19 @@
                     <span class="total-label">Your Credits:</span>
                     <span class="total-amount" id="creditsAmount">5,000⭐</span>
                 </div>
+            </div>
+            
+            <!-- Tax Banner -->
+            <div class="tax-banner" onclick="navigateTo('tax-center.html')">
+                <div class="tax-icon">💰</div>
+                <div class="tax-content">
+                    <div class="tax-title">Tax Center</div>
+                    <div class="tax-stats">
+                        <span>Paid this month: <span class="tax-amount" id="monthlyTax">0⭐</span></span>
+                        <span>Rate: <span id="taxRate">2.0%</span></span>
+                    </div>
+                </div>
+                <div class="tax-icon">→</div>
             </div>
             
             <!-- MARKET TRENDS CARD -->
@@ -689,10 +786,10 @@
                     <div class="hub-desc">Buy & manage storage</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('settings.html')">
-                    <div class="hub-icon">⚙️</div>
-                    <div class="hub-label">Settings</div>
-                    <div class="hub-desc">Game options</div>
+                <div class="hub-card" onclick="navigateTo('economy-dashboard.html')">
+                    <div class="hub-icon">📊</div>
+                    <div class="hub-label">Economy</div>
+                    <div class="hub-desc">Galactic economic stats</div>
                 </div>
             </div>
             
@@ -709,6 +806,9 @@
 
     <script src="js/storage.js"></script>
     <script src="js/market-dynamics.js"></script>
+    <script src="js/economic-metrics.js"></script>
+    <script src="js/tax-system.js"></script>
+    <script src="js/economic-events.js"></script>
     
     <script>
         // Telegram Mini App
@@ -763,10 +863,45 @@
             document.getElementById('cargoDisplay').textContent = `Cargo: ${totalItems}/100`;
             
             renderMarket(collection);
+            loadTaxSummary();
+            checkEconomicAlerts();
             
             // Update daily prices if needed
             if (typeof updateDailyPrices === 'function') {
                 updateDailyPrices();
+            }
+        }
+        
+        // ===== LOAD TAX SUMMARY =====
+        function loadTaxSummary() {
+            // Simulated tax data
+            const monthlyTax = Math.floor(Math.random() * 5000) + 1000;
+            const rates = typeof getCurrentRates === 'function' ? 
+                getCurrentRates() : { transaction: 0.02 };
+            
+            document.getElementById('monthlyTax').textContent = formatMoney(monthlyTax);
+            document.getElementById('taxRate').textContent = (rates.transaction * 100).toFixed(1) + '%';
+        }
+        
+        // ===== CHECK ECONOMIC ALERTS =====
+        function checkEconomicAlerts() {
+            const banner = document.getElementById('alertBanner');
+            
+            if (typeof getActiveEvents !== 'function') {
+                banner.style.display = 'none';
+                return;
+            }
+            
+            const events = getActiveEvents();
+            const majorEvents = events.filter(e => e.severity === 'major' || e.severity === 'epic');
+            
+            if (majorEvents.length > 0) {
+                const event = majorEvents[0];
+                document.getElementById('alertTitle').textContent = event.name;
+                document.getElementById('alertMessage').textContent = event.description;
+                banner.style.display = 'flex';
+            } else {
+                banner.style.display = 'none';
             }
         }
         
@@ -1204,6 +1339,13 @@
             document.getElementById('trendPeriod').textContent = days + 'd';
         }
         
+        // ===== FORMATTING =====
+        function formatMoney(amount) {
+            if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M';
+            if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K';
+            return amount.toString();
+        }
+        
         // ===== INITIALIZE =====
         function init() {
             const player = localStorage.getItem('voidfarer_player');
@@ -1214,6 +1356,16 @@
             
             loadData();
             initPriceChart();
+            
+            // Check for expired events periodically
+            if (typeof checkAndExpireEvents === 'function') {
+                setInterval(checkAndExpireEvents, 60000);
+            }
+            
+            // Check for new events
+            if (typeof checkAndGenerateEvents === 'function') {
+                setInterval(checkAndGenerateEvents, 300000);
+            }
         }
         
         init();
