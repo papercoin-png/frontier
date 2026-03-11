@@ -6,6 +6,8 @@
     <title>Voidfarer - Tax Center</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
@@ -64,6 +66,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -72,21 +76,21 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
             text-shadow: 0 0 30px #4a8ac0;
             animation: pulse 1.5s infinite;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #4a8ac0;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
         
         @keyframes spin {
@@ -481,6 +485,23 @@
             background: #6a8ac0;
             transform: translateX(-50%) scale(0.96);
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+
+        .positive { color: #4affaa; }
+        .negative { color: #ff6b6b; }
     </style>
 </head>
 <body>
@@ -498,8 +519,8 @@
                 <div class="player-info">
                     <div class="player-name" id="playerName">Loading...</div>
                     <div class="player-stats">
-                        <span>Paid: <span class="player-stat-value" id="totalPaid">0⭐</span></span>
-                        <span>Rate: <span class="player-stat-value" id="effectiveRate">0%</span></span>
+                        <span>Paid: <span class="player-stat-value" id="totalPaid">--⭐</span></span>
+                        <span>Rate: <span class="player-stat-value" id="effectiveRate">--%</span></span>
                     </div>
                 </div>
             </div>
@@ -508,21 +529,21 @@
             <div class="summary-grid">
                 <div class="summary-card">
                     <div class="summary-label">This Month</div>
-                    <div class="summary-value" id="monthlyTax">0</div>
+                    <div class="summary-value" id="monthlyTax">--</div>
                     <div class="summary-unit">⭐</div>
                     <div class="summary-period" id="monthlyChange"></div>
                 </div>
                 
                 <div class="summary-card">
                     <div class="summary-label">This Year</div>
-                    <div class="summary-value" id="yearlyTax">0</div>
+                    <div class="summary-value" id="yearlyTax">--</div>
                     <div class="summary-unit">⭐</div>
                     <div class="summary-period" id="yearlyChange"></div>
                 </div>
                 
                 <div class="summary-card">
                     <div class="summary-label">Lifetime</div>
-                    <div class="summary-value" id="lifetimeTax">0</div>
+                    <div class="summary-value" id="lifetimeTax">--</div>
                     <div class="summary-unit">⭐</div>
                 </div>
                 
@@ -537,7 +558,7 @@
             <div class="breakdown-section">
                 <div class="section-title">Tax Breakdown</div>
                 <div id="taxBreakdown">
-                    <!-- Filled by JavaScript -->
+                    <div style="color: #a0c0ff; text-align: center; padding: 20px;">Loading tax data...</div>
                 </div>
             </div>
             
@@ -572,7 +593,7 @@
             <div class="history-section">
                 <div class="section-title">Recent Transactions</div>
                 <div class="history-list" id="historyList">
-                    <!-- Filled by JavaScript -->
+                    <div style="color: #a0c0ff; text-align: center; padding: 20px;">Loading history...</div>
                 </div>
                 <button class="view-all-btn" onclick="viewAllHistory()">VIEW ALL HISTORY</button>
             </div>
@@ -583,18 +604,30 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">updating...</div>
+                <div class="loading-text" id="loadingText">loading tax data...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/tax-collector.js"></script>
-    <script src="js/tax-history.js"></script>
-    
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getPlayer,
+            getPlayerId,
+            getPlayerName,
+            getTaxHistory,
+            getPlayerTaxSummary as storageGetPlayerTaxSummary,
+            getCurrentRates,
+            getTaxExemptions,
+            getCredits
+        } from './js/storage.js';
+        import { getTaxAnalytics, getPlayerAnalytics麺 } from './js/tax-history.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -602,110 +635,148 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Chart instance
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
+        // ===== STATE =====
         let taxChart = null;
-        
-        // Player ID (would come from login system)
-        const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'player_1';
-        const PLAYER_NAME = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
-        
-        // Navigation
-        function returnToEarthHub() {
+        const PLAYER_ID = getPlayerId();
+
+        // ===== NAVIGATION =====
+        window.returnToEarthHub = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'earth-hub.html';
-        }
-        
-        function viewAllHistory() {
+        };
+
+        window.viewAllHistory = function() {
             alert('Full tax history would open here');
-        }
-        
+        };
+
         // ===== LOAD TAX DATA =====
-        function loadTaxData() {
-            loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
+        async function loadTaxData() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'calculating taxes...';
+
                 // Get player data
-                document.getElementById('playerName').textContent = PLAYER_NAME;
-                
-                // Get tax summary
-                const summary = getPlayerTaxSummary(PLAYER_ID, PLAYER_NAME);
-                const history = getPlayerTransactions(PLAYER_ID, 50);
-                const rates = getCurrentRates();
-                const exemptions = getTaxExemptions(PLAYER_ID);
-                
+                const player = await getPlayer();
+                const playerName = player?.name || 'Voidfarer';
+                document.getElementById('playerName').textContent = playerName;
+
+                // Load all tax data in parallel
+                const [
+                    history,
+                    rates,
+                    exemptions,
+                    analytics,
+                    playerAnalytics
+                ] = await Promise.all([
+                    getTaxHistory(PLAYER_ID, 100),
+                    getCurrentRates(),
+                    getTaxExemptions(PLAYER_ID),
+                    getTaxAnalytics(),
+                    getPlayerAnalytics(PLAYER_ID)
+                ]);
+
                 // Calculate totals
                 const now = Date.now();
                 const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
                 const yearAgo = now - (365 * 24 * 60 * 60 * 1000);
-                
+
                 const monthlyTransactions = history.filter(t => t.timestamp > monthAgo);
                 const yearlyTransactions = history.filter(t => t.timestamp > yearAgo);
-                
+
                 const monthlyTotal = monthlyTransactions.reduce((sum, t) => sum + t.amount, 0);
                 const yearlyTotal = yearlyTransactions.reduce((sum, t) => sum + t.amount, 0);
-                const lifetimeTotal = summary?.totalPaid || 0;
-                
-                // Calculate effective rate
-                const totalIncome = estimatePlayerIncome(); // Placeholder
+                const lifetimeTotal = history.reduce((sum, t) => sum + t.amount, 0);
+
+                // Calculate effective rate (placeholder)
+                const totalIncome = 50000; // Would come from player data
                 const effectiveRate = totalIncome > 0 ? (lifetimeTotal / totalIncome) * 100 : 0;
-                
+
                 // Update summary cards
                 document.getElementById('monthlyTax').textContent = formatMoney(monthlyTotal);
                 document.getElementById('yearlyTax').textContent = formatMoney(yearlyTotal);
                 document.getElementById('lifetimeTax').textContent = formatMoney(lifetimeTotal);
                 document.getElementById('totalPaid').textContent = formatMoney(lifetimeTotal);
                 document.getElementById('effectiveRate').textContent = effectiveRate.toFixed(1) + '%';
+
+                // Update monthly change (compare to previous month)
+                const prevMonth = monthAgo - (30 * 24 * 60 * 60 * 1000);
+                const prevMonthTransactions = history.filter(t => t.timestamp > prevMonth && t.timestamp <= monthAgo);
+                const prevMonthTotal = prevMonthTransactions.reduce((sum, t) => sum + t.amount, 0);
                 
-                // Update monthly change (simulated)
-                const lastMonth = monthlyTotal * 0.85; // Placeholder
-                const monthlyChange = ((monthlyTotal - lastMonth) / lastMonth) * 100;
+                const monthlyChange = prevMonthTotal > 0 
+                    ? ((monthlyTotal - prevMonthTotal) / prevMonthTotal) * 100 
+                    : monthlyTotal > 0 ? 100 : 0;
+                    
                 document.getElementById('monthlyChange').textContent = 
                     (monthlyChange > 0 ? '+' : '') + monthlyChange.toFixed(1) + '% vs last month';
                 document.getElementById('monthlyChange').className = 
                     monthlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
+
+                // Update yearly change (compare to previous year)
+                const prevYear = yearAgo - (365 * 24 * 60 * 60 * 1000);
+                const prevYearTransactions = history.filter(t => t.timestamp > prevYear && t.timestamp <= yearAgo);
+                const prevYearTotal = prevYearTransactions.reduce((sum, t) => sum + t.amount, 0);
                 
-                // Update yearly change (simulated)
-                const lastYear = yearlyTotal * 0.9; // Placeholder
-                const yearlyChange = ((yearlyTotal - lastYear) / lastYear) * 100;
+                const yearlyChange = prevYearTotal > 0 
+                    ? ((yearlyTotal - prevYearTotal) / prevYearTotal) * 100 
+                    : yearlyTotal > 0 ? 100 : 0;
+                    
                 document.getElementById('yearlyChange').textContent = 
                     (yearlyChange > 0 ? '+' : '') + yearlyChange.toFixed(1) + '% vs last year';
                 document.getElementById('yearlyChange').className = 
                     yearlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
-                
+
                 // Next due date (simulated)
                 const nextDate = new Date();
                 nextDate.setDate(nextDate.getDate() + 15);
                 document.getElementById('nextDue').textContent = 'Property Tax';
                 document.getElementById('nextDueDate').textContent = nextDate.toLocaleDateString();
-                
+
                 // Update tax breakdown
-                updateTaxBreakdown(summary?.byType || {});
-                
+                updateTaxBreakdown(playerAnalytics?.byType || {});
+
                 // Update tax rates
                 updateTaxRates(rates);
-                
+
                 // Update exemptions
                 updateExemptions(exemptions);
-                
+
                 // Update history
                 updateHistoryList(history.slice(0, 10));
-                
+
                 // Update chart
                 updateTaxChart(history);
-                
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
                 loadingOverlay.classList.remove('active');
-            }, 500);
+
+            } catch (error) {
+                console.error('Error loading tax data:', error);
+                loadingText.textContent = 'error loading data';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
         }
-        
+
         // ===== UPDATE TAX BREAKDOWN =====
         function updateTaxBreakdown(byType) {
             const container = document.getElementById('taxBreakdown');
             container.innerHTML = '';
-            
+
             const taxTypes = [
                 { key: 'transaction', name: 'Transaction Tax', desc: 'On all sales' },
                 { key: 'property', name: 'Property Tax', desc: 'Monthly on owned property' },
@@ -714,13 +785,13 @@
                 { key: 'estate', name: 'Estate Tax', desc: 'On transfers' },
                 { key: 'registration', name: 'Registration', desc: 'One-time fees' }
             ];
-            
+
             let hasAny = false;
-            
+
             taxTypes.forEach(type => {
                 const amount = byType[type.key] || 0;
                 if (amount > 0) hasAny = true;
-                
+
                 const item = document.createElement('div');
                 item.className = 'tax-item';
                 item.innerHTML = `
@@ -733,10 +804,10 @@
                         <div class="tax-amount-period">lifetime</div>
                     </div>
                 `;
-                
+
                 container.appendChild(item);
             });
-            
+
             if (!hasAny) {
                 container.innerHTML = `
                     <div style="color: #a0c0ff; text-align: center; padding: 20px;">
@@ -745,12 +816,12 @@
                 `;
             }
         }
-        
+
         // ===== UPDATE TAX RATES =====
         function updateTaxRates(rates) {
             const container = document.getElementById('taxRates');
             container.innerHTML = '';
-            
+
             const rateItems = [
                 { key: 'transaction', name: 'Transaction', rate: rates.transaction, bracket: 'on all sales' },
                 { key: 'property', name: 'Property', rate: rates.property, bracket: 'monthly' },
@@ -759,33 +830,33 @@
                 { key: 'estate', name: 'Estate', rate: rates.estate, bracket: 'on transfers' },
                 { key: 'registration', name: 'Registration', rate: rates.registration, bracket: 'one-time' }
             ];
-            
+
             rateItems.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'rate-item';
-                
+
                 let rateDisplay = item.key === 'registration' ? 
                     item.rate + '⭐' : 
                     (item.rate * 100).toFixed(1) + '%';
-                
+
                 div.innerHTML = `
                     <div class="rate-label">${item.name}</div>
                     <div class="rate-value">${rateDisplay}</div>
                     <div class="rate-bracket">${item.bracket}</div>
                 `;
-                
+
                 container.appendChild(div);
             });
         }
-        
+
         // ===== UPDATE EXEMPTIONS =====
         function updateExemptions(exemptions) {
             const section = document.getElementById('exemptionsSection');
             const list = document.getElementById('exemptionsList');
-            
+
             let hasExemptions = false;
             list.innerHTML = '';
-            
+
             if (exemptions.transaction > 0) {
                 hasExemptions = true;
                 const item = document.createElement('div');
@@ -796,7 +867,7 @@
                 `;
                 list.appendChild(item);
             }
-            
+
             if (exemptions.property > 0) {
                 hasExemptions = true;
                 const item = document.createElement('div');
@@ -807,7 +878,7 @@
                 `;
                 list.appendChild(item);
             }
-            
+
             if (exemptions.income > 0) {
                 hasExemptions = true;
                 const item = document.createElement('div');
@@ -818,7 +889,7 @@
                 `;
                 list.appendChild(item);
             }
-            
+
             if (exemptions.luxury) {
                 hasExemptions = true;
                 const item = document.createElement('div');
@@ -829,19 +900,19 @@
                 `;
                 list.appendChild(item);
             }
-            
+
             if (hasExemptions) {
                 section.style.display = 'block';
             } else {
                 section.style.display = 'none';
             }
         }
-        
+
         // ===== UPDATE HISTORY LIST =====
         function updateHistoryList(history) {
             const container = document.getElementById('historyList');
             container.innerHTML = '';
-            
+
             if (history.length === 0) {
                 container.innerHTML = `
                     <div style="color: #a0c0ff; text-align: center; padding: 20px;">
@@ -850,11 +921,11 @@
                 `;
                 return;
             }
-            
+
             history.forEach(tx => {
                 const date = new Date(tx.timestamp);
                 const formattedDate = date.toLocaleDateString();
-                
+
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 item.innerHTML = `
@@ -862,39 +933,39 @@
                     <span class="history-type">${getTaxTypeName(tx.taxType)}</span>
                     <span class="history-amount">${formatMoney(tx.amount)}</span>
                 `;
-                
+
                 container.appendChild(item);
             });
         }
-        
+
         // ===== UPDATE TAX CHART =====
         function updateTaxChart(history) {
             const ctx = document.getElementById('taxChart').getContext('2d');
-            
+
             // Group by day for last 30 days
             const now = Date.now();
             const dayMs = 24 * 60 * 60 * 1000;
             const labels = [];
             const data = [];
-            
+
             for (let i = 29; i >= 0; i--) {
                 const date = new Date(now - (i * dayMs));
                 labels.push(`${date.getMonth()+1}/${date.getDate()}`);
-                
+
                 const dayStart = now - (i * dayMs);
                 const dayEnd = dayStart + dayMs;
-                
+
                 const dayTotal = history
                     .filter(tx => tx.timestamp >= dayStart && tx.timestamp < dayEnd)
                     .reduce((sum, tx) => sum + tx.amount, 0);
-                
+
                 data.push(dayTotal);
             }
-            
+
             if (taxChart) {
                 taxChart.destroy();
             }
-            
+
             taxChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -942,7 +1013,7 @@
                 }
             });
         }
-        
+
         // ===== HELPER FUNCTIONS =====
         function getTaxTypeName(type) {
             const names = {
@@ -951,39 +1022,51 @@
                 'income': 'Income',
                 'luxury': 'Luxury',
                 'estate': 'Estate',
-                'registration': 'Registration'
+                'registration': 'Registration',
+                'refund': 'Refund'
             };
             return names[type] || type;
         }
-        
+
         function formatMoney(amount) {
             if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B';
             if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M';
             if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K';
             return amount.toString();
         }
-        
-        function estimatePlayerIncome() {
-            // Placeholder - in real implementation, would calculate from player data
-            return 50000;
-        }
-        
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'accessing tax center...';
+
+                // Check for player data
+                const credits = await getCredits();
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load tax data
+                await loadTaxData();
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            // Store player info
-            const playerData = JSON.parse(player);
-            localStorage.setItem('voidfarer_player_id', 'player_1');
-            localStorage.setItem('voidfarer_player_name', playerData.name || 'Voidfarer');
-            
-            loadTaxData();
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
