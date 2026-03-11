@@ -6,6 +6,8 @@
     <title>Voidfarer - Warp Drive</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -158,6 +160,7 @@
             min-width: 150px;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            pointer-events: auto;
         }
         
         .skip-btn:active {
@@ -193,6 +196,20 @@
             .cycle-counter { bottom: max(160px, env(safe-area-inset-bottom) + 90px); }
             .skip-btn { bottom: max(30px, env(safe-area-inset-bottom)); }
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -201,7 +218,7 @@
         
         <div class="warp-overlay">
             <div class="destination-info" id="destinationName">Warping to...</div>
-            <div class="distance-detail" id="distanceDetail">2.3 LY • 1 cycle</div>
+            <div class="distance-detail" id="distanceDetail">-- LY • -- cycle</div>
             
             <div class="warp-status" id="warpStatus">WARP DRIVE ACTIVE</div>
             
@@ -213,9 +230,33 @@
             
             <button class="skip-btn" id="skipBtn" onclick="skipWarp()">SKIP WARP</button>
         </div>
+
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
+    <script type="module">
+        // ===== IMPORTS =====
+        import { getWarpData, clearWarpData, getCredits, useFuel } from './js/storage.js';
+        import { 
+            WARP_CONFIG,
+            getCycleProgress,
+            getWarpSpeedFactor,
+            getTotalWarpProgress,
+            getCurrentCycle,
+            isWarpComplete,
+            getWarpStatusMessage
+        } from './js/warp-calculator.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
         const canvas = document.getElementById('warpCanvas');
         const ctx = canvas.getContext('2d');
         const skipBtn = document.getElementById('skipBtn');
@@ -224,36 +265,24 @@
         const cycleCounter = document.getElementById('cycleCounter');
         const destinationName = document.getElementById('destinationName');
         const distanceDetail = document.getElementById('distanceDetail');
-        
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-        }
-        
-        // ===== GET WARP DATA =====
-        const destination = localStorage.getItem('voidfarer_warp_destination') || 'Unknown Destination';
-        const returnPage = localStorage.getItem('voidfarer_warp_return') || 'galaxy-map.html';
-        const cycles = parseInt(localStorage.getItem('voidfarer_warp_cycles')) || 1;
-        
-        // Calculate distance (rough estimate based on cycles)
-        const distance = (cycles * 2.3).toFixed(1);
-        
-        destinationName.textContent = '→ ' + destination;
-        distanceDetail.innerHTML = `${distance} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}`;
-        cycleCounter.textContent = `Cycle 1 of ${cycles}`;
-        
+        const migrationStatus = document.getElementById('migrationStatus');
+
         // ===== WARP STATE =====
+        let destination = 'Unknown Destination';
+        let returnPage = 'galaxy-map.html';
+        let cycles = 1;
+        let distance = 0;
+        let fuel = 0;
         let currentCycle = 1;
-        let cycleProgress = 0;
         let animationFrame;
         let startTime = Date.now();
         const CYCLE_DURATION = 2000; // 2 seconds per cycle
-        
+
         // ===== STARS =====
         const stars = [];
         const STAR_COUNT = 400;
-        
+
+        // Initialize stars
         for (let i = 0; i < STAR_COUNT; i++) {
             stars.push({
                 x: (Math.random() - 0.5) * 2000,
@@ -262,7 +291,51 @@
                 speed: 30 + Math.random() * 40
             });
         }
-        
+
+        // ===== LOAD WARP DATA =====
+        async function loadWarpData() {
+            try {
+                // Get warp data from storage
+                const warpData = getWarpData();
+                
+                destination = warpData.destination;
+                returnPage = warpData.returnPage;
+                cycles = warpData.cycles || 1;
+                distance = warpData.distance || 0;
+                fuel = warpData.fuel || 0;
+
+                // Update UI
+                destinationName.textContent = '→ ' + destination;
+                distanceDetail.innerHTML = `${distance.toFixed(1)} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}`;
+                cycleCounter.textContent = `Cycle 1 of ${cycles}`;
+
+                // Check if player has enough fuel
+                const credits = await getCredits();
+                if (credits < fuel) {
+                    console.warn('Not enough fuel for warp!');
+                    // Still allow warp for gameplay, but log warning
+                }
+
+                // Use fuel
+                if (fuel > 0) {
+                    useFuel(fuel);
+                }
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error loading warp data:', error);
+                // Use defaults
+                destinationName.textContent = '→ Unknown Destination';
+            }
+        }
+
         // ===== RESIZE CANVAS =====
         function resizeCanvas() {
             canvas.width = window.innerWidth;
@@ -270,53 +343,54 @@
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
-        
+
         // ===== UPDATE CYCLE =====
         function updateCycle() {
             const elapsed = Date.now() - startTime;
             const totalDuration = cycles * CYCLE_DURATION;
             const progress = Math.min(elapsed / totalDuration, 1);
-            
+
             // Update progress bar
             progressBar.style.width = (progress * 100) + '%';
-            
+
             // Calculate current cycle
             const newCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
             if (newCycle <= cycles && newCycle !== currentCycle) {
                 currentCycle = newCycle;
                 cycleCounter.textContent = `Cycle ${currentCycle} of ${cycles}`;
-                
+
                 // Haptic feedback on cycle change
                 if (tg?.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('light');
                 }
-                
+
                 // Flash effect
                 warpStatus.style.opacity = '1';
+                warpStatus.textContent = getWarpStatusMessage(currentCycle, cycles);
                 setTimeout(() => {
                     warpStatus.style.opacity = '0';
                 }, 200);
             }
-            
+
             // Check if warp complete
             if (elapsed >= totalDuration) {
                 completeWarp();
             }
-            
+
             return progress;
         }
-        
+
         // ===== DRAW WARP EFFECT =====
         function drawWarp(progress) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            
+
             // Calculate warp intensity based on progress within current cycle
             const cycleElapsed = (Date.now() - startTime) % CYCLE_DURATION;
             const cycleProgress = cycleElapsed / CYCLE_DURATION;
-            
+
             // Speed factor: peak at middle of cycle
             let speedFactor;
             if (cycleProgress < 0.3) {
@@ -329,54 +403,54 @@
                 // Full speed
                 speedFactor = 1.0;
             }
-            
+
             // Overall progress factor (slows down near end)
             const overallProgress = (Date.now() - startTime) / (cycles * CYCLE_DURATION);
             const finalApproach = Math.max(0, 1 - overallProgress * 1.5);
-            
+
             stars.forEach(s => {
                 // Update star position
                 s.z -= s.speed * speedFactor * (0.5 + finalApproach * 0.5);
-                
+
                 // Reset stars that pass by
                 if (s.z < 1) {
                     s.z = 2000;
                     s.x = (Math.random() - 0.5) * 2000;
                     s.y = (Math.random() - 0.5) * 2000;
                 }
-                
+
                 // Project to 2D
                 const factor = 500 / s.z;
                 const x = s.x * factor + centerX;
                 const y = s.y * factor + centerY;
-                
+
                 // Skip if outside view
                 if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) return;
-                
+
                 // Calculate brightness and size
                 const brightness = Math.min(1, 0.3 + (2000 - s.z) / 2000);
                 const size = 1 + (2000 - s.z) / 200 * speedFactor;
-                
+
                 // Draw star
                 ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
                 ctx.beginPath();
                 ctx.arc(x, y, size, 0, Math.PI * 2);
                 ctx.fill();
-                
+
                 // Draw streak for faster stars
                 if (s.z < 800 && speedFactor > 0.5) {
                     ctx.strokeStyle = `rgba(100, 150, 255, ${brightness * 0.3})`;
                     ctx.lineWidth = size * 1.5;
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                    
+
                     const streakX = (s.x / s.z) * 30 * speedFactor;
                     const streakY = (s.y / s.z) * 30 * speedFactor;
                     ctx.lineTo(x + streakX, y + streakY);
                     ctx.stroke();
                 }
             });
-            
+
             // Draw central glow
             const glowSize = 50 + Math.sin(Date.now() / 200) * 10;
             const gradient = ctx.createRadialGradient(
@@ -385,58 +459,72 @@
             );
             gradient.addColorStop(0, `rgba(100, 150, 255, ${0.2 * speedFactor})`);
             gradient.addColorStop(1, 'transparent');
-            
+
             ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(centerX, centerY, glowSize, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         // ===== ANIMATION LOOP =====
         function animate() {
             const progress = updateCycle();
             drawWarp(progress);
-            
+
             animationFrame = requestAnimationFrame(animate);
         }
-        
+
         // ===== COMPLETE WARP =====
         function completeWarp() {
             // Clear warp data
-            localStorage.removeItem('voidfarer_warp_destination');
-            localStorage.removeItem('voidfarer_warp_cycles');
-            localStorage.removeItem('voidfarer_warp_return');
-            
+            clearWarpData();
+
             // Navigate to destination
             window.location.href = returnPage;
         }
-        
+
         // ===== SKIP WARP =====
-        function skipWarp() {
+        window.skipWarp = function() {
             if (tg?.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('medium');
             }
-            
+
             skipBtn.classList.add('hidden');
             completeWarp();
-        }
-        
+        };
+
         // ===== CLEANUP =====
         window.addEventListener('beforeunload', () => {
             if (animationFrame) {
                 cancelAnimationFrame(animationFrame);
             }
         });
-        
-        // ===== START ANIMATION =====
-        setTimeout(() => {
-            warpStatus.classList.add('visible');
-            setTimeout(() => {
-                warpStatus.classList.remove('visible');
-            }, 2000);
-        }, 100);
-        
-        animate();
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                // Load warp data
+                await loadWarpData();
+
+                // Start animation
+                setTimeout(() => {
+                    warpStatus.classList.add('visible');
+                    setTimeout(() => {
+                        warpStatus.classList.remove('visible');
+                    }, 2000);
+                }, 100);
+
+                animate();
+
+            } catch (error) {
+                console.error('Init error:', error);
+                // Still try to animate with defaults
+                animate();
+            }
+        }
+
+        // ===== START =====
+        init();
     </script>
 </body>
 </html>
