@@ -1,15 +1,18 @@
-// galaxy-data.js
+// js/galaxy-data.js
 // Galaxy structure and sector data for Voidfarer's shared procedural universe
 // Defines the 12 sectors of the Milky Way and their properties
+// Static data with minimal dependencies
+
+import { getCollection } from './storage.js';
 
 // ===== CONSTANTS =====
-const GALAXY_SEED = 42793; // Must match procedural-universe.js
+export const GALAXY_SEED = 42793; // Must match procedural-universe.js
 
 // ===== SECTOR DEFINITIONS =====
 // 12 sectors in a 3x4 grid (A1 through C4)
 // Each sector contains 6 nebulae
 
-const SECTORS = [
+export const SECTORS = [
     // Row 1 (top)
     {
         id: 'A1',
@@ -191,7 +194,7 @@ const SECTORS = [
 // ===== NEBULA NAMES BY SECTOR =====
 // Each sector has 6 nebulae (procedurally generated, but names are fixed for reference)
 
-const SECTOR_NEBULAE = {
+export const SECTOR_NEBULAE = {
     'A1': ['Cygnus Nebula', 'Veil Nebula', 'Crescent Nebula', 'Butterfly Nebula', 'Blinking Nebula', 'Propeller Nebula'],
     'B1': ['Perseus Nebula', 'California Nebula', 'Heart Nebula', 'Soul Nebula', 'Little Dumbbell', 'Medusa Nebula'],
     'C1': ['Outer Nebula', 'Bubble Nebula', 'Crab Nebula', 'Jellyfish Nebula', 'Pelican Nebula', 'Flaming Star'],
@@ -209,7 +212,7 @@ const SECTOR_NEBULAE = {
 // ===== SECTOR NEIGHBORS =====
 // Which sectors are adjacent (for navigation/warp calculations)
 
-const SECTOR_CONNECTIONS = {
+export const SECTOR_CONNECTIONS = {
     'A1': ['B1', 'A2'],
     'B1': ['A1', 'C1', 'B2'],
     'C1': ['B1', 'C2'],
@@ -225,7 +228,7 @@ const SECTOR_CONNECTIONS = {
 };
 
 // ===== GALAXY STATISTICS =====
-const GALAXY_STATS = {
+export const GALAXY_STATS = {
     totalSectors: SECTORS.length,
     totalNebulae: SECTORS.length * 6, // 12 sectors × 6 nebulae = 72
     totalStars: SECTORS.length * 6 * 50, // 72 nebulae × 50 stars = 3,600
@@ -242,7 +245,7 @@ const GALAXY_STATS = {
 // ===== NOTABLE LOCATIONS =====
 // Hand-crafted special locations for players to discover
 
-const NOTABLE_LOCATIONS = [
+export const NOTABLE_LOCATIONS = [
     {
         name: 'Earth',
         sector: 'B2',
@@ -286,17 +289,17 @@ const NOTABLE_LOCATIONS = [
 // ===== HELPER FUNCTIONS =====
 
 // Get sector by ID
-function getSector(sectorId) {
+export function getSector(sectorId) {
     return SECTORS.find(s => s.id === sectorId) || SECTORS[4]; // Default to B2 (Orion Arm)
 }
 
 // Get sector by name
-function getSectorByName(name) {
+export function getSectorByName(name) {
     return SECTORS.find(s => s.name === name) || SECTORS[4];
 }
 
 // Get current sector (from localStorage or default to B2)
-function getCurrentSector() {
+export function getCurrentSector() {
     if (typeof localStorage !== 'undefined') {
         const saved = localStorage.getItem('voidfarer_current_galaxy_sector');
         if (saved) return getSector(saved);
@@ -305,17 +308,30 @@ function getCurrentSector() {
 }
 
 // Get nebulae for a sector
-function getNebulaeForSector(sectorId) {
+export function getNebulaeForSector(sectorId) {
     return SECTOR_NEBULAE[sectorId] || SECTOR_NEBULAE['B2'];
 }
 
-// Check if sector is explored (based on player data)
-function isSectorExplored(sectorId, collection = {}) {
+// Check if sector is explored (based on player collection) - NOW ASYNC
+export async function isSectorExplored(sectorId, collection = null) {
+    // If collection not provided, try to get it
+    if (!collection) {
+        try {
+            collection = await getCollection();
+        } catch (e) {
+            console.warn('Could not load collection for exploration check', e);
+            return false;
+        }
+    }
+    
     if (!collection || typeof collection !== 'object') return false;
     
     // Check if any element was found in this sector
-    for (const element of Object.values(collection)) {
-        if (element.location?.sector === sectorId) {
+    // Note: This assumes elements have location data with sector info
+    // You may need to adjust this based on your actual data structure
+    for (const elementName of Object.keys(collection)) {
+        const elementData = collection[elementName];
+        if (elementData?.location?.sector === sectorId) {
             return true;
         }
     }
@@ -323,9 +339,17 @@ function isSectorExplored(sectorId, collection = {}) {
     return false;
 }
 
-// Get exploration percentage for a sector
-function getSectorExplorationPercentage(sectorId, collection = {}) {
-    if (!collection || typeof collection !== 'object') return 0;
+// Get exploration percentage for a sector - NOW ASYNC
+export async function getSectorExplorationPercentage(sectorId, collection = null) {
+    // If collection not provided, try to get it
+    if (!collection) {
+        try {
+            collection = await getCollection();
+        } catch (e) {
+            console.warn('Could not load collection for exploration percentage', e);
+            return 0;
+        }
+    }
     
     const sector = getSector(sectorId);
     if (!sector) return 0;
@@ -335,8 +359,9 @@ function getSectorExplorationPercentage(sectorId, collection = {}) {
     
     // Boost based on player discoveries
     let discoveries = 0;
-    for (const element of Object.values(collection)) {
-        if (element.location?.sector === sectorId) {
+    for (const elementName of Object.keys(collection)) {
+        const elementData = collection[elementName];
+        if (elementData?.location?.sector === sectorId) {
             discoveries++;
         }
     }
@@ -348,7 +373,7 @@ function getSectorExplorationPercentage(sectorId, collection = {}) {
 }
 
 // Calculate warp distance between sectors
-function getWarpDistance(fromSector, toSector) {
+export function getWarpDistance(fromSector, toSector) {
     const from = getSector(fromSector);
     const to = getSector(toSector);
     
@@ -368,70 +393,81 @@ function getWarpDistance(fromSector, toSector) {
 }
 
 // Get warp fuel cost between sectors
-function getWarpFuelCost(fromSector, toSector) {
+export function getWarpFuelCost(fromSector, toSector) {
     const distance = getWarpDistance(fromSector, toSector);
     return Math.ceil(distance * 10);
 }
 
-// Get all visited sectors from collection
-function getVisitedSectors(collection = {}) {
+// Get all visited sectors from collection - NOW ASYNC
+export async function getVisitedSectors(collection = null) {
+    // If collection not provided, try to get it
+    if (!collection) {
+        try {
+            collection = await getCollection();
+        } catch (e) {
+            console.warn('Could not load collection for visited sectors', e);
+            return [];
+        }
+    }
+    
     const visited = new Set();
     
-    for (const element of Object.values(collection)) {
-        if (element.location?.sector) {
-            visited.add(element.location.sector);
+    for (const elementName of Object.keys(collection)) {
+        const elementData = collection[elementName];
+        if (elementData?.location?.sector) {
+            visited.add(elementData.location.sector);
         }
     }
     
     return Array.from(visited).sort();
 }
 
-// Get unexplored sectors
-function getUnexploredSectors(collection = {}) {
-    const visited = getVisitedSectors(collection);
+// Get unexplored sectors - NOW ASYNC
+export async function getUnexploredSectors(collection = null) {
+    const visited = await getVisitedSectors(collection);
     return SECTORS.filter(s => !visited.includes(s.id)).map(s => s.id);
 }
 
 // Get sector color
-function getSectorColor(sectorId) {
+export function getSectorColor(sectorId) {
     const sector = getSector(sectorId);
     return sector?.color || '#8a6aff';
 }
 
 // Check if two sectors are adjacent
-function areSectorsAdjacent(sector1, sector2) {
+export function areSectorsAdjacent(sector1, sector2) {
     const connections = SECTOR_CONNECTIONS[sector1];
     return connections?.includes(sector2) || false;
 }
 
 // Get neighboring sectors
-function getNeighboringSectors(sectorId) {
+export function getNeighboringSectors(sectorId) {
     return SECTOR_CONNECTIONS[sectorId] || [];
 }
 
 // Get sector description
-function getSectorDescription(sectorId) {
+export function getSectorDescription(sectorId) {
     const sector = getSector(sectorId);
     return sector?.description || 'Unknown region of space.';
 }
 
 // Get sector distance from Earth
-function getSectorDistance(sectorId) {
+export function getSectorDistance(sectorId) {
     const sector = getSector(sectorId);
     return sector?.distanceFromEarth || 'Unknown';
 }
 
 // Format sector coordinates for display
-function formatSectorCoordinates(sectorId) {
+export function formatSectorCoordinates(sectorId) {
     const sector = getSector(sectorId);
     if (!sector) return 'Unknown';
     
     return `${sector.name} (Sector ${sectorId})`;
 }
 
-// Get random unexplored sector (for mission generation)
-function getRandomUnexploredSector(collection = {}) {
-    const unexplored = getUnexploredSectors(collection);
+// Get random unexplored sector (for mission generation) - NOW ASYNC
+export async function getRandomUnexploredSector(collection = null) {
+    const unexplored = await getUnexploredSectors(collection);
     
     if (unexplored.length === 0) {
         // All sectors explored, return random sector
@@ -443,13 +479,13 @@ function getRandomUnexploredSector(collection = {}) {
     return unexplored[randomIndex];
 }
 
-// Get sector statistics summary
-function getSectorSummary(sectorId, collection = {}) {
+// Get sector statistics summary - NOW ASYNC
+export async function getSectorSummary(sectorId, collection = null) {
     const sector = getSector(sectorId);
     if (!sector) return null;
     
-    const visited = isSectorExplored(sectorId, collection);
-    const percentage = getSectorExplorationPercentage(sectorId, collection);
+    const visited = await isSectorExplored(sectorId, collection);
+    const percentage = await getSectorExplorationPercentage(sectorId, collection);
     const neighbors = getNeighboringSectors(sectorId);
     const nebulae = getNebulaeForSector(sectorId);
     
@@ -468,9 +504,9 @@ function getSectorSummary(sectorId, collection = {}) {
     };
 }
 
-// Get galaxy overview statistics
-function getGalaxyOverview(collection = {}) {
-    const visited = getVisitedSectors(collection);
+// Get galaxy overview statistics - NOW ASYNC
+export async function getGalaxyOverview(collection = null) {
+    const visited = await getVisitedSectors(collection);
     
     return {
         totalSectors: GALAXY_STATS.totalSectors,
@@ -485,31 +521,29 @@ function getGalaxyOverview(collection = {}) {
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        SECTORS,
-        SECTOR_NEBULAE,
-        SECTOR_CONNECTIONS,
-        GALAXY_STATS,
-        NOTABLE_LOCATIONS,
-        getSector,
-        getSectorByName,
-        getCurrentSector,
-        getNebulaeForSector,
-        isSectorExplored,
-        getSectorExplorationPercentage,
-        getWarpDistance,
-        getWarpFuelCost,
-        getVisitedSectors,
-        getUnexploredSectors,
-        getSectorColor,
-        areSectorsAdjacent,
-        getNeighboringSectors,
-        getSectorDescription,
-        getSectorDistance,
-        formatSectorCoordinates,
-        getRandomUnexploredSector,
-        getSectorSummary,
-        getGalaxyOverview
-    };
-}
+export default {
+    SECTORS,
+    SECTOR_NEBULAE,
+    SECTOR_CONNECTIONS,
+    GALAXY_STATS,
+    NOTABLE_LOCATIONS,
+    getSector,
+    getSectorByName,
+    getCurrentSector,
+    getNebulaeForSector,
+    isSectorExplored,
+    getSectorExplorationPercentage,
+    getWarpDistance,
+    getWarpFuelCost,
+    getVisitedSectors,
+    getUnexploredSectors,
+    getSectorColor,
+    areSectorsAdjacent,
+    getNeighboringSectors,
+    getSectorDescription,
+    getSectorDistance,
+    formatSectorCoordinates,
+    getRandomUnexploredSector,
+    getSectorSummary,
+    getGalaxyOverview
+};
