@@ -1,5 +1,15 @@
-// economic-metrics.js - Core economic tracking for Voidfarer
+// js/economic-metrics.js - Core economic tracking for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Tracks money supply, inflation, wealth distribution, and economic health
+
+import { 
+    getItem,
+    setItem,
+    getAll,
+    getAllFromIndex,
+    getPlayer,
+    getCollection
+} from './storage.js';
 
 // ===== STORAGE KEYS =====
 const METRICS_KEYS = {
@@ -12,7 +22,7 @@ const METRICS_KEYS = {
 };
 
 // ===== TARGET RANGES =====
-const TARGET_RANGES = {
+export const TARGET_RANGES = {
     INFLATION: { min: 0.02, max: 0.05, ideal: 0.035 }, // 2-5%, ideal 3.5%
     GINI: { min: 0.3, max: 0.4, ideal: 0.35 }, // Gini coefficient
     POOL_EFFICIENCY: { min: 0.8, max: 1.2, ideal: 1.0 }, // 80-120%
@@ -22,39 +32,43 @@ const TARGET_RANGES = {
 };
 
 // ===== INITIALIZE METRICS =====
-function initializeMetrics() {
-    // Set initial money supply if not exists
+export async function initializeMetrics() {
+    // Set initial money supply if not exists (keep in localStorage for quick access)
     if (!localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) {
         localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, '5000000'); // 5M starting credits
     }
     
-    // Initialize empty metrics array if not exists
-    if (!localStorage.getItem(METRICS_KEYS.DAILY_METRICS)) {
-        localStorage.setItem(METRICS_KEYS.DAILY_METRICS, JSON.stringify([]));
+    // Initialize daily metrics in IndexedDB
+    const metrics = await getAll('dailyMetrics');
+    if (metrics.length === 0) {
+        // No metrics yet, that's fine
     }
     
-    // Initialize hourly snapshots
-    if (!localStorage.getItem(METRICS_KEYS.HOURLY_SNAPSHOTS)) {
-        localStorage.setItem(METRICS_KEYS.HOURLY_SNAPSHOTS, JSON.stringify([]));
+    // Initialize hourly snapshots in IndexedDB
+    const snapshots = await getAll('hourlySnapshots');
+    if (snapshots.length === 0) {
+        // No snapshots yet, that's fine
     }
     
     // Set initial player count
-    updatePlayerCount();
+    await updatePlayerCount();
+    
+    console.log('Economic metrics initialized');
 }
 
-// ===== MONEY SUPPLY TRACKING =====
-function getTotalMoneySupply() {
+// ===== MONEY SUPPLY TRACKING (keep in localStorage for speed) =====
+export function getTotalMoneySupply() {
     return parseInt(localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) || 5000000;
 }
 
-function addMoneyToSupply(amount) {
+export function addMoneyToSupply(amount) {
     const current = getTotalMoneySupply();
     const newTotal = current + amount;
     localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
     return newTotal;
 }
 
-function removeMoneyFromSupply(amount) {
+export function removeMoneyFromSupply(amount) {
     const current = getTotalMoneySupply();
     const newTotal = Math.max(0, current - amount);
     localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
@@ -62,31 +76,38 @@ function removeMoneyFromSupply(amount) {
 }
 
 // ===== PLAYER COUNT TRACKING =====
-function updatePlayerCount() {
-    // This would be called whenever a player joins or leaves
-    // For now, estimate based on localStorage
-    const players = getActivePlayers();
-    localStorage.setItem(METRICS_KEYS.PLAYER_COUNT, players.length.toString());
-    return players.length;
+export async function updatePlayerCount() {
+    // In a real implementation, this would count all players
+    // For now, estimate based on player data
+    const player = await getPlayer();
+    const count = player ? 1 : 0;
+    localStorage.setItem(METRICS_KEYS.PLAYER_COUNT, count.toString());
+    return count;
 }
 
-function getActivePlayers() {
-    // In a real implementation, this would query all player data
-    // For now, return placeholder
-    const playerData = localStorage.getItem('voidfarer_player');
-    return playerData ? [JSON.parse(playerData)] : [];
-}
-
-function getPlayerCount() {
+export function getPlayerCount() {
     return parseInt(localStorage.getItem(METRICS_KEYS.PLAYER_COUNT)) || 1;
 }
 
 // ===== WEALTH DISTRIBUTION =====
-function calculateWealthDistribution() {
+export async function calculateWealthDistribution() {
     // This would gather all player wealth in real implementation
-    // For now, return sample data
+    // For now, return sample data based on current player
     const totalWealth = getTotalMoneySupply();
     const playerCount = getPlayerCount();
+    
+    // Get player's collection value
+    const collection = await getCollection();
+    let playerWealth = 0;
+    for (const [name, data] of Object.entries(collection)) {
+        const value = getElementValue(name);
+        playerWealth += (data.count || 1) * value;
+    }
+    
+    const player = await getPlayer();
+    if (player && player.credits) {
+        playerWealth += player.credits;
+    }
     
     // Simulate realistic distribution (Pareto principle)
     const wealthData = [];
@@ -103,11 +124,16 @@ function calculateWealthDistribution() {
         }
     }
     
+    // Insert player at appropriate position (simplified)
+    if (playerCount === 1) {
+        return [playerWealth];
+    }
+    
     return wealthData.sort((a, b) => b - a);
 }
 
-function calculateGiniCoefficient() {
-    const wealthData = calculateWealthDistribution();
+export async function calculateGiniCoefficient() {
+    const wealthData = await calculateWealthDistribution();
     const n = wealthData.length;
     
     if (n === 0) return 0;
@@ -128,8 +154,8 @@ function calculateGiniCoefficient() {
     return Math.min(1, Math.max(0, gini));
 }
 
-function getWealthPercentiles() {
-    const wealthData = calculateWealthDistribution();
+export async function getWealthPercentiles() {
+    const wealthData = await calculateWealthDistribution();
     const totalWealth = wealthData.reduce((a, b) => a + b, 0);
     const n = wealthData.length;
     
@@ -151,8 +177,8 @@ function getWealthPercentiles() {
 }
 
 // ===== INFLATION CALCULATION =====
-function calculateInflationRate() {
-    const metrics = getDailyMetrics();
+export async function calculateInflationRate() {
+    const metrics = await getDailyMetrics();
     
     if (metrics.length < 2) return 0.03; // Default 3%
     
@@ -170,10 +196,10 @@ function calculateInflationRate() {
 }
 
 // ===== MONEY VELOCITY =====
-function calculateMoneyVelocity() {
+export async function calculateMoneyVelocity() {
     // Money velocity = GDP / Money Supply
     // GDP approximated by total transactions
-    const metrics = getDailyMetrics();
+    const metrics = await getDailyMetrics();
     if (metrics.length < 7) return 1.0;
     
     const recentMetrics = metrics.slice(-7);
@@ -183,18 +209,25 @@ function calculateMoneyVelocity() {
     return moneySupply > 0 ? avgDailyTransactions / moneySupply : 0.5;
 }
 
-// ===== DAILY METRICS =====
-function getDailyMetrics() {
-    const data = localStorage.getItem(METRICS_KEYS.DAILY_METRICS);
-    return data ? JSON.parse(data) : [];
+// ===== DAILY METRICS (IndexedDB) =====
+export async function getDailyMetrics() {
+    return await getAll('dailyMetrics');
 }
 
-function saveDailyMetrics(metrics) {
-    localStorage.setItem(METRICS_KEYS.DAILY_METRICS, JSON.stringify(metrics));
+export async function saveDailyMetrics(metrics) {
+    // Clear and rebuild (simpler than diffing)
+    const db = await getDb();
+    const tx = db.transaction('dailyMetrics', 'readwrite');
+    await tx.objectStore('dailyMetrics').clear();
+    
+    for (const metric of metrics) {
+        await tx.objectStore('dailyMetrics').put(metric);
+    }
+    await tx.done;
 }
 
-function recordDailyMetrics() {
-    const metrics = getDailyMetrics();
+export async function recordDailyMetrics() {
+    const metrics = await getDailyMetrics();
     const today = new Date().toISOString().split('T')[0];
     
     // Check if we already recorded today
@@ -202,19 +235,19 @@ function recordDailyMetrics() {
         return metrics[metrics.length - 1];
     }
     
-    const wealthPercentiles = getWealthPercentiles();
-    const gini = calculateGiniCoefficient();
+    const wealthPercentiles = await getWealthPercentiles();
+    const gini = await calculateGiniCoefficient();
     
     const dailyMetric = {
         date: today,
         moneySupply: getTotalMoneySupply(),
         playerCount: getPlayerCount(),
-        inflation: calculateInflationRate(),
+        inflation: await calculateInflationRate(),
         gini: gini,
         wealthTop1: wealthPercentiles.top1Percent,
         wealthTop10: wealthPercentiles.top10Percent,
         wealthBottom50: wealthPercentiles.bottom50Percent,
-        moneyVelocity: calculateMoneyVelocity(),
+        moneyVelocity: await calculateMoneyVelocity(),
         transactionVolume: estimateTransactionVolume(),
         timestamp: Date.now()
     };
@@ -226,20 +259,30 @@ function recordDailyMetrics() {
         metrics.shift();
     }
     
-    saveDailyMetrics(metrics);
+    await saveDailyMetrics(metrics);
     localStorage.setItem(METRICS_KEYS.LAST_METRIC_UPDATE, Date.now().toString());
     
     return dailyMetric;
 }
 
-// ===== HOURLY SNAPSHOTS (for real-time dashboard) =====
-function getHourlySnapshots() {
-    const data = localStorage.getItem(METRICS_KEYS.HOURLY_SNAPSHOTS);
-    return data ? JSON.parse(data) : [];
+// ===== HOURLY SNAPSHOTS (IndexedDB) =====
+export async function getHourlySnapshots() {
+    return await getAll('hourlySnapshots');
 }
 
-function recordHourlySnapshot() {
-    const snapshots = getHourlySnapshots();
+export async function saveHourlySnapshots(snapshots) {
+    const db = await getDb();
+    const tx = db.transaction('hourlySnapshots', 'readwrite');
+    await tx.objectStore('hourlySnapshots').clear();
+    
+    for (const snapshot of snapshots) {
+        await tx.objectStore('hourlySnapshots').put(snapshot);
+    }
+    await tx.done;
+}
+
+export async function recordHourlySnapshot() {
+    const snapshots = await getHourlySnapshots();
     const now = Date.now();
     const hour = new Date().toISOString().split('T')[1].split(':')[0];
     
@@ -258,26 +301,55 @@ function recordHourlySnapshot() {
         snapshots.shift();
     }
     
-    localStorage.setItem(METRICS_KEYS.HOURLY_SNAPSHOTS, JSON.stringify(snapshots));
+    await saveHourlySnapshots(snapshots);
 }
 
 // ===== ESTIMATION HELPERS (would be replaced with real data) =====
-function estimateTransactionVolume() {
+export function estimateTransactionVolume() {
     // Placeholder - would track actual transactions in real implementation
     return Math.floor(Math.random() * 100000) + 50000;
 }
 
-function estimateRecentTransactions() {
+export function estimateRecentTransactions() {
     // Placeholder - would track actual transactions
     return Math.floor(Math.random() * 5000) + 1000;
 }
 
+// ===== ELEMENT VALUE HELPER =====
+function getElementValue(elementName) {
+    const elements = {
+        // Common - 100
+        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
+        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
+        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
+        
+        // Uncommon - 250
+        'Carbon': 250, 'Oxygen': 250, 'Nitrogen': 250, 'Iron': 250,
+        'Nickel': 250, 'Sulfur': 250, 'Phosphorus': 250, 'Chlorine': 250,
+        'Argon': 250, 'Lead': 250,
+        
+        // Rare - 1000
+        'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Copper': 1000,
+        'Titanium': 1000, 'Zinc': 1000, 'Tin': 1000, 'Mercury': 1000,
+        'Cobalt': 1000, 'Chromium': 1000,
+        
+        // Very Rare - 5000
+        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
+        'Radium': 5000, 'Polonium': 5000,
+        
+        // Legendary - 25000
+        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
+    };
+    
+    return elements[elementName] || 100;
+}
+
 // ===== ECONOMIC HEALTH ASSESSMENT =====
-function assessEconomicHealth() {
-    const inflation = calculateInflationRate();
-    const gini = calculateGiniCoefficient();
-    const velocity = calculateMoneyVelocity();
-    const wealth = getWealthPercentiles();
+export async function assessEconomicHealth() {
+    const inflation = await calculateInflationRate();
+    const gini = await calculateGiniCoefficient();
+    const velocity = await calculateMoneyVelocity();
+    const wealth = await getWealthPercentiles();
     
     const health = {
         inflation: {
@@ -358,8 +430,8 @@ function getVelocityMessage(velocity) {
 }
 
 // ===== HISTORICAL TRENDS =====
-function getHistoricalTrend(days = 30) {
-    const metrics = getDailyMetrics();
+export async function getHistoricalTrend(days = 30) {
+    const metrics = await getDailyMetrics();
     const recent = metrics.slice(-days);
     
     if (recent.length < 2) return null;
@@ -378,46 +450,40 @@ function getHistoricalTrend(days = 30) {
 }
 
 // ===== FORMATTING HELPERS =====
-function formatMoney(amount) {
+export function formatMoney(amount) {
     if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B⭐';
     if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M⭐';
     if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K⭐';
     return amount + '⭐';
 }
 
-function formatPercent(value) {
+export function formatPercent(value) {
     return (value * 100).toFixed(1) + '%';
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        METRICS_KEYS,
-        TARGET_RANGES,
-        initializeMetrics,
-        getTotalMoneySupply,
-        addMoneyToSupply,
-        removeMoneyFromSupply,
-        getPlayerCount,
-        updatePlayerCount,
-        calculateGiniCoefficient,
-        getWealthPercentiles,
-        calculateInflationRate,
-        calculateMoneyVelocity,
-        getDailyMetrics,
-        recordDailyMetrics,
-        getHourlySnapshots,
-        recordHourlySnapshot,
-        assessEconomicHealth,
-        getHistoricalTrend,
-        formatMoney,
-        formatPercent
-    };
-}
+export default {
+    METRICS_KEYS,
+    TARGET_RANGES,
+    initializeMetrics,
+    getTotalMoneySupply,
+    addMoneyToSupply,
+    removeMoneyFromSupply,
+    getPlayerCount,
+    updatePlayerCount,
+    calculateGiniCoefficient,
+    getWealthPercentiles,
+    calculateInflationRate,
+    calculateMoneyVelocity,
+    getDailyMetrics,
+    recordDailyMetrics,
+    getHourlySnapshots,
+    recordHourlySnapshot,
+    assessEconomicHealth,
+    getHistoricalTrend,
+    formatMoney,
+    formatPercent
+};
 
-// Auto-initialize
-initializeMetrics();
-
-// Set up hourly snapshots (would be called by a timer in real implementation)
-// For now, we'll just record on load
-recordDailyMetrics();
+// Need to import getDb for some functions
+import { getDb } from './db.js';
