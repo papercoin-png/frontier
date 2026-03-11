@@ -1,11 +1,12 @@
-// procedural-names.js
+// js/procedural-names.js
 // Procedural name generation for Voidfarer's shared universe
 // All names are deterministic based on seeds
+// Pure calculation module - no storage dependencies
 
 // ===== STAR NAME COMPONENTS =====
 // Inspired by real stellar nomenclature (Bayer designations, proper names)
 
-const starPrefixes = [
+export const starPrefixes = [
     // Greek letters (Bayer designations)
     'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 
     'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 
@@ -17,7 +18,7 @@ const starPrefixes = [
     'Phi', 'Chi', 'Psi', 'Ome', 'Prox', 'Sol', 'Sir', 'Can', 'Rig', 'Veg'
 ];
 
-const starSuffixes = [
+export const starSuffixes = [
     // Constellations (Latin genitive forms)
     'Andromedae', 'Antliae', 'Apodis', 'Aquarii', 'Aquilae', 'Arae', 'Arietis',
     'Aurigae', 'Bootis', 'Caeli', 'Camelopardalis', 'Cancri', 'Canum Venaticorum',
@@ -43,7 +44,7 @@ const starSuffixes = [
 ];
 
 // ===== PLANET NAME COMPONENTS =====
-const planetPrefixes = [
+export const planetPrefixes = [
     // Earth-like
     'Verdant', 'Terra', 'Tellus', 'Gaia', 'Earth', 'Terre', 'Erde',
     
@@ -80,7 +81,7 @@ const planetPrefixes = [
     'Octavus', 'Nonus', 'Decimus', 'Primus', 'Altera', 'Secunda'
 ];
 
-const planetSuffixes = [
+export const planetSuffixes = [
     'Prime', 'Secundus', 'Tertius', 'Quartus', 'Quintus', 'Sextus', 'Septimus',
     'Octavus', 'Nonus', 'Decimus', 'Major', 'Minor', 'Alpha', 'Beta', 'Gamma',
     'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII',
@@ -88,7 +89,7 @@ const planetSuffixes = [
 ];
 
 // ===== ANOMALY NAME COMPONENTS =====
-const anomalyPrefixes = [
+export const anomalyPrefixes = [
     // Dark/Mysterious
     'Dark', 'Shadow', 'Umbral', 'Nocturnal', 'Eclipse', 'Void', 'Abyssal',
     'Depthless', 'Bottomless', 'Infinite', 'Eternal', 'Ancient', 'Primordial',
@@ -118,7 +119,7 @@ const anomalyPrefixes = [
     'Memory', 'Destiny', 'Fate', 'Fortune', 'Doom', 'Salvation'
 ];
 
-const anomalySuffixes = [
+export const anomalySuffixes = [
     // Locations
     'Reach', 'Expanse', 'Void', 'Abyss', 'Maw', 'Heart', 'Eye', 'Core',
     'Rift', 'Hollow', 'Gate', 'Portal', 'Nexus', 'Conduit', 'Stream',
@@ -142,14 +143,14 @@ const anomalySuffixes = [
 ];
 
 // ===== STATION NAME COMPONENTS =====
-const stationPrefixes = [
+export const stationPrefixes = [
     'Port', 'Station', 'Outpost', 'Base', 'Hold', 'Haven', 'Refuge',
     'Sanctuary', 'Citadel', 'Fortress', 'Colony', 'Settlement', 'Habitat',
     'Platform', 'Spire', 'Tower', 'Ring', 'Wheel', 'Dome', 'City',
     'Nexus', 'Hub', 'Center', 'Core', 'Heart', 'Capital', 'Metropolis'
 ];
 
-const stationSuffixes = [
+export const stationSuffixes = [
     'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta',
     'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho',
     'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega',
@@ -160,25 +161,25 @@ const stationSuffixes = [
 // ===== SEEDED RANDOM FUNCTIONS =====
 // These match the ones in procedural-universe.js for consistency
 
-function seededRandom(seed, index = 0) {
+export function seededRandom(seed, index = 0) {
     const x = Math.sin(seed * (index + 1)) * 10000;
     return x - Math.floor(x);
 }
 
-function seededRandomChoice(seed, index, array) {
+export function seededRandomChoice(seed, index, array) {
     if (!array || array.length === 0) return 'Unknown';
     const choice = Math.floor(seededRandom(seed, index) * array.length);
     return array[choice];
 }
 
-function seededRandomRange(seed, index, min, max) {
+export function seededRandomRange(seed, index, min, max) {
     return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
 }
 
 // ===== STAR NAME GENERATION =====
 // Generates names like: "Alpha Centauri", "Betelgeuse", "Sirius A"
 
-function generateStarName(seed, index = 0) {
+export function generateStarName(seed, index = 0) {
     const style = seededRandomRange(seed, index, 1, 4);
     
     switch(style) {
@@ -210,7 +211,7 @@ function generateStarName(seed, index = 0) {
 // ===== PLANET NAME GENERATION =====
 // Generates names like: "Verdant-3", "Pyros Prime", "Terra Nova"
 
-function generatePlanetName(seed, index = 0) {
+export function generatePlanetName(seed, index = 0) {
     const style = seededRandomRange(seed, index, 1, 4);
     
     switch(style) {
@@ -242,7 +243,7 @@ function generatePlanetName(seed, index = 0) {
 // ===== ANOMALY NAME GENERATION =====
 // Generates names like: "Dark Reach", "Crimson Void", "Whispering Rift"
 
-function generateAnomalyName(seed, index = 0) {
+export function generateAnomalyName(seed, index = 0) {
     const style = seededRandomRange(seed, index, 1, 3);
     
     switch(style) {
@@ -270,7 +271,7 @@ function generateAnomalyName(seed, index = 0) {
 // ===== STATION NAME GENERATION =====
 // Generates names like: "Port Alpha", "Station Beta", "Outpost Prime"
 
-function generateStationName(seed, index = 0) {
+export function generateStationName(seed, index = 0) {
     const style = seededRandomRange(seed, index, 1, 3);
     
     switch(style) {
@@ -297,7 +298,7 @@ function generateStationName(seed, index = 0) {
 // ===== SYSTEM NAME GENERATION =====
 // Generates a name for an entire star system
 
-function generateSystemName(seed, index = 0) {
+export function generateSystemName(seed, index = 0) {
     const style = seededRandomRange(seed, index, 1, 3);
     
     switch(style) {
@@ -319,7 +320,7 @@ function generateSystemName(seed, index = 0) {
 // ===== NEBULA NAME GENERATION =====
 // Generates names for nebulae
 
-function generateNebulaName(seed, index = 0) {
+export function generateNebulaName(seed, index = 0) {
     const nebulaNames = [
         'Orion', 'Cygnus', 'Sagittarius', 'Perseus', 'Carina', 'Eagle',
         'Omega', 'Trifid', 'Lagoon', 'Veil', 'Crab', 'Helix',
@@ -334,7 +335,7 @@ function generateNebulaName(seed, index = 0) {
 // ===== REGION NAME GENERATION =====
 // Generates names for galactic regions
 
-function generateRegionName(seed, index = 0) {
+export function generateRegionName(seed, index = 0) {
     const regions = [
         'Orion Arm', 'Cygnus Arm', 'Perseus Arm', 'Sagittarius Arm', 'Carina Arm',
         'Norma Arm', 'Scutum Arm', 'Centaurus Arm', 'Outer Arm', 'Far Arm',
@@ -345,38 +346,52 @@ function generateRegionName(seed, index = 0) {
     return regions[index2];
 }
 
-// ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        // Star names
-        generateStarName,
-        
-        // Planet names
-        generatePlanetName,
-        
-        // Anomaly names
-        generateAnomalyName,
-        
-        // Station names
-        generateStationName,
-        
-        // System names
-        generateSystemName,
-        
-        // Nebula names
-        generateNebulaName,
-        
-        // Region names
-        generateRegionName,
-        
-        // Raw components (for custom generation)
-        starPrefixes,
-        starSuffixes,
-        planetPrefixes,
-        planetSuffixes,
-        anomalyPrefixes,
-        anomalySuffixes,
-        stationPrefixes,
-        stationSuffixes
-    };
+// ===== CONVENIENCE FUNCTIONS =====
+// Generate multiple names at once
+
+export function generateMultipleStarNames(seed, count) {
+    const names = [];
+    for (let i = 0; i < count; i++) {
+        names.push(generateStarName(seed, i));
+    }
+    return names;
 }
+
+export function generateMultiplePlanetNames(seed, count) {
+    const names = [];
+    for (let i = 0; i < count; i++) {
+        names.push(generatePlanetName(seed, i));
+    }
+    return names;
+}
+
+// ===== EXPORT =====
+export default {
+    // Components (for custom generation)
+    starPrefixes,
+    starSuffixes,
+    planetPrefixes,
+    planetSuffixes,
+    anomalyPrefixes,
+    anomalySuffixes,
+    stationPrefixes,
+    stationSuffixes,
+    
+    // Core generation functions
+    generateStarName,
+    generatePlanetName,
+    generateAnomalyName,
+    generateStationName,
+    generateSystemName,
+    generateNebulaName,
+    generateRegionName,
+    
+    // Batch generation
+    generateMultipleStarNames,
+    generateMultiplePlanetNames,
+    
+    // Random utilities
+    seededRandom,
+    seededRandomChoice,
+    seededRandomRange
+};
