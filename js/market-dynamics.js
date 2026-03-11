@@ -1,8 +1,22 @@
-// market-dynamics.js - Dynamic pricing engine for Voidfarer
+// js/market-dynamics.js - Dynamic pricing engine for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Handles supply/demand calculations, price history, and market trends
 
+import {
+    getItem,
+    setItem,
+    getAll,
+    getAllFromIndex,
+    addElementToCollection,
+    removeElementFromCollection,
+    getCollection,
+    getCredits,
+    addCredits,
+    spendCredits
+} from './storage.js';
+
 // ===== BASE PRICES =====
-const BASE_PRICES = {
+export const BASE_PRICES = {
     // Common
     'Carbon': 100,
     'Silicon': 100,
@@ -51,7 +65,7 @@ const BASE_PRICES = {
 };
 
 // ===== RARITY MAPPING =====
-const ELEMENT_RARITY = {
+export const ELEMENT_RARITY = {
     // Common
     'Carbon': 'common', 'Silicon': 'common', 'Hydrogen': 'common', 'Helium': 'common',
     'Sodium': 'common', 'Lithium': 'common', 'Magnesium': 'common', 'Aluminum': 'common',
@@ -74,7 +88,7 @@ const ELEMENT_RARITY = {
 };
 
 // ===== VOLATILITY BY RARITY =====
-const VOLATILITY = {
+export const VOLATILITY = {
     'common': 0.08,      // 8% daily fluctuation
     'uncommon': 0.12,    // 12%
     'rare': 0.18,        // 18%
@@ -83,14 +97,14 @@ const VOLATILITY = {
 };
 
 // ===== MARKET TRENDS =====
-const TREND_TYPES = {
+export const TREND_TYPES = {
     BULL: 'bull',        // Price increasing
     BEAR: 'bear',        // Price decreasing
     STABLE: 'stable',    // Little movement
     VOLATILE: 'volatile' // High fluctuation
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (for localStorage fallback) =====
 const MARKET_STORAGE_KEYS = {
     PRICE_HISTORY_PREFIX: 'market_price_',
     TRADE_HISTORY_PREFIX: 'market_trades_',
@@ -100,100 +114,127 @@ const MARKET_STORAGE_KEYS = {
 };
 
 // ===== HELPER FUNCTIONS =====
-function getElementRarity(elementName) {
+export function getElementRarity(elementName) {
     return ELEMENT_RARITY[elementName] || 'common';
 }
 
-function getBasePrice(elementName) {
+export function getBasePrice(elementName) {
     return BASE_PRICES[elementName] || 100;
 }
 
-// ===== PRICE HISTORY MANAGEMENT =====
-function getPriceHistory(elementName) {
-    const key = MARKET_STORAGE_KEYS.PRICE_HISTORY_PREFIX + elementName;
-    const history = localStorage.getItem(key);
-    return history ? JSON.parse(history) : [];
+// ===== PRICE HISTORY MANAGEMENT (IndexedDB) =====
+export async function getPriceHistory(elementName) {
+    const allHistory = await getAll('priceHistory');
+    return allHistory.filter(h => h.elementName === elementName)
+                    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function recordPrice(elementName, price) {
-    const key = MARKET_STORAGE_KEYS.PRICE_HISTORY_PREFIX + elementName;
-    let history = getPriceHistory(elementName);
+export async function recordPrice(elementName, price) {
+    const history = await getPriceHistory(elementName);
     
-    // Add new price with date
-    history.push({
-        date: new Date().toISOString().split('T')[0],
-        price: Math.round(price)
-    });
+    const today = new Date().toISOString().split('T')[0];
+    // Check if we already have an entry for today
+    const existingEntry = history.find(h => h.date === today);
     
-    // Keep only last 90 days
-    if (history.length > 90) {
-        history = history.slice(-90);
+    if (existingEntry) {
+        // Update existing entry
+        existingEntry.price = Math.round(price);
+        await setItem('priceHistory', existingEntry);
+    } else {
+        // Create new entry
+        const newEntry = {
+            id: `price_${elementName}_${today}`,
+            elementName: elementName,
+            date: today,
+            price: Math.round(price),
+            timestamp: Date.now()
+        };
+        await setItem('priceHistory', newEntry);
     }
     
-    localStorage.setItem(key, JSON.stringify(history));
-    return history;
+    // Clean up old entries (keep last 90 days)
+    const allEntries = await getAll('priceHistory');
+    const elementEntries = allEntries.filter(h => h.elementName === elementName)
+                                    .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (elementEntries.length > 90) {
+        const toDelete = elementEntries.slice(90);
+        for (const entry of toDelete) {
+            await deleteItem('priceHistory', entry.id);
+        }
+    }
+    
+    return await getPriceHistory(elementName);
 }
 
-function getPriceForDate(elementName, date) {
-    const history = getPriceHistory(elementName);
+export async function getPriceForDate(elementName, date) {
+    const history = await getPriceHistory(elementName);
     const entry = history.find(h => h.date === date);
     return entry ? entry.price : null;
 }
 
-function getLatestPrice(elementName) {
-    const history = getPriceHistory(elementName);
-    return history.length > 0 ? history[history.length - 1].price : getBasePrice(elementName);
+export async function getLatestPrice(elementName) {
+    const history = await getPriceHistory(elementName);
+    if (history.length > 0) {
+        return history[history.length - 1].price;
+    }
+    return getBasePrice(elementName);
 }
 
-// ===== TRADE HISTORY MANAGEMENT =====
-function getTradeHistory(elementName) {
-    const key = MARKET_STORAGE_KEYS.TRADE_HISTORY_PREFIX + elementName;
-    const trades = localStorage.getItem(key);
-    return trades ? JSON.parse(trades) : [];
+// ===== TRADE HISTORY MANAGEMENT (IndexedDB) =====
+export async function getTradeHistory(elementName) {
+    const allTrades = await getAll('tradeHistory');
+    return allTrades.filter(t => t.elementName === elementName)
+                   .sort((a, b) => b.timestamp - a.timestamp);
 }
 
-function recordTrade(elementName, quantity, price) {
-    const key = MARKET_STORAGE_KEYS.TRADE_HISTORY_PREFIX + elementName;
-    let trades = getTradeHistory(elementName);
-    
-    trades.push({
-        timestamp: Date.now(),
-        date: new Date().toISOString().split('T')[0],
+export async function recordTrade(elementName, quantity, price) {
+    const trade = {
+        id: 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        elementName: elementName,
         quantity: quantity,
-        price: price
-    });
+        price: price,
+        totalValue: quantity * price,
+        timestamp: Date.now(),
+        date: new Date().toISOString().split('T')[0]
+    };
     
-    // Keep only last 100 trades
-    if (trades.length > 100) {
-        trades = trades.slice(-100);
+    await setItem('tradeHistory', trade);
+    
+    // Clean up old trades (keep last 1000)
+    const allTrades = await getAll('tradeHistory');
+    if (allTrades.length > 1000) {
+        const sorted = allTrades.sort((a, b) => a.timestamp - b.timestamp);
+        const toDelete = sorted.slice(0, allTrades.length - 1000);
+        for (const trade of toDelete) {
+            await deleteItem('tradeHistory', trade.id);
+        }
     }
     
-    localStorage.setItem(key, JSON.stringify(trades));
-    return trades;
+    return trade;
 }
 
-function getRecentTrades(elementName, days = 7) {
-    const trades = getTradeHistory(elementName);
+export async function getRecentTrades(elementName, days = 7) {
+    const trades = await getTradeHistory(elementName);
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
     return trades.filter(t => t.timestamp > cutoff);
 }
 
 // ===== SUPPLY CALCULATION =====
-function calculateGlobalSupply(elementName) {
-    // This would ideally track all players, but for single player we use local collection
-    const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+export async function calculateGlobalSupply(elementName) {
+    const collection = await getCollection();
     return collection[elementName]?.count || 0;
 }
 
-function calculateSupplyFactor(elementName) {
-    const supply = calculateGlobalSupply(elementName);
+export async function calculateSupplyFactor(elementName) {
+    const supply = await calculateGlobalSupply(elementName);
     // More supply = lower price factor (0.5 to 1.5 range)
     return Math.max(0.5, Math.min(1.5, 20 / (supply + 5)));
 }
 
 // ===== DEMAND CALCULATION =====
-function calculateDemandFactor(elementName) {
-    const recentTrades = getRecentTrades(elementName, 3);
+export async function calculateDemandFactor(elementName) {
+    const recentTrades = await getRecentTrades(elementName, 3);
     const tradeCount = recentTrades.length;
     
     // More trades = higher demand factor (0.8 to 1.8 range)
@@ -201,8 +242,8 @@ function calculateDemandFactor(elementName) {
 }
 
 // ===== TREND DETECTION =====
-function detectTrend(elementName) {
-    const history = getPriceHistory(elementName);
+export async function detectTrend(elementName) {
+    const history = await getPriceHistory(elementName);
     if (history.length < 5) return TREND_TYPES.STABLE;
     
     // Get last 5 prices
@@ -228,8 +269,8 @@ function detectTrend(elementName) {
 }
 
 // ===== PRICE CHANGE CALCULATION =====
-function calculatePriceChange(elementName, days = 7) {
-    const history = getPriceHistory(elementName);
+export async function calculatePriceChange(elementName, days = 7) {
+    const history = await getPriceHistory(elementName);
     if (history.length < 2) return 0;
     
     const current = history[history.length - 1].price;
@@ -240,20 +281,20 @@ function calculatePriceChange(elementName, days = 7) {
 }
 
 // ===== MARKET PRICE CALCULATION =====
-function calculateMarketPrice(elementName) {
+export async function calculateMarketPrice(elementName) {
     const basePrice = getBasePrice(elementName);
     const rarity = getElementRarity(elementName);
     
     // Get current market factors
-    const supplyFactor = calculateSupplyFactor(elementName);
-    const demandFactor = calculateDemandFactor(elementName);
+    const supplyFactor = await calculateSupplyFactor(elementName);
+    const demandFactor = await calculateDemandFactor(elementName);
     
     // Random volatility
     const volatility = VOLATILITY[rarity];
     const randomWalk = 1 + (Math.random() * volatility * 2 - volatility);
     
     // Trend influence
-    const trend = detectTrend(elementName);
+    const trend = await detectTrend(elementName);
     let trendFactor = 1.0;
     if (trend === TREND_TYPES.BULL) trendFactor = 1.05;
     if (trend === TREND_TYPES.BEAR) trendFactor = 0.95;
@@ -265,7 +306,7 @@ function calculateMarketPrice(elementName) {
 }
 
 // ===== UPDATE ALL PRICES =====
-function updateDailyPrices() {
+export async function updateDailyPrices() {
     const lastUpdate = localStorage.getItem(MARKET_STORAGE_KEYS.LAST_UPDATE);
     const today = new Date().toISOString().split('T')[0];
     
@@ -278,24 +319,24 @@ function updateDailyPrices() {
     console.log('Updating daily market prices...');
     
     // Update price for each element
-    Object.keys(BASE_PRICES).forEach(elementName => {
-        const newPrice = calculateMarketPrice(elementName);
-        recordPrice(elementName, newPrice);
-    });
+    for (const elementName of Object.keys(BASE_PRICES)) {
+        const newPrice = await calculateMarketPrice(elementName);
+        await recordPrice(elementName, newPrice);
+    }
     
     localStorage.setItem(MARKET_STORAGE_KEYS.LAST_UPDATE, today);
     return true;
 }
 
 // ===== GET MARKET SUMMARY =====
-function getMarketSummary() {
+export async function getMarketSummary() {
     const summary = {};
     
-    Object.keys(BASE_PRICES).forEach(elementName => {
-        const currentPrice = getLatestPrice(elementName);
-        const change7d = calculatePriceChange(elementName, 7);
-        const change30d = calculatePriceChange(elementName, 30);
-        const trend = detectTrend(elementName);
+    for (const elementName of Object.keys(BASE_PRICES)) {
+        const currentPrice = await getLatestPrice(elementName);
+        const change7d = await calculatePriceChange(elementName, 7);
+        const change30d = await calculatePriceChange(elementName, 30);
+        const trend = await detectTrend(elementName);
         const rarity = getElementRarity(elementName);
         
         summary[elementName] = {
@@ -306,14 +347,14 @@ function getMarketSummary() {
             rarity: rarity,
             basePrice: BASE_PRICES[elementName]
         };
-    });
+    }
     
     return summary;
 }
 
 // ===== GET TOP MOVERS =====
-function getTopMovers(limit = 5) {
-    const summary = getMarketSummary();
+export async function getTopMovers(limit = 5) {
+    const summary = await getMarketSummary();
     const movers = Object.keys(summary).map(elementName => ({
         name: elementName,
         change: parseFloat(summary[elementName].change7d),
@@ -330,10 +371,69 @@ function getTopMovers(limit = 5) {
     };
 }
 
-// ===== PRICE ALERTS =====
+// ===== BUY/SELL FUNCTIONS =====
+export async function buyElement(elementName, quantity, pricePerUnit) {
+    const totalCost = quantity * pricePerUnit;
+    const credits = await getCredits();
+    
+    if (credits < totalCost) {
+        return { success: false, reason: 'insufficient_credits', required: totalCost };
+    }
+    
+    // Spend credits
+    const spent = await spendCredits(totalCost);
+    if (!spent) {
+        return { success: false, reason: 'transaction_failed' };
+    }
+    
+    // Add to collection
+    await addElementToCollection(elementName, quantity);
+    
+    // Record trade
+    await recordTrade(elementName, quantity, pricePerUnit);
+    
+    return {
+        success: true,
+        quantity,
+        totalCost,
+        newCredits: credits - totalCost
+    };
+}
+
+export async function sellElement(elementName, quantity, pricePerUnit) {
+    const collection = await getCollection();
+    
+    if (!collection[elementName] || collection[elementName].count < quantity) {
+        return { 
+            success: false, 
+            reason: 'insufficient_elements', 
+            available: collection[elementName]?.count || 0 
+        };
+    }
+    
+    const totalEarnings = quantity * pricePerUnit;
+    
+    // Remove from collection
+    await removeElementFromCollection(elementName, quantity);
+    
+    // Add credits
+    await addCredits(totalEarnings);
+    
+    // Record trade
+    await recordTrade(elementName, -quantity, pricePerUnit); // Negative quantity for sell
+    
+    return {
+        success: true,
+        quantity,
+        totalEarnings,
+        newCredits: (await getCredits())
+    };
+}
+
+// ===== PRICE ALERTS (keep in localStorage) =====
 const PRICE_ALERTS = {};
 
-function setPriceAlert(elementName, targetPrice, type = 'above') {
+export function setPriceAlert(elementName, targetPrice, type = 'above') {
     if (!PRICE_ALERTS[elementName]) {
         PRICE_ALERTS[elementName] = [];
     }
@@ -343,14 +443,26 @@ function setPriceAlert(elementName, targetPrice, type = 'above') {
         type: type,
         triggered: false
     });
+    
+    // Store in localStorage for persistence
+    const alerts = JSON.parse(localStorage.getItem('voidfarer_price_alerts') || '{}');
+    if (!alerts[elementName]) alerts[elementName] = [];
+    alerts[elementName].push({
+        targetPrice,
+        type,
+        created: Date.now()
+    });
+    localStorage.setItem('voidfarer_price_alerts', JSON.stringify(alerts));
 }
 
-function checkPriceAlerts() {
-    Object.keys(PRICE_ALERTS).forEach(elementName => {
-        const currentPrice = getLatestPrice(elementName);
+export async function checkPriceAlerts() {
+    const alerts = JSON.parse(localStorage.getItem('voidfarer_price_alerts') || '{}');
+    
+    for (const [elementName, elementAlerts] of Object.entries(alerts)) {
+        const currentPrice = await getLatestPrice(elementName);
         
-        PRICE_ALERTS[elementName].forEach(alert => {
-            if (alert.triggered) return;
+        for (const alert of elementAlerts) {
+            if (alert.triggered) continue;
             
             if (alert.type === 'above' && currentPrice >= alert.targetPrice) {
                 alert.triggered = true;
@@ -359,8 +471,10 @@ function checkPriceAlerts() {
                 alert.triggered = true;
                 showPriceAlert(elementName, currentPrice, 'below');
             }
-        });
-    });
+        }
+    }
+    
+    localStorage.setItem('voidfarer_price_alerts', JSON.stringify(alerts));
 }
 
 function showPriceAlert(elementName, price, type) {
@@ -380,29 +494,71 @@ function showPriceAlert(elementName, price, type) {
     }
 }
 
-// ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        BASE_PRICES,
-        ELEMENT_RARITY,
-        VOLATILITY,
-        TREND_TYPES,
-        getElementRarity,
-        getBasePrice,
-        getPriceHistory,
-        recordPrice,
-        getLatestPrice,
-        recordTrade,
-        getRecentTrades,
-        calculateSupplyFactor,
-        calculateDemandFactor,
-        detectTrend,
-        calculatePriceChange,
-        calculateMarketPrice,
-        updateDailyPrices,
-        getMarketSummary,
-        getTopMovers,
-        setPriceAlert,
-        checkPriceAlerts
-    };
+// ===== MARKET STATISTICS =====
+export async function getMarketStats() {
+    const allTrades = await getAll('tradeHistory');
+    const allPrices = await getAll('priceHistory');
+    
+    // Group by element
+    const stats = {};
+    
+    for (const elementName of Object.keys(BASE_PRICES)) {
+        const elementTrades = allTrades.filter(t => t.elementName === elementName);
+        const elementPrices = allPrices.filter(p => p.elementName === elementName)
+                                       .sort((a, b) => a.date.localeCompare(b.date));
+        
+        const currentPrice = elementPrices.length > 0 ? 
+            elementPrices[elementPrices.length - 1].price : 
+            BASE_PRICES[elementName];
+        
+        const prices = elementPrices.map(p => p.price);
+        const avgPrice = prices.length > 0 ? 
+            prices.reduce((a, b) => a + b, 0) / prices.length : 
+            BASE_PRICES[elementName];
+        
+        const volume = elementTrades.reduce((sum, t) => sum + Math.abs(t.quantity), 0);
+        const tradeCount = elementTrades.length;
+        
+        stats[elementName] = {
+            currentPrice,
+            averagePrice: Math.round(avgPrice),
+            volume,
+            tradeCount,
+            volatility: VOLATILITY[getElementRarity(elementName)],
+            basePrice: BASE_PRICES[elementName]
+        };
+    }
+    
+    return stats;
 }
+
+// ===== EXPORT =====
+export default {
+    BASE_PRICES,
+    ELEMENT_RARITY,
+    VOLATILITY,
+    TREND_TYPES,
+    getElementRarity,
+    getBasePrice,
+    getPriceHistory,
+    recordPrice,
+    getLatestPrice,
+    recordTrade,
+    getRecentTrades,
+    calculateSupplyFactor,
+    calculateDemandFactor,
+    detectTrend,
+    calculatePriceChange,
+    calculateMarketPrice,
+    updateDailyPrices,
+    getMarketSummary,
+    getTopMovers,
+    buyElement,
+    sellElement,
+    setPriceAlert,
+    checkPriceAlerts,
+    getMarketStats
+};
+
+// Need to import deleteItem for cleanup
+import { deleteItem } from './storage.js';
