@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -49,7 +49,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
             background: rgba(10,10,26,0.7);
@@ -61,6 +61,8 @@
             white-space: nowrap;
             letter-spacing: 1px;
             pointer-events: none;
+            font-weight: 600;
+            text-transform: uppercase;
         }
         
         .current-location {
@@ -100,7 +102,7 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             z-index: 30;
             min-width: 100px;
@@ -134,13 +136,14 @@
         }
         
         .sector-name {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 22px;
             color: #ffffff;
             margin-bottom: 15px;
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.2);
             padding-bottom: 8px;
+            font-weight: 600;
         }
         
         .sector-type {
@@ -192,10 +195,11 @@
             padding: 15px;
             border-radius: 40px 10px 40px 10px;
             font-size: 18px;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             cursor: pointer;
             margin-top: 15px;
             transition: all 0.1s;
+            font-weight: 600;
         }
         
         .travel-btn:active {
@@ -262,7 +266,7 @@
             position: absolute;
             top: 40px;
             color: rgba(255, 255, 255, 0.9);
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 11px;
             text-shadow: 0 0 8px #ffffff;
             background: rgba(10,10,26,0.6);
@@ -273,6 +277,7 @@
             white-space: nowrap;
             z-index: 23;
             pointer-events: none;
+            font-weight: 500;
         }
         
         .star-count-badge {
@@ -334,9 +339,10 @@
         
         .loading-text {
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 20px #8a6aff;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -415,19 +421,9 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCurrentRegion,
-            getCurrentSectorName,
-            getCurrentSectorX,
-            getCurrentSectorY,
-            setCurrentNebula,
-            setWarpData,
-            getCredits
-        } from './js/storage.js';
-        import { calculateNebulaTrip } from './js/warp-calculator.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -517,18 +513,11 @@
         // ===== LOAD REGION DATA =====
         async function loadRegionData() {
             try {
-                // Load all data in parallel
-                const [
-                    region,
-                    sector,
-                    x,
-                    y
-                ] = await Promise.all([
-                    getCurrentRegion(),
-                    getCurrentSectorName(),
-                    getCurrentSectorX(),
-                    getCurrentSectorY()
-                ]);
+                // Load data
+                const region = typeof getCurrentRegion === 'function' ? await getCurrentRegion() : 'Orion';
+                const sector = typeof getCurrentSectorName === 'function' ? await getCurrentSectorName() : 'Orion Molecular Cloud';
+                const x = typeof getCurrentSectorX === 'function' ? await getCurrentSectorX() : 30;
+                const y = typeof getCurrentSectorY === 'function' ? await getCurrentSectorY() : 40;
 
                 currentRegion = region || 'Orion';
                 currentSector = sector || 'Orion Molecular Cloud';
@@ -556,7 +545,7 @@
         }
 
         // ===== SELECT SECTOR =====
-        window.selectSector = function(index) {
+        function selectSector(index) {
             const sector = sectors[index];
             if (!sector) return;
             
@@ -579,19 +568,18 @@
                 currentSectorX, currentSectorY,
                 sector.x, sector.y
             );
-            const trip = calculateNebulaTrip(
-                currentSectorX, currentSectorY,
-                sector.x, sector.y
-            );
+            const cycles = calculateWarpCycles(distance);
+            const fuel = calculateFuel(distance);
+            const time = cycles * 2;
             
             // Update panel
             document.getElementById('selectedSectorName').textContent = sector.name;
             document.getElementById('selectedSectorType').textContent = sector.type;
             document.getElementById('selectedStarCount').innerHTML = '⭐ ' + sector.stars + ' stars';
-            document.getElementById('sectorDistance').textContent = trip.distanceFormatted;
-            document.getElementById('warpCycles').textContent = trip.cyclesFormatted;
-            document.getElementById('travelTime').textContent = trip.timeFormatted;
-            document.getElementById('fuelCost').innerHTML = trip.fuelFormatted;
+            document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
+            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
+            document.getElementById('travelTime').textContent = time + ' sec';
+            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
             
             // Enable/disable based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
@@ -606,18 +594,29 @@
             sectorPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== DISTANCE CALCULATION =====
         function calculateDistance(x1, y1, x2, y2) {
-            // Euclidean distance between percentage points
             const dx = (x1 - x2) / 10;
             const dy = (y1 - y2) / 10;
             return Math.sqrt(dx*dx + dy*dy) * 5;
         }
 
+        function calculateWarpCycles(distance) {
+            if (distance <= 2) return 1;
+            if (distance <= 4) return 2;
+            if (distance <= 6) return 3;
+            if (distance <= 8) return 4;
+            return 5;
+        }
+
+        function calculateFuel(distance) {
+            return Math.floor(distance * 3) + 5;
+        }
+
         // ===== TRAVEL TO SECTOR =====
-        window.travelToSector = async function() {
+        async function travelToSector() {
             if (!selectedSector || selectedSector.name === currentSector) return;
             
             loadingOverlay.classList.add('active');
@@ -625,28 +624,37 @@
             
             try {
                 // Calculate warp details
-                const trip = calculateNebulaTrip(
+                const distance = calculateDistance(
                     currentSectorX, currentSectorY,
                     selectedSector.x, selectedSector.y
                 );
+                const cycles = calculateWarpCycles(distance);
+                const fuel = calculateFuel(distance);
                 
                 // Save destination
-                await setCurrentNebula(
-                    selectedSector.name,
-                    selectedSector.type,
-                    selectedSector.stars,
-                    selectedSector.x,
-                    selectedSector.y
-                );
+                if (typeof setCurrentNebula === 'function') {
+                    await setCurrentNebula(
+                        selectedSector.name,
+                        selectedSector.type,
+                        selectedSector.stars,
+                        selectedSector.x,
+                        selectedSector.y
+                    );
+                } else {
+                    localStorage.setItem('voidfarer_current_nebula', selectedSector.name);
+                    localStorage.setItem('voidfarer_current_sector_name', selectedSector.name);
+                    localStorage.setItem('voidfarer_current_sector_type', selectedSector.type);
+                    localStorage.setItem('voidfarer_current_sector_stars', selectedSector.stars);
+                }
                 
                 // Save warp data
-                setWarpData(
-                    selectedSector.name,
-                    'star-sectors.html',
-                    trip.cycles,
-                    trip.distance,
-                    trip.fuel
-                );
+                if (typeof setWarpData === 'function') {
+                    setWarpData(selectedSector.name, 'star-sectors.html', cycles, distance, fuel);
+                } else {
+                    localStorage.setItem('voidfarer_warp_destination', selectedSector.name);
+                    localStorage.setItem('voidfarer_warp_return', 'star-sectors.html');
+                    localStorage.setItem('voidfarer_warp_cycles', cycles);
+                }
                 
                 setTimeout(() => {
                     window.location.href = 'warp.html';
@@ -657,12 +665,12 @@
                 loadingOverlay.classList.remove('active');
                 alert('Failed to travel. Please try again.');
             }
-        };
+        }
 
         // ===== RETURN TO GALAXY =====
-        window.returnToGalaxy = function() {
+        function returnToGalaxy() {
             window.location.href = 'galaxy-map.html';
-        };
+        }
 
         // ===== CREATE SECTOR MARKERS =====
         function createSectorMarkers() {
@@ -674,7 +682,9 @@
                 marker.id = 'sector-' + index;
                 marker.style.left = sector.x + '%';
                 marker.style.top = sector.y + '%';
-                marker.setAttribute('onclick', `selectSector(${index})`);
+                
+                // Use onclick directly
+                marker.onclick = function() { selectSector(index); };
                 
                 // Highlight current location
                 if (sector.name === currentSector) {
@@ -747,7 +757,7 @@
                 loadingText.textContent = 'loading star sectors...';
 
                 // Check for player data
-                const credits = await getCredits();
+                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -762,14 +772,6 @@
 
                 // Create sector markers
                 createSectorMarkers();
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 // Hide loading
                 setTimeout(() => {
@@ -788,5 +790,11 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/warp-calculator.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
