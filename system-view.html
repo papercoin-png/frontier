@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -34,7 +34,7 @@
             overflow: hidden;
         }
         
-        /* Central Star - MUCH SMALLER */
+        /* Central Star */
         .star-container {
             position: absolute;
             top: 50%;
@@ -60,7 +60,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 20px;
             white-space: nowrap;
             text-shadow: 0 0 15px #ffd700;
@@ -68,6 +68,7 @@
             padding: 4px 16px;
             border-radius: 30px;
             border: 1px solid #ffd700;
+            font-weight: 500;
         }
         
         /* Planets Container */
@@ -128,7 +129,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 12px;
             white-space: nowrap;
             text-shadow: 0 0 8px black;
@@ -137,6 +138,7 @@
             border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.3);
             pointer-events: none;
+            font-weight: 500;
         }
         
         /* UI Elements */
@@ -146,7 +148,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 22px;
             text-shadow: 0 0 15px #6a8ac0;
             background: rgba(10,10,26,0.7);
@@ -156,6 +158,7 @@
             z-index: 30;
             white-space: nowrap;
             backdrop-filter: blur(5px);
+            font-weight: 600;
         }
         
         .back-btn {
@@ -171,6 +174,8 @@
             font-size: 16px;
             cursor: pointer;
             z-index: 30;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 500;
         }
         
         .back-btn:active {
@@ -191,6 +196,8 @@
             text-align: center;
             z-index: 30;
             font-size: 14px;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 500;
         }
         
         .planet-info {
@@ -216,10 +223,11 @@
         }
         
         .planet-info h2 {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             margin-bottom: 10px;
             color: #fff;
+            font-weight: 600;
         }
         
         .planet-info p {
@@ -236,8 +244,9 @@
             border-radius: 30px;
             color: white;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             font-size: 16px;
+            font-weight: 500;
         }
         
         .planet-info button:active {
@@ -280,9 +289,10 @@
         
         .loading-text {
             color: #ffffff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 15px #6a8ac0;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -369,24 +379,9 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCurrentStar,
-            getCurrentStarType,
-            getCurrentStarIndex,
-            getCurrentStarPlanets,
-            setCurrentPlanet,
-            getCurrentNebula,
-            getCurrentSector,
-            getCredits
-        } from './js/storage.js';
-        import { 
-            generateStarSystem,
-            UNIVERSE_SEED,
-            seededRandom
-        } from './js/procedural-universe.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -404,69 +399,8 @@
         let planets = [];
         let currentPlanet = null;
 
-        // ===== LOAD STAR DATA =====
-        async function loadStarData() {
-            try {
-                // Load star data from storage
-                const [
-                    starName,
-                    starType,
-                    starIndex,
-                    starPlanets,
-                    nebula,
-                    sector
-                ] = await Promise.all([
-                    getCurrentStar(),
-                    getCurrentStarType(),
-                    getCurrentStarIndex(),
-                    getCurrentStarPlanets(),
-                    getCurrentNebula(),
-                    getCurrentSector()
-                ]);
-
-                // Generate star system using procedural generation
-                // Use a deterministic seed based on star name and universe seed
-                const starSeed = UNIVERSE_SEED + (starName ? hashString(starName) : 0);
-                const system = generateStarSystem(starSeed, starIndex || 0);
-                
-                starData = system.star;
-                planets = system.planets;
-
-                // Update UI
-                document.getElementById('starName').textContent = starName || 'Unknown Star';
-                document.getElementById('systemName').textContent = (starName || 'Unknown') + ' System';
-                document.getElementById('planetCount').textContent = planets.length + ' planets';
-
-                // Set star color based on type
-                const starEl = document.getElementById('star');
-                const starColors = {
-                    'main': '#ffd700',
-                    'red': '#ff6b6b',
-                    'blue': '#6ba5ff',
-                    'neutron': '#ffffff',
-                    'blackhole': '#4a4a4a'
-                };
-                const color = starColors[starData?.type] || '#ffd700';
-                starEl.style.background = `radial-gradient(circle at 30% 30%, #fff, ${color})`;
-                starEl.style.boxShadow = `0 0 40px ${color}`;
-
-                return { starName, nebula, sector };
-
-            } catch (error) {
-                console.error('Error loading star data:', error);
-                // Generate fallback data
-                const fallbackSeed = UNIVERSE_SEED + Math.floor(Math.random() * 1000);
-                const system = generateStarSystem(fallbackSeed, 0);
-                starData = system.star;
-                planets = system.planets;
-
-                document.getElementById('starName').textContent = 'Unknown Star';
-                document.getElementById('systemName').textContent = 'Unknown System';
-                document.getElementById('planetCount').textContent = planets.length + ' planets';
-
-                return { starName: 'Unknown', nebula: 'Unknown', sector: 'Unknown' };
-            }
-        }
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -476,6 +410,147 @@
                 hash |= 0;
             }
             return Math.abs(hash);
+        }
+
+        // ===== SEEDED RANDOM =====
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function seededRandomRange(seed, index, min, max) {
+            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+        }
+
+        // ===== STAR TYPES =====
+        const starTypes = [
+            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
+            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
+            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
+            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0 },
+            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
+        ];
+
+        function getStarType(seed, index) {
+            const rand = seededRandom(seed, index);
+            let cumulative = 0;
+            
+            for (const type of starTypes) {
+                cumulative += type.prob;
+                if (rand < cumulative) {
+                    return { ...type };
+                }
+            }
+            return { ...starTypes[0] };
+        }
+
+        // ===== PLANET TYPES =====
+        const planetTypes = [
+            { type: 'scorched', name: 'Scorched', prob: 0.15, temp: '450°C', atmos: 'Toxic', gravity: '1.2g', landable: true, icon: '🔥' },
+            { type: 'barren', name: 'Barren', prob: 0.25, temp: '-50°C', atmos: 'Thin', gravity: '0.8g', landable: true, icon: '🪨' },
+            { type: 'lush', name: 'Lush', prob: 0.15, temp: '22°C', atmos: 'Breathable', gravity: '0.9g', landable: true, icon: '🌱' },
+            { type: 'frozen', name: 'Frozen', prob: 0.20, temp: '-80°C', atmos: 'Thin', gravity: '0.7g', landable: true, icon: '❄️' },
+            { type: 'gas', name: 'Gas Giant', prob: 0.25, temp: '-120°C', atmos: 'Dense', gravity: '2.1g', landable: false, icon: '🌪️' }
+        ];
+
+        function getPlanetType(seed, index) {
+            const rand = seededRandom(seed, index);
+            let cumulative = 0;
+            
+            for (const type of planetTypes) {
+                cumulative += type.prob;
+                if (rand < cumulative) {
+                    return { ...type };
+                }
+            }
+            return { ...planetTypes[1] };
+        }
+
+        // ===== NAME GENERATION =====
+        const planetPrefixes = [
+            'Verdant', 'Pyros', 'Glacier', 'Aether', 'Ignis', 'Terra', 'Aqua', 'Ventus',
+            'Saxum', 'Silva', 'Desertum', 'Lux', 'Umbra', 'Crystal', 'Eden',
+            'Nova', 'Prime', 'Secundus', 'Tertius', 'Quartus'
+        ];
+
+        function generatePlanetName(seed, index) {
+            const prefix = planetPrefixes[Math.floor(seededRandom(seed, index * 5) * planetPrefixes.length)];
+            const number = Math.floor(seededRandom(seed, index * 5 + 1) * 12) + 1;
+            return prefix + '-' + number;
+        }
+
+        // ===== LOAD STAR DATA =====
+        async function loadStarData() {
+            try {
+                // Load star data from storage
+                const starName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
+                const starType = typeof getCurrentStarType === 'function' ? await getCurrentStarType() : 'Main Sequence';
+                const starIndex = typeof getCurrentStarIndex === 'function' ? await getCurrentStarIndex() : 0;
+
+                // Generate star system
+                const starSeed = UNIVERSE_SEED + (starName ? hashString(starName) : 0);
+                
+                // Generate star
+                const starTypeObj = getStarType(starSeed, 0);
+                starData = {
+                    type: starTypeObj.type,
+                    typeName: starTypeObj.name,
+                    color: starTypeObj.color
+                };
+                
+                // Generate planets
+                const planetCount = Math.floor(Math.random() * 6) + 3; // 3-8 planets
+                planets = [];
+                
+                const orbitRadii = [70, 110, 150, 190, 230, 270, 310, 350];
+                
+                for (let i = 0; i < planetCount; i++) {
+                    const planetSeed = starSeed + i * 100;
+                    const planetType = getPlanetType(planetSeed, i);
+                    
+                    // Generate resources
+                    const resources = [];
+                    const possibleResources = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 'Uranium', 'Titanium', 'Oxygen', 'Hydrogen', 'Helium'];
+                    for (let r = 0; r < 3; r++) {
+                        if (Math.random() > 0.3) {
+                            resources.push(possibleResources[Math.floor(Math.random() * possibleResources.length)]);
+                        }
+                    }
+                    
+                    planets.push({
+                        index: i,
+                        name: generatePlanetName(planetSeed, i),
+                        type: planetType.type,
+                        typeName: planetType.name,
+                        icon: planetType.icon,
+                        temp: planetType.temp,
+                        atmos: planetType.atmos,
+                        gravity: planetType.gravity,
+                        landable: planetType.landable,
+                        resources: resources,
+                        orbitRadius: orbitRadii[i],
+                        orbitSpeed: 0.002 - (i * 0.0002),
+                        angle: Math.random() * Math.PI * 2
+                    });
+                }
+
+                // Update UI
+                document.getElementById('starName').textContent = starName || 'Unknown Star';
+                document.getElementById('systemName').textContent = (starName || 'Unknown') + ' System';
+                document.getElementById('planetCount').textContent = planets.length + ' planets';
+
+                // Set star color
+                const starEl = document.getElementById('star');
+                const color = starData?.color || '#ffd700';
+                starEl.style.background = `radial-gradient(circle at 30% 30%, #fff, ${color})`;
+                starEl.style.boxShadow = `0 0 40px ${color}`;
+
+                return true;
+
+            } catch (error) {
+                console.error('Error loading star data:', error);
+                return false;
+            }
         }
 
         // ===== CREATE ORBIT RINGS =====
@@ -507,7 +582,6 @@
                 
                 // Store position for animation
                 planet.element = planetEl;
-                planet.angle = Math.random() * Math.PI * 2; // Random start position
             });
         }
 
@@ -517,7 +591,7 @@
                 planet.angle += planet.orbitSpeed;
                 
                 const x = Math.cos(planet.angle) * planet.orbitRadius;
-                const y = Math.sin(planet.angle) * planet.orbitRadius * 0.6; // Flatten for perspective
+                const y = Math.sin(planet.angle) * planet.orbitRadius * 0.6;
                 
                 if (planet.element) {
                     planet.element.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
@@ -547,13 +621,13 @@
         }
 
         // ===== HIDE PLANET INFO =====
-        window.hidePlanetInfo = function() {
+        function hidePlanetInfo() {
             planetInfo.classList.remove('visible');
             currentPlanet = null;
-        };
+        }
 
         // ===== LAND ON PLANET =====
-        window.landOnPlanet = async function() {
+        async function landOnPlanet() {
             if (!currentPlanet) return;
             
             if (!currentPlanet.landable) {
@@ -566,11 +640,17 @@
             
             try {
                 // Save current planet to storage
-                await setCurrentPlanet(
-                    currentPlanet.name,
-                    currentPlanet.type,
-                    currentPlanet.resources
-                );
+                if (typeof setCurrentPlanet === 'function') {
+                    await setCurrentPlanet(
+                        currentPlanet.name,
+                        currentPlanet.type,
+                        currentPlanet.resources
+                    );
+                } else {
+                    localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
+                    localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
+                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
+                }
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -581,12 +661,12 @@
                 loadingOverlay.classList.remove('active');
                 alert('Failed to land. Please try again.');
             }
-        };
+        }
 
         // ===== GO BACK =====
-        window.goBack = function() {
+        function goBack() {
             window.location.href = 'star-cluster.html';
-        };
+        }
 
         // ===== INITIALIZE =====
         async function init() {
@@ -596,7 +676,7 @@
                 loadingText.textContent = 'loading star system...';
 
                 // Check for player data
-                const credits = await getCredits();
+                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -613,14 +693,6 @@
 
                 // Start animation
                 animate();
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 // Hide loading
                 setTimeout(() => {
@@ -639,5 +711,11 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/warp-calculator.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
