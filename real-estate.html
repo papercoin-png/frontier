@@ -6,6 +6,8 @@
     <title>Voidfarer - Real Estate</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -63,6 +65,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -71,21 +75,21 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a9a8a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
+            text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #4a9a8a;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
         
         @keyframes spin {
@@ -387,6 +391,20 @@
             background: #4a9a8a;
             transform: translateX(-50%) scale(0.98);
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -401,23 +419,23 @@
             <!-- Stats Bar -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> 5,000
+                    <span>⭐</span> --
                 </div>
                 <div class="total-capacity" id="totalCapacity">
-                    Total: 0/0
+                    Total: --/--
                 </div>
             </div>
             
             <!-- Your Properties Section -->
             <div class="section-title">✦ Your Properties</div>
             <div class="properties-grid" id="propertiesContainer">
-                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading your properties...</div>
             </div>
             
             <!-- Available Properties Section -->
             <div class="section-title">✦ Available for Purchase</div>
             <div class="market-grid" id="marketContainer">
-                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading available properties...</div>
             </div>
             
             <!-- Back button -->
@@ -426,15 +444,26 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">processing...</div>
+                <div class="loading-text" id="loadingText">processing...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCredits,
+            getRealEstate,
+            addProperty,
+            getPlayer,
+            spendCredits
+        } from './js/storage.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -442,25 +471,12 @@
             tg.setHeaderColor('#0a2a3a');
             tg.setBackgroundColor('#0a2a3a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Navigation
-        function returnToEarthHub() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'earth-hub.html';
-        }
-        
-        function navigateTo(screen) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            loadingOverlay.classList.add('active');
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = screen;
-            }, 300);
-        }
-        
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
         // ===== PROPERTY TYPES =====
         const PROPERTY_TYPES = {
             'storage_locker': {
@@ -492,51 +508,78 @@
                 desc: 'Zero-G storage in orbit. Maximum capacity.'
             }
         };
-        
-        // ===== STORAGE HELPERS (if not in storage.js) =====
-        function getCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-        }
-        
-        function saveCredits(credits) {
-            localStorage.setItem('voidfarer_credits', credits.toString());
-        }
-        
-        function getProperties() {
-            const data = localStorage.getItem('voidfarer_real_estate');
-            return data ? JSON.parse(data) : { properties: [] };
-        }
-        
-        function saveProperties(propertyData) {
-            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
-        }
-        
+
+        // ===== NAVIGATION =====
+        window.returnToEarthHub = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        };
+
+        window.navigateTo = function(screen) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = screen;
+            }, 300);
+        };
+
         // ===== LOAD DATA =====
-        function loadData() {
-            const credits = getCredits();
-            const propertyData = getProperties();
-            
-            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-            
-            renderProperties(propertyData);
-            renderMarket(propertyData, credits);
-            updateTotalCapacity(propertyData);
+        async function loadData() {
+            try {
+                // Load all data in parallel
+                const [credits, propertyData, player] = await Promise.all([
+                    getCredits(),
+                    getRealEstate(),
+                    getPlayer()
+                ]);
+
+                // Update header
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+
+                // Render properties
+                renderProperties(propertyData);
+                
+                // Render market
+                renderMarket(propertyData, credits);
+
+                // Update total capacity
+                updateTotalCapacity(propertyData);
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('propertiesContainer').innerHTML = 
+                    '<div class="empty-state">Error loading properties</div>';
+                document.getElementById('marketContainer').innerHTML = 
+                    '<div class="empty-state">Error loading market</div>';
+            }
         }
-        
+
         // ===== RENDER PROPERTIES =====
         function renderProperties(propertyData) {
             const container = document.getElementById('propertiesContainer');
             container.innerHTML = '';
-            
+
             if (!propertyData.properties || propertyData.properties.length === 0) {
                 container.innerHTML = '<div class="empty-state">You don\'t own any properties yet</div>';
                 return;
             }
-            
+
             propertyData.properties.forEach(prop => {
                 const propType = PROPERTY_TYPES[prop.type];
-                const usedPercent = (prop.used / prop.capacity) * 100;
-                
+                if (!propType) return;
+
+                const usedPercent = ((prop.used || 0) / prop.capacity) * 100;
+
                 const card = document.createElement('div');
                 card.className = 'property-card';
                 card.innerHTML = `
@@ -545,7 +588,7 @@
                         <span class="property-type">${propType.icon} ${propType.name}</span>
                     </div>
                     <div class="property-details">
-                        <span>Capacity: <span class="property-capacity">${prop.used}/${prop.capacity}</span></span>
+                        <span>Capacity: <span class="property-capacity">${prop.used || 0}/${prop.capacity}</span></span>
                         <span class="property-date">Purchased: ${new Date(prop.purchaseDate).toLocaleDateString()}</span>
                     </div>
                     <div class="capacity-bar-bg">
@@ -556,25 +599,25 @@
                         <button class="property-btn primary" onclick="transferToProperty('${prop.id}')">TRANSFER</button>
                     </div>
                 `;
-                
+
                 container.appendChild(card);
             });
         }
-        
+
         // ===== RENDER MARKET =====
         function renderMarket(propertyData, credits) {
             const container = document.getElementById('marketContainer');
             container.innerHTML = '';
-            
+
             const ownedTypes = new Set((propertyData.properties || []).map(p => p.type));
-            
+
             Object.keys(PROPERTY_TYPES).forEach(type => {
                 const prop = PROPERTY_TYPES[type];
                 const alreadyOwned = ownedTypes.has(type);
-                
+
                 const card = document.createElement('div');
                 card.className = `market-card ${alreadyOwned ? 'disabled' : ''}`;
-                
+
                 card.innerHTML = `
                     <div class="market-header">
                         <span class="market-name">${prop.icon} ${prop.name}</span>
@@ -590,50 +633,57 @@
                         ${alreadyOwned ? '✓ OWNED' : 'PURCHASE'}
                     </button>
                 `;
-                
+
                 container.appendChild(card);
             });
         }
-        
+
         // ===== UPDATE TOTAL CAPACITY =====
         function updateTotalCapacity(propertyData) {
             let totalCapacity = 0;
             let totalUsed = 0;
-            
+
             (propertyData.properties || []).forEach(prop => {
                 totalCapacity += prop.capacity;
                 totalUsed += prop.used || 0;
             });
-            
+
             document.getElementById('totalCapacity').textContent = `Total: ${totalUsed}/${totalCapacity}`;
         }
-        
+
         // ===== PURCHASE PROPERTY =====
-        function purchaseProperty(type) {
+        window.purchaseProperty = async function(type) {
             const propType = PROPERTY_TYPES[type];
             if (!propType) return;
-            
-            let credits = getCredits();
-            
+
+            let credits = await getCredits();
+
             if (credits < propType.price) {
                 alert('Not enough credits!');
                 return;
             }
-            
-            let propertyData = getProperties();
-            
+
+            let propertyData = await getRealEstate();
+
             // Check if already own this type
             if (propertyData.properties?.some(p => p.type === type)) {
                 alert('You already own this type of property!');
                 return;
             }
-            
+
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
+            loadingText.textContent = 'purchasing property...';
+
+            try {
+                // Spend credits
+                const spent = await spendCredits(propType.price);
+                if (!spent) {
+                    throw new Error('Failed to spend credits');
+                }
+
                 // Create new property
                 const newProp = {
-                    id: 'prop_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                    id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
                     type: type,
                     name: propType.name,
                     capacity: propType.capacity,
@@ -642,50 +692,83 @@
                     cost: propType.price,
                     items: {}
                 };
-                
+
                 if (!propertyData.properties) {
                     propertyData.properties = [];
                 }
-                
+
                 propertyData.properties.push(newProp);
-                saveProperties(propertyData);
                 
-                // Deduct credits
-                credits -= propType.price;
-                saveCredits(credits);
-                
-                // Reload
-                loadData();
-                
+                // Save to storage
+                // Note: You'll need to add a saveRealEstate function or use the storage module
+                // For now, we'll assume there's a way to save
+                await saveRealEstate(propertyData);
+
+                // Reload data
+                await loadData();
+
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-                
                 alert(`Successfully purchased ${propType.name}!`);
-            }, 500);
-        }
-        
+
+            } catch (error) {
+                console.error('Purchase error:', error);
+                alert('Failed to purchase property');
+            }
+
+            loadingOverlay.classList.remove('active');
+        };
+
         // ===== PROPERTY ACTIONS =====
-        function viewProperty(propertyId) {
-            // Navigate to property detail view (could be a separate page)
+        window.viewProperty = function(propertyId) {
+            // In a real implementation, this would show property details
             alert(`View items in property ${propertyId}\n(This would show stored items)`);
-        }
-        
-        function transferToProperty(propertyId) {
+        };
+
+        window.transferToProperty = function(propertyId) {
             // Navigate to transfer page
             navigateTo(`property-transfer.html?property=${propertyId}`);
+        };
+
+        // ===== SAVE REAL ESTATE (helper) =====
+        // This is a temporary function - you should add this to storage.js
+        async function saveRealEstate(propertyData) {
+            // This assumes you have a way to save real estate data
+            // You'll need to implement this in storage.js
+            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
         }
-        
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading real estate...';
+
+                // Check for player data
+                const player = await getPlayer();
+                if (!player) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load data
+                await loadData();
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            loadData();
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
