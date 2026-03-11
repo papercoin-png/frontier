@@ -791,7 +791,7 @@
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
             try {
-                // Load all ship data
+                // Load all ship data with fallbacks
                 const player = typeof getPlayer === 'function' ? await getPlayer() : { ship: 'Prospector' };
                 const fuel = typeof getShipFuel === 'function' ? await getShipFuel() : 100;
                 const power = typeof getShipPower === 'function' ? await getShipPower() : 100;
@@ -852,6 +852,8 @@
 
             } catch (error) {
                 console.error('Error loading ship data:', error);
+                // Show error but don't redirect
+                document.getElementById('shipName').textContent = 'Error loading data';
             }
         }
 
@@ -1197,14 +1199,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading ship systems...';
 
-                // Check for player data
-                const credits = typeof getCredits === 'function' ? await getCredits() : 0;
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-
-                // Load ship data for status tab
+                // Load ship data for status tab - don't check credits, just try to load
                 await loadShipData();
 
                 // Hide loading
@@ -1214,9 +1209,9 @@
 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
+                loadingText.textContent = 'error loading data';
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    loadingOverlay.classList.remove('active');
                 }, 2000);
             }
         }
