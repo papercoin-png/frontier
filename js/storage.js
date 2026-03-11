@@ -71,8 +71,18 @@ const STORAGE_KEYS = {
     ACHIEVEMENTS: 'voidfarer_achievements',
     LAST_SAVE: 'voidfarer_last_save',
     
-    // Real Estate (New)
-    REAL_ESTATE: 'voidfarer_real_estate'
+    // Real Estate
+    REAL_ESTATE: 'voidfarer_real_estate',
+    
+    // Economic Data
+    TOTAL_MONEY_SUPPLY: 'voidfarer_total_money_supply',
+    DAILY_METRICS: 'voidfarer_daily_metrics',
+    HOURLY_SNAPSHOTS: 'voidfarer_hourly_snapshots',
+    TAX_RATES: 'voidfarer_tax_rates',
+    TAX_HISTORY: 'voidfarer_tax_history',
+    COMMUNITY_FUND: 'voidfarer_community_fund',
+    ACTIVE_EVENTS: 'voidfarer_active_events',
+    EVENT_HISTORY: 'voidfarer_event_history'
 };
 
 // ===== UNIVERSE CONSTANTS =====
@@ -127,6 +137,54 @@ function initializeStorage() {
             properties: []
         };
         localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(defaultRealEstate));
+    }
+    
+    // Initialize economic data
+    if (!localStorage.getItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY)) {
+        localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, '5000000'); // 5M starting credits
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.DAILY_METRICS)) {
+        localStorage.setItem(STORAGE_KEYS.DAILY_METRICS, JSON.stringify([]));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.HOURLY_SNAPSHOTS)) {
+        localStorage.setItem(STORAGE_KEYS.HOURLY_SNAPSHOTS, JSON.stringify([]));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.TAX_RATES)) {
+        const defaultRates = {
+            transaction: 0.02,
+            property: 0.005,
+            income: 0.08,
+            luxury: 0.03,
+            estate: 0.10,
+            registration: 5000
+        };
+        localStorage.setItem(STORAGE_KEYS.TAX_RATES, JSON.stringify(defaultRates));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.TAX_HISTORY)) {
+        localStorage.setItem(STORAGE_KEYS.TAX_HISTORY, JSON.stringify([]));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.COMMUNITY_FUND)) {
+        const defaultFund = {
+            balance: 0,
+            totalContributions: 0,
+            totalAllocations: 0,
+            lastUpdated: Date.now(),
+            categories: {}
+        };
+        localStorage.setItem(STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(defaultFund));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_EVENTS)) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_EVENTS, JSON.stringify([]));
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEYS.EVENT_HISTORY)) {
+        localStorage.setItem(STORAGE_KEYS.EVENT_HISTORY, JSON.stringify([]));
     }
     
     // Initialize default location if none exists
@@ -506,7 +564,7 @@ function saveColonies(colonies) {
 function addColony(name, planet, star, nebula, sector) {
     const colonies = getColonies();
     colonies.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
         name: name,
         planet: planet,
         star: star,
@@ -710,6 +768,112 @@ function getTotalPropertyCapacity() {
     return { totalCapacity, totalUsed };
 }
 
+// ===== ECONOMIC DATA =====
+function getTotalMoneySupply() {
+    return parseInt(localStorage.getItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY)) || 5000000;
+}
+
+function addMoneyToSupply(amount) {
+    const current = getTotalMoneySupply();
+    const newTotal = current + amount;
+    localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
+    return newTotal;
+}
+
+function removeMoneyFromSupply(amount) {
+    const current = getTotalMoneySupply();
+    const newTotal = Math.max(0, current - amount);
+    localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
+    return newTotal;
+}
+
+function getDailyMetrics() {
+    const data = localStorage.getItem(STORAGE_KEYS.DAILY_METRICS);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDailyMetrics(metrics) {
+    localStorage.setItem(STORAGE_KEYS.DAILY_METRICS, JSON.stringify(metrics));
+}
+
+function getTaxRates() {
+    const data = localStorage.getItem(STORAGE_KEYS.TAX_RATES);
+    return data ? JSON.parse(data) : {
+        transaction: 0.02,
+        property: 0.005,
+        income: 0.08,
+        luxury: 0.03,
+        estate: 0.10,
+        registration: 5000
+    };
+}
+
+function saveTaxRates(rates) {
+    localStorage.setItem(STORAGE_KEYS.TAX_RATES, JSON.stringify(rates));
+}
+
+function getTaxHistory() {
+    const data = localStorage.getItem(STORAGE_KEYS.TAX_HISTORY);
+    return data ? JSON.parse(data) : [];
+}
+
+function addTaxRecord(record) {
+    const history = getTaxHistory();
+    history.push(record);
+    
+    // Keep only last 1000 records
+    if (history.length > 1000) {
+        history.shift();
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.TAX_HISTORY, JSON.stringify(history));
+    return record;
+}
+
+function getCommunityFund() {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_FUND);
+    return data ? JSON.parse(data) : {
+        balance: 0,
+        totalContributions: 0,
+        totalAllocations: 0,
+        lastUpdated: Date.now(),
+        categories: {}
+    };
+}
+
+function saveCommunityFund(fund) {
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(fund));
+}
+
+function getActiveEvents() {
+    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EVENTS);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveActiveEvents(events) {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_EVENTS, JSON.stringify(events));
+}
+
+function getEventHistory() {
+    const data = localStorage.getItem(STORAGE_KEYS.EVENT_HISTORY);
+    return data ? JSON.parse(data) : [];
+}
+
+function addEventToHistory(event) {
+    const history = getEventHistory();
+    history.push({
+        ...event,
+        recordedAt: Date.now()
+    });
+    
+    // Keep only last 500 events
+    if (history.length > 500) {
+        history.shift();
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.EVENT_HISTORY, JSON.stringify(history));
+}
+
 // ===== SETTINGS =====
 function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
@@ -838,6 +1002,21 @@ function importGameData(jsonString) {
     }
 }
 
+// ===== PLAYER ID MANAGEMENT =====
+function getPlayerId() {
+    let playerId = localStorage.getItem('voidfarer_player_id');
+    if (!playerId) {
+        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+        localStorage.setItem('voidfarer_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getPlayerName() {
+    const player = getPlayer();
+    return player?.name || 'Voidfarer';
+}
+
 // ===== INITIALIZE ON LOAD =====
 initializeStorage();
 
@@ -913,6 +1092,21 @@ if (typeof module !== 'undefined' && module.exports) {
         transferToProperty,
         transferFromProperty,
         getTotalPropertyCapacity,
+        getTotalMoneySupply,
+        addMoneyToSupply,
+        removeMoneyFromSupply,
+        getDailyMetrics,
+        saveDailyMetrics,
+        getTaxRates,
+        saveTaxRates,
+        getTaxHistory,
+        addTaxRecord,
+        getCommunityFund,
+        saveCommunityFund,
+        getActiveEvents,
+        saveActiveEvents,
+        getEventHistory,
+        addEventToHistory,
         getHapticsEnabled,
         setHapticsEnabled,
         getAutoGatherEnabled,
@@ -929,6 +1123,8 @@ if (typeof module !== 'undefined' && module.exports) {
         getLastSaveTime,
         resetGame,
         exportGameData,
-        importGameData
+        importGameData,
+        getPlayerId,
+        getPlayerName
     };
 }
