@@ -137,7 +137,6 @@
             cursor: pointer;
             transition: all 0.2s;
             width: 100%;
-            pointer-events: auto; /* Ensure clicks work */
         }
         
         .menu-button:active {
@@ -145,11 +144,6 @@
             transform: scale(0.98);
             border-color: #8ac8c8;
             box-shadow: 0 0 30px #3a8a8a;
-        }
-        
-        .menu-button.disabled {
-            opacity: 0.5;
-            pointer-events: none;
         }
         
         .button-icon {
@@ -260,6 +254,19 @@
             font-size: 14px;
             margin-top: 10px;
         }
+
+        /* Error message */
+        .error-message {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        .error-message.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -306,6 +313,9 @@
             <!-- Version -->
             <div class="version">v1.0 · alone in the stars</div>
             
+            <!-- Error Message (hidden by default) -->
+            <div class="error-message" id="errorMessage"></div>
+            
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
@@ -319,18 +329,9 @@
     </div>
 
     <script type="module">
-        // ===== IMPORTS =====
-        import { initializeDatabase } from './js/db.js';
-        import { migrateFromLocalStorage, getMigrationProgress } from './js/migration.js';
-        import { initializeStorage, getPlayer } from './js/storage.js';
-        import { initializeTaxSystem } from './js/tax-system.js';
-        import { initializeTaxHistory } from './js/tax-history.js';
-        import { initializeCommunityFund } from './js/community-fund.js';
-        import { initializeMetrics } from './js/economic-metrics.js';
-        import { initializeAdjuster } from './js/economic-adjuster.js';
-        import { initializeEventSystem } from './js/economic-events.js';
-        import { initializeCollector } from './js/tax-collector.js';
-
+        // ===== SIMPLIFIED INITIALIZATION FOR TESTING =====
+        console.log('Index.html loaded');
+        
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -338,6 +339,7 @@
             tg.expand();
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
+            console.log('Telegram initialized');
         }
 
         // ===== DOM ELEMENTS =====
@@ -345,6 +347,7 @@
         const loadingText = document.getElementById('loadingText');
         const migrationProgressFill = document.getElementById('migrationProgressFill');
         const migrationStatus = document.getElementById('migrationStatus');
+        const errorMessage = document.getElementById('errorMessage');
         
         // Menu buttons
         const newGameBtn = document.getElementById('newGameBtn');
@@ -352,213 +355,75 @@
         const settingsBtn = document.getElementById('settingsBtn');
         const creditsBtn = document.getElementById('creditsBtn');
 
-        // ===== BUTTON CLICK HANDLERS =====
-        newGameBtn.addEventListener('click', () => handleMenu('new'));
-        continueBtn.addEventListener('click', () => handleMenu('continue'));
-        settingsBtn.addEventListener('click', () => handleMenu('settings'));
-        creditsBtn.addEventListener('click', () => handleMenu('credits'));
+        // ===== SHOW LOADING OVERLAY =====
+        function showLoading(message = 'loading...') {
+            console.log('Showing loading:', message);
+            loadingText.textContent = message;
+            loadingOverlay.classList.add('active');
+        }
 
-        // ===== INITIALIZATION =====
+        // ===== HIDE LOADING OVERLAY =====
+        function hideLoading() {
+            console.log('Hiding loading');
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== SHOW ERROR =====
+        function showError(message) {
+            console.error('Error:', message);
+            errorMessage.textContent = '⚠️ ' + message;
+            errorMessage.classList.add('visible');
+            hideLoading();
+        }
+
+        // ===== SIMPLE BUTTON HANDLERS FOR TESTING =====
+        newGameBtn.addEventListener('click', () => {
+            console.log('New Game clicked');
+            showLoading('starting new journey...');
+            setTimeout(() => {
+                window.location.href = 'earth-hub.html';
+            }, 500);
+        });
+
+        continueBtn.addEventListener('click', () => {
+            console.log('Continue clicked');
+            showLoading('loading your journey...');
+            setTimeout(() => {
+                window.location.href = 'earth-hub.html';
+            }, 500);
+        });
+
+        settingsBtn.addEventListener('click', () => {
+            console.log('Settings clicked');
+            window.location.href = 'settings.html';
+        });
+
+        creditsBtn.addEventListener('click', () => {
+            console.log('Credits clicked');
+            alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
+        });
+
+        // ===== SIMPLE INITIALIZATION =====
         async function initializeGame() {
             try {
-                // Show loading overlay
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'initializing database...';
+                console.log('Starting initialization...');
+                showLoading('initializing...');
                 
-                // Step 1: Initialize database
-                await initializeDatabase();
-                loadingText.textContent = 'database ready...';
+                // Simple timeout to show loading works
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Step 2: Run migration (if needed)
-                loadingText.textContent = 'checking for saved data...';
-                migrationProgressFill.style.width = '10%';
-                
-                const migrationResult = await migrateFromLocalStorage();
-                
-                if (migrationResult.success) {
-                    if (migrationResult.reason === 'ALREADY_COMPLETED') {
-                        migrationStatus.textContent = '✓ Save data loaded';
-                    } else if (migrationResult.results) {
-                        const { collection, missions, realEstate, taxTransactions } = migrationResult.results;
-                        migrationStatus.textContent = `✓ Migrated: ${collection} elements, ${missions} missions, ${realEstate} properties`;
-                    }
-                } else if (migrationResult.error) {
-                    console.warn('Migration warning:', migrationResult.error);
-                    migrationStatus.textContent = '⚠ Using new save';
-                }
-                
-                migrationProgressFill.style.width = '50%';
-                loadingText.textContent = 'initializing systems...';
-                
-                // Step 3: Initialize all game systems
-                await Promise.all([
-                    initializeStorage(),
-                    initializeTaxSystem(),
-                    initializeTaxHistory(),
-                    initializeCommunityFund(),
-                    initializeMetrics(),
-                    initializeAdjuster(),
-                    initializeEventSystem(),
-                    initializeCollector()
-                ]);
-                
-                migrationProgressFill.style.width = '100%';
-                loadingText.textContent = 'welcome back, voidfarer...';
-                
-                // Step 4: Small delay for visual feedback
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Hide loading overlay
-                loadingOverlay.classList.remove('active');
+                console.log('Initialization complete');
+                hideLoading();
                 
             } catch (error) {
-                console.error('Failed to initialize game:', error);
-                loadingText.textContent = 'error loading game';
-                migrationStatus.textContent = 'Please refresh and try again';
-                
-                // Still hide loading after error so buttons are usable
-                setTimeout(() => {
-                    loadingOverlay.classList.remove('active');
-                }, 2000);
+                console.error('Initialization failed:', error);
+                showError('Failed to initialize: ' + error.message);
             }
         }
 
-        // ===== NAVIGATION =====
-        function navigateTo(screen, useWarp = false) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            if (useWarp) {
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'warping...';
-                migrationProgressFill.style.width = '0%';
-                migrationStatus.textContent = '';
-                
-                setTimeout(() => {
-                    window.location.href = screen;
-                }, 800);
-            } else {
-                window.location.href = screen;
-            }
-        }
-
-        // ===== CHECK FOR EXISTING PLAYER =====
-        async function hasExistingSave() {
-            try {
-                const player = await getPlayer();
-                return player !== null;
-            } catch (e) {
-                return false;
-            }
-        }
-
-        // ===== UNIVERSE SEED =====
-        function initializeUniverse() {
-            if (!localStorage.getItem('voidfarer_universe_seed')) {
-                // Fixed seed - everyone gets the same universe
-                localStorage.setItem('voidfarer_universe_seed', '42793');
-            }
-        }
-
-        // ===== CREATE NEW SAVE =====
-        async function createNewSave() {
-            // Clear all IndexedDB data (handled by migration system)
-            // Set default values in localStorage for location data
-            localStorage.setItem('voidfarer_player', JSON.stringify({
-                name: 'Voidfarer',
-                ship: 'Prospector',
-                credits: 1000,
-                created: new Date().toISOString()
-            }));
-            
-            // Initialize universe seed
-            initializeUniverse();
-            
-            // Set starting location
-            localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
-            localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
-            localStorage.setItem('voidfarer_current_star', 'Sol');
-            localStorage.setItem('voidfarer_current_planet', 'Earth');
-            
-            // Default missions in localStorage (will be migrated)
-            localStorage.setItem('voidfarer_missions', JSON.stringify([
-                { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
-                { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
-                { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
-            ]));
-            
-            localStorage.setItem('voidfarer_credits', '12450');
-        }
-
-        // ===== HANDLE MENU ACTIONS =====
-        async function handleMenu(action) {
-            switch(action) {
-                case 'new':
-                    if (confirm('Start a new journey? This will erase all progress.')) {
-                        loadingOverlay.classList.add('active');
-                        loadingText.textContent = 'creating new universe...';
-                        migrationProgressFill.style.width = '0%';
-                        migrationStatus.textContent = '';
-                        
-                        // Small delay for visual feedback
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        await createNewSave();
-                        
-                        // Navigate to Earth Hub with warp effect
-                        navigateTo('earth-hub.html', true);
-                    }
-                    break;
-                    
-                case 'continue':
-                    loadingOverlay.classList.add('active');
-                    loadingText.textContent = 'loading your journey...';
-                    migrationProgressFill.style.width = '50%';
-                    
-                    const hasSave = await hasExistingSave();
-                    
-                    if (!hasSave) {
-                        // First time playing - create default save
-                        loadingText.textContent = 'creating new save...';
-                        await createNewSave();
-                    }
-                    
-                    migrationProgressFill.style.width = '100%';
-                    
-                    // Navigate to Earth Hub with warp effect
-                    navigateTo('earth-hub.html', true);
-                    break;
-                    
-                case 'settings':
-                    navigateTo('settings.html');
-                    break;
-                    
-                case 'credits':
-                    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-                    alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
-                    break;
-            }
-        }
-
-        // ===== PRELOAD SCREENS =====
-        function preloadScreen(url) {
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.href = url;
-            link.as = 'document';
-            document.head.appendChild(link);
-        }
-
-        // ===== START THE GAME =====
-        window.addEventListener('load', async () => {
-            // Preload next screen for faster transition
-            preloadScreen('earth-hub.html');
-            
-            // Initialize universe seed
-            initializeUniverse();
-            
-            // Start game initialization
-            await initializeGame();
-        });
+        // ===== START =====
+        console.log('Calling initializeGame...');
+        initializeGame();
     </script>
 </body>
 </html>
