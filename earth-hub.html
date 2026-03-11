@@ -669,7 +669,7 @@
         .rarity-very-rare { color: #e0b0ff; }
         .rarity-legendary { color: #ffd700; }
 
-        /* Migration status (hidden by default) */
+        /* Migration status (debug) */
         .migration-status {
             position: fixed;
             bottom: 10px;
@@ -710,7 +710,7 @@
             </div>
             
             <!-- Economic Alert Banner (dynamic) -->
-            <div class="alert-banner" id="alertBanner" style="display: none;">
+            <div class="alert-banner" id="alertBanner" style="display: none;" onclick="window.navigateTo('economy-dashboard.html')">
                 <div class="alert-icon">📈</div>
                 <div class="alert-content">
                     <div class="alert-title" id="alertTitle">Economic Alert</div>
@@ -734,10 +734,10 @@
                 
                 <!-- Quick Sell Bar -->
                 <div class="quick-sell">
-                    <button class="quick-sell-btn" id="quickSell100" onclick="quickSell(100)">100⭐</button>
-                    <button class="quick-sell-btn" id="quickSell500" onclick="quickSell(500)">500⭐</button>
-                    <button class="quick-sell-btn" id="quickSell1000" onclick="quickSell(1000)">1000⭐</button>
-                    <button class="quick-sell-btn" id="quickSellAll" onclick="quickSell('all')">ALL</button>
+                    <button class="quick-sell-btn" id="quickSell100" onclick="window.quickSell(100)">100⭐</button>
+                    <button class="quick-sell-btn" id="quickSell500" onclick="window.quickSell(500)">500⭐</button>
+                    <button class="quick-sell-btn" id="quickSell1000" onclick="window.quickSell(1000)">1000⭐</button>
+                    <button class="quick-sell-btn" id="quickSellAll" onclick="window.quickSell('all')">ALL</button>
                 </div>
                 
                 <!-- Total Value Row -->
@@ -748,7 +748,7 @@
             </div>
             
             <!-- Tax Banner -->
-            <div class="tax-banner" onclick="navigateTo('tax-center.html')">
+            <div class="tax-banner" onclick="window.navigateTo('tax-center.html')">
                 <div class="tax-icon">💰</div>
                 <div class="tax-content">
                     <div class="tax-title">Tax Center</div>
@@ -776,7 +776,7 @@
                 
                 <!-- Chart Controls -->
                 <div class="chart-controls">
-                    <select id="chartElement" class="chart-select" onchange="updatePriceChart()">
+                    <select id="chartElement" class="chart-select" onchange="window.updatePriceChart()">
                         <option value="Gold">Gold</option>
                         <option value="Silver">Silver</option>
                         <option value="Platinum">Platinum</option>
@@ -784,7 +784,7 @@
                         <option value="Promethium">Promethium</option>
                     </select>
                     
-                    <select id="chartPeriod" class="chart-select" onchange="updatePriceChart()">
+                    <select id="chartPeriod" class="chart-select" onchange="window.updatePriceChart()">
                         <option value="7">7 Days</option>
                         <option value="30">30 Days</option>
                         <option value="90">90 Days</option>
@@ -794,25 +794,25 @@
             
             <!-- HUB CARDS GRID -->
             <div class="hub-grid">
-                <div class="hub-card" onclick="navigateTo('ship-bridge.html')">
+                <div class="hub-card" onclick="window.navigateTo('ship-bridge.html')">
                     <div class="hub-icon">🚀</div>
                     <div class="hub-label">Ship Bridge</div>
                     <div class="hub-desc">Return to your ship</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('cargo.html')">
+                <div class="hub-card" onclick="window.navigateTo('cargo.html')">
                     <div class="hub-icon">📦</div>
                     <div class="hub-label">Cargo Hold</div>
                     <div class="hub-desc">Manage inventory</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('real-estate.html')">
+                <div class="hub-card" onclick="window.navigateTo('real-estate.html')">
                     <div class="hub-icon">🏢</div>
                     <div class="hub-label">Real Estate</div>
                     <div class="hub-desc">Buy & manage storage</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('economy-dashboard.html')">
+                <div class="hub-card" onclick="window.navigateTo('economy-dashboard.html')">
                     <div class="hub-icon">📊</div>
                     <div class="hub-label">Economy</div>
                     <div class="hub-desc">Galactic economic stats</div>
@@ -820,7 +820,7 @@
             </div>
             
             <!-- Back button to main menu -->
-            <button class="back-button" onclick="returnToMenu()">← MAIN MENU</button>
+            <button class="back-button" onclick="window.returnToMenu()">← MAIN MENU</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -848,9 +848,7 @@
             getLatestPrice, 
             getPriceHistory, 
             updateDailyPrices,
-            recordTrade,
-            getMarketSummary,
-            getTopMovers
+            recordTrade
         } from './js/market-dynamics.js';
         import { getActiveEvents, checkAndExpireEvents } from './js/economic-events.js';
         import { getCurrentRates } from './js/tax-system.js';
@@ -876,7 +874,7 @@
         let currentCollection = {};
         let currentCredits = 0;
 
-        // ===== NAVIGATION =====
+        // ===== GLOBAL FUNCTIONS (exposed to window for onclick handlers) =====
         window.navigateTo = function(screen) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             loadingOverlay.classList.add('active');
@@ -888,7 +886,193 @@
         };
 
         window.returnToMenu = function() {
-            navigateTo('index.html');
+            window.navigateTo('index.html');
+        };
+
+        window.toggleGroup = function(rarity) {
+            if (expandedGroup === rarity) {
+                expandedGroup = null;
+            } else {
+                expandedGroup = rarity;
+            }
+            renderMarket(currentCollection);
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        window.sellItem = async function(elementName, quantity, price, event) {
+            if (event) event.stopPropagation();
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selling...';
+            
+            try {
+                const result = await safeSellElement(elementName, quantity, price);
+                
+                if (result.success) {
+                    await recordTrade(elementName, quantity, price);
+                    await loadAllData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Sale failed: ' + (result.reason || 'unknown error'));
+                }
+            } catch (error) {
+                console.error('Sell error:', error);
+                alert('Error selling item');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        };
+
+        window.sellGroup = async function(rarity, quantity, event) {
+            if (event) event.stopPropagation();
+            
+            const groups = groupElements(currentCollection);
+            const group = groups[rarity];
+            
+            if (!group || group.elements.length === 0) {
+                alert('No items to sell');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selling group...';
+            
+            try {
+                let totalEarnings = 0;
+                
+                for (const element of group.elements) {
+                    let sellQuantity = 0;
+                    
+                    if (quantity === 'all') {
+                        sellQuantity = element.count;
+                    } else if (quantity === 'half') {
+                        sellQuantity = Math.floor(element.count / 2);
+                    } else {
+                        sellQuantity = Math.min(quantity, element.count);
+                    }
+                    
+                    if (sellQuantity > 0) {
+                        const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
+                        if (result.success) {
+                            totalEarnings += result.earnings;
+                            await recordTrade(element.name, sellQuantity, element.marketPrice);
+                        }
+                    }
+                }
+                
+                if (totalEarnings > 0) {
+                    await loadAllData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`Sold for ${totalEarnings}⭐`);
+                }
+            } catch (error) {
+                console.error('Group sell error:', error);
+                alert('Error selling group');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        };
+
+        window.quickSell = async function(amount) {
+            const groups = groupElements(currentCollection);
+            const allElements = [];
+            
+            Object.values(groups).forEach(group => {
+                group.elements.forEach(element => {
+                    allElements.push(element);
+                });
+            });
+            
+            if (allElements.length === 0) {
+                alert('No items to sell');
+                return;
+            }
+            
+            allElements.sort((a, b) => a.marketPrice - b.marketPrice);
+            
+            let remaining = amount === 'all' ? Infinity : amount;
+            let totalEarned = 0;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'quick selling...';
+            
+            try {
+                for (const element of allElements) {
+                    if (remaining <= 0) break;
+                    
+                    if (amount === 'all') {
+                        const result = await safeSellElement(element.name, element.count, element.marketPrice);
+                        if (result.success) {
+                            totalEarned += result.earnings;
+                            await recordTrade(element.name, element.count, element.marketPrice);
+                        }
+                    } else {
+                        const maxCanSell = Math.floor(remaining / element.marketPrice);
+                        const sellQuantity = Math.min(maxCanSell, element.count);
+                        
+                        if (sellQuantity > 0) {
+                            const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
+                            if (result.success) {
+                                totalEarned += result.earnings;
+                                remaining -= result.earnings;
+                                await recordTrade(element.name, sellQuantity, element.marketPrice);
+                            }
+                        }
+                    }
+                }
+                
+                if (totalEarned > 0) {
+                    await loadAllData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`Sold for ${totalEarned}⭐`);
+                } else {
+                    alert('Not enough items to reach that amount');
+                }
+            } catch (error) {
+                console.error('Quick sell error:', error);
+                alert('Error during quick sell');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        };
+
+        window.updatePriceChart = async function() {
+            if (!priceChart) return;
+            
+            const element = document.getElementById('chartElement').value;
+            const days = parseInt(document.getElementById('chartPeriod').value);
+            
+            const history = await getPriceHistory(element);
+            const recentHistory = history.slice(-days);
+            
+            if (recentHistory.length === 0) {
+                // Use simulated data for demo
+                const labels = [];
+                const data = [];
+                const basePrice = element === 'Gold' ? 1000 : 
+                                 element === 'Silver' ? 1000 :
+                                 element === 'Platinum' ? 1000 :
+                                 element === 'Uranium' ? 5000 : 25000;
+                
+                for (let i = 0; i < days; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (days - i));
+                    labels.push(`${date.getMonth()+1}/${date.getDate()}`);
+                    data.push(basePrice + (Math.random() * 200 - 100));
+                }
+                
+                priceChart.data.labels = labels;
+                priceChart.data.datasets[0].data = data;
+            } else {
+                priceChart.data.labels = recentHistory.map(h => {
+                    const date = new Date(h.date);
+                    return `${date.getMonth()+1}/${date.getDate()}`;
+                });
+                priceChart.data.datasets[0].data = recentHistory.map(h => h.price);
+            }
+            
+            priceChart.update();
+            document.getElementById('trendPeriod').textContent = days + 'd';
         };
 
         // ===== LOAD ALL DATA =====
@@ -1069,7 +1253,7 @@
                 header.className = `group-header ${expandedGroup === rarity ? 'expanded' : ''}`;
                 header.onclick = (e) => {
                     e.stopPropagation();
-                    toggleGroup(rarity);
+                    window.toggleGroup(rarity);
                 };
                 
                 let rarityColor = 'rarity-common';
@@ -1109,7 +1293,7 @@
                             <span class="item-current-price">${element.marketPrice}⭐</span>
                         </div>
                         <div class="item-actions">
-                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, ${element.marketPrice}, event)">SELL</button>
+                            <button class="sell-btn small" onclick="window.sellItem('${element.name}', 1, ${element.marketPrice}, event)">SELL</button>
                         </div>
                     `;
                     itemsDiv.appendChild(itemRow);
@@ -1122,9 +1306,9 @@
                 const hasItems = group.totalCount > 0;
                 
                 actionsDiv.innerHTML = `
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 1, event)" ${!hasItems ? 'disabled' : ''}>SELL 1</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'half', event)" ${!hasItems ? 'disabled' : ''}>SELL HALF</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'all', event)" ${!hasItems ? 'disabled' : ''}>SELL ALL</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 1, event)" ${!hasItems ? 'disabled' : ''}>SELL 1</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 'half', event)" ${!hasItems ? 'disabled' : ''}>SELL HALF</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 'all', event)" ${!hasItems ? 'disabled' : ''}>SELL ALL</button>
                 `;
                 itemsDiv.appendChild(actionsDiv);
                 
@@ -1142,162 +1326,7 @@
             document.getElementById('quickSellAll').disabled = !hasAnyItems;
         }
 
-        // ===== TOGGLE GROUP =====
-        window.toggleGroup = function(rarity) {
-            if (expandedGroup === rarity) {
-                expandedGroup = null;
-            } else {
-                expandedGroup = rarity;
-            }
-            renderMarket(currentCollection);
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
-
-        // ===== SELL ITEM =====
-        window.sellItem = async function(elementName, quantity, price, event) {
-            if (event) event.stopPropagation();
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'selling...';
-            
-            try {
-                const result = await safeSellElement(elementName, quantity, price);
-                
-                if (result.success) {
-                    // Record trade for market dynamics
-                    await recordTrade(elementName, quantity, price);
-                    
-                    // Reload data
-                    await loadAllData();
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                } else {
-                    alert('Sale failed: ' + (result.reason || 'unknown error'));
-                }
-            } catch (error) {
-                console.error('Sell error:', error);
-                alert('Error selling item');
-            }
-            
-            loadingOverlay.classList.remove('active');
-        };
-
-        // ===== SELL GROUP =====
-        window.sellGroup = async function(rarity, quantity, event) {
-            if (event) event.stopPropagation();
-            
-            const groups = groupElements(currentCollection);
-            const group = groups[rarity];
-            
-            if (!group || group.elements.length === 0) {
-                alert('No items to sell');
-                return;
-            }
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'selling group...';
-            
-            try {
-                let totalEarnings = 0;
-                
-                for (const element of group.elements) {
-                    let sellQuantity = 0;
-                    
-                    if (quantity === 'all') {
-                        sellQuantity = element.count;
-                    } else if (quantity === 'half') {
-                        sellQuantity = Math.floor(element.count / 2);
-                    } else {
-                        sellQuantity = Math.min(quantity, element.count);
-                    }
-                    
-                    if (sellQuantity > 0) {
-                        const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
-                        if (result.success) {
-                            totalEarnings += result.earnings;
-                            await recordTrade(element.name, sellQuantity, element.marketPrice);
-                        }
-                    }
-                }
-                
-                if (totalEarnings > 0) {
-                    await loadAllData();
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    alert(`Sold for ${totalEarnings}⭐`);
-                }
-            } catch (error) {
-                console.error('Group sell error:', error);
-                alert('Error selling group');
-            }
-            
-            loadingOverlay.classList.remove('active');
-        };
-
-        // ===== QUICK SELL =====
-        window.quickSell = async function(amount) {
-            const groups = groupElements(currentCollection);
-            const allElements = [];
-            
-            Object.values(groups).forEach(group => {
-                group.elements.forEach(element => {
-                    allElements.push(element);
-                });
-            });
-            
-            if (allElements.length === 0) {
-                alert('No items to sell');
-                return;
-            }
-            
-            allElements.sort((a, b) => a.marketPrice - b.marketPrice);
-            
-            let remaining = amount === 'all' ? Infinity : amount;
-            let totalEarned = 0;
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'quick selling...';
-            
-            try {
-                for (const element of allElements) {
-                    if (remaining <= 0) break;
-                    
-                    if (amount === 'all') {
-                        const result = await safeSellElement(element.name, element.count, element.marketPrice);
-                        if (result.success) {
-                            totalEarned += result.earnings;
-                            await recordTrade(element.name, element.count, element.marketPrice);
-                        }
-                    } else {
-                        const maxCanSell = Math.floor(remaining / element.marketPrice);
-                        const sellQuantity = Math.min(maxCanSell, element.count);
-                        
-                        if (sellQuantity > 0) {
-                            const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
-                            if (result.success) {
-                                totalEarned += result.earnings;
-                                remaining -= result.earnings;
-                                await recordTrade(element.name, sellQuantity, element.marketPrice);
-                            }
-                        }
-                    }
-                }
-                
-                if (totalEarned > 0) {
-                    await loadAllData();
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    alert(`Sold for ${totalEarned}⭐`);
-                } else {
-                    alert('Not enough items to reach that amount');
-                }
-            } catch (error) {
-                console.error('Quick sell error:', error);
-                alert('Error during quick sell');
-            }
-            
-            loadingOverlay.classList.remove('active');
-        };
-
-        // ===== PRICE CHART =====
+        // ===== INITIALIZE PRICE CHART =====
         function initPriceChart() {
             const ctx = document.getElementById('priceChart').getContext('2d');
             
@@ -1342,47 +1371,8 @@
                 }
             });
             
-            updatePriceChart();
+            window.updatePriceChart();
         }
-
-        window.updatePriceChart = async function() {
-            if (!priceChart) return;
-            
-            const element = document.getElementById('chartElement').value;
-            const days = parseInt(document.getElementById('chartPeriod').value);
-            
-            const history = await getPriceHistory(element);
-            const recentHistory = history.slice(-days);
-            
-            if (recentHistory.length === 0) {
-                // Use simulated data for demo
-                const labels = [];
-                const data = [];
-                const basePrice = element === 'Gold' ? 1000 : 
-                                 element === 'Silver' ? 1000 :
-                                 element === 'Platinum' ? 1000 :
-                                 element === 'Uranium' ? 5000 : 25000;
-                
-                for (let i = 0; i < days; i++) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - (days - i));
-                    labels.push(`${date.getMonth()+1}/${date.getDate()}`);
-                    data.push(basePrice + (Math.random() * 200 - 100));
-                }
-                
-                priceChart.data.labels = labels;
-                priceChart.data.datasets[0].data = data;
-            } else {
-                priceChart.data.labels = recentHistory.map(h => {
-                    const date = new Date(h.date);
-                    return `${date.getMonth()+1}/${date.getDate()}`;
-                });
-                priceChart.data.datasets[0].data = recentHistory.map(h => h.price);
-            }
-            
-            priceChart.update();
-            document.getElementById('trendPeriod').textContent = days + 'd';
-        };
 
         // ===== FORMATTING =====
         function formatMoney(amount) {
