@@ -446,6 +446,11 @@
             background: #ffaa4a;
         }
         
+        .action-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -521,6 +526,7 @@
             font-family: 'WindSong', cursive;
             font-size: 24px;
             text-shadow: 0 0 30px #6a8ac0;
+            margin-top: 15px;
         }
         
         @keyframes spin {
@@ -541,7 +547,7 @@
             <!-- Stats Bar -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> 12,450
+                    <span>⭐</span> 5,000
                 </div>
                 <div class="cargo-capacity" id="cargoCapacityDisplay">
                     Used: 0/100
@@ -611,8 +617,8 @@
             
             <!-- Quick Actions -->
             <div class="quick-actions">
-                <button class="action-btn" onclick="sellAllCommon()">💰 SELL ALL COMMON</button>
-                <button class="action-btn sell" onclick="quickSell()">⚡ QUICK SELL (500⭐)</button>
+                <button class="action-btn" id="sellCommonBtn" onclick="sellAllCommon()">💰 SELL ALL COMMON</button>
+                <button class="action-btn sell" id="quickSellBtn" onclick="quickSell()">⚡ QUICK SELL (500⭐)</button>
             </div>
             
             <!-- Back Button -->
@@ -697,9 +703,24 @@
             'Astatine': { icon: '☣️', rarity: 'legendary', value: 25000, size: 5 }
         };
         
+        // ===== STORAGE HELPERS =====
+        function getCollection() {
+            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+        }
+        
+        function saveCollection(collection) {
+            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+        }
+        
+        function getCredits() {
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+        }
+        
+        function saveCredits(credits) {
+            localStorage.setItem('voidfarer_credits', credits.toString());
+        }
+        
         // ===== STATE =====
-        let collection = {};
-        let credits = 0;
         let cargoItems = [];
         let filteredItems = [];
         let currentFilter = 'all';
@@ -708,8 +729,8 @@
         
         // ===== LOAD DATA =====
         function loadData() {
-            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-            credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+            const collection = getCollection();
+            const credits = getCredits();
             
             // Update header
             document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
@@ -738,6 +759,11 @@
             
             updateStats();
             applyFilters();
+            
+            // Enable/disable quick action buttons
+            const hasItems = cargoItems.length > 0;
+            document.getElementById('sellCommonBtn').disabled = !hasItems;
+            document.getElementById('quickSellBtn').disabled = !hasItems;
         }
         
         // ===== UPDATE STATS =====
@@ -746,7 +772,7 @@
             const uniqueItems = cargoItems.length;
             const totalValue = cargoItems.reduce((sum, item) => sum + item.totalValue, 0);
             
-            // Calculate cargo usage
+            // Calculate cargo usage (each item takes size * count space)
             const cargoUsed = cargoItems.reduce((sum, item) => sum + (item.size * item.count), 0);
             const cargoMax = 100;
             
@@ -897,25 +923,31 @@
         
         // ===== SELL ITEM =====
         function sellItem(itemName, quantity) {
-            const item = collection[itemName];
-            if (!item || item.count < quantity) return;
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
+            
+            if (!collection[itemName] || collection[itemName].count < quantity) {
+                alert('Not enough items to sell!');
+                return;
+            }
+            
+            const elementData = elementDatabase[itemName] || { value: 100 };
+            const earnings = quantity * elementData.value;
             
             loadingOverlay.classList.add('active');
             
             setTimeout(() => {
-                const elementData = elementDatabase[itemName] || { value: 100 };
-                const earnings = quantity * elementData.value;
-                
                 // Update collection
-                item.count -= quantity;
-                if (item.count <= 0) {
+                collection[itemName].count -= quantity;
+                if (collection[itemName].count <= 0) {
                     delete collection[itemName];
                 }
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                saveCollection(collection);
                 
                 // Update credits
                 credits += earnings;
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                saveCredits(credits);
                 
                 // Reload data
                 loadData();
@@ -927,6 +959,10 @@
         
         // ===== SELL ALL COMMON =====
         function sellAllCommon() {
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
+            
             let totalEarnings = 0;
             let itemsSold = 0;
             
@@ -947,37 +983,57 @@
             loadingOverlay.classList.add('active');
             
             setTimeout(() => {
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                saveCollection(collection);
                 credits += totalEarnings;
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                saveCredits(credits);
                 
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
+                
                 alert(`Sold ${itemsSold} common items for ${totalEarnings}⭐`);
             }, 300);
         }
         
         // ===== QUICK SELL =====
         function quickSell() {
-            // Sell items until we reach 500⭐
-            let targetAmount = 500;
+            // Get FRESH data
+            let collection = getCollection();
+            let credits = getCredits();
+            
+            const targetAmount = 500;
             let earned = 0;
             let soldItems = [];
             
-            // Sort by value (cheapest first)
-            const sorted = [...cargoItems].sort((a, b) => a.value - b.value);
+            // Flatten all elements
+            const allElements = [];
+            Object.keys(collection).forEach(name => {
+                const elementData = elementDatabase[name] || { value: 100 };
+                allElements.push({
+                    name: name,
+                    count: collection[name].count,
+                    value: elementData.value
+                });
+            });
             
-            for (let item of sorted) {
+            if (allElements.length === 0) {
+                alert('No items to sell');
+                return;
+            }
+            
+            // Sort by value (cheapest first)
+            allElements.sort((a, b) => a.value - b.value);
+            
+            for (let element of allElements) {
                 if (earned >= targetAmount) break;
                 
-                const maxNeeded = Math.ceil((targetAmount - earned) / item.value);
-                const sellQuantity = Math.min(maxNeeded, item.count);
+                const maxNeeded = Math.ceil((targetAmount - earned) / element.value);
+                const sellQuantity = Math.min(maxNeeded, element.count);
                 
                 if (sellQuantity > 0) {
-                    earned += sellQuantity * item.value;
-                    soldItems.push({ name: item.name, quantity: sellQuantity });
+                    earned += sellQuantity * element.value;
+                    soldItems.push({ name: element.name, quantity: sellQuantity });
                 }
             }
             
@@ -997,14 +1053,15 @@
                     }
                 });
                 
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                saveCollection(collection);
                 credits += earned;
-                localStorage.setItem('voidfarer_credits', credits.toString());
+                saveCredits(credits);
                 
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
+                
                 alert(`Quick sold for ${earned}⭐`);
             }, 300);
         }
