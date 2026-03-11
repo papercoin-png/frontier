@@ -1,12 +1,13 @@
-// procedural-universe.js
+// js/procedural-universe.js
 // Core generation engine for Voidfarer's shared procedural universe
 // All players share the same seed = same universe for everyone
+// This is a pure calculation module - no storage dependencies
 
 // ===== CONSTANTS =====
-const UNIVERSE_SEED = 42793; // Fixed seed - every player sees the same universe
+export const UNIVERSE_SEED = 42793; // Fixed seed - every player sees the same universe
 
 // Galaxy structure (Starfield scale)
-const GALAXY_CONFIG = {
+export const GALAXY_CONFIG = {
     name: "Milky Way",
     sectors: 12, // 3x4 grid (A1-C4)
     nebulaePerSector: 6, // 6 nebulae per sector × 12 sectors = 72 nebulae
@@ -19,23 +20,24 @@ const GALAXY_CONFIG = {
 // All random numbers are deterministic based on seeds
 // Same inputs always produce same outputs
 
-function seededRandom(seed, index = 0) {
+export function seededRandom(seed, index = 0) {
     // Using sin for pseudo-random but deterministic results
     const x = Math.sin(seed * (index + 1)) * 10000;
     return x - Math.floor(x);
 }
 
-function seededRandomRange(seed, index, min, max) {
+export function seededRandomRange(seed, index, min, max) {
     return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
 }
 
-function seededRandomChoice(seed, index, array) {
+export function seededRandomChoice(seed, index, array) {
+    if (!array || array.length === 0) return null;
     const choice = Math.floor(seededRandom(seed, index) * array.length);
     return array[choice];
 }
 
 // ===== HASH FUNCTION FOR STRINGS =====
-function hashString(str) {
+export function hashString(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         hash = ((hash << 5) - hash) + str.charCodeAt(i);
@@ -48,26 +50,26 @@ function hashString(str) {
 // Every location in the universe gets a unique seed
 // Format: base seed + sector hash + nebula index + star index + planet index
 
-function getSectorSeed(sectorId) {
+export function getSectorSeed(sectorId) {
     // sectorId format: "A1", "B2", "C4", etc.
     const row = sectorId.charCodeAt(0) - 65; // A=0, B=1, C=2
     const col = parseInt(sectorId[1]) - 1;
     return UNIVERSE_SEED + (row * 10000) + (col * 1000);
 }
 
-function getNebulaSeed(sectorSeed, nebulaIndex) {
+export function getNebulaSeed(sectorSeed, nebulaIndex) {
     return sectorSeed + (nebulaIndex * 100000);
 }
 
-function getStarSeed(nebulaSeed, starIndex) {
+export function getStarSeed(nebulaSeed, starIndex) {
     return nebulaSeed + (starIndex * 1000);
 }
 
-function getPlanetSeed(starSeed, planetIndex) {
+export function getPlanetSeed(starSeed, planetIndex) {
     return starSeed + (planetIndex * 10);
 }
 
-function getAnomalySeed(sectorSeed, anomalyIndex) {
+export function getAnomalySeed(sectorSeed, anomalyIndex) {
     return sectorSeed + 500000 + (anomalyIndex * 1000);
 }
 
@@ -101,26 +103,26 @@ const anomalySuffixes = [
     'Gate', 'Portal', 'Nexus', 'Conduit', 'Stream', 'Field', 'Zone', 'Sector', 'Domain'
 ];
 
-function generateStarName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 3, namePrefixes);
-    const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes);
+export function generateStarName(seed, index) {
+    const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
+    const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
     return prefix + ' ' + suffix;
 }
 
-function generatePlanetName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 5, planetPrefixes);
+export function generatePlanetName(seed, index) {
+    const prefix = seededRandomChoice(seed, index * 5, planetPrefixes) || 'Terra';
     const number = seededRandomRange(seed, index * 5 + 1, 1, 12);
     return prefix + '-' + number;
 }
 
-function generateAnomalyName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 7, anomalyPrefixes);
-    const suffix = seededRandomChoice(seed, index * 7 + 1, anomalySuffixes);
+export function generateAnomalyName(seed, index) {
+    const prefix = seededRandomChoice(seed, index * 7, anomalyPrefixes) || 'Mystic';
+    const suffix = seededRandomChoice(seed, index * 7 + 1, anomalySuffixes) || 'Reach';
     return prefix + ' ' + suffix;
 }
 
 // ===== STAR TYPE GENERATION =====
-const starTypes = [
+export const starTypes = [
     { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
     { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
     { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
@@ -128,7 +130,7 @@ const starTypes = [
     { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
 ];
 
-function getStarType(seed, index) {
+export function getStarType(seed, index) {
     const rand = seededRandom(seed, index);
     let cumulative = 0;
     
@@ -143,7 +145,7 @@ function getStarType(seed, index) {
 }
 
 // ===== PLANET TYPE GENERATION =====
-const planetTypes = [
+export const planetTypes = [
     { type: 'scorched', name: 'Scorched', prob: 0.15, temp: '450°C', atmos: 'Toxic', gravity: '1.2g', landable: true, icon: '🔥' },
     { type: 'barren', name: 'Barren', prob: 0.25, temp: '-50°C', atmos: 'Thin', gravity: '0.8g', landable: true, icon: '🪨' },
     { type: 'lush', name: 'Lush', prob: 0.15, temp: '22°C', atmos: 'Breathable', gravity: '0.9g', landable: true, icon: '🌱' },
@@ -151,7 +153,7 @@ const planetTypes = [
     { type: 'gas', name: 'Gas Giant', prob: 0.25, temp: '-120°C', atmos: 'Dense', gravity: '2.1g', landable: false, icon: '🌪️' }
 ];
 
-function getPlanetType(seed, index) {
+export function getPlanetType(seed, index) {
     const rand = seededRandom(seed, index);
     let cumulative = 0;
     
@@ -166,7 +168,7 @@ function getPlanetType(seed, index) {
 }
 
 // ===== RESOURCE GENERATION =====
-const resourcePools = {
+export const resourcePools = {
     common: ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Potassium', 'Calcium'],
     uncommon: ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Nickel', 'Sulfur', 'Phosphorus', 'Chlorine', 'Argon', 'Lead'],
     rare: ['Gold', 'Silver', 'Platinum', 'Copper', 'Titanium', 'Zinc', 'Tin', 'Mercury', 'Cobalt', 'Chromium'],
@@ -174,7 +176,7 @@ const resourcePools = {
     legendary: ['Promethium', 'Technetium', 'Astatine', 'Francium']
 };
 
-function generateResources(seed, index, planetType, count = null) {
+export function generateResources(seed, index, planetType, count = null) {
     // Determine resource count based on planet type
     if (count === null) {
         if (planetType === 'gas') count = seededRandomRange(seed, index, 2, 4);
@@ -214,7 +216,7 @@ function generateResources(seed, index, planetType, count = null) {
 }
 
 // ===== STAR GENERATION =====
-function generateStar(nebulaSeed, starIndex) {
+export function generateStar(nebulaSeed, starIndex) {
     const seed = getStarSeed(nebulaSeed, starIndex);
     const starType = getStarType(seed, 0);
     
@@ -240,7 +242,7 @@ function generateStar(nebulaSeed, starIndex) {
 }
 
 // ===== PLANET GENERATION =====
-function generatePlanet(starSeed, planetIndex, starType) {
+export function generatePlanet(starSeed, planetIndex, starType) {
     const seed = getPlanetSeed(starSeed, planetIndex);
     const planetType = getPlanetType(seed, 0);
     
@@ -276,7 +278,7 @@ function generatePlanet(starSeed, planetIndex, starType) {
 }
 
 // ===== NEBULA GENERATION =====
-function generateNebula(sectorSeed, nebulaIndex) {
+export function generateNebula(sectorSeed, nebulaIndex) {
     const seed = getNebulaSeed(sectorSeed, nebulaIndex);
     
     const nebulaNames = [
@@ -307,7 +309,7 @@ function generateNebula(sectorSeed, nebulaIndex) {
 }
 
 // ===== ANOMALY GENERATION =====
-const anomalyTypes = [
+export const anomalyTypes = [
     { type: 'blackhole', name: 'Black Hole', prob: 0.3, icon: '⚫', danger: 5, interest: 5 },
     { type: 'nebula', name: 'Proto-Nebula', prob: 0.2, icon: '🌌', danger: 2, interest: 4 },
     { type: 'pulsar', name: 'Pulsar', prob: 0.2, icon: '⚡', danger: 4, interest: 4 },
@@ -315,7 +317,7 @@ const anomalyTypes = [
     { type: 'asteroid', name: 'Asteroid Field', prob: 0.15, icon: '🪨', danger: 3, interest: 3 }
 ];
 
-function generateAnomaly(sectorSeed, anomalyIndex) {
+export function generateAnomaly(sectorSeed, anomalyIndex) {
     const seed = getAnomalySeed(sectorSeed, anomalyIndex);
     
     const rand = seededRandom(seed, 0);
@@ -348,7 +350,7 @@ function generateAnomaly(sectorSeed, anomalyIndex) {
 }
 
 // ===== SECTOR GENERATION =====
-function generateSector(sectorId) {
+export function generateSector(sectorId) {
     const sectorSeed = getSectorSeed(sectorId);
     
     const sectorNames = {
@@ -381,7 +383,7 @@ function generateSector(sectorId) {
 }
 
 // ===== STAR SYSTEM GENERATION =====
-function generateStarSystem(nebulaSeed, starIndex) {
+export function generateStarSystem(nebulaSeed, starIndex) {
     const star = generateStar(nebulaSeed, starIndex);
     
     // Generate planets for this star
@@ -397,7 +399,7 @@ function generateStarSystem(nebulaSeed, starIndex) {
 }
 
 // ===== UTILITY FUNCTIONS =====
-function getSectorFromLocation(location) {
+export function getSectorFromLocation(location) {
     // Extract sector from location string or object
     if (typeof location === 'string') {
         return location;
@@ -405,59 +407,83 @@ function getSectorFromLocation(location) {
     return location?.sector || 'B2';
 }
 
-function getNebulaFromLocation(location) {
+export function getNebulaFromLocation(location) {
     if (typeof location === 'string') {
         return location;
     }
     return location?.nebula || 'Orion Nebula';
 }
 
-function getStarFromLocation(location) {
+export function getStarFromLocation(location) {
     if (typeof location === 'string') {
         return location;
     }
     return location?.star || 'Sol';
 }
 
-function getPlanetFromLocation(location) {
+export function getPlanetFromLocation(location) {
     if (typeof location === 'string') {
         return location;
     }
     return location?.planet || 'Earth';
 }
 
-// ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        UNIVERSE_SEED,
-        GALAXY_CONFIG,
-        seededRandom,
-        seededRandomRange,
-        seededRandomChoice,
-        hashString,
-        getSectorSeed,
-        getNebulaSeed,
-        getStarSeed,
-        getPlanetSeed,
-        generateStarName,
-        generatePlanetName,
-        generateAnomalyName,
-        getStarType,
-        getPlanetType,
-        generateResources,
-        generateStar,
-        generatePlanet,
-        generateNebula,
-        generateAnomaly,
-        generateSector,
-        generateStarSystem,
-        getSectorFromLocation,
-        getNebulaFromLocation,
-        getStarFromLocation,
-        getPlanetFromLocation,
-        starTypes,
-        planetTypes,
-        anomalyTypes,
-        resourcePools
-    };
+// ===== BATCH GENERATION FUNCTIONS =====
+export function generateAllSectors() {
+    const sectors = {};
+    const sectorIds = ['A1', 'B1', 'C1', 'A2', 'B2', 'C2', 'A3', 'B3', 'C3', 'A4', 'B4', 'C4'];
+    
+    for (const id of sectorIds) {
+        sectors[id] = generateSector(id);
+    }
+    
+    return sectors;
 }
+
+export function generateAllStarsInNebula(sectorId, nebulaIndex) {
+    const sectorSeed = getSectorSeed(sectorId);
+    const nebulaSeed = getNebulaSeed(sectorSeed, nebulaIndex);
+    const stars = [];
+    
+    for (let i = 0; i < GALAXY_CONFIG.starsPerNebula; i++) {
+        stars.push(generateStar(nebulaSeed, i));
+    }
+    
+    return stars;
+}
+
+// ===== EXPORT =====
+export default {
+    UNIVERSE_SEED,
+    GALAXY_CONFIG,
+    seededRandom,
+    seededRandomRange,
+    seededRandomChoice,
+    hashString,
+    getSectorSeed,
+    getNebulaSeed,
+    getStarSeed,
+    getPlanetSeed,
+    generateStarName,
+    generatePlanetName,
+    generateAnomalyName,
+    getStarType,
+    getPlanetType,
+    generateResources,
+    generateStar,
+    generatePlanet,
+    generateNebula,
+    generateAnomaly,
+    generateSector,
+    generateStarSystem,
+    generateAllSectors,
+    generateAllStarsInNebula,
+    getSectorFromLocation,
+    getNebulaFromLocation,
+    getStarFromLocation,
+    getPlanetFromLocation,
+    starTypes,
+    planetTypes,
+    anomalyTypes,
+    resourcePools
+};
