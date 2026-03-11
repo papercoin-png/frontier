@@ -6,6 +6,7 @@
     <title>Voidfarer - Earth Hub</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -309,18 +310,30 @@
             margin-left: 10px;
         }
         
+        .item-price-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-right: 10px;
+        }
+        
+        .item-current-price {
+            color: #4affaa;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .item-price-change {
+            font-size: 11px;
+        }
+        
+        .price-up { color: #4affaa; }
+        .price-down { color: #ff6b6b; }
+        
         .item-actions {
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        
-        .item-price {
-            color: #4affaa;
-            font-size: 14px;
-            font-weight: 600;
-            min-width: 60px;
-            text-align: right;
         }
         
         .sell-btn {
@@ -375,6 +388,122 @@
             opacity: 0.3;
             pointer-events: none;
         }
+        
+        /* Market Trends Card */
+        .trends-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px #2a5a5a;
+        }
+        
+        .trends-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .trends-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .trends-title span {
+            font-size: 24px;
+        }
+        
+        .trend-period {
+            color: #ffd966;
+            font-size: 14px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 10px;
+            border-radius: 30px;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-select {
+            flex: 1;
+            background: rgba(30, 70, 80, 0.7);
+            border: 2px solid #4a9a8a;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 13px;
+            outline: none;
+        }
+        
+        .chart-select option {
+            background: #0a2a3a;
+        }
+        
+        /* Top Movers */
+        .movers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .movers-section {
+            background: rgba(20, 50, 60, 0.4);
+            border-radius: 30px 10px 30px 10px;
+            padding: 12px;
+        }
+        
+        .movers-section-title {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .movers-section.gainers .movers-section-title {
+            color: #4affaa;
+        }
+        
+        .movers-section.losers .movers-section-title {
+            color: #ff6b6b;
+        }
+        
+        .mover-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px;
+        }
+        
+        .mover-name {
+            color: #ffffff;
+        }
+        
+        .mover-change {
+            font-weight: 600;
+        }
+        
+        .mover-change.positive { color: #4affaa; }
+        .mover-change.negative { color: #ff6b6b; }
         
         /* Quick Sell Bar */
         .quick-sell {
@@ -568,6 +697,57 @@
                 </div>
             </div>
             
+            <!-- MARKET TRENDS CARD -->
+            <div class="trends-card">
+                <div class="trends-header">
+                    <div class="trends-title">
+                        <span>📈</span> Market Trends
+                    </div>
+                    <div class="trend-period" id="trendPeriod">7d</div>
+                </div>
+                
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                
+                <!-- Chart Controls -->
+                <div class="chart-controls">
+                    <select id="chartElement" class="chart-select" onchange="updatePriceChart()">
+                        <option value="Gold">Gold</option>
+                        <option value="Silver">Silver</option>
+                        <option value="Platinum">Platinum</option>
+                        <option value="Uranium">Uranium</option>
+                        <option value="Promethium">Promethium</option>
+                        <option value="Iron">Iron</option>
+                        <option value="Carbon">Carbon</option>
+                    </select>
+                    
+                    <select id="chartPeriod" class="chart-select" onchange="updatePriceChart()">
+                        <option value="7">7 Days</option>
+                        <option value="30">30 Days</option>
+                        <option value="90">90 Days</option>
+                    </select>
+                </div>
+                
+                <!-- Current Price Stats -->
+                <div class="stats-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 15px;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="currentPrice">0⭐</div>
+                        <div class="stat-label">CURRENT</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="priceChange">0%</div>
+                        <div class="stat-label">CHANGE</div>
+                    </div>
+                </div>
+                
+                <!-- Top Movers -->
+                <div class="movers-grid" id="topMovers">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+            
             <!-- Other Hub Cards -->
             <div class="hub-grid">
                 <div class="hub-card" onclick="navigateTo('ship-bridge.html')">
@@ -606,6 +786,9 @@
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/market-dynamics.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -633,60 +816,9 @@
             navigateTo('index.html');
         }
         
-        // ===== ELEMENT DATABASE =====
-        const elementDatabase = {
-            // Common
-            'Carbon': { icon: '⚫', rarity: 'common', value: 100 },
-            'Silicon': { icon: '💎', rarity: 'common', value: 100 },
-            'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
-            'Helium': { icon: '🎈', rarity: 'common', value: 100 },
-            'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
-            'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
-            
-            // Uncommon
-            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
-            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
-            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
-            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
-            'Magnesium': { icon: '✨', rarity: 'uncommon', value: 250 },
-            
-            // Rare
-            'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
-            'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
-            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
-            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
-            'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
-            
-            // Very Rare
-            'Uranium': { icon: '🟣', rarity: 'very-rare', value: 5000 },
-            'Thorium': { icon: '🔮', rarity: 'very-rare', value: 5000 },
-            'Plutonium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            
-            // Legendary
-            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
-            'Technetium': { icon: '🧪', rarity: 'legendary', value: 25000 },
-            'Astatine': { icon: '☣️', rarity: 'legendary', value: 25000 }
-        };
-        
         // State
         let expandedGroup = null;
-        
-        // ===== STORAGE HELPERS =====
-        function getCollection() {
-            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-        }
-        
-        function saveCollection(collection) {
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-        }
-        
-        function getCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-        }
-        
-        function saveCredits(credits) {
-            localStorage.setItem('voidfarer_credits', credits.toString());
-        }
+        let priceChart = null;
         
         // ===== LOAD DATA =====
         function loadData() {
@@ -702,6 +834,10 @@
             document.getElementById('cargoDisplay').innerHTML = `Cargo: ${totalItems}/100<br>${itemCount} items`;
             
             renderMarket(collection);
+            updateTopMovers();
+            
+            // Update daily prices if needed
+            updateDailyPrices();
         }
         
         // ===== GROUP ELEMENTS BY RARITY =====
@@ -721,17 +857,20 @@
                     value: 100 
                 };
                 const count = collection[elementName].count || 1;
+                const marketPrice = getLatestPrice(elementName);
                 
                 if (groups[elementData.rarity]) {
                     groups[elementData.rarity].elements.push({
                         name: elementName,
                         count: count,
                         icon: elementData.icon,
-                        value: elementData.value,
-                        totalValue: count * elementData.value
+                        baseValue: elementData.value,
+                        marketPrice: marketPrice,
+                        priceChange: calculatePriceChange(elementName, 1),
+                        totalValue: count * marketPrice
                     });
                     groups[elementData.rarity].totalCount += count;
-                    groups[elementData.rarity].totalValue += count * elementData.value;
+                    groups[elementData.rarity].totalValue += count * marketPrice;
                 }
             });
             
@@ -791,15 +930,22 @@
                 group.elements.forEach(element => {
                     const itemRow = document.createElement('div');
                     itemRow.className = 'item-row';
+                    
+                    const changeClass = element.priceChange >= 0 ? 'price-up' : 'price-down';
+                    const changeSymbol = element.priceChange >= 0 ? '▲' : '▼';
+                    
                     itemRow.innerHTML = `
                         <div class="item-info">
                             <span class="item-icon">${element.icon}</span>
                             <span class="item-name">${element.name}</span>
                             <span class="item-quantity">x${element.count}</span>
                         </div>
+                        <div class="item-price-info">
+                            <span class="item-current-price">${element.marketPrice}⭐</span>
+                            <span class="item-price-change ${changeClass}">${changeSymbol} ${Math.abs(element.priceChange)}%</span>
+                        </div>
                         <div class="item-actions">
-                            <span class="item-price">${element.value}⭐</span>
-                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, event)">SELL</button>
+                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, ${element.marketPrice}, event)">SELL</button>
                         </div>
                     `;
                     itemsDiv.appendChild(itemRow);
@@ -809,7 +955,6 @@
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'group-actions';
                 
-                // Check if group has items to enable/disable buttons
                 const hasItems = group.totalCount > 0;
                 
                 actionsDiv.innerHTML = `
@@ -825,7 +970,7 @@
             
             document.getElementById('totalMarketValue').textContent = totalMarketValue.toLocaleString() + '⭐';
             
-            // Enable/disable quick sell buttons based on total value
+            // Enable/disable quick sell buttons
             const hasAnyItems = totalMarketValue > 0;
             document.getElementById('quickSell100').disabled = !hasAnyItems;
             document.getElementById('quickSell500').disabled = !hasAnyItems;
@@ -845,21 +990,18 @@
         }
         
         // ===== SELL SINGLE ITEM =====
-        function sellItem(elementName, quantity, event) {
+        function sellItem(elementName, quantity, price, event) {
             if (event) event.stopPropagation();
             
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
-            // Check if player actually has the item
             if (!collection[elementName] || collection[elementName].count < quantity) {
                 alert('Not enough items to sell!');
                 return;
             }
             
-            const elementData = elementDatabase[elementName] || { value: 100 };
-            const earnings = quantity * elementData.value;
+            const earnings = quantity * price;
             
             loadingOverlay.classList.add('active');
             
@@ -875,8 +1017,12 @@
                 credits += earnings;
                 saveCredits(credits);
                 
+                // Record trade for market dynamics
+                recordTrade(elementName, quantity, price);
+                
                 // Reload display
                 loadData();
+                updatePriceChart();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
@@ -887,7 +1033,6 @@
         function sellGroup(rarity, quantity, event) {
             if (event) event.stopPropagation();
             
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
@@ -900,7 +1045,6 @@
             }
             
             let totalEarnings = 0;
-            let itemsToRemove = [];
             
             loadingOverlay.classList.add('active');
             
@@ -918,7 +1062,10 @@
                     
                     if (sellQuantity > 0) {
                         collection[element.name].count -= sellQuantity;
-                        totalEarnings += sellQuantity * element.value;
+                        totalEarnings += sellQuantity * element.marketPrice;
+                        
+                        // Record trade
+                        recordTrade(element.name, sellQuantity, element.marketPrice);
                         
                         if (collection[element.name].count <= 0) {
                             delete collection[element.name];
@@ -926,37 +1073,37 @@
                     }
                 });
                 
-                // Save changes
+                if (totalEarnings === 0) {
+                    loadingOverlay.classList.remove('active');
+                    return;
+                }
+                
                 saveCollection(collection);
                 credits += totalEarnings;
                 saveCredits(credits);
                 
-                // Reload display
                 loadData();
+                updatePriceChart();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
                 
-                if (totalEarnings > 0) {
-                    alert(`Sold for ${totalEarnings}⭐`);
-                }
+                alert(`Sold for ${totalEarnings}⭐`);
             }, 300);
         }
         
         // ===== QUICK SELL =====
         function quickSell(amount) {
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
-            // Flatten all elements
             const allElements = [];
             Object.keys(collection).forEach(name => {
-                const elementData = elementDatabase[name] || { value: 100 };
+                const marketPrice = getLatestPrice(name);
                 allElements.push({
                     name: name,
                     count: collection[name].count,
-                    value: elementData.value
+                    price: marketPrice
                 });
             });
             
@@ -965,11 +1112,11 @@
                 return;
             }
             
-            // Sort by value (lowest first) to sell cheapest first
-            allElements.sort((a, b) => a.value - b.value);
+            allElements.sort((a, b) => a.price - b.price);
             
             let remaining = amount === 'all' ? Infinity : amount;
             let totalEarned = 0;
+            let soldItems = [];
             
             loadingOverlay.classList.add('active');
             
@@ -978,18 +1125,18 @@
                     if (remaining <= 0) break;
                     
                     if (amount === 'all') {
-                        // Sell everything
-                        totalEarned += element.count * element.value;
+                        totalEarned += element.count * element.price;
+                        soldItems.push({ name: element.name, quantity: element.count });
                         delete collection[element.name];
                     } else {
-                        // Sell until we reach the amount
-                        const maxCanSell = Math.floor(remaining / element.value);
+                        const maxCanSell = Math.floor(remaining / element.price);
                         const sellQuantity = Math.min(maxCanSell, element.count);
                         
                         if (sellQuantity > 0) {
-                            totalEarned += sellQuantity * element.value;
+                            totalEarned += sellQuantity * element.price;
                             collection[element.name].count -= sellQuantity;
-                            remaining -= sellQuantity * element.value;
+                            soldItems.push({ name: element.name, quantity: sellQuantity });
+                            remaining -= sellQuantity * element.price;
                             
                             if (collection[element.name].count <= 0) {
                                 delete collection[element.name];
@@ -999,24 +1146,137 @@
                 }
                 
                 if (totalEarned === 0) {
-                    alert('Not enough items to reach that amount');
                     loadingOverlay.classList.remove('active');
+                    alert('Not enough items to reach that amount');
                     return;
                 }
                 
-                // Save changes
+                // Record trades
+                soldItems.forEach(item => {
+                    recordTrade(item.name, item.quantity, getLatestPrice(item.name));
+                });
+                
                 saveCollection(collection);
                 credits += totalEarned;
                 saveCredits(credits);
                 
-                // Reload display
                 loadData();
+                updatePriceChart();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 loadingOverlay.classList.remove('active');
                 
                 alert(`Sold for ${totalEarned}⭐`);
             }, 300);
+        }
+        
+        // ===== PRICE CHART =====
+        function initPriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Price (⭐)',
+                        data: [],
+                        borderColor: '#4affaa',
+                        backgroundColor: 'rgba(74, 255, 170, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0a2a3a',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0d0c0',
+                            borderColor: '#4a9a8a',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(74, 154, 138, 0.1)' },
+                            ticks: { color: '#a0d0c0' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#a0d0c0', maxRotation: 45 }
+                        }
+                    }
+                }
+            });
+            
+            updatePriceChart();
+        }
+        
+        function updatePriceChart() {
+            const element = document.getElementById('chartElement').value;
+            const days = parseInt(document.getElementById('chartPeriod').value);
+            
+            const history = getPriceHistory(element);
+            const recentHistory = history.slice(-days);
+            
+            if (recentHistory.length === 0) {
+                // Use base price if no history
+                const basePrice = getBasePrice(element);
+                priceChart.data.labels = ['Today'];
+                priceChart.data.datasets[0].data = [basePrice];
+            } else {
+                priceChart.data.labels = recentHistory.map(h => {
+                    const date = new Date(h.date);
+                    return `${date.getMonth()+1}/${date.getDate()}`;
+                });
+                priceChart.data.datasets[0].data = recentHistory.map(h => h.price);
+            }
+            
+            priceChart.update();
+            
+            // Update current price stats
+            const currentPrice = getLatestPrice(element);
+            const change = calculatePriceChange(element, days);
+            
+            document.getElementById('currentPrice').textContent = currentPrice + '⭐';
+            document.getElementById('priceChange').textContent = change + '%';
+            document.getElementById('priceChange').style.color = change >= 0 ? '#4affaa' : '#ff6b6b';
+            document.getElementById('trendPeriod').textContent = days + 'd';
+        }
+        
+        // ===== TOP MOVERS =====
+        function updateTopMovers() {
+            const movers = getTopMovers(3);
+            const container = document.getElementById('topMovers');
+            
+            container.innerHTML = `
+                <div class="movers-section gainers">
+                    <div class="movers-section-title">📈 TOP GAINERS</div>
+                    ${movers.gainers.map(m => `
+                        <div class="mover-item">
+                            <span class="mover-name">${m.name}</span>
+                            <span class="mover-change positive">+${m.change}%</span>
+                        </div>
+                    `).join('')}
+                    ${movers.gainers.length === 0 ? '<div class="mover-item"><span>None</span></div>' : ''}
+                </div>
+                <div class="movers-section losers">
+                    <div class="movers-section-title">📉 TOP LOSERS</div>
+                    ${movers.losers.map(m => `
+                        <div class="mover-item">
+                            <span class="mover-name">${m.name}</span>
+                            <span class="mover-change negative">${m.change}%</span>
+                        </div>
+                    `).join('')}
+                    ${movers.losers.length === 0 ? '<div class="mover-item"><span>None</span></div>' : ''}
+                </div>
+            `;
         }
         
         // ===== INITIALIZE =====
@@ -1027,7 +1287,11 @@
                 return;
             }
             
+            // Update daily prices on first load
+            updateDailyPrices();
+            
             loadData();
+            initPriceChart();
         }
         
         init();
