@@ -69,7 +69,10 @@ const STORAGE_KEYS = {
     // Stats
     PLAYER_STATS: 'voidfarer_player_stats',
     ACHIEVEMENTS: 'voidfarer_achievements',
-    LAST_SAVE: 'voidfarer_last_save'
+    LAST_SAVE: 'voidfarer_last_save',
+    
+    // Real Estate (New)
+    REAL_ESTATE: 'voidfarer_real_estate'
 };
 
 // ===== UNIVERSE CONSTANTS =====
@@ -116,6 +119,14 @@ function initializeStorage() {
     // Initialize empty colonies if none exists
     if (!localStorage.getItem(STORAGE_KEYS.COLONIES)) {
         localStorage.setItem(STORAGE_KEYS.COLONIES, JSON.stringify([]));
+    }
+    
+    // Initialize empty real estate if none exists
+    if (!localStorage.getItem(STORAGE_KEYS.REAL_ESTATE)) {
+        const defaultRealEstate = {
+            properties: []
+        };
+        localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(defaultRealEstate));
     }
     
     // Initialize default location if none exists
@@ -577,6 +588,128 @@ function clearScanHistory() {
     localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
 }
 
+// ===== REAL ESTATE =====
+function getRealEstate() {
+    const data = localStorage.getItem(STORAGE_KEYS.REAL_ESTATE);
+    return data ? JSON.parse(data) : { properties: [] };
+}
+
+function saveRealEstate(realEstateData) {
+    localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(realEstateData));
+    saveTimestamp();
+}
+
+function addProperty(propertyData) {
+    const realEstate = getRealEstate();
+    
+    const newProperty = {
+        id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: propertyData.name,
+        type: propertyData.type,
+        capacity: propertyData.capacity,
+        used: 0,
+        purchaseDate: new Date().toISOString(),
+        cost: propertyData.cost,
+        items: {}
+    };
+    
+    if (!realEstate.properties) {
+        realEstate.properties = [];
+    }
+    
+    realEstate.properties.push(newProperty);
+    saveRealEstate(realEstate);
+    
+    return newProperty;
+}
+
+function getProperty(propertyId) {
+    const realEstate = getRealEstate();
+    return realEstate.properties?.find(p => p.id === propertyId) || null;
+}
+
+function updateProperty(propertyId, updates) {
+    const realEstate = getRealEstate();
+    const index = realEstate.properties?.findIndex(p => p.id === propertyId);
+    
+    if (index === -1 || index === undefined) return false;
+    
+    realEstate.properties[index] = { ...realEstate.properties[index], ...updates };
+    saveRealEstate(realEstate);
+    return true;
+}
+
+function deleteProperty(propertyId) {
+    const realEstate = getRealEstate();
+    realEstate.properties = realEstate.properties?.filter(p => p.id !== propertyId) || [];
+    saveRealEstate(realEstate);
+    return true;
+}
+
+function transferToProperty(propertyId, elementName, quantity) {
+    const realEstate = getRealEstate();
+    const property = realEstate.properties?.find(p => p.id === propertyId);
+    
+    if (!property) return { success: false, reason: 'property_not_found' };
+    
+    // Check if property has enough space
+    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+    if (currentUsed + quantity > property.capacity) {
+        return { success: false, reason: 'insufficient_space' };
+    }
+    
+    // Initialize items if needed
+    if (!property.items) property.items = {};
+    
+    // Add items to property
+    if (!property.items[elementName]) {
+        property.items[elementName] = { count: quantity };
+    } else {
+        property.items[elementName].count += quantity;
+    }
+    
+    // Update used space
+    property.used = currentUsed + quantity;
+    
+    saveRealEstate(realEstate);
+    return { success: true };
+}
+
+function transferFromProperty(propertyId, elementName, quantity) {
+    const realEstate = getRealEstate();
+    const property = realEstate.properties?.find(p => p.id === propertyId);
+    
+    if (!property) return { success: false, reason: 'property_not_found' };
+    if (!property.items || !property.items[elementName]) return { success: false, reason: 'item_not_found' };
+    if (property.items[elementName].count < quantity) return { success: false, reason: 'insufficient' };
+    
+    // Remove from property
+    property.items[elementName].count -= quantity;
+    if (property.items[elementName].count <= 0) {
+        delete property.items[elementName];
+    }
+    
+    // Update used space
+    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+    property.used = currentUsed;
+    
+    saveRealEstate(realEstate);
+    return { success: true };
+}
+
+function getTotalPropertyCapacity() {
+    const realEstate = getRealEstate();
+    let totalCapacity = 0;
+    let totalUsed = 0;
+    
+    (realEstate.properties || []).forEach(prop => {
+        totalCapacity += prop.capacity || 0;
+        totalUsed += prop.used || 0;
+    });
+    
+    return { totalCapacity, totalUsed };
+}
+
 // ===== SETTINGS =====
 function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
@@ -771,6 +904,15 @@ if (typeof module !== 'undefined' && module.exports) {
         getScanHistory,
         addScan,
         clearScanHistory,
+        getRealEstate,
+        saveRealEstate,
+        addProperty,
+        getProperty,
+        updateProperty,
+        deleteProperty,
+        transferToProperty,
+        transferFromProperty,
+        getTotalPropertyCapacity,
         getHapticsEnabled,
         setHapticsEnabled,
         getAutoGatherEnabled,
