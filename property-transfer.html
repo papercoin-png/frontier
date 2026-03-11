@@ -1,1 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Transfer Items</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .transfer-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8a9a;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #4a9a8a;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .transfer-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .transfer-title {
+            font-family: 'WindSong', cursive;
+            font-size: 32px;
+            color: #c0e0ff;
+            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
+            margin-bottom: 4px;
+        }
+        
+        .transfer-subtitle {
+            color: #a0d0c0;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Property Info */
+        .property-info {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .property-name {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 600;
+            font-family: 'WindSong', cursive;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        
+        .property-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0d0c0;
+            font-size: 14px;
+        }
+        
+        .property-capacity {
+            color: #ffd966;
+        }
+        
+        /* Transfer Controls */
+        .transfer-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .direction-btn {
+            flex: 1;
+            background: rgba(30, 60, 70, 0.6);
+            border: 2px solid #4a9a8a;
+            color: #a0d0c0;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .direction-btn.active {
+            background: #4a9a8a;
+            color: #ffffff;
+            border-color: #7ac0b0;
+        }
+        
+        .direction-btn:active {
+            transform: scale(0.97);
+        }
+        
+        /* Items Grid */
+        .items-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .item-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 12px 40px 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .item-icon {
+            font-size: 32px;
+            min-width: 45px;
+            text-align: center;
+        }
+        
+        .item-info {
+            flex: 1;
+        }
+        
+        .item-name {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .item-quantity {
+            color: #ffd966;
+            font-size: 14px;
+        }
+        
+        .item-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .quantity-input {
+            width: 60px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #4a9a8a;
+            color: #ffffff;
+            padding: 8px;
+            border-radius: 20px;
+            text-align: center;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .transfer-item-btn {
+            background: rgba(74, 154, 138, 0.3);
+            border: 1px solid #4a9a8a;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 30px 8px 30px 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.1s;
+            min-width: 70px;
+        }
+        
+        .transfer-item-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.95);
+        }
+        
+        .transfer-item-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .quick-btn {
+            background: rgba(255, 170, 74, 0.2);
+            border: 1px solid #ffaa4a;
+            color: #ffffff;
+            padding: 14px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .quick-btn:active {
+            background: #ffaa4a;
+            transform: scale(0.97);
+        }
+        
+        .quick-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 60, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a9a8a;
+            font-style: italic;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 60, 70, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #6aa0a0;
+            color: #ffffff;
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #2a5a5a;
+            z-index: 100;
+            margin-top: 10px;
+        }
+        
+        .back-button:active {
+            background: #4a9a8a;
+            transform: translateX(-50%) scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="transfer-view" id="transferView">
+            <!-- Header -->
+            <div class="transfer-header">
+                <div class="transfer-title">Transfer Items</div>
+                <div class="transfer-subtitle">✦ move cargo ✦</div>
+            </div>
+            
+            <!-- Property Info -->
+            <div class="property-info" id="propertyInfo">
+                <div class="property-name" id="propertyName">Loading...</div>
+                <div class="property-stats">
+                    <span>Used: <span class="property-capacity" id="propertyUsed">0</span></span>
+                    <span>Capacity: <span class="property-capacity" id="propertyCapacity">0</span></span>
+                </div>
+            </div>
+            
+            <!-- Transfer Direction -->
+            <div class="transfer-controls">
+                <button class="direction-btn active" id="toPropertyBtn" onclick="setDirection('toProperty')">🚀 TO PROPERTY</button>
+                <button class="direction-btn" id="toShipBtn" onclick="setDirection('toShip')">🚢 TO SHIP</button>
+            </div>
+            
+            <!-- Items Grid -->
+            <div class="items-grid" id="itemsGrid">
+                <!-- Filled by JavaScript -->
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <button class="quick-btn" id="moveAllBtn" onclick="moveAll()">📦 MOVE ALL</button>
+                <button class="quick-btn" id="resetBtn" onclick="resetQuantities()">⟲ RESET</button>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToRealEstate()">← BACK TO PROPERTIES</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">transferring...</div>
+            </div>
+        </div>
+    </div>
 
+    <script src="js/storage.js"></script>
+    
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a2a3a');
+            tg.setBackgroundColor('#0a2a3a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Get property ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const propertyId = urlParams.get('property');
+        
+        // State
+        let currentProperty = null;
+        let shipItems = [];
+        let propertyItems = [];
+        let currentDirection = 'toProperty'; // 'toProperty' or 'toShip'
+        
+        // Element icons database
+        const elementIcons = {
+            'Carbon': '⚫', 'Silicon': '💎', 'Hydrogen': '💧', 'Helium': '🎈',
+            'Iron': '⚙️', 'Oxygen': '💨', 'Nickel': '🔩', 'Gold': '🟡',
+            'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷', 'Uranium': '🟣',
+            'Promethium': '✨', 'Technetium': '🧪', 'Astatine': '☣️'
+        };
+        
+        // Navigation
+        function returnToRealEstate() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'real-estate.html';
+        }
+        
+        // ===== STORAGE HELPERS =====
+        function getCollection() {
+            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+        }
+        
+        function saveCollection(collection) {
+            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+        }
+        
+        function getProperties() {
+            const data = localStorage.getItem('voidfarer_real_estate');
+            return data ? JSON.parse(data) : { properties: [] };
+        }
+        
+        function saveProperties(propertyData) {
+            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
+        }
+        
+        // ===== LOAD DATA =====
+        function loadData() {
+            if (!propertyId) {
+                alert('No property selected');
+                returnToRealEstate();
+                return;
+            }
+            
+            const propertyData = getProperties();
+            currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+            
+            if (!currentProperty) {
+                alert('Property not found');
+                returnToRealEstate();
+                return;
+            }
+            
+            // Initialize items if not exists
+            if (!currentProperty.items) {
+                currentProperty.items = {};
+            }
+            
+            // Calculate used space
+            const propertyUsed = Object.values(currentProperty.items).reduce((sum, item) => sum + (item.count || 0), 0);
+            currentProperty.used = propertyUsed;
+            
+            // Update UI
+            document.getElementById('propertyName').textContent = currentProperty.name;
+            document.getElementById('propertyUsed').textContent = propertyUsed;
+            document.getElementById('propertyCapacity').textContent = currentProperty.capacity;
+            
+            // Load items
+            loadItems();
+        }
+        
+        // ===== LOAD ITEMS =====
+        function loadItems() {
+            const collection = getCollection();
+            
+            shipItems = Object.keys(collection).map(name => ({
+                name: name,
+                count: collection[name].count || 1,
+                icon: elementIcons[name] || '🔹'
+            }));
+            
+            propertyItems = Object.keys(currentProperty.items || {}).map(name => ({
+                name: name,
+                count: currentProperty.items[name].count || 1,
+                icon: elementIcons[name] || '🔹'
+            }));
+            
+            renderItems();
+        }
+        
+        // ===== RENDER ITEMS =====
+        function renderItems() {
+            const grid = document.getElementById('itemsGrid');
+            grid.innerHTML = '';
+            
+            const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
+            const targetItems = currentDirection === 'toProperty' ? propertyItems : shipItems;
+            const targetCapacity = currentDirection === 'toProperty' ? currentProperty.capacity : Infinity;
+            const targetUsed = currentDirection === 'toProperty' ? 
+                (currentProperty.used || 0) : 
+                Object.values(getCollection()).reduce((sum, item) => sum + (item.count || 0), 0);
+            
+            if (sourceItems.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No items available to transfer</div>';
+                return;
+            }
+            
+            sourceItems.sort((a, b) => a.name.localeCompare(b.name));
+            
+            sourceItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                
+                const availableSpace = targetCapacity - targetUsed;
+                const maxTransfer = Math.min(item.count, availableSpace);
+                
+                card.innerHTML = `
+                    <div class="item-icon">${item.icon}</div>
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-quantity">Available: ${item.count}</div>
+                    </div>
+                    <div class="item-controls">
+                        <input type="number" class="quantity-input" id="qty_${item.name}" value="1" min="1" max="${item.count}" ${maxTransfer <= 0 ? 'disabled' : ''}>
+                        <button class="transfer-item-btn" 
+                            onclick="transferItem('${item.name}')"
+                            ${maxTransfer <= 0 ? 'disabled' : ''}>
+                            TRANSFER
+                        </button>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        // ===== SET TRANSFER DIRECTION =====
+        function setDirection(direction) {
+            currentDirection = direction;
+            
+            document.getElementById('toPropertyBtn').classList.remove('active');
+            document.getElementById('toShipBtn').classList.remove('active');
+            
+            if (direction === 'toProperty') {
+                document.getElementById('toPropertyBtn').classList.add('active');
+            } else {
+                document.getElementById('toShipBtn').classList.add('active');
+            }
+            
+            loadItems();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // ===== TRANSFER ITEM =====
+        function transferItem(itemName) {
+            const qtyInput = document.getElementById(`qty_${itemName}`);
+            const quantity = parseInt(qtyInput.value);
+            
+            if (!quantity || quantity < 1) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                if (currentDirection === 'toProperty') {
+                    transferToProperty(itemName, quantity);
+                } else {
+                    transferToShip(itemName, quantity);
+                }
+                
+                // Reload data
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+            }, 300);
+        }
+        
+        // ===== TRANSFER TO PROPERTY =====
+        function transferToProperty(itemName, quantity) {
+            const collection = getCollection();
+            const propertyData = getProperties();
+            const property = propertyData.properties.find(p => p.id === propertyId);
+            
+            if (!property) return;
+            
+            // Check if ship has enough
+            if (!collection[itemName] || collection[itemName].count < quantity) {
+                alert('Not enough items in ship cargo');
+                return;
+            }
+            
+            // Check property capacity
+            const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+            if (currentUsed + quantity > property.capacity) {
+                alert('Not enough space in property');
+                return;
+            }
+            
+            // Remove from ship
+            collection[itemName].count -= quantity;
+            if (collection[itemName].count <= 0) {
+                delete collection[itemName];
+            }
+            saveCollection(collection);
+            
+            // Add to property
+            if (!property.items) property.items = {};
+            if (!property.items[itemName]) {
+                property.items[itemName] = { count: quantity };
+            } else {
+                property.items[itemName].count += quantity;
+            }
+            
+            // Update used space
+            property.used = (property.used || 0) + quantity;
+            
+            saveProperties(propertyData);
+        }
+        
+        // ===== TRANSFER TO SHIP =====
+        function transferToShip(itemName, quantity) {
+            const collection = getCollection();
+            const propertyData = getProperties();
+            const property = propertyData.properties.find(p => p.id === propertyId);
+            
+            if (!property) return;
+            
+            // Check if property has enough
+            if (!property.items[itemName] || property.items[itemName].count < quantity) {
+                alert('Not enough items in property');
+                return;
+            }
+            
+            // Add to ship
+            if (!collection[itemName]) {
+                collection[itemName] = { count: quantity, firstFound: new Date().toISOString() };
+            } else {
+                collection[itemName].count += quantity;
+            }
+            saveCollection(collection);
+            
+            // Remove from property
+            property.items[itemName].count -= quantity;
+            if (property.items[itemName].count <= 0) {
+                delete property.items[itemName];
+            }
+            
+            // Update used space
+            property.used = (property.used || 0) - quantity;
+            
+            saveProperties(propertyData);
+        }
+        
+        // ===== MOVE ALL ITEMS =====
+        function moveAll() {
+            const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
+            
+            if (sourceItems.length === 0) {
+                alert('No items to move');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                if (currentDirection === 'toProperty') {
+                    // Move all ship items to property
+                    const collection = getCollection();
+                    const propertyData = getProperties();
+                    const property = propertyData.properties.find(p => p.id === propertyId);
+                    
+                    if (!property) return;
+                    
+                    let totalToMove = Object.values(collection).reduce((sum, item) => sum + (item.count || 0), 0);
+                    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                    
+                    if (currentUsed + totalToMove > property.capacity) {
+                        alert('Not enough space in property');
+                        loadingOverlay.classList.remove('active');
+                        return;
+                    }
+                    
+                    // Move all items
+                    Object.keys(collection).forEach(itemName => {
+                        const quantity = collection[itemName].count;
+                        
+                        if (!property.items) property.items = {};
+                        if (!property.items[itemName]) {
+                            property.items[itemName] = { count: quantity };
+                        } else {
+                            property.items[itemName].count += quantity;
+                        }
+                    });
+                    
+                    // Clear ship
+                    saveCollection({});
+                    
+                    // Update property used space
+                    property.used = (property.used || 0) + totalToMove;
+                    
+                    saveProperties(propertyData);
+                    
+                } else {
+                    // Move all property items to ship
+                    const collection = getCollection();
+                    const propertyData = getProperties();
+                    const property = propertyData.properties.find(p => p.id === propertyId);
+                    
+                    if (!property) return;
+                    
+                    // Move all items
+                    Object.keys(property.items || {}).forEach(itemName => {
+                        const quantity = property.items[itemName].count;
+                        
+                        if (!collection[itemName]) {
+                            collection[itemName] = { count: quantity, firstFound: new Date().toISOString() };
+                        } else {
+                            collection[itemName].count += quantity;
+                        }
+                    });
+                    
+                    saveCollection(collection);
+                    
+                    // Clear property
+                    property.items = {};
+                    property.used = 0;
+                    
+                    saveProperties(propertyData);
+                }
+                
+                loadData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                loadingOverlay.classList.remove('active');
+            }, 500);
+        }
+        
+        // ===== RESET QUANTITIES =====
+        function resetQuantities() {
+            const inputs = document.querySelectorAll('.quantity-input');
+            inputs.forEach(input => {
+                input.value = '1';
+            });
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // ===== INITIALIZE =====
+        function init() {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            loadData();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
