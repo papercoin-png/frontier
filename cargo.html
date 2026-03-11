@@ -6,6 +6,7 @@
     <title>Voidfarer - Cargo Hold</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -315,6 +316,26 @@
             color: #4affaa;
         }
         
+        .item-market {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-right: 10px;
+        }
+        
+        .item-market-price {
+            color: #4affaa;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .item-market-change {
+            font-size: 11px;
+        }
+        
+        .price-up { color: #4affaa; }
+        .price-down { color: #ff6b6b; }
+        
         .item-rarity {
             font-size: 11px;
             padding: 4px 10px;
@@ -369,14 +390,19 @@
         
         .modal-details {
             color: #a0c0ff;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             font-size: 14px;
         }
         
-        .modal-price {
+        .modal-market-price {
             color: #4affaa;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .modal-price-change {
+            font-size: 14px;
             margin-bottom: 20px;
         }
         
@@ -629,7 +655,8 @@
                 <div class="modal-content">
                     <div class="modal-title" id="modalItemName">Item Name</div>
                     <div class="modal-details" id="modalItemDetails">Quantity: 0</div>
-                    <div class="modal-price" id="modalItemPrice">0⭐</div>
+                    <div class="modal-market-price" id="modalMarketPrice">0⭐</div>
+                    <div class="modal-price-change" id="modalPriceChange">0%</div>
                     <div class="modal-buttons">
                         <button class="modal-btn" onclick="closeModal()">CANCEL</button>
                         <button class="modal-btn sell" onclick="sellFromModal()">SELL 1</button>
@@ -645,6 +672,9 @@
         </div>
     </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/market-dynamics.js"></script>
+    
     <script>
         // Telegram Mini App
         const tg = window.Telegram?.WebApp;
@@ -671,54 +701,37 @@
         // ===== ELEMENT DATABASE =====
         const elementDatabase = {
             // Common
-            'Carbon': { icon: '⚫', rarity: 'common', value: 100, size: 1 },
-            'Silicon': { icon: '💎', rarity: 'common', value: 100, size: 1 },
-            'Hydrogen': { icon: '💧', rarity: 'common', value: 100, size: 1 },
-            'Helium': { icon: '🎈', rarity: 'common', value: 100, size: 1 },
-            'Sodium': { icon: '🧂', rarity: 'common', value: 100, size: 1 },
-            'Lithium': { icon: '🔋', rarity: 'common', value: 100, size: 1 },
+            'Carbon': { icon: '⚫', rarity: 'common', size: 1 },
+            'Silicon': { icon: '💎', rarity: 'common', size: 1 },
+            'Hydrogen': { icon: '💧', rarity: 'common', size: 1 },
+            'Helium': { icon: '🎈', rarity: 'common', size: 1 },
+            'Sodium': { icon: '🧂', rarity: 'common', size: 1 },
+            'Lithium': { icon: '🔋', rarity: 'common', size: 1 },
             
             // Uncommon
-            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250, size: 1 },
-            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250, size: 1 },
-            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250, size: 1 },
-            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250, size: 1 },
-            'Magnesium': { icon: '✨', rarity: 'uncommon', value: 250, size: 1 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', size: 1 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', size: 1 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', size: 1 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', size: 1 },
+            'Magnesium': { icon: '✨', rarity: 'uncommon', size: 1 },
             
             // Rare
-            'Gold': { icon: '🟡', rarity: 'rare', value: 1000, size: 2 },
-            'Silver': { icon: '⚪', rarity: 'rare', value: 1000, size: 2 },
-            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000, size: 2 },
-            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000, size: 2 },
-            'Copper': { icon: '🔴', rarity: 'rare', value: 1000, size: 2 },
+            'Gold': { icon: '🟡', rarity: 'rare', size: 2 },
+            'Silver': { icon: '⚪', rarity: 'rare', size: 2 },
+            'Platinum': { icon: '⬜', rarity: 'rare', size: 2 },
+            'Titanium': { icon: '🔷', rarity: 'rare', size: 2 },
+            'Copper': { icon: '🔴', rarity: 'rare', size: 2 },
             
             // Very Rare
-            'Uranium': { icon: '🟣', rarity: 'very-rare', value: 5000, size: 3 },
-            'Thorium': { icon: '🔮', rarity: 'very-rare', value: 5000, size: 3 },
-            'Plutonium': { icon: '☢️', rarity: 'very-rare', value: 5000, size: 3 },
+            'Uranium': { icon: '🟣', rarity: 'very-rare', size: 3 },
+            'Thorium': { icon: '🔮', rarity: 'very-rare', size: 3 },
+            'Plutonium': { icon: '☢️', rarity: 'very-rare', size: 3 },
             
             // Legendary
-            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000, size: 5 },
-            'Technetium': { icon: '🧪', rarity: 'legendary', value: 25000, size: 5 },
-            'Astatine': { icon: '☣️', rarity: 'legendary', value: 25000, size: 5 }
+            'Promethium': { icon: '✨', rarity: 'legendary', size: 5 },
+            'Technetium': { icon: '🧪', rarity: 'legendary', size: 5 },
+            'Astatine': { icon: '☣️', rarity: 'legendary', size: 5 }
         };
-        
-        // ===== STORAGE HELPERS =====
-        function getCollection() {
-            return JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-        }
-        
-        function saveCollection(collection) {
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-        }
-        
-        function getCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-        }
-        
-        function saveCredits(credits) {
-            localStorage.setItem('voidfarer_credits', credits.toString());
-        }
         
         // ===== STATE =====
         let cargoItems = [];
@@ -735,25 +748,27 @@
             // Update header
             document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
             
-            // Build cargo items
+            // Build cargo items with market data
             cargoItems = [];
             Object.keys(collection).forEach(name => {
                 const elementData = elementDatabase[name] || {
                     icon: '🔹',
                     rarity: 'common',
-                    value: 100,
                     size: 1
                 };
                 const count = collection[name].count || 1;
+                const marketPrice = getLatestPrice(name);
+                const priceChange = calculatePriceChange(name, 1);
                 
                 cargoItems.push({
                     name: name,
                     count: count,
                     icon: elementData.icon,
                     rarity: elementData.rarity,
-                    value: elementData.value,
                     size: elementData.size,
-                    totalValue: count * elementData.value
+                    marketPrice: marketPrice,
+                    priceChange: priceChange,
+                    totalValue: count * marketPrice
                 });
             });
             
@@ -878,14 +893,21 @@
                 else if (item.rarity === 'very-rare') rarityClass = 'rarity-very-rare';
                 else if (item.rarity === 'legendary') rarityClass = 'rarity-legendary';
                 
+                const changeClass = item.priceChange >= 0 ? 'price-up' : 'price-down';
+                const changeSymbol = item.priceChange >= 0 ? '▲' : '▼';
+                
                 card.innerHTML = `
                     <div class="item-icon">${item.icon}</div>
                     <div class="item-info">
                         <div class="item-name">${item.name}</div>
                         <div class="item-details">
                             <span class="item-quantity">📦 ${item.count}</span>
-                            <span class="item-value">💰 ${item.value}⭐</span>
+                            <span class="item-value">💰 ${item.marketPrice}⭐</span>
                         </div>
+                    </div>
+                    <div class="item-market">
+                        <span class="item-market-price">${item.marketPrice}⭐</span>
+                        <span class="item-market-change ${changeClass}">${changeSymbol} ${Math.abs(item.priceChange)}%</span>
                     </div>
                     <div class="item-rarity ${rarityClass}">${item.rarity}</div>
                 `;
@@ -901,9 +923,14 @@
             
             currentItem = item;
             
+            const changeClass = item.priceChange >= 0 ? 'price-up' : 'price-down';
+            const changeSymbol = item.priceChange >= 0 ? '▲' : '▼';
+            
             document.getElementById('modalItemName').textContent = item.name;
-            document.getElementById('modalItemDetails').textContent = `Quantity: ${item.count} • Value: ${item.value}⭐ each`;
-            document.getElementById('modalItemPrice').textContent = `${item.value}⭐`;
+            document.getElementById('modalItemDetails').textContent = `Quantity: ${item.count}`;
+            document.getElementById('modalMarketPrice').textContent = `${item.marketPrice}⭐ each`;
+            document.getElementById('modalPriceChange').textContent = `${changeSymbol} ${Math.abs(item.priceChange)}% (24h)`;
+            document.getElementById('modalPriceChange').className = `modal-price-change ${changeClass}`;
             
             modal.classList.add('active');
             
@@ -923,7 +950,6 @@
         
         // ===== SELL ITEM =====
         function sellItem(itemName, quantity) {
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
@@ -932,8 +958,8 @@
                 return;
             }
             
-            const elementData = elementDatabase[itemName] || { value: 100 };
-            const earnings = quantity * elementData.value;
+            const marketPrice = getLatestPrice(itemName);
+            const earnings = quantity * marketPrice;
             
             loadingOverlay.classList.add('active');
             
@@ -949,6 +975,9 @@
                 credits += earnings;
                 saveCredits(credits);
                 
+                // Record trade for market dynamics
+                recordTrade(itemName, quantity, marketPrice);
+                
                 // Reload data
                 loadData();
                 
@@ -959,18 +988,23 @@
         
         // ===== SELL ALL COMMON =====
         function sellAllCommon() {
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
             let totalEarnings = 0;
             let itemsSold = 0;
+            let soldItems = [];
             
             Object.keys(collection).forEach(name => {
-                const elementData = elementDatabase[name] || { rarity: 'common', value: 100 };
-                if (elementData.rarity === 'common') {
-                    totalEarnings += collection[name].count * elementData.value;
-                    itemsSold += collection[name].count;
+                const rarity = getElementRarity(name);
+                if (rarity === 'common') {
+                    const marketPrice = getLatestPrice(name);
+                    const quantity = collection[name].count;
+                    
+                    totalEarnings += quantity * marketPrice;
+                    itemsSold += quantity;
+                    soldItems.push({ name: name, quantity: quantity, price: marketPrice });
+                    
                     delete collection[name];
                 }
             });
@@ -987,6 +1021,11 @@
                 credits += totalEarnings;
                 saveCredits(credits);
                 
+                // Record trades
+                soldItems.forEach(item => {
+                    recordTrade(item.name, item.quantity, item.price);
+                });
+                
                 loadData();
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -998,7 +1037,6 @@
         
         // ===== QUICK SELL =====
         function quickSell() {
-            // Get FRESH data
             let collection = getCollection();
             let credits = getCredits();
             
@@ -1009,11 +1047,11 @@
             // Flatten all elements
             const allElements = [];
             Object.keys(collection).forEach(name => {
-                const elementData = elementDatabase[name] || { value: 100 };
+                const marketPrice = getLatestPrice(name);
                 allElements.push({
                     name: name,
                     count: collection[name].count,
-                    value: elementData.value
+                    price: marketPrice
                 });
             });
             
@@ -1023,17 +1061,17 @@
             }
             
             // Sort by value (cheapest first)
-            allElements.sort((a, b) => a.value - b.value);
+            allElements.sort((a, b) => a.price - b.price);
             
             for (let element of allElements) {
                 if (earned >= targetAmount) break;
                 
-                const maxNeeded = Math.ceil((targetAmount - earned) / element.value);
+                const maxNeeded = Math.ceil((targetAmount - earned) / element.price);
                 const sellQuantity = Math.min(maxNeeded, element.count);
                 
                 if (sellQuantity > 0) {
-                    earned += sellQuantity * element.value;
-                    soldItems.push({ name: element.name, quantity: sellQuantity });
+                    earned += sellQuantity * element.price;
+                    soldItems.push({ name: element.name, quantity: sellQuantity, price: element.price });
                 }
             }
             
@@ -1051,6 +1089,7 @@
                     if (collection[sold.name].count <= 0) {
                         delete collection[sold.name];
                     }
+                    recordTrade(sold.name, sold.quantity, sold.price);
                 });
                 
                 saveCollection(collection);
@@ -1072,6 +1111,11 @@
             if (!player) {
                 window.location.href = 'index.html';
                 return;
+            }
+            
+            // Update daily prices if needed
+            if (typeof updateDailyPrices === 'function') {
+                updateDailyPrices();
             }
             
             loadData();
