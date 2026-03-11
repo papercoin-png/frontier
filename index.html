@@ -137,6 +137,7 @@
             cursor: pointer;
             transition: all 0.2s;
             width: 100%;
+            pointer-events: auto; /* Ensure clicks work */
         }
         
         .menu-button:active {
@@ -144,6 +145,11 @@
             transform: scale(0.98);
             border-color: #8ac8c8;
             box-shadow: 0 0 30px #3a8a8a;
+        }
+        
+        .menu-button.disabled {
+            opacity: 0.5;
+            pointer-events: none;
         }
         
         .button-icon {
@@ -273,22 +279,22 @@
             
             <!-- Menu Buttons -->
             <div class="menu-buttons">
-                <div class="menu-button" onclick="handleMenu('new')" id="newGameBtn">
+                <div class="menu-button" id="newGameBtn">
                     <span class="button-icon">🌙</span>
                     <span class="button-text">New Journey</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('continue')" id="continueBtn">
+                <div class="menu-button" id="continueBtn">
                     <span class="button-icon">🚀</span>
                     <span class="button-text">Continue</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('settings')" id="settingsBtn">
+                <div class="menu-button" id="settingsBtn">
                     <span class="button-icon">⚙️</span>
                     <span class="button-text">Settings</span>
                 </div>
                 
-                <div class="menu-button" onclick="handleMenu('credits')" id="creditsBtn">
+                <div class="menu-button" id="creditsBtn">
                     <span class="button-icon">✨</span>
                     <span class="button-text">Credits</span>
                 </div>
@@ -339,12 +345,18 @@
         const loadingText = document.getElementById('loadingText');
         const migrationProgressFill = document.getElementById('migrationProgressFill');
         const migrationStatus = document.getElementById('migrationStatus');
-        const menuButtons = {
-            new: document.getElementById('newGameBtn'),
-            continue: document.getElementById('continueBtn'),
-            settings: document.getElementById('settingsBtn'),
-            credits: document.getElementById('creditsBtn')
-        };
+        
+        // Menu buttons
+        const newGameBtn = document.getElementById('newGameBtn');
+        const continueBtn = document.getElementById('continueBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const creditsBtn = document.getElementById('creditsBtn');
+
+        // ===== BUTTON CLICK HANDLERS =====
+        newGameBtn.addEventListener('click', () => handleMenu('new'));
+        continueBtn.addEventListener('click', () => handleMenu('continue'));
+        settingsBtn.addEventListener('click', () => handleMenu('settings'));
+        creditsBtn.addEventListener('click', () => handleMenu('credits'));
 
         // ===== INITIALIZATION =====
         async function initializeGame() {
@@ -399,35 +411,16 @@
                 // Hide loading overlay
                 loadingOverlay.classList.remove('active');
                 
-                // Enable menu buttons
-                enableMenuButtons();
-                
             } catch (error) {
                 console.error('Failed to initialize game:', error);
                 loadingText.textContent = 'error loading game';
                 migrationStatus.textContent = 'Please refresh and try again';
                 
-                // Still enable buttons but with caution
+                // Still hide loading after error so buttons are usable
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
-                    enableMenuButtons();
                 }, 2000);
             }
-        }
-
-        // ===== MENU BUTTON STATES =====
-        function enableMenuButtons() {
-            menuButtons.new.style.pointerEvents = 'auto';
-            menuButtons.continue.style.pointerEvents = 'auto';
-            menuButtons.settings.style.pointerEvents = 'auto';
-            menuButtons.credits.style.pointerEvents = 'auto';
-        }
-
-        function disableMenuButtons() {
-            menuButtons.new.style.pointerEvents = 'none';
-            menuButtons.continue.style.pointerEvents = 'none';
-            menuButtons.settings.style.pointerEvents = 'none';
-            menuButtons.credits.style.pointerEvents = 'none';
         }
 
         // ===== NAVIGATION =====
@@ -497,10 +490,7 @@
         }
 
         // ===== HANDLE MENU ACTIONS =====
-        window.handleMenu = async function(action) {
-            // Disable buttons during processing
-            disableMenuButtons();
-            
+        async function handleMenu(action) {
             switch(action) {
                 case 'new':
                     if (confirm('Start a new journey? This will erase all progress.')) {
@@ -516,8 +506,6 @@
                         
                         // Navigate to Earth Hub with warp effect
                         navigateTo('earth-hub.html', true);
-                    } else {
-                        enableMenuButtons();
                     }
                     break;
                     
@@ -547,10 +535,9 @@
                 case 'credits':
                     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
                     alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
-                    enableMenuButtons();
                     break;
             }
-        };
+        }
 
         // ===== PRELOAD SCREENS =====
         function preloadScreen(url) {
@@ -563,9 +550,6 @@
 
         // ===== START THE GAME =====
         window.addEventListener('load', async () => {
-            // Disable menu buttons during initialization
-            disableMenuButtons();
-            
             // Preload next screen for faster transition
             preloadScreen('earth-hub.html');
             
