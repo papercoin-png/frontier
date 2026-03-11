@@ -352,6 +352,69 @@
         .rarity-very-rare { color: #e0b0ff; }
         .rarity-legendary { color: #ffd700; }
         
+        /* Property Selector */
+        .property-selector {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 10px 40px 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .property-selector h3 {
+            color: #ffffff;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .property-select {
+            width: 100%;
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 14px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        
+        .property-select option {
+            background: #0a1a2a;
+        }
+        
+        .property-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        
+        .transfer-btn {
+            width: 100%;
+            background: rgba(74, 138, 192, 0.3);
+            border: 2px solid #6a8ac0;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .transfer-btn:active {
+            background: #6a8ac0;
+            transform: scale(0.98);
+        }
+        
+        .transfer-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
         /* Item Actions Modal */
         .modal-overlay {
             position: fixed;
@@ -408,19 +471,21 @@
         
         .modal-buttons {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             justify-content: center;
+            flex-wrap: wrap;
         }
         
         .modal-btn {
             flex: 1;
+            min-width: 80px;
             background: rgba(74, 138, 192, 0.3);
             border: 2px solid #6a8ac0;
             color: #ffffff;
             padding: 12px;
             border-radius: 40px 10px 40px 10px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             transition: all 0.1s;
         }
         
@@ -436,6 +501,15 @@
         
         .modal-btn.sell:active {
             background: #ffaa4a;
+        }
+        
+        .modal-btn.transfer {
+            background: rgba(74, 154, 138, 0.3);
+            border-color: #4a9a8a;
+        }
+        
+        .modal-btn.transfer:active {
+            background: #4a9a8a;
         }
         
         /* Quick Actions */
@@ -583,7 +657,7 @@
             <!-- Capacity Card -->
             <div class="capacity-card">
                 <div class="capacity-header">
-                    <span class="capacity-label">Storage Capacity</span>
+                    <span class="capacity-label">Ship Storage</span>
                     <span class="capacity-numbers" id="capacityText">0 / 100</span>
                 </div>
                 <div class="capacity-bar-bg">
@@ -605,6 +679,19 @@
                     <div class="stat-value" id="totalValue">0</div>
                     <div class="stat-label">VALUE</div>
                 </div>
+            </div>
+            
+            <!-- Property Selector -->
+            <div class="property-selector" id="propertySelector" style="display: none;">
+                <h3>🏢 Transfer to Property</h3>
+                <select class="property-select" id="propertySelect">
+                    <option value="">Select a property...</option>
+                </select>
+                <div class="property-stats" id="propertyStats">
+                    <span>Used: <span id="propertyUsed">0</span></span>
+                    <span>Capacity: <span id="propertyCapacity">0</span></span>
+                </div>
+                <button class="transfer-btn" id="transferBtn" onclick="transferSelectedItem()" disabled>TRANSFER</button>
             </div>
             
             <!-- Filter Bar -->
@@ -659,7 +746,8 @@
                     <div class="modal-price-change" id="modalPriceChange">0%</div>
                     <div class="modal-buttons">
                         <button class="modal-btn" onclick="closeModal()">CANCEL</button>
-                        <button class="modal-btn sell" onclick="sellFromModal()">SELL 1</button>
+                        <button class="modal-btn sell" id="modalSellBtn" onclick="sellFromModal()">SELL 1</button>
+                        <button class="modal-btn transfer" id="modalTransferBtn" onclick="showTransferFromModal()">TRANSFER</button>
                     </div>
                 </div>
             </div>
@@ -691,6 +779,8 @@
         // Modal
         const modal = document.getElementById('itemModal');
         let currentItem = null;
+        let transferMode = false;
+        let selectedPropertyId = null;
         
         // Navigation
         function returnToBridge() {
@@ -739,11 +829,14 @@
         let currentFilter = 'all';
         let currentSearch = '';
         let currentSort = 'name-asc';
+        let properties = [];
         
         // ===== LOAD DATA =====
         function loadData() {
             const collection = getCollection();
             const credits = getCredits();
+            const realEstate = getRealEstate();
+            properties = realEstate.properties || [];
             
             // Update header
             document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
@@ -757,8 +850,10 @@
                     size: 1
                 };
                 const count = collection[name].count || 1;
-                const marketPrice = getLatestPrice(name);
-                const priceChange = calculatePriceChange(name, 1);
+                const marketPrice = typeof getLatestPrice === 'function' ? 
+                    (getLatestPrice(name) || 100) : 100;
+                const priceChange = typeof calculatePriceChange === 'function' ? 
+                    calculatePriceChange(name, 1) : 0;
                 
                 cargoItems.push({
                     name: name,
@@ -774,6 +869,7 @@
             
             updateStats();
             applyFilters();
+            updatePropertySelector();
             
             // Enable/disable quick action buttons
             const hasItems = cargoItems.length > 0;
@@ -798,6 +894,56 @@
             document.getElementById('cargoCapacityDisplay').textContent = `Used: ${cargoUsed}/${cargoMax}`;
             document.getElementById('capacityBar').style.width = Math.min(100, (cargoUsed / cargoMax) * 100) + '%';
         }
+        
+        // ===== UPDATE PROPERTY SELECTOR =====
+        function updatePropertySelector() {
+            const selector = document.getElementById('propertySelector');
+            const select = document.getElementById('propertySelect');
+            const transferBtn = document.getElementById('transferBtn');
+            
+            if (properties.length === 0) {
+                selector.style.display = 'none';
+                return;
+            }
+            
+            selector.style.display = 'block';
+            select.innerHTML = '<option value="">Select a property...</option>';
+            
+            properties.forEach(prop => {
+                const option = document.createElement('option');
+                option.value = prop.id;
+                option.textContent = `${prop.name} (${prop.used || 0}/${prop.capacity})`;
+                select.appendChild(option);
+            });
+            
+            // Reset selection
+            selectedPropertyId = null;
+            transferBtn.disabled = true;
+            document.getElementById('propertyUsed').textContent = '0';
+            document.getElementById('propertyCapacity').textContent = '0';
+        }
+        
+        // ===== PROPERTY SELECTION =====
+        document.getElementById('propertySelect').addEventListener('change', function(e) {
+            selectedPropertyId = e.target.value;
+            const transferBtn = document.getElementById('transferBtn');
+            
+            if (selectedPropertyId && currentItem) {
+                const property = properties.find(p => p.id === selectedPropertyId);
+                if (property) {
+                    document.getElementById('propertyUsed').textContent = property.used || 0;
+                    document.getElementById('propertyCapacity').textContent = property.capacity;
+                    
+                    // Check if there's space
+                    const itemSize = (elementDatabase[currentItem.name]?.size || 1) * 1;
+                    const spaceLeft = property.capacity - (property.used || 0);
+                    transferBtn.disabled = spaceLeft < itemSize;
+                }
+                transferBtn.disabled = false;
+            } else {
+                transferBtn.disabled = true;
+            }
+        });
         
         // ===== FILTER CARGO =====
         function filterCargo(rarity) {
@@ -922,6 +1068,7 @@
             if (!item) return;
             
             currentItem = item;
+            transferMode = false;
             
             const changeClass = item.priceChange >= 0 ? 'price-up' : 'price-down';
             const changeSymbol = item.priceChange >= 0 ? '▲' : '▼';
@@ -932,20 +1079,63 @@
             document.getElementById('modalPriceChange').textContent = `${changeSymbol} ${Math.abs(item.priceChange)}% (24h)`;
             document.getElementById('modalPriceChange').className = `modal-price-change ${changeClass}`;
             
+            document.getElementById('modalSellBtn').style.display = 'block';
+            document.getElementById('modalTransferBtn').style.display = properties.length > 0 ? 'block' : 'none';
+            
             modal.classList.add('active');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
         
+        function showTransferFromModal() {
+            transferMode = true;
+            document.getElementById('propertySelector').style.display = 'block';
+            document.getElementById('modalSellBtn').style.display = 'none';
+            document.getElementById('modalTransferBtn').style.display = 'none';
+        }
+        
         function closeModal() {
             modal.classList.remove('active');
+            document.getElementById('propertySelector').style.display = 'none';
             currentItem = null;
+            transferMode = false;
         }
         
         function sellFromModal() {
             if (!currentItem) return;
             sellItem(currentItem.name, 1);
             closeModal();
+        }
+        
+        function transferSelectedItem() {
+            if (!currentItem || !selectedPropertyId) return;
+            
+            const quantity = 1; // Default to 1 for now, could add quantity input later
+            
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                const result = transferToProperty(selectedPropertyId, currentItem.name, quantity);
+                
+                if (result.success) {
+                    // Remove from ship cargo
+                    const collection = getCollection();
+                    collection[currentItem.name].count -= quantity;
+                    if (collection[currentItem.name].count <= 0) {
+                        delete collection[currentItem.name];
+                    }
+                    saveCollection(collection);
+                    
+                    loadData();
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Transfer failed: ' + (result.reason || 'unknown error'));
+                }
+                
+                loadingOverlay.classList.remove('active');
+                closeModal();
+            }, 300);
         }
         
         // ===== SELL ITEM =====
@@ -958,7 +1148,8 @@
                 return;
             }
             
-            const marketPrice = getLatestPrice(itemName);
+            const marketPrice = typeof getLatestPrice === 'function' ? 
+                (getLatestPrice(itemName) || 100) : 100;
             const earnings = quantity * marketPrice;
             
             loadingOverlay.classList.add('active');
@@ -976,7 +1167,9 @@
                 saveCredits(credits);
                 
                 // Record trade for market dynamics
-                recordTrade(itemName, quantity, marketPrice);
+                if (typeof recordTrade === 'function') {
+                    recordTrade(itemName, quantity, marketPrice);
+                }
                 
                 // Reload data
                 loadData();
@@ -996,9 +1189,12 @@
             let soldItems = [];
             
             Object.keys(collection).forEach(name => {
-                const rarity = getElementRarity(name);
+                const rarity = (elementDatabase[name]?.rarity) || 
+                    (typeof getElementRarity === 'function' ? getElementRarity(name) : 'common');
+                
                 if (rarity === 'common') {
-                    const marketPrice = getLatestPrice(name);
+                    const marketPrice = typeof getLatestPrice === 'function' ? 
+                        (getLatestPrice(name) || 100) : 100;
                     const quantity = collection[name].count;
                     
                     totalEarnings += quantity * marketPrice;
@@ -1022,9 +1218,11 @@
                 saveCredits(credits);
                 
                 // Record trades
-                soldItems.forEach(item => {
-                    recordTrade(item.name, item.quantity, item.price);
-                });
+                if (typeof recordTrade === 'function') {
+                    soldItems.forEach(item => {
+                        recordTrade(item.name, item.quantity, item.price);
+                    });
+                }
                 
                 loadData();
                 
@@ -1047,7 +1245,8 @@
             // Flatten all elements
             const allElements = [];
             Object.keys(collection).forEach(name => {
-                const marketPrice = getLatestPrice(name);
+                const marketPrice = typeof getLatestPrice === 'function' ? 
+                    (getLatestPrice(name) || 100) : 100;
                 allElements.push({
                     name: name,
                     count: collection[name].count,
@@ -1089,7 +1288,9 @@
                     if (collection[sold.name].count <= 0) {
                         delete collection[sold.name];
                     }
-                    recordTrade(sold.name, sold.quantity, sold.price);
+                    if (typeof recordTrade === 'function') {
+                        recordTrade(sold.name, sold.quantity, sold.price);
+                    }
                 });
                 
                 saveCollection(collection);
