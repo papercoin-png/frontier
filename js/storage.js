@@ -52,6 +52,7 @@ const STORAGE_KEYS = {
     DISCOVERED_LOCATIONS: 'voidfarer_discovered_locations',
     BOOKMARKS: 'voidfarer_bookmarks',
     RECENT_LOCATIONS: 'voidfarer_recent_locations',
+    SCAN_HISTORY: 'voidfarer_scan_history',
     
     // Ship data
     SHIP_POWER: 'voidfarer_ship_power',
@@ -105,6 +106,11 @@ function initializeStorage() {
     // Initialize ship power if none exists
     if (!localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) {
         localStorage.setItem(STORAGE_KEYS.SHIP_POWER, '100');
+    }
+    
+    // Initialize empty scan history if none exists
+    if (!localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY)) {
+        localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
     }
     
     // Initialize default location if none exists
@@ -176,6 +182,27 @@ function addElementToCollection(elementName, count = 1) {
     return Object.keys(collection).length;
 }
 
+function removeElementFromCollection(elementName, count = 1) {
+    const collection = getCollection();
+    
+    if (!collection[elementName]) {
+        return false;
+    }
+    
+    if (collection[elementName].count < count) {
+        return false;
+    }
+    
+    collection[elementName].count -= count;
+    
+    if (collection[elementName].count <= 0) {
+        delete collection[elementName];
+    }
+    
+    saveCollection(collection);
+    return true;
+}
+
 function getElementCount(elementName) {
     const collection = getCollection();
     return collection[elementName]?.count || 0;
@@ -184,6 +211,15 @@ function getElementCount(elementName) {
 function getUniqueElementsCount() {
     const collection = getCollection();
     return Object.keys(collection).length;
+}
+
+function getTotalElementCount() {
+    const collection = getCollection();
+    let total = 0;
+    Object.values(collection).forEach(item => {
+        total += item.count || 1;
+    });
+    return total;
 }
 
 // ===== CREDITS =====
@@ -243,6 +279,30 @@ function useFuel(amount) {
 function refuelShip(amount) {
     const current = getShipFuel();
     saveShipFuel(current + amount);
+}
+
+// ===== SHIP POWER =====
+function getShipPower() {
+    const power = localStorage.getItem(STORAGE_KEYS.SHIP_POWER);
+    return power ? parseInt(power) : 100;
+}
+
+function setShipPower(power) {
+    localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
+}
+
+function usePower(amount) {
+    const current = getShipPower();
+    if (current >= amount) {
+        setShipPower(current - amount);
+        return true;
+    }
+    return false;
+}
+
+function repairShip(amount) {
+    const current = getShipPower();
+    setShipPower(Math.min(100, current + amount));
 }
 
 // ===== LOCATION DATA - GALAXY LEVEL =====
@@ -435,6 +495,50 @@ function saveCompletedMissions(missions) {
     localStorage.setItem(STORAGE_KEYS.COMPLETED_MISSIONS, JSON.stringify(missions));
 }
 
+function updateMissionProgress(elementName, count = 1) {
+    const missions = getMissions();
+    let updated = false;
+    
+    missions.forEach(mission => {
+        if (mission.element === elementName && mission.current < mission.target) {
+            mission.current = Math.min(mission.current + count, mission.target);
+            updated = true;
+        }
+    });
+    
+    if (updated) {
+        saveMissions(missions);
+    }
+    
+    return updated;
+}
+
+// ===== SCAN HISTORY =====
+function getScanHistory() {
+    const data = localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
+    return data ? JSON.parse(data) : [];
+}
+
+function addScan(scanData) {
+    const history = getScanHistory();
+    history.unshift({
+        ...scanData,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Keep only last 10 scans
+    if (history.length > 10) {
+        history.pop();
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify(history));
+    return history;
+}
+
+function clearScanHistory() {
+    localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
+}
+
 // ===== SETTINGS =====
 function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
@@ -476,29 +580,31 @@ function setAmbientVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
 }
 
-// ===== SHIP DATA =====
-function getShipPower() {
-    const power = localStorage.getItem(STORAGE_KEYS.SHIP_POWER);
-    return power ? parseInt(power) : 100;
-}
-
-function setShipPower(power) {
-    localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
-}
-
+// ===== SHIP UPGRADES =====
 function getShipUpgrades() {
     const data = localStorage.getItem(STORAGE_KEYS.SHIP_UPGRADES);
     return data ? JSON.parse(data) : {
+        engine: 1,
+        shields: 1,
         miningLaser: 1,
         cargoHold: 1,
         warpDrive: 1,
-        shields: 1,
-        engine: 1
+        scanner: 1
     };
 }
 
 function saveShipUpgrades(upgrades) {
     localStorage.setItem(STORAGE_KEYS.SHIP_UPGRADES, JSON.stringify(upgrades));
+}
+
+function upgradeShip(component) {
+    const upgrades = getShipUpgrades();
+    if (upgrades[component] < 5) {
+        upgrades[component]++;
+        saveShipUpgrades(upgrades);
+        return true;
+    }
+    return false;
 }
 
 // ===== SAVE TIMESTAMP =====
@@ -537,10 +643,34 @@ function resetGame() {
     initializeStorage();
 }
 
+// ===== EXPORT / UTILITY =====
+function exportGameData() {
+    const gameData = {};
+    Object.values(STORAGE_KEYS).forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value) {
+            gameData[key] = value;
+        }
+    });
+    return JSON.stringify(gameData);
+}
+
+function importGameData(jsonString) {
+    try {
+        const gameData = JSON.parse(jsonString);
+        Object.keys(gameData).forEach(key => {
+            localStorage.setItem(key, gameData[key]);
+        });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // ===== INITIALIZE ON LOAD =====
 initializeStorage();
 
-// ===== EXPORT =====
+// ===== EXPORT FOR MODULE USE =====
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         STORAGE_KEYS,
@@ -551,8 +681,10 @@ if (typeof module !== 'undefined' && module.exports) {
         getCollection,
         saveCollection,
         addElementToCollection,
+        removeElementFromCollection,
         getElementCount,
         getUniqueElementsCount,
+        getTotalElementCount,
         getCredits,
         saveCredits,
         addCredits,
@@ -561,6 +693,10 @@ if (typeof module !== 'undefined' && module.exports) {
         saveShipFuel,
         useFuel,
         refuelShip,
+        getShipPower,
+        setShipPower,
+        usePower,
+        repairShip,
         getCurrentSector,
         getCurrentRegion,
         setCurrentSector,
@@ -592,6 +728,10 @@ if (typeof module !== 'undefined' && module.exports) {
         saveMissions,
         getCompletedMissions,
         saveCompletedMissions,
+        updateMissionProgress,
+        getScanHistory,
+        addScan,
+        clearScanHistory,
         getHapticsEnabled,
         setHapticsEnabled,
         getAutoGatherEnabled,
@@ -602,11 +742,12 @@ if (typeof module !== 'undefined' && module.exports) {
         setMusicVolume,
         getAmbientVolume,
         setAmbientVolume,
-        getShipPower,
-        setShipPower,
         getShipUpgrades,
         saveShipUpgrades,
+        upgradeShip,
         getLastSaveTime,
-        resetGame
+        resetGame,
+        exportGameData,
+        importGameData
     };
 }
