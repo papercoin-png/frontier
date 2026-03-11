@@ -1,8 +1,28 @@
-// storage.js - Save/load player progress for Voidfarer
-// Handles all persistent data for the shared procedural universe
+// js/storage.js - Save/load player progress for Voidfarer
+// Now using IndexedDB via db.js for unlimited storage
 
-// ===== STORAGE KEYS =====
-const STORAGE_KEYS = {
+import { 
+  getItem,
+  getAll,
+  setItem,
+  deleteItem,
+  getCollectionAsObject,
+  addElementToCollection as dbAddElement,
+  removeElementFromCollection as dbRemoveElement,
+  getAllProperties,
+  getProperty,
+  addProperty as dbAddProperty,
+  updateProperty as dbUpdateProperty,
+  getPropertyItems,
+  addItemToProperty as dbAddItemToProperty,
+  addTaxTransaction as dbAddTaxTransaction,
+  getPlayerTransactions,
+  isMigrationComplete,
+  resetAllData as dbResetAll
+} from './db.js';
+
+// ===== STORAGE KEYS (kept for reference, but not used for storage) =====
+export const STORAGE_KEYS = {
     // Player data
     PLAYER: 'voidfarer_player',
     COLLECTION: 'voidfarer_collection',
@@ -86,105 +106,46 @@ const STORAGE_KEYS = {
 };
 
 // ===== UNIVERSE CONSTANTS =====
-const UNIVERSE_SEED = 42793;
+export const UNIVERSE_SEED = 42793;
+
+// ===== HELPER: Settings storage (keep in localStorage for simplicity) =====
+function getSetting(key, defaultValue) {
+    const value = localStorage.getItem(key);
+    return value !== null ? value : defaultValue;
+}
+
+function setSetting(key, value) {
+    localStorage.setItem(key, value.toString());
+}
 
 // ===== INITIALIZATION =====
-// Initialize storage with defaults if needed
-function initializeStorage() {
-    // Set universe seed
+export async function initializeStorage() {
+    // Set universe seed (keep in localStorage - it's tiny)
     if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED)) {
         localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, UNIVERSE_SEED.toString());
     }
     
-    // Create default player if none exists
-    if (!getPlayer()) {
-        createDefaultPlayer();
+    // Create default player if none exists in IndexedDB
+    const player = await getPlayer();
+    if (!player) {
+        await createDefaultPlayer();
     }
     
-    // Initialize empty collection if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.COLLECTION)) {
-        saveCollection({});
+    // Initialize default settings in localStorage if needed
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, 'true');
     }
-    
-    // Initialize credits if none exist
-    if (!localStorage.getItem(STORAGE_KEYS.CREDITS)) {
-        saveCredits(5000);
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, 'true');
     }
-    
-    // Initialize ship fuel if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.SHIP_FUEL)) {
-        localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, '100');
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, 'gentle');
     }
-    
-    // Initialize ship power if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) {
-        localStorage.setItem(STORAGE_KEYS.SHIP_POWER, '100');
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, '50');
     }
-    
-    // Initialize empty scan history if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
-    }
-    
-    // Initialize empty colonies if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.COLONIES)) {
-        localStorage.setItem(STORAGE_KEYS.COLONIES, JSON.stringify([]));
-    }
-    
-    // Initialize empty real estate if none exists
-    if (!localStorage.getItem(STORAGE_KEYS.REAL_ESTATE)) {
-        const defaultRealEstate = {
-            properties: []
-        };
-        localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(defaultRealEstate));
-    }
-    
-    // Initialize economic data
-    if (!localStorage.getItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY)) {
-        localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, '5000000'); // 5M starting credits
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.DAILY_METRICS)) {
-        localStorage.setItem(STORAGE_KEYS.DAILY_METRICS, JSON.stringify([]));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.HOURLY_SNAPSHOTS)) {
-        localStorage.setItem(STORAGE_KEYS.HOURLY_SNAPSHOTS, JSON.stringify([]));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.TAX_RATES)) {
-        const defaultRates = {
-            transaction: 0.02,
-            property: 0.005,
-            income: 0.08,
-            luxury: 0.03,
-            estate: 0.10,
-            registration: 5000
-        };
-        localStorage.setItem(STORAGE_KEYS.TAX_RATES, JSON.stringify(defaultRates));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.TAX_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.TAX_HISTORY, JSON.stringify([]));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.COMMUNITY_FUND)) {
-        const defaultFund = {
-            balance: 0,
-            totalContributions: 0,
-            totalAllocations: 0,
-            lastUpdated: Date.now(),
-            categories: {}
-        };
-        localStorage.setItem(STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(defaultFund));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_EVENTS)) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_EVENTS, JSON.stringify([]));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.EVENT_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.EVENT_HISTORY, JSON.stringify([]));
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
     }
     
     // Initialize default location if none exists
@@ -194,18 +155,18 @@ function initializeStorage() {
 }
 
 // ===== PLAYER DATA =====
-function getPlayer() {
-    const data = localStorage.getItem(STORAGE_KEYS.PLAYER);
-    return data ? JSON.parse(data) : null;
+export async function getPlayer() {
+    return await getItem('player', 'main');
 }
 
-function savePlayer(playerData) {
-    localStorage.setItem(STORAGE_KEYS.PLAYER, JSON.stringify(playerData));
+export async function savePlayer(playerData) {
+    await setItem('player', { id: 'main', ...playerData });
     saveTimestamp();
 }
 
-function createDefaultPlayer(name = 'Voidfarer') {
+export async function createDefaultPlayer(name = 'Voidfarer') {
     const player = {
+        id: 'main',
         name: name,
         ship: 'Prospector',
         shipLevel: 1,
@@ -215,71 +176,64 @@ function createDefaultPlayer(name = 'Voidfarer') {
         totalElementsCollected: 0,
         totalCreditsEarned: 5000,
         totalDistanceTraveled: 0,
-        totalWarps: 0
+        totalWarps: 0,
+        credits: 5000
     };
-    savePlayer(player);
+    await savePlayer(player);
     return player;
 }
 
 // ===== COLLECTION DATA =====
-function getCollection() {
-    const data = localStorage.getItem(STORAGE_KEYS.COLLECTION);
-    return data ? JSON.parse(data) : {};
+export async function getCollection() {
+    return await getCollectionAsObject();
 }
 
-function saveCollection(collection) {
-    localStorage.setItem(STORAGE_KEYS.COLLECTION, JSON.stringify(collection));
+export async function saveCollection(collection) {
+    // This is a bulk operation - convert object back to individual records
+    const elements = [];
+    for (const [name, data] of Object.entries(collection)) {
+        elements.push({
+            name: name,
+            count: data.count || 1,
+            firstFound: data.firstFound || new Date().toISOString(),
+            rarity: data.rarity || 'common',
+            value: data.value || 100
+        });
+    }
+    
+    // Clear and rebuild (simpler than diffing)
+    const db = await getDb();
+    const tx = db.transaction('collection', 'readwrite');
+    await tx.objectStore('collection').clear();
+    
+    for (const element of elements) {
+        await tx.objectStore('collection').put(element);
+    }
+    await tx.done;
+    
     saveTimestamp();
 }
 
-function addElementToCollection(elementName, count = 1) {
-    const collection = getCollection();
-    
-    if (!collection[elementName]) {
-        collection[elementName] = {
-            count: count,
-            firstFound: new Date().toISOString()
-        };
-    } else {
-        collection[elementName].count += count;
-    }
-    
-    saveCollection(collection);
+export async function addElementToCollection(elementName, count = 1) {
+    const result = await dbAddElement(elementName, count);
     
     // Update player stats
-    const player = getPlayer();
+    const player = await getPlayer();
     if (player) {
         player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
-        savePlayer(player);
+        await savePlayer(player);
     }
     
-    return { success: true, newCount: collection[elementName].count };
+    return { success: true, newCount: result.count };
 }
 
-function removeElementFromCollection(elementName, count = 1) {
-    const collection = getCollection();
-    
-    if (!collection[elementName]) {
-        return { success: false, reason: 'not_found' };
-    }
-    
-    if (collection[elementName].count < count) {
-        return { success: false, reason: 'insufficient', available: collection[elementName].count };
-    }
-    
-    collection[elementName].count -= count;
-    
-    if (collection[elementName].count <= 0) {
-        delete collection[elementName];
-    }
-    
-    saveCollection(collection);
-    return { success: true };
+export async function removeElementFromCollection(elementName, count = 1) {
+    return await dbRemoveElement(elementName, count);
 }
 
-function safeSellElement(elementName, quantity, pricePerUnit) {
-    const collection = getCollection();
-    const credits = getCredits();
+export async function safeSellElement(elementName, quantity, pricePerUnit) {
+    const collection = await getCollection();
+    const credits = await getCredits();
     
     if (!collection[elementName]) {
         return { success: false, reason: 'not_found' };
@@ -290,18 +244,15 @@ function safeSellElement(elementName, quantity, pricePerUnit) {
     }
     
     // Remove from collection
-    collection[elementName].count -= quantity;
-    if (collection[elementName].count <= 0) {
-        delete collection[elementName];
+    const removeResult = await dbRemoveElement(elementName, quantity);
+    if (!removeResult.success) {
+        return removeResult;
     }
     
     // Add credits
     const earnings = quantity * pricePerUnit;
     const newCredits = credits + earnings;
-    
-    // Save both atomically
-    saveCollection(collection);
-    saveCredits(newCredits);
+    await saveCredits(newCredits);
     
     return { 
         success: true, 
@@ -310,71 +261,75 @@ function safeSellElement(elementName, quantity, pricePerUnit) {
     };
 }
 
-function getElementCount(elementName) {
-    const collection = getCollection();
-    return collection[elementName]?.count || 0;
+export async function getElementCount(elementName) {
+    const element = await getItem('collection', elementName);
+    return element?.count || 0;
 }
 
-function getUniqueElementsCount() {
-    const collection = getCollection();
-    return Object.keys(collection).length;
+export async function getUniqueElementsCount() {
+    const elements = await getAll('collection');
+    return elements.length;
 }
 
-function getTotalElementCount() {
-    const collection = getCollection();
+export async function getTotalElementCount() {
+    const elements = await getAll('collection');
     let total = 0;
-    Object.values(collection).forEach(item => {
-        total += item.count || 1;
+    elements.forEach(element => {
+        total += element.count || 1;
     });
     return total;
 }
 
 // ===== CREDITS =====
-function getCredits() {
-    const credits = localStorage.getItem(STORAGE_KEYS.CREDITS);
-    return credits ? parseInt(credits) : 5000;
+export async function getCredits() {
+    const player = await getPlayer();
+    return player?.credits || 5000;
 }
 
-function saveCredits(credits) {
-    localStorage.setItem(STORAGE_KEYS.CREDITS, credits.toString());
+export async function saveCredits(credits) {
+    const player = await getPlayer();
+    if (player) {
+        player.credits = credits;
+        await savePlayer(player);
+    }
     saveTimestamp();
 }
 
-function addCredits(amount) {
-    const current = getCredits();
+export async function addCredits(amount) {
+    const current = await getCredits();
     const newTotal = current + amount;
-    saveCredits(newTotal);
+    await saveCredits(newTotal);
     
     // Update player stats
-    const player = getPlayer();
+    const player = await getPlayer();
     if (player) {
         player.totalCreditsEarned = (player.totalCreditsEarned || 5000) + amount;
-        savePlayer(player);
+        await savePlayer(player);
     }
     
     return newTotal;
 }
 
-function spendCredits(amount) {
-    const current = getCredits();
+export async function spendCredits(amount) {
+    const current = await getCredits();
     if (current >= amount) {
-        saveCredits(current - amount);
+        await saveCredits(current - amount);
         return true;
     }
     return false;
 }
 
-// ===== SHIP FUEL =====
-function getShipFuel() {
+// ===== SHIP FUEL (keep in localStorage for quick access) =====
+export function getShipFuel() {
     const fuel = localStorage.getItem(STORAGE_KEYS.SHIP_FUEL);
     return fuel ? parseInt(fuel) : 100;
 }
 
-function saveShipFuel(fuel) {
+export function saveShipFuel(fuel) {
     localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
 }
 
-function useFuel(amount) {
+export function useFuel(amount) {
     const current = getShipFuel();
     if (current >= amount) {
         saveShipFuel(current - amount);
@@ -383,22 +338,22 @@ function useFuel(amount) {
     return false;
 }
 
-function refuelShip(amount) {
+export function refuelShip(amount) {
     const current = getShipFuel();
     saveShipFuel(Math.min(100, current + amount));
 }
 
-// ===== SHIP POWER =====
-function getShipPower() {
+// ===== SHIP POWER (keep in localStorage for quick access) =====
+export function getShipPower() {
     const power = localStorage.getItem(STORAGE_KEYS.SHIP_POWER);
     return power ? parseInt(power) : 100;
 }
 
-function setShipPower(power) {
+export function setShipPower(power) {
     localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
 }
 
-function usePower(amount) {
+export function usePower(amount) {
     const current = getShipPower();
     if (current >= amount) {
         setShipPower(current - amount);
@@ -407,50 +362,50 @@ function usePower(amount) {
     return false;
 }
 
-function repairShip(amount) {
+export function repairShip(amount) {
     const current = getShipPower();
     setShipPower(Math.min(100, current + amount));
 }
 
-// ===== LOCATION DATA - GALAXY LEVEL =====
-function getCurrentSector() {
+// ===== LOCATION DATA - GALAXY LEVEL (keep in localStorage) =====
+export function getCurrentSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR) || 'B2';
 }
 
-function getCurrentRegion() {
+export function getCurrentRegion() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_REGION) || 'Orion';
 }
 
-function setCurrentSector(sector, region) {
+export function setCurrentSector(sector, region) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR, sector);
     localStorage.setItem(STORAGE_KEYS.CURRENT_REGION, region);
 }
 
-// ===== LOCATION DATA - NEBULA/SECTOR LEVEL =====
-function getCurrentNebula() {
+// ===== LOCATION DATA - NEBULA/SECTOR LEVEL (keep in localStorage) =====
+export function getCurrentNebula() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_NEBULA) || 'Orion Molecular Cloud';
 }
 
-function getCurrentSectorName() {
+export function getCurrentSectorName() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR_NAME) || 'Orion Molecular Cloud';
 }
 
-function getCurrentSectorType() {
+export function getCurrentSectorType() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR_TYPE) || 'Star-forming';
 }
 
-function getCurrentSectorStars() {
+export function getCurrentSectorStars() {
     const stars = localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR_STARS);
     return stars ? parseInt(stars) : 85;
 }
 
-function getCurrentSectorCoords() {
+export function getCurrentSectorCoords() {
     const x = parseFloat(localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR_X)) || 30;
     const y = parseFloat(localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR_Y)) || 40;
     return { x, y };
 }
 
-function setCurrentNebula(name, type, stars, x, y) {
+export function setCurrentNebula(name, type, stars, x, y) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_NEBULA, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_NAME, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_TYPE, type);
@@ -459,32 +414,32 @@ function setCurrentNebula(name, type, stars, x, y) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_Y, y.toString());
 }
 
-// ===== LOCATION DATA - STAR LEVEL =====
-function getCurrentStar() {
+// ===== LOCATION DATA - STAR LEVEL (keep in localStorage) =====
+export function getCurrentStar() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || '';
 }
 
-function getCurrentStarType() {
+export function getCurrentStarType() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_TYPE) || '';
 }
 
-function getCurrentStarIndex() {
+export function getCurrentStarIndex() {
     const index = localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_INDEX);
     return index ? parseInt(index) : -1;
 }
 
-function getCurrentStarCoords() {
+export function getCurrentStarCoords() {
     const x = parseFloat(localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_X)) || 50;
     const y = parseFloat(localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_Y)) || 50;
     return { x, y };
 }
 
-function getCurrentStarPlanets() {
+export function getCurrentStarPlanets() {
     const planets = localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_PLANETS);
     return planets || '3-7';
 }
 
-function setCurrentStar(name, type, index, planets, x, y) {
+export function setCurrentStar(name, type, index, planets, x, y) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_STAR, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_INDEX, index.toString());
@@ -493,28 +448,28 @@ function setCurrentStar(name, type, index, planets, x, y) {
     if (y) localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_Y, y.toString());
 }
 
-// ===== LOCATION DATA - PLANET LEVEL =====
-function getCurrentPlanet() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || '';
+// ===== LOCATION DATA - PLANET LEVEL (keep in localStorage) =====
+export function getCurrentPlanet() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Verdant Prime';
 }
 
-function getCurrentPlanetType() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || '';
+export function getCurrentPlanetType() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'lush';
 }
 
-function getCurrentPlanetResources() {
+export function getCurrentPlanetResources() {
     const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
-    return resources ? JSON.parse(resources) : [];
+    return resources ? JSON.parse(resources) : ['Carbon', 'Iron', 'Silicon'];
 }
 
-function setCurrentPlanet(name, type, resources) {
+export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
 }
 
 // ===== SET CURRENT LOCATION (ALL LEVELS) =====
-function setCurrentLocation(region, sector, nebula, nebulaType, nebulaStars, nebulaX, nebulaY) {
+export function setCurrentLocation(region, sector, nebula, nebulaType, nebulaStars, nebulaX, nebulaY) {
     // Galaxy level
     setCurrentSector(sector, region);
     
@@ -524,8 +479,8 @@ function setCurrentLocation(region, sector, nebula, nebulaType, nebulaStars, neb
     }
 }
 
-// ===== WARP DATA =====
-function setWarpData(destination, returnPage, cycles, distance, fuel) {
+// ===== WARP DATA (keep in localStorage) =====
+export function setWarpData(destination, returnPage, cycles, distance, fuel) {
     localStorage.setItem(STORAGE_KEYS.WARP_DESTINATION, destination);
     localStorage.setItem(STORAGE_KEYS.WARP_RETURN, returnPage);
     localStorage.setItem(STORAGE_KEYS.WARP_CYCLES, cycles.toString());
@@ -533,7 +488,7 @@ function setWarpData(destination, returnPage, cycles, distance, fuel) {
     if (fuel) localStorage.setItem(STORAGE_KEYS.WARP_FUEL, fuel.toString());
 }
 
-function getWarpData() {
+export function getWarpData() {
     return {
         destination: localStorage.getItem(STORAGE_KEYS.WARP_DESTINATION) || 'Unknown',
         returnPage: localStorage.getItem(STORAGE_KEYS.WARP_RETURN) || 'galaxy-map.html',
@@ -543,7 +498,7 @@ function getWarpData() {
     };
 }
 
-function clearWarpData() {
+export function clearWarpData() {
     localStorage.removeItem(STORAGE_KEYS.WARP_DESTINATION);
     localStorage.removeItem(STORAGE_KEYS.WARP_RETURN);
     localStorage.removeItem(STORAGE_KEYS.WARP_CYCLES);
@@ -552,215 +507,258 @@ function clearWarpData() {
 }
 
 // ===== COLONIES =====
-function getColonies() {
-    const data = localStorage.getItem(STORAGE_KEYS.COLONIES);
-    return data ? JSON.parse(data) : [];
+export async function getColonies() {
+    return await getAll('colonies');
 }
 
-function saveColonies(colonies) {
-    localStorage.setItem(STORAGE_KEYS.COLONIES, JSON.stringify(colonies));
+export async function saveColonies(colonies) {
+    const db = await getDb();
+    const tx = db.transaction('colonies', 'readwrite');
+    await tx.objectStore('colonies').clear();
+    
+    for (const colony of colonies) {
+        await tx.objectStore('colonies').put(colony);
+    }
+    await tx.done;
 }
 
-function addColony(name, planet, star, nebula, sector) {
-    const colonies = getColonies();
-    colonies.push({
-        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+export async function addColony(name, planet, star, nebula, sector) {
+    const colony = {
+        id: 'colony_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         name: name,
         planet: planet,
         star: star,
         nebula: nebula,
         sector: sector,
         established: new Date().toISOString()
-    });
-    saveColonies(colonies);
+    };
+    
+    await setItem('colonies', colony);
+    
+    // Also update the full colonies list for backward compatibility
+    const colonies = await getColonies();
     return colonies;
 }
 
-function removeColony(colonyId) {
-    const colonies = getColonies();
-    const filtered = colonies.filter(c => c.id !== colonyId);
-    saveColonies(filtered);
-    return filtered;
+export async function removeColony(colonyId) {
+    await deleteItem('colonies', colonyId);
+    return await getColonies();
 }
 
 // ===== MISSIONS =====
-function getMissions() {
-    const data = localStorage.getItem(STORAGE_KEYS.MISSIONS);
-    return data ? JSON.parse(data) : [];
+export async function getMissions() {
+    return await getAll('missions');
 }
 
-function saveMissions(missions) {
-    localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(missions));
+export async function saveMissions(missions) {
+    const db = await getDb();
+    const tx = db.transaction('missions', 'readwrite');
+    await tx.objectStore('missions').clear();
+    
+    for (const mission of missions) {
+        await tx.objectStore('missions').put(mission);
+    }
+    await tx.done;
 }
 
-function getCompletedMissions() {
-    const data = localStorage.getItem(STORAGE_KEYS.COMPLETED_MISSIONS);
-    return data ? JSON.parse(data) : [];
+export async function getCompletedMissions() {
+    return await getAll('completedMissions');
 }
 
-function saveCompletedMissions(missions) {
-    localStorage.setItem(STORAGE_KEYS.COMPLETED_MISSIONS, JSON.stringify(missions));
+export async function saveCompletedMissions(missions) {
+    const db = await getDb();
+    const tx = db.transaction('completedMissions', 'readwrite');
+    await tx.objectStore('completedMissions').clear();
+    
+    for (const mission of missions) {
+        await tx.objectStore('completedMissions').put(mission);
+    }
+    await tx.done;
 }
 
-function updateMissionProgress(elementName, count = 1) {
-    const missions = getMissions();
+export async function updateMissionProgress(elementName, count = 1) {
+    const missions = await getMissions();
     let updated = false;
     
-    missions.forEach(mission => {
+    for (const mission of missions) {
         if (mission.element === elementName && mission.current < mission.target) {
             mission.current = Math.min(mission.current + count, mission.target);
             updated = true;
         }
-    });
+    }
     
     if (updated) {
-        saveMissions(missions);
+        await saveMissions(missions);
     }
     
     return updated;
 }
 
 // ===== SCAN HISTORY =====
-function getScanHistory() {
-    const data = localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
-    return data ? JSON.parse(data) : [];
+export async function getScanHistory() {
+    const scans = await getAll('scanHistory');
+    return scans.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-function addScan(scanData) {
-    const history = getScanHistory();
-    history.unshift({
+export async function addScan(scanData) {
+    const scan = {
+        timestamp: Date.now(),
         ...scanData,
-        timestamp: new Date().toISOString()
-    });
+        date: new Date().toISOString()
+    };
     
-    // Keep only last 10 scans
-    if (history.length > 10) {
-        history.pop();
+    await setItem('scanHistory', scan);
+    
+    // Keep only last 10 scans by cleaning up older ones
+    const allScans = await getScanHistory();
+    if (allScans.length > 10) {
+        const toDelete = allScans.slice(10);
+        for (const scan of toDelete) {
+            await deleteItem('scanHistory', scan.timestamp);
+        }
     }
     
-    localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify(history));
-    return history;
+    return await getScanHistory();
 }
 
-function clearScanHistory() {
-    localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify([]));
+export async function clearScanHistory() {
+    const db = await getDb();
+    await db.clear('scanHistory');
 }
 
 // ===== REAL ESTATE =====
-function getRealEstate() {
-    const data = localStorage.getItem(STORAGE_KEYS.REAL_ESTATE);
-    return data ? JSON.parse(data) : { properties: [] };
+export async function getRealEstate() {
+    const properties = await getAllProperties();
+    return { properties: properties };
 }
 
-function saveRealEstate(realEstateData) {
-    localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(realEstateData));
+export async function saveRealEstate(realEstateData) {
+    // This is a bulk operation
+    const db = await getDb();
+    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+    
+    // Clear existing properties
+    await tx.objectStore('properties').clear();
+    await tx.objectStore('propertyItems').clear();
+    
+    // Save all properties
+    for (const property of realEstateData.properties || []) {
+        await tx.objectStore('properties').put(property);
+        
+        // Save property items
+        if (property.items) {
+            for (const [elementName, itemData] of Object.entries(property.items)) {
+                await tx.objectStore('propertyItems').put({
+                    id: `item_${property.id}_${elementName}`,
+                    propertyId: property.id,
+                    elementName: elementName,
+                    count: itemData.count || 1
+                });
+            }
+        }
+    }
+    
+    await tx.done;
     saveTimestamp();
 }
 
-function addProperty(propertyData) {
-    const realEstate = getRealEstate();
+export async function addProperty(propertyData) {
+    return await dbAddProperty(propertyData);
+}
+
+export async function getProperty(propertyId) {
+    return await getProperty(propertyId);
+}
+
+export async function updateProperty(propertyId, updates) {
+    return await dbUpdateProperty(propertyId, updates);
+}
+
+export async function deleteProperty(propertyId) {
+    const db = await getDb();
+    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
     
-    const newProperty = {
-        id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        name: propertyData.name,
-        type: propertyData.type,
-        capacity: propertyData.capacity,
-        used: 0,
-        purchaseDate: new Date().toISOString(),
-        cost: propertyData.cost,
-        items: {}
-    };
+    await tx.objectStore('properties').delete(propertyId);
     
-    if (!realEstate.properties) {
-        realEstate.properties = [];
+    // Delete all items for this property
+    const items = await tx.objectStore('propertyItems').index('by-propertyId').getAll(propertyId);
+    for (const item of items) {
+        await tx.objectStore('propertyItems').delete(item.id);
     }
     
-    realEstate.properties.push(newProperty);
-    saveRealEstate(realEstate);
-    
-    return newProperty;
-}
-
-function getProperty(propertyId) {
-    const realEstate = getRealEstate();
-    return realEstate.properties?.find(p => p.id === propertyId) || null;
-}
-
-function updateProperty(propertyId, updates) {
-    const realEstate = getRealEstate();
-    const index = realEstate.properties?.findIndex(p => p.id === propertyId);
-    
-    if (index === -1 || index === undefined) return false;
-    
-    realEstate.properties[index] = { ...realEstate.properties[index], ...updates };
-    saveRealEstate(realEstate);
+    await tx.done;
     return true;
 }
 
-function deleteProperty(propertyId) {
-    const realEstate = getRealEstate();
-    realEstate.properties = realEstate.properties?.filter(p => p.id !== propertyId) || [];
-    saveRealEstate(realEstate);
-    return true;
+export async function transferToProperty(propertyId, elementName, quantity) {
+    return await dbAddItemToProperty(propertyId, elementName, quantity);
 }
 
-function transferToProperty(propertyId, elementName, quantity) {
-    const realEstate = getRealEstate();
-    const property = realEstate.properties?.find(p => p.id === propertyId);
+export async function transferFromProperty(propertyId, elementName, quantity) {
+    const db = await getDb();
+    const tx = db.transaction(['properties', 'propertyItems', 'collection'], 'readwrite');
     
-    if (!property) return { success: false, reason: 'property_not_found' };
+    const propertyStore = tx.objectStore('properties');
+    const itemsStore = tx.objectStore('propertyItems');
+    const collectionStore = tx.objectStore('collection');
     
-    // Check if property has enough space
-    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-    if (currentUsed + quantity > property.capacity) {
-        return { success: false, reason: 'insufficient_space' };
+    // Get property
+    const property = await propertyStore.get(propertyId);
+    if (!property) {
+        await tx.done;
+        return { success: false, reason: 'property_not_found' };
     }
     
-    // Initialize items if needed
-    if (!property.items) property.items = {};
+    // Find the item
+    const items = await itemsStore.index('by-propertyId').getAll(propertyId);
+    const item = items.find(i => i.elementName === elementName);
     
-    // Add items to property
-    if (!property.items[elementName]) {
-        property.items[elementName] = { count: quantity };
+    if (!item) {
+        await tx.done;
+        return { success: false, reason: 'item_not_found' };
+    }
+    
+    if (item.count < quantity) {
+        await tx.done;
+        return { success: false, reason: 'insufficient', available: item.count };
+    }
+    
+    // Update or delete the property item
+    item.count -= quantity;
+    if (item.count <= 0) {
+        await itemsStore.delete(item.id);
     } else {
-        property.items[elementName].count += quantity;
+        await itemsStore.put(item);
     }
     
-    // Update used space
-    property.used = currentUsed + quantity;
+    // Add to ship collection
+    let collectionItem = await collectionStore.get(elementName);
+    if (!collectionItem) {
+        collectionItem = {
+            name: elementName,
+            count: quantity,
+            firstFound: new Date().toISOString()
+        };
+    } else {
+        collectionItem.count += quantity;
+    }
+    await collectionStore.put(collectionItem);
     
-    saveRealEstate(realEstate);
+    // Update property used space
+    const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
+    property.used = remainingItems.reduce((sum, i) => sum + i.count, 0);
+    await propertyStore.put(property);
+    
+    await tx.done;
     return { success: true };
 }
 
-function transferFromProperty(propertyId, elementName, quantity) {
-    const realEstate = getRealEstate();
-    const property = realEstate.properties?.find(p => p.id === propertyId);
-    
-    if (!property) return { success: false, reason: 'property_not_found' };
-    if (!property.items || !property.items[elementName]) return { success: false, reason: 'item_not_found' };
-    if (property.items[elementName].count < quantity) return { success: false, reason: 'insufficient' };
-    
-    // Remove from property
-    property.items[elementName].count -= quantity;
-    if (property.items[elementName].count <= 0) {
-        delete property.items[elementName];
-    }
-    
-    // Update used space
-    const currentUsed = Object.values(property.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-    property.used = currentUsed;
-    
-    saveRealEstate(realEstate);
-    return { success: true };
-}
-
-function getTotalPropertyCapacity() {
-    const realEstate = getRealEstate();
+export async function getTotalPropertyCapacity() {
+    const properties = await getAllProperties();
     let totalCapacity = 0;
     let totalUsed = 0;
     
-    (realEstate.properties || []).forEach(prop => {
+    properties.forEach(prop => {
         totalCapacity += prop.capacity || 0;
         totalUsed += prop.used || 0;
     });
@@ -768,157 +766,64 @@ function getTotalPropertyCapacity() {
     return { totalCapacity, totalUsed };
 }
 
-// ===== ECONOMIC DATA =====
-function getTotalMoneySupply() {
-    return parseInt(localStorage.getItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY)) || 5000000;
+// ===== TAX TRANSACTIONS =====
+export async function addTaxRecord(record) {
+    return await dbAddTaxTransaction(record);
 }
 
-function addMoneyToSupply(amount) {
-    const current = getTotalMoneySupply();
-    const newTotal = current + amount;
-    localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
-    return newTotal;
-}
-
-function removeMoneyFromSupply(amount) {
-    const current = getTotalMoneySupply();
-    const newTotal = Math.max(0, current - amount);
-    localStorage.setItem(STORAGE_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
-    return newTotal;
-}
-
-function getDailyMetrics() {
-    const data = localStorage.getItem(STORAGE_KEYS.DAILY_METRICS);
-    return data ? JSON.parse(data) : [];
-}
-
-function saveDailyMetrics(metrics) {
-    localStorage.setItem(STORAGE_KEYS.DAILY_METRICS, JSON.stringify(metrics));
-}
-
-function getTaxRates() {
-    const data = localStorage.getItem(STORAGE_KEYS.TAX_RATES);
-    return data ? JSON.parse(data) : {
-        transaction: 0.02,
-        property: 0.005,
-        income: 0.08,
-        luxury: 0.03,
-        estate: 0.10,
-        registration: 5000
-    };
-}
-
-function saveTaxRates(rates) {
-    localStorage.setItem(STORAGE_KEYS.TAX_RATES, JSON.stringify(rates));
-}
-
-function getTaxHistory() {
-    const data = localStorage.getItem(STORAGE_KEYS.TAX_HISTORY);
-    return data ? JSON.parse(data) : [];
-}
-
-function addTaxRecord(record) {
-    const history = getTaxHistory();
-    history.push(record);
-    
-    // Keep only last 1000 records
-    if (history.length > 1000) {
-        history.shift();
+export async function getTaxHistory(playerId, limit = 100) {
+    if (playerId) {
+        return await getPlayerTransactions(playerId, limit);
     }
-    
-    localStorage.setItem(STORAGE_KEYS.TAX_HISTORY, JSON.stringify(history));
-    return record;
+    const all = await getAll('taxTransactions');
+    return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
-function getCommunityFund() {
-    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_FUND);
-    return data ? JSON.parse(data) : {
-        balance: 0,
-        totalContributions: 0,
-        totalAllocations: 0,
-        lastUpdated: Date.now(),
-        categories: {}
-    };
-}
-
-function saveCommunityFund(fund) {
-    localStorage.setItem(STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(fund));
-}
-
-function getActiveEvents() {
-    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EVENTS);
-    return data ? JSON.parse(data) : [];
-}
-
-function saveActiveEvents(events) {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_EVENTS, JSON.stringify(events));
-}
-
-function getEventHistory() {
-    const data = localStorage.getItem(STORAGE_KEYS.EVENT_HISTORY);
-    return data ? JSON.parse(data) : [];
-}
-
-function addEventToHistory(event) {
-    const history = getEventHistory();
-    history.push({
-        ...event,
-        recordedAt: Date.now()
-    });
-    
-    // Keep only last 500 events
-    if (history.length > 500) {
-        history.shift();
-    }
-    
-    localStorage.setItem(STORAGE_KEYS.EVENT_HISTORY, JSON.stringify(history));
-}
-
-// ===== SETTINGS =====
-function getHapticsEnabled() {
+// ===== SETTINGS (keep in localStorage) =====
+export function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
 }
 
-function setHapticsEnabled(enabled) {
+export function setHapticsEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, enabled.toString());
 }
 
-function getAutoGatherEnabled() {
+export function getAutoGatherEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER) !== 'false';
 }
 
-function setAutoGatherEnabled(enabled) {
+export function setAutoGatherEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, enabled.toString());
 }
 
-function getOrbitSpeed() {
+export function getOrbitSpeed() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED) || 'gentle';
 }
 
-function setOrbitSpeed(speed) {
+export function setOrbitSpeed(speed) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, speed);
 }
 
-function getMusicVolume() {
+export function getMusicVolume() {
     return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) || 50;
 }
 
-function setMusicVolume(volume) {
+export function setMusicVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, volume.toString());
 }
 
-function getAmbientVolume() {
+export function getAmbientVolume() {
     return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) || 50;
 }
 
-function setAmbientVolume(volume) {
+export function setAmbientVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
 }
 
 // ===== SHIP UPGRADES =====
-function getShipUpgrades() {
-    const data = localStorage.getItem(STORAGE_KEYS.SHIP_UPGRADES);
-    return data ? JSON.parse(data) : {
+export async function getShipUpgrades() {
+    const upgrades = await getItem('shipUpgrades', 'current');
+    return upgrades || {
         engine: 1,
         shields: 1,
         miningLaser: 1,
@@ -928,32 +833,32 @@ function getShipUpgrades() {
     };
 }
 
-function saveShipUpgrades(upgrades) {
-    localStorage.setItem(STORAGE_KEYS.SHIP_UPGRADES, JSON.stringify(upgrades));
+export async function saveShipUpgrades(upgrades) {
+    await setItem('shipUpgrades', { id: 'current', ...upgrades });
 }
 
-function upgradeShip(component) {
-    const upgrades = getShipUpgrades();
+export async function upgradeShip(component) {
+    const upgrades = await getShipUpgrades();
     if (upgrades[component] < 5) {
         upgrades[component]++;
-        saveShipUpgrades(upgrades);
+        await saveShipUpgrades(upgrades);
         return true;
     }
     return false;
 }
 
 // ===== SAVE TIMESTAMP =====
-function saveTimestamp() {
+export function saveTimestamp() {
     localStorage.setItem(STORAGE_KEYS.LAST_SAVE, new Date().toISOString());
 }
 
-function getLastSaveTime() {
+export function getLastSaveTime() {
     return localStorage.getItem(STORAGE_KEYS.LAST_SAVE);
 }
 
 // ===== RESET GAME =====
-function resetGame() {
-    // Clear all game data but keep settings
+export async function resetGame() {
+    // Keep settings
     const settings = {
         haptics: getHapticsEnabled(),
         autoGather: getAutoGatherEnabled(),
@@ -962,10 +867,28 @@ function resetGame() {
         ambient: getAmbientVolume()
     };
     
-    // Remove all game keys
-    Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
-    });
+    // Clear all IndexedDB data
+    await dbResetAll();
+    
+    // Clear location data from localStorage
+    const locationKeys = [
+        STORAGE_KEYS.CURRENT_SECTOR,
+        STORAGE_KEYS.CURRENT_REGION,
+        STORAGE_KEYS.CURRENT_NEBULA,
+        STORAGE_KEYS.CURRENT_SECTOR_NAME,
+        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
+        STORAGE_KEYS.CURRENT_SECTOR_STARS,
+        STORAGE_KEYS.CURRENT_SECTOR_X,
+        STORAGE_KEYS.CURRENT_SECTOR_Y,
+        STORAGE_KEYS.CURRENT_STAR,
+        STORAGE_KEYS.CURRENT_STAR_TYPE,
+        STORAGE_KEYS.CURRENT_STAR_INDEX,
+        STORAGE_KEYS.CURRENT_PLANET,
+        STORAGE_KEYS.CURRENT_PLANET_TYPE,
+        STORAGE_KEYS.CURRENT_PLANET_RESOURCES
+    ];
+    
+    locationKeys.forEach(key => localStorage.removeItem(key));
     
     // Restore settings
     setHapticsEnabled(settings.haptics);
@@ -975,35 +898,116 @@ function resetGame() {
     setAmbientVolume(settings.ambient);
     
     // Re-initialize
-    initializeStorage();
+    await initializeStorage();
 }
 
 // ===== EXPORT / UTILITY =====
-function exportGameData() {
-    const gameData = {};
-    Object.values(STORAGE_KEYS).forEach(key => {
-        const value = localStorage.getItem(key);
-        if (value) {
-            gameData[key] = value;
+export async function exportGameData() {
+    const gameData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        universeSeed: UNIVERSE_SEED,
+        player: await getPlayer(),
+        collection: await getCollection(),
+        missions: await getMissions(),
+        completedMissions: await getCompletedMissions(),
+        colonies: await getColonies(),
+        realEstate: await getRealEstate(),
+        taxTransactions: await getAll('taxTransactions'),
+        dailyMetrics: await getAll('dailyMetrics'),
+        activeEvents: await getAll('activeEvents'),
+        shipUpgrades: await getShipUpgrades(),
+        
+        // Include localStorage settings
+        settings: {
+            haptics: getHapticsEnabled(),
+            autoGather: getAutoGatherEnabled(),
+            orbitSpeed: getOrbitSpeed(),
+            music: getMusicVolume(),
+            ambient: getAmbientVolume()
+        },
+        
+        // Include current location
+        location: {
+            sector: getCurrentSector(),
+            region: getCurrentRegion(),
+            nebula: getCurrentNebula(),
+            star: getCurrentStar(),
+            planet: getCurrentPlanet()
         }
-    });
-    return JSON.stringify(gameData);
+    };
+    
+    return JSON.stringify(gameData, null, 2);
 }
 
-function importGameData(jsonString) {
+export async function importGameData(jsonString) {
     try {
         const gameData = JSON.parse(jsonString);
-        Object.keys(gameData).forEach(key => {
-            localStorage.setItem(key, gameData[key]);
-        });
+        
+        // Validate version/universe seed?
+        
+        // Restore data to IndexedDB
+        if (gameData.player) await setItem('player', { id: 'main', ...gameData.player });
+        
+        if (gameData.collection) {
+            const collection = gameData.collection;
+            for (const [name, data] of Object.entries(collection)) {
+                await setItem('collection', {
+                    name: name,
+                    count: data.count || 1,
+                    firstFound: data.firstFound || new Date().toISOString()
+                });
+            }
+        }
+        
+        if (gameData.missions) {
+            for (const mission of gameData.missions) {
+                await setItem('missions', mission);
+            }
+        }
+        
+        if (gameData.completedMissions) {
+            for (const mission of gameData.completedMissions) {
+                await setItem('completedMissions', mission);
+            }
+        }
+        
+        if (gameData.realEstate) {
+            await saveRealEstate(gameData.realEstate);
+        }
+        
+        if (gameData.taxTransactions) {
+            for (const tx of gameData.taxTransactions) {
+                await setItem('taxTransactions', tx);
+            }
+        }
+        
+        // Restore settings
+        if (gameData.settings) {
+            setHapticsEnabled(gameData.settings.haptics);
+            setAutoGatherEnabled(gameData.settings.autoGather);
+            setOrbitSpeed(gameData.settings.orbitSpeed);
+            setMusicVolume(gameData.settings.music);
+            setAmbientVolume(gameData.settings.ambient);
+        }
+        
+        // Restore location
+        if (gameData.location) {
+            setCurrentSector(gameData.location.sector, gameData.location.region);
+            setCurrentNebula(gameData.location.nebula, 'Unknown', 50, 30, 40);
+            setCurrentStar(gameData.location.star, 'Unknown', 0, '3-7');
+            setCurrentPlanet(gameData.location.planet, 'lush', []);
+        }
+        
         return true;
     } catch (e) {
+        console.error('Import failed:', e);
         return false;
     }
 }
 
 // ===== PLAYER ID MANAGEMENT =====
-function getPlayerId() {
+export function getPlayerId() {
     let playerId = localStorage.getItem('voidfarer_player_id');
     if (!playerId) {
         playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
@@ -1012,119 +1016,13 @@ function getPlayerId() {
     return playerId;
 }
 
-function getPlayerName() {
-    const player = getPlayer();
+export async function getPlayerName() {
+    const player = await getPlayer();
     return player?.name || 'Voidfarer';
 }
 
-// ===== INITIALIZE ON LOAD =====
-initializeStorage();
+// ===== INITIALIZE ON LOAD (but don't await - let app handle it) =====
+// We'll export the initialization function and let the app call it
 
-// ===== EXPORT FOR MODULE USE =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        STORAGE_KEYS,
-        UNIVERSE_SEED,
-        getPlayer,
-        savePlayer,
-        createDefaultPlayer,
-        getCollection,
-        saveCollection,
-        addElementToCollection,
-        removeElementFromCollection,
-        safeSellElement,
-        getElementCount,
-        getUniqueElementsCount,
-        getTotalElementCount,
-        getCredits,
-        saveCredits,
-        addCredits,
-        spendCredits,
-        getShipFuel,
-        saveShipFuel,
-        useFuel,
-        refuelShip,
-        getShipPower,
-        setShipPower,
-        usePower,
-        repairShip,
-        getCurrentSector,
-        getCurrentRegion,
-        setCurrentSector,
-        getCurrentNebula,
-        getCurrentSectorName,
-        getCurrentSectorType,
-        getCurrentSectorStars,
-        getCurrentSectorCoords,
-        setCurrentNebula,
-        getCurrentStar,
-        getCurrentStarType,
-        getCurrentStarIndex,
-        getCurrentStarCoords,
-        getCurrentStarPlanets,
-        setCurrentStar,
-        getCurrentPlanet,
-        getCurrentPlanetType,
-        getCurrentPlanetResources,
-        setCurrentPlanet,
-        setCurrentLocation,
-        setWarpData,
-        getWarpData,
-        clearWarpData,
-        getColonies,
-        saveColonies,
-        addColony,
-        removeColony,
-        getMissions,
-        saveMissions,
-        getCompletedMissions,
-        saveCompletedMissions,
-        updateMissionProgress,
-        getScanHistory,
-        addScan,
-        clearScanHistory,
-        getRealEstate,
-        saveRealEstate,
-        addProperty,
-        getProperty,
-        updateProperty,
-        deleteProperty,
-        transferToProperty,
-        transferFromProperty,
-        getTotalPropertyCapacity,
-        getTotalMoneySupply,
-        addMoneyToSupply,
-        removeMoneyFromSupply,
-        getDailyMetrics,
-        saveDailyMetrics,
-        getTaxRates,
-        saveTaxRates,
-        getTaxHistory,
-        addTaxRecord,
-        getCommunityFund,
-        saveCommunityFund,
-        getActiveEvents,
-        saveActiveEvents,
-        getEventHistory,
-        addEventToHistory,
-        getHapticsEnabled,
-        setHapticsEnabled,
-        getAutoGatherEnabled,
-        setAutoGatherEnabled,
-        getOrbitSpeed,
-        setOrbitSpeed,
-        getMusicVolume,
-        setMusicVolume,
-        getAmbientVolume,
-        setAmbientVolume,
-        getShipUpgrades,
-        saveShipUpgrades,
-        upgradeShip,
-        getLastSaveTime,
-        resetGame,
-        exportGameData,
-        importGameData,
-        getPlayerId,
-        getPlayerName
-    };
-}
+// Need to import getDb for some functions
+import { getDb } from './db.js';
