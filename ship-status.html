@@ -6,6 +6,8 @@
     <title>Voidfarer - Ship Status</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
@@ -64,6 +66,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -72,21 +76,21 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
             text-shadow: 0 0 30px #6a8ac0;
             animation: pulse 1.5s infinite;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #6a8ac0;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
         }
         
         @keyframes spin {
@@ -551,6 +555,20 @@
             background: #6a8ac0;
             transform: translateX(-50%) scale(0.96);
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -572,26 +590,26 @@
             <div class="tab-content active" id="statusTab">
                 <!-- Ship Card -->
                 <div class="ship-card">
-                    <div class="ship-name" id="shipName">Prospector</div>
+                    <div class="ship-name" id="shipName">Loading...</div>
                     <div class="stats-grid">
                         <div class="stat-item">
                             <div class="stat-label">FUEL</div>
-                            <div class="stat-value" id="fuelValue">100</div>
+                            <div class="stat-value" id="fuelValue">--</div>
                             <span class="stat-unit">⭐</span>
                         </div>
                         <div class="stat-item">
                             <div class="stat-label">POWER</div>
-                            <div class="stat-value" id="powerValue">100</div>
+                            <div class="stat-value" id="powerValue">--</div>
                             <span class="stat-unit">%</span>
                         </div>
                         <div class="stat-item">
                             <div class="stat-label">CARGO</div>
-                            <div class="stat-value" id="cargoValue">0</div>
+                            <div class="stat-value" id="cargoValue">--</div>
                             <span class="stat-unit">/100</span>
                         </div>
                         <div class="stat-item">
                             <div class="stat-label">VALUE</div>
-                            <div class="stat-value" id="portfolioValue">0</div>
+                            <div class="stat-value" id="portfolioValue">--</div>
                             <span class="stat-unit">⭐</span>
                         </div>
                     </div>
@@ -601,30 +619,30 @@
                 <div class="progress-section">
                     <div class="progress-header">
                         <span>Fuel Tank</span>
-                        <span id="fuelPercent">100%</span>
+                        <span id="fuelPercent">--%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-fill fill-green" id="fuelBar" style="width: 100%"></div>
+                        <div class="progress-fill fill-green" id="fuelBar" style="width: 0%"></div>
                     </div>
                 </div>
                 
                 <div class="progress-section">
                     <div class="progress-header">
                         <span>Hull Integrity</span>
-                        <span id="hullPercent">100%</span>
+                        <span id="hullPercent">--%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-fill fill-blue" id="hullBar" style="width: 100%"></div>
+                        <div class="progress-fill fill-blue" id="hullBar" style="width: 0%"></div>
                     </div>
                 </div>
                 
                 <div class="progress-section">
                     <div class="progress-header">
                         <span>Shield Strength</span>
-                        <span id="shieldPercent">100%</span>
+                        <span id="shieldPercent">--%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div class="progress-fill fill-orange" id="shieldBar" style="width: 100%"></div>
+                        <div class="progress-fill fill-orange" id="shieldBar" style="width: 0%"></div>
                     </div>
                 </div>
                 
@@ -632,43 +650,14 @@
                 <div class="property-summary">
                     <div class="property-summary-title">🏢 Real Estate Summary</div>
                     <div class="property-summary-stats">
-                        <span>Properties Owned: <span class="property-summary-value" id="propertyCount">0</span></span>
-                        <span>Total Storage: <span class="property-summary-value" id="totalPropertyStorage">0</span></span>
+                        <span>Properties Owned: <span class="property-summary-value" id="propertyCount">--</span></span>
+                        <span>Total Storage: <span class="property-summary-value" id="totalPropertyStorage">--</span></span>
                     </div>
                 </div>
                 
                 <!-- Ship Upgrades -->
-                <div class="upgrades-grid">
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">⚡</div>
-                        <div class="upgrade-name">Engine</div>
-                        <div class="upgrade-level">III <span>/ V</span></div>
-                    </div>
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">🛡️</div>
-                        <div class="upgrade-name">Shields</div>
-                        <div class="upgrade-level">II <span>/ V</span></div>
-                    </div>
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">⛏️</div>
-                        <div class="upgrade-name">Mining Laser</div>
-                        <div class="upgrade-level">IV <span>/ V</span></div>
-                    </div>
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">📦</div>
-                        <div class="upgrade-name">Cargo Hold</div>
-                        <div class="upgrade-level">III <span>/ V</span></div>
-                    </div>
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">🌌</div>
-                        <div class="upgrade-name">Warp Drive</div>
-                        <div class="upgrade-level">II <span>/ V</span></div>
-                    </div>
-                    <div class="upgrade-card">
-                        <div class="upgrade-icon">🔍</div>
-                        <div class="upgrade-name">Scanner</div>
-                        <div class="upgrade-level">I <span>/ V</span></div>
-                    </div>
+                <div class="upgrades-grid" id="upgradesGrid">
+                    <!-- Filled by JavaScript -->
                 </div>
                 
                 <!-- Action Buttons -->
@@ -682,15 +671,15 @@
                 <div class="journal-stats">
                     <div class="journal-stats-grid">
                         <div class="journal-stat">
-                            <div class="journal-stat-value" id="totalElements">0</div>
+                            <div class="journal-stat-value" id="totalElements">--</div>
                             <div class="journal-stat-label">TOTAL</div>
                         </div>
                         <div class="journal-stat">
-                            <div class="journal-stat-value" id="uniqueElements">0</div>
+                            <div class="journal-stat-value" id="uniqueElements">--</div>
                             <div class="journal-stat-label">UNIQUE</div>
                         </div>
                         <div class="journal-stat">
-                            <div class="journal-stat-value" id="completionPct">0%</div>
+                            <div class="journal-stat-value" id="completionPct">--%</div>
                             <div class="journal-stat-label">COMPLETE</div>
                         </div>
                     </div>
@@ -713,22 +702,22 @@
                 
                 <!-- Elements List -->
                 <div class="elements-list" id="elementsList">
-                    <!-- Filled by JavaScript -->
+                    <div class="empty-state">Loading elements...</div>
                 </div>
                 
                 <!-- Value Summary -->
                 <div class="value-summary">
                     <div class="value-row">
                         <span class="value-label">Ship Cargo Value:</span>
-                        <span class="value-amount" id="shipValue">0⭐</span>
+                        <span class="value-amount" id="shipValue">--⭐</span>
                     </div>
                     <div class="value-row">
                         <span class="value-label">Property Value:</span>
-                        <span class="value-amount" id="propertyValue">0⭐</span>
+                        <span class="value-amount" id="propertyValue">--⭐</span>
                     </div>
                     <div class="value-row">
                         <span class="value-label">Total Net Worth:</span>
-                        <span class="value-amount" id="netWorth">0⭐</span>
+                        <span class="value-amount" id="netWorth">--⭐</span>
                     </div>
                 </div>
             </div>
@@ -739,16 +728,34 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">updating...</div>
+                <div class="loading-text" id="loadingText">updating...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/market-dynamics.js"></script>
-    
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getPlayer,
+            getShipFuel,
+            getShipPower,
+            getCredits,
+            getCollection,
+            getRealEstate,
+            getShipUpgrades,
+            spendCredits,
+            saveShipFuel,
+            setShipPower,
+            getTotalElementCount,
+            getUniqueElementsCount,
+            getLatestPrice
+        } from './js/storage.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -756,17 +763,24 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Tab switching
-        function switchTab(tabName) {
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
+        // ===== STATE =====
+        let currentFilter = 'all';
+        let portfolioChart = null;
+        let elements = [];
+
+        // ===== TAB SWITCHING =====
+        window.switchTab = function(tabName) {
             document.getElementById('tabStatus').classList.remove('active');
             document.getElementById('tabJournal').classList.remove('active');
             document.getElementById('statusTab').classList.remove('active');
             document.getElementById('journalTab').classList.remove('active');
-            
+
             if (tabName === 'status') {
                 document.getElementById('tabStatus').classList.add('active');
                 document.getElementById('statusTab').classList.add('active');
@@ -774,74 +788,86 @@
             } else {
                 document.getElementById('tabJournal').classList.add('active');
                 document.getElementById('journalTab').classList.add('active');
-                loadJournalData(); // Refresh journal data when switching to it
+                loadJournalData();
             }
-            
+
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        // Navigation
-        function returnToBridge() {
+        };
+
+        // ===== NAVIGATION =====
+        window.returnToBridge = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
+        };
+
+        // ===== LOAD SHIP DATA =====
+        async function loadShipData() {
+            try {
+                // Load all ship data in parallel
+                const [player, fuel, power, credits, collection, realEstate, upgrades] = await Promise.all([
+                    getPlayer(),
+                    getShipFuel(),
+                    getShipPower(),
+                    getCredits(),
+                    getCollection(),
+                    getRealEstate(),
+                    getShipUpgrades()
+                ]);
+
+                // Ship name
+                document.getElementById('shipName').textContent = player?.ship || 'Prospector';
+
+                // Fuel
+                document.getElementById('fuelValue').textContent = fuel;
+                document.getElementById('fuelPercent').textContent = fuel + '%';
+                document.getElementById('fuelBar').style.width = fuel + '%';
+
+                // Power
+                document.getElementById('powerValue').textContent = power;
+                document.getElementById('shieldPercent').textContent = power + '%';
+                document.getElementById('shieldBar').style.width = power + '%';
+
+                // Hull (always 100 for now)
+                document.getElementById('hullPercent').textContent = '100%';
+                document.getElementById('hullBar').style.width = '100%';
+
+                // Collection stats
+                const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
+                
+                // Calculate cargo usage
+                let cargoUsed = 0;
+                Object.keys(collection).forEach(name => {
+                    const size = getElementSize(name);
+                    cargoUsed += (collection[name].count || 1) * size;
+                });
+
+                document.getElementById('cargoValue').textContent = Math.min(cargoUsed, 100);
+
+                // Calculate portfolio value
+                let portfolioValue = 0;
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = data.count || 1;
+                    const marketPrice = await getLatestPrice(name) || 100;
+                    portfolioValue += count * marketPrice;
+                }
+                document.getElementById('portfolioValue').textContent = portfolioValue.toLocaleString();
+
+                // Load real estate summary
+                loadPropertySummary(realEstate);
+
+                // Load upgrades
+                renderUpgrades(upgrades);
+
+                // Enable/disable buttons based on credits
+                document.getElementById('refuelBtn').disabled = credits < 50 || fuel >= 100;
+                document.getElementById('repairBtn').disabled = credits < 100 || power >= 100;
+
+            } catch (error) {
+                console.error('Error loading ship data:', error);
+            }
         }
-        
-        // ===== STATUS TAB FUNCTIONS =====
-        
-        // Load ship data
-        function loadShipData() {
-            // Ship name
-            const player = getPlayer() || { ship: 'Prospector' };
-            document.getElementById('shipName').textContent = player.ship || 'Prospector';
-            
-            // Fuel
-            const fuel = getShipFuel();
-            document.getElementById('fuelValue').textContent = fuel;
-            document.getElementById('fuelPercent').textContent = fuel + '%';
-            document.getElementById('fuelBar').style.width = fuel + '%';
-            
-            // Power
-            const power = getShipPower();
-            document.getElementById('powerValue').textContent = power;
-            document.getElementById('shieldPercent').textContent = power + '%';
-            document.getElementById('shieldBar').style.width = power + '%';
-            
-            // Hull (always 100 for now)
-            document.getElementById('hullPercent').textContent = '100%';
-            document.getElementById('hullBar').style.width = '100%';
-            
-            // Collection stats
-            const collection = getCollection();
-            const totalItems = getTotalElementCount();
-            
-            // Calculate cargo usage (using size from database)
-            let cargoUsed = 0;
-            Object.keys(collection).forEach(name => {
-                const size = getElementSize(name);
-                cargoUsed += (collection[name].count || 1) * size;
-            });
-            
-            document.getElementById('cargoValue').textContent = Math.min(cargoUsed, 100);
-            
-            // Calculate portfolio value
-            let portfolioValue = 0;
-            Object.keys(collection).forEach(name => {
-                const count = collection[name].count || 1;
-                const marketPrice = getLatestPrice(name);
-                portfolioValue += count * marketPrice;
-            });
-            document.getElementById('portfolioValue').textContent = portfolioValue.toLocaleString();
-            
-            // Load real estate summary
-            loadPropertySummary();
-            
-            // Enable/disable buttons based on credits
-            const credits = getCredits();
-            document.getElementById('refuelBtn').disabled = credits < 50 || fuel >= 100;
-            document.getElementById('repairBtn').disabled = credits < 100 || power >= 100;
-        }
-        
-        // Get element size from database
+
+        // ===== GET ELEMENT SIZE =====
         function getElementSize(elementName) {
             const elementDatabase = {
                 'Carbon': 1, 'Silicon': 1, 'Hydrogen': 1, 'Helium': 1,
@@ -852,75 +878,121 @@
             };
             return elementDatabase[elementName] || 1;
         }
-        
-        // Load property summary
-        function loadPropertySummary() {
-            const realEstate = getRealEstate();
+
+        // ===== LOAD PROPERTY SUMMARY =====
+        function loadPropertySummary(realEstate) {
             const properties = realEstate.properties || [];
-            
+
             document.getElementById('propertyCount').textContent = properties.length;
-            
+
             let totalCapacity = 0;
             properties.forEach(prop => {
                 totalCapacity += prop.capacity || 0;
             });
             document.getElementById('totalPropertyStorage').textContent = totalCapacity.toLocaleString();
         }
-        
-        // Refuel ship
-        function refuelShip() {
-            const credits = getCredits();
-            const fuel = getShipFuel();
-            
+
+        // ===== RENDER UPGRADES =====
+        function renderUpgrades(upgrades) {
+            const grid = document.getElementById('upgradesGrid');
+            grid.innerHTML = '';
+
+            const upgradeItems = [
+                { key: 'engine', name: 'Engine', icon: '⚡' },
+                { key: 'shields', name: 'Shields', icon: '🛡️' },
+                { key: 'miningLaser', name: 'Mining Laser', icon: '⛏️' },
+                { key: 'cargoHold', name: 'Cargo Hold', icon: '📦' },
+                { key: 'warpDrive', name: 'Warp Drive', icon: '🌌' },
+                { key: 'scanner', name: 'Scanner', icon: '🔍' }
+            ];
+
+            upgradeItems.forEach(item => {
+                const level = upgrades[item.key] || 1;
+                
+                const card = document.createElement('div');
+                card.className = 'upgrade-card';
+                card.innerHTML = `
+                    <div class="upgrade-icon">${item.icon}</div>
+                    <div class="upgrade-name">${item.name}</div>
+                    <div class="upgrade-level">${getRomanNumeral(level)} <span>/ V</span></div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        // ===== GET ROMAN NUMERAL =====
+        function getRomanNumeral(level) {
+            const roman = ['I', 'II', 'III', 'IV', 'V'];
+            return roman[level - 1] || level;
+        }
+
+        // ===== REFUEL SHIP =====
+        window.refuelShip = async function() {
+            const credits = await getCredits();
+            const fuel = await getShipFuel();
+
             if (fuel >= 100) {
                 alert('Fuel tank already full!');
                 return;
             }
-            
+
             if (credits < 50) {
                 alert('Not enough credits! Need 50⭐');
                 return;
             }
-            
+
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
-                spendCredits(50);
-                saveShipFuel(100);
-                loadShipData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-            }, 500);
-        }
-        
-        // Repair ship
-        function repairShip() {
-            const credits = getCredits();
-            const power = getShipPower();
-            
+            loadingText.textContent = 'refueling...';
+
+            try {
+                const spent = await spendCredits(50);
+                if (spent) {
+                    await saveShipFuel(100);
+                    await loadShipData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (error) {
+                console.error('Refuel error:', error);
+                alert('Failed to refuel');
+            }
+
+            loadingOverlay.classList.remove('active');
+        };
+
+        // ===== REPAIR SHIP =====
+        window.repairShip = async function() {
+            const credits = await getCredits();
+            const power = await getShipPower();
+
             if (power >= 100) {
                 alert('Ship already at full power!');
                 return;
             }
-            
+
             if (credits < 100) {
                 alert('Not enough credits! Need 100⭐');
                 return;
             }
-            
+
             loadingOverlay.classList.add('active');
-            
-            setTimeout(() => {
-                spendCredits(100);
-                setShipPower(100);
-                loadShipData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-            }, 500);
-        }
-        
+            loadingText.textContent = 'repairing...';
+
+            try {
+                const spent = await spendCredits(100);
+                if (spent) {
+                    await setShipPower(100);
+                    await loadShipData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (error) {
+                console.error('Repair error:', error);
+                alert('Failed to repair');
+            }
+
+            loadingOverlay.classList.remove('active');
+        };
+
         // ===== JOURNAL TAB FUNCTIONS =====
         
         // Element database with icons
@@ -957,73 +1029,78 @@
             'Technetium': { icon: '🧪', rarity: 'legendary' },
             'Astatine': { icon: '☣️', rarity: 'legendary' }
         };
-        
-        let currentFilter = 'all';
-        let portfolioChart = null;
-        
+
         // Load journal data
-        function loadJournalData() {
-            const collection = getCollection();
-            const realEstate = getRealEstate();
-            const properties = realEstate.properties || [];
-            
-            const elements = [];
-            let shipValue = 0;
-            let propertyValue = 0;
-            
-            // Calculate ship cargo value
-            Object.keys(collection).forEach(name => {
-                const count = collection[name].count || 1;
-                const marketPrice = getLatestPrice(name);
-                const elementValue = count * marketPrice;
-                shipValue += elementValue;
-                
-                elements.push({
-                    name: name,
-                    count: count,
-                    icon: elementDatabase[name]?.icon || '🔹',
-                    rarity: elementDatabase[name]?.rarity || 'common',
-                    marketPrice: marketPrice,
-                    value: elementValue
-                });
-            });
-            
-            // Calculate property value (estimate)
-            propertyValue = properties.length * 10000; // Rough estimate
-            
-            // Calculate stats
-            const totalElements = getTotalElementCount();
-            const uniqueElements = getUniqueElementsCount();
-            const completionPct = Math.round((uniqueElements / 118) * 100);
-            
-            document.getElementById('totalElements').textContent = totalElements;
-            document.getElementById('uniqueElements').textContent = uniqueElements;
-            document.getElementById('completionPct').textContent = completionPct + '%';
-            
-            document.getElementById('shipValue').textContent = shipValue.toLocaleString() + '⭐';
-            document.getElementById('propertyValue').textContent = propertyValue.toLocaleString() + '⭐';
-            document.getElementById('netWorth').textContent = (shipValue + propertyValue).toLocaleString() + '⭐';
-            
-            // Update portfolio chart
-            updatePortfolioChart(elements);
-            
-            // Render elements with filter
-            renderElements(elements);
+        async function loadJournalData() {
+            try {
+                const [collection, realEstate] = await Promise.all([
+                    getCollection(),
+                    getRealEstate()
+                ]);
+
+                const properties = realEstate.properties || [];
+
+                elements = [];
+                let shipValue = 0;
+                let propertyValue = 0;
+
+                // Calculate ship cargo value
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = data.count || 1;
+                    const marketPrice = await getLatestPrice(name) || 100;
+                    const elementValue = count * marketPrice;
+                    shipValue += elementValue;
+
+                    elements.push({
+                        name: name,
+                        count: count,
+                        icon: elementDatabase[name]?.icon || '🔹',
+                        rarity: elementDatabase[name]?.rarity || 'common',
+                        marketPrice: marketPrice,
+                        value: elementValue
+                    });
+                }
+
+                // Calculate property value (estimate)
+                propertyValue = properties.length * 10000; // Rough estimate
+
+                // Calculate stats
+                const totalElements = await getTotalElementCount();
+                const uniqueElements = await getUniqueElementsCount();
+                const completionPct = Math.round((uniqueElements / 118) * 100);
+
+                document.getElementById('totalElements').textContent = totalElements;
+                document.getElementById('uniqueElements').textContent = uniqueElements;
+                document.getElementById('completionPct').textContent = completionPct + '%';
+
+                document.getElementById('shipValue').textContent = shipValue.toLocaleString() + '⭐';
+                document.getElementById('propertyValue').textContent = propertyValue.toLocaleString() + '⭐';
+                document.getElementById('netWorth').textContent = (shipValue + propertyValue).toLocaleString() + '⭐';
+
+                // Update portfolio chart
+                updatePortfolioChart(elements);
+
+                // Render elements with filter
+                renderElements(elements);
+
+            } catch (error) {
+                console.error('Error loading journal data:', error);
+            }
         }
-        
+
         // Update portfolio chart
         function updatePortfolioChart(elements) {
             const ctx = document.getElementById('portfolioChart').getContext('2d');
-            
+
             // Get top 5 elements by value
             const topElements = elements.sort((a, b) => b.value - a.value).slice(0, 5);
             const labels = topElements.map(e => e.name);
             const data = topElements.map(e => e.value);
-            
+
             if (portfolioChart) {
                 portfolioChart.destroy();
             }
-            
+
             portfolioChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -1064,35 +1141,35 @@
                 }
             });
         }
-        
+
         // Render elements based on filter
         function renderElements(elements) {
             const list = document.getElementById('elementsList');
             list.innerHTML = '';
-            
+
             let filtered = elements;
             if (currentFilter !== 'all') {
                 filtered = elements.filter(e => e.rarity === currentFilter);
             }
-            
+
             // Sort by value (highest first)
             filtered.sort((a, b) => b.value - a.value);
-            
+
             if (filtered.length === 0) {
                 list.innerHTML = '<div class="empty-state">No elements found</div>';
                 return;
             }
-            
+
             filtered.forEach(element => {
                 const item = document.createElement('div');
                 item.className = 'element-item';
-                
+
                 let rarityClass = 'rarity-common';
                 if (element.rarity === 'uncommon') rarityClass = 'rarity-uncommon';
                 else if (element.rarity === 'rare') rarityClass = 'rarity-rare';
                 else if (element.rarity === 'very-rare') rarityClass = 'rarity-very-rare';
                 else if (element.rarity === 'legendary') rarityClass = 'rarity-legendary';
-                
+
                 item.innerHTML = `
                     <div class="element-icon">${element.icon}</div>
                     <div class="element-info">
@@ -1104,42 +1181,65 @@
                     </div>
                     <div class="element-rarity-badge ${rarityClass}">${element.rarity}</div>
                 `;
-                
+
                 list.appendChild(item);
             });
         }
-        
+
         // Filter journal
-        function filterJournal(rarity) {
+        window.filterJournal = function(rarity) {
             // Update active filter pill
             document.querySelectorAll('.filter-pill').forEach(pill => {
                 pill.classList.remove('active');
             });
             event.target.classList.add('active');
-            
+
             currentFilter = rarity;
-            loadJournalData();
-            
+            renderElements(elements);
+
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading ship systems...';
+
+                // Check for player data
+                const player = await getPlayer();
+                if (!player) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load ship data for status tab
+                await loadShipData();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            // Update daily prices
-            if (typeof updateDailyPrices === 'function') {
-                updateDailyPrices();
-            }
-            
-            loadShipData();
-            // Journal tab loads when switched to it
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
