@@ -1,11 +1,19 @@
-// community-fund.js - Community fund management for Voidfarer
+// js/community-fund.js - Community fund management for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Tracks where tax money goes, allocates to projects, and funds community initiatives
 
+import { 
+    getItem,
+    setItem,
+    getAll,
+    addTransaction as addTaxTransaction
+} from './storage.js';
+
 // ===== DEPENDENCIES =====
-// Requires tax-system.js to be loaded first
+// Requires tax-system.js to be loaded first (but we'll handle gracefully)
 
 // ===== FUND ALLOCATION CATEGORIES =====
-const FUND_CATEGORIES = {
+export const FUND_CATEGORIES = {
     INFRASTRUCTURE: 'infrastructure',
     NEW_PLAYER_GRANTS: 'new_player_grants',
     EMERGENCY_AID: 'emergency_aid',
@@ -17,7 +25,7 @@ const FUND_CATEGORIES = {
 };
 
 // ===== ALLOCATION TARGETS (ideal percentages) =====
-const ALLOCATION_TARGETS = {
+export const ALLOCATION_TARGETS = {
     [FUND_CATEGORIES.INFRASTRUCTURE]: 0.28,      // 28% to infrastructure
     [FUND_CATEGORIES.NEW_PLAYER_GRANTS]: 0.15,   // 15% to new players
     [FUND_CATEGORIES.EMERGENCY_AID]: 0.12,        // 12% emergency fund
@@ -28,7 +36,7 @@ const ALLOCATION_TARGETS = {
     [FUND_CATEGORIES.ADMIN]: 0.03                 // 3% administration
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (for localStorage fallback/settings) =====
 const FUND_STORAGE_KEYS = {
     COMMUNITY_FUND: 'voidfarer_community_fund',
     FUND_HISTORY: 'voidfarer_fund_history',
@@ -39,10 +47,12 @@ const FUND_STORAGE_KEYS = {
 };
 
 // ===== INITIALIZE FUND =====
-function initializeCommunityFund() {
-    // Initialize fund if not exists
-    if (!localStorage.getItem(FUND_STORAGE_KEYS.COMMUNITY_FUND)) {
+export async function initializeCommunityFund() {
+    // Initialize fund in IndexedDB if not exists
+    const fund = await getItem('communityFund', 'main');
+    if (!fund) {
         const initialFund = {
+            id: 'main',
             balance: 0,
             totalContributions: 0,
             totalAllocations: 0,
@@ -55,25 +65,27 @@ function initializeCommunityFund() {
             initialFund.categories[cat] = 0;
         });
         
-        localStorage.setItem(FUND_STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(initialFund));
+        await setItem('communityFund', initialFund);
     }
     
-    // Initialize projects list
-    if (!localStorage.getItem(FUND_STORAGE_KEYS.PROJECTS)) {
-        localStorage.setItem(FUND_STORAGE_KEYS.PROJECTS, JSON.stringify([]));
+    // Initialize projects list in IndexedDB
+    const projects = await getAll('communityProjects');
+    if (projects.length === 0) {
+        // No projects yet, that's fine
     }
     
-    // Initialize grants list
-    if (!localStorage.getItem(FUND_STORAGE_KEYS.GRANTS)) {
-        localStorage.setItem(FUND_STORAGE_KEYS.GRANTS, JSON.stringify([]));
+    // Initialize grants list in IndexedDB
+    const grants = await getAll('communityGrants');
+    if (grants.length === 0) {
+        // No grants yet, that's fine
     }
     
-    // Initialize allocation log
+    // Initialize allocation log in localStorage (small data)
     if (!localStorage.getItem(FUND_STORAGE_KEYS.ALLOCATION_LOG)) {
         localStorage.setItem(FUND_STORAGE_KEYS.ALLOCATION_LOG, JSON.stringify([]));
     }
     
-    // Initialize fund settings
+    // Initialize fund settings in localStorage
     if (!localStorage.getItem(FUND_STORAGE_KEYS.FUND_SETTINGS)) {
         const settings = {
             allocationTargets: { ...ALLOCATION_TARGETS },
@@ -86,30 +98,32 @@ function initializeCommunityFund() {
         };
         localStorage.setItem(FUND_STORAGE_KEYS.FUND_SETTINGS, JSON.stringify(settings));
     }
+    
+    console.log('Community fund initialized');
 }
 
 // ===== FUND ACCESSORS =====
-function getCommunityFund() {
-    const data = localStorage.getItem(FUND_STORAGE_KEYS.COMMUNITY_FUND);
-    return data ? JSON.parse(data) : null;
+export async function getCommunityFund() {
+    return await getItem('communityFund', 'main');
 }
 
-function saveCommunityFund(fund) {
+export async function saveCommunityFund(fund) {
     fund.lastUpdated = Date.now();
-    localStorage.setItem(FUND_STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(fund));
+    await setItem('communityFund', fund);
 }
 
 // ===== FUND OPERATIONS =====
-function addToFund(amount, source, description, category = FUND_CATEGORIES.RESERVE) {
+export async function addToFund(amount, source, description, category = FUND_CATEGORIES.RESERVE) {
     if (amount <= 0) return { success: false, reason: 'Amount must be positive' };
     
-    const fund = getCommunityFund();
+    const fund = await getCommunityFund();
+    if (!fund) return { success: false, reason: 'Fund not initialized' };
     
     fund.balance += amount;
     fund.totalContributions += amount;
     fund.categories[category] = (fund.categories[category] || 0) + amount;
     
-    saveCommunityFund(fund);
+    await saveCommunityFund(fund);
     
     // Record transaction
     const transaction = {
@@ -133,10 +147,12 @@ function addToFund(amount, source, description, category = FUND_CATEGORIES.RESER
     };
 }
 
-function allocateFromFund(amount, category, purpose, description, requestedBy = 'system') {
+export async function allocateFromFund(amount, category, purpose, description, requestedBy = 'system') {
     if (amount <= 0) return { success: false, reason: 'Amount must be positive' };
     
-    const fund = getCommunityFund();
+    const fund = await getCommunityFund();
+    if (!fund) return { success: false, reason: 'Fund not initialized' };
+    
     const settings = getFundSettings();
     
     // Check minimum reserve
@@ -160,7 +176,7 @@ function allocateFromFund(amount, category, purpose, description, requestedBy = 
     fund.balance -= amount;
     fund.totalAllocations += amount;
     
-    saveCommunityFund(fund);
+    await saveCommunityFund(fund);
     
     // Record allocation
     const allocation = {
@@ -185,14 +201,14 @@ function allocateFromFund(amount, category, purpose, description, requestedBy = 
     };
 }
 
-// ===== ALLOCATION LOG =====
-function getAllocationLog(limit = 100) {
+// ===== ALLOCATION LOG (keep in localStorage) =====
+export function getAllocationLog(limit = 100) {
     const log = localStorage.getItem(FUND_STORAGE_KEYS.ALLOCATION_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     return allLogs.slice(-limit);
 }
 
-function addToAllocationLog(entry) {
+export function addToAllocationLog(entry) {
     const log = localStorage.getItem(FUND_STORAGE_KEYS.ALLOCATION_LOG);
     const allLogs = log ? JSON.parse(log) : [];
     
@@ -206,17 +222,25 @@ function addToAllocationLog(entry) {
     localStorage.setItem(FUND_STORAGE_KEYS.ALLOCATION_LOG, JSON.stringify(allLogs));
 }
 
-// ===== FUND SETTINGS =====
-function getFundSettings() {
+// ===== FUND SETTINGS (keep in localStorage) =====
+export function getFundSettings() {
     const data = localStorage.getItem(FUND_STORAGE_KEYS.FUND_SETTINGS);
-    return data ? JSON.parse(data) : null;
+    return data ? JSON.parse(data) : {
+        allocationTargets: { ...ALLOCATION_TARGETS },
+        autoAllocate: true,
+        allocationDay: 1,
+        minimumReserve: 10000,
+        emergencyReservePercent: 0.20,
+        publicVoting: true,
+        transparencyLevel: 'full'
+    };
 }
 
-function saveFundSettings(settings) {
+export function saveFundSettings(settings) {
     localStorage.setItem(FUND_STORAGE_KEYS.FUND_SETTINGS, JSON.stringify(settings));
 }
 
-function updateAllocationTarget(category, newTarget) {
+export function updateAllocationTarget(category, newTarget) {
     const settings = getFundSettings();
     if (settings.allocationTargets[category] !== undefined) {
         settings.allocationTargets[category] = Math.max(0, Math.min(1, newTarget));
@@ -226,17 +250,16 @@ function updateAllocationTarget(category, newTarget) {
     return false;
 }
 
-// ===== COMMUNITY PROJECTS =====
-function getProjects(status = 'all') {
-    const projects = localStorage.getItem(FUND_STORAGE_KEYS.PROJECTS);
-    const allProjects = projects ? JSON.parse(projects) : [];
+// ===== COMMUNITY PROJECTS (IndexedDB) =====
+export async function getProjects(status = 'all') {
+    const allProjects = await getAll('communityProjects') || [];
     
     if (status === 'all') return allProjects;
     return allProjects.filter(p => p.status === status);
 }
 
-function addProject(project) {
-    const projects = getProjects('all');
+export async function addProject(project) {
+    const projects = await getProjects('all');
     
     const newProject = {
         id: 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -255,8 +278,7 @@ function addProject(project) {
         comments: []
     };
     
-    projects.push(newProject);
-    localStorage.setItem(FUND_STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    await setItem('communityProjects', newProject);
     
     addToAllocationLog({
         type: 'PROJECT_CREATED',
@@ -270,9 +292,8 @@ function addProject(project) {
     return newProject;
 }
 
-function voteOnProject(projectId, playerId, voteFor) {
-    const projects = getProjects('all');
-    const project = projects.find(p => p.id === projectId);
+export async function voteOnProject(projectId, playerId, voteFor) {
+    const project = await getItem('communityProjects', projectId);
     
     if (!project) return { success: false, reason: 'Project not found' };
     if (project.status !== 'proposed' && project.status !== 'voting') {
@@ -287,21 +308,20 @@ function voteOnProject(projectId, playerId, voteFor) {
     project.votes[playerId] = voteFor;
     project.totalVotes = (project.totalVotes || 0) + 1;
     
-    localStorage.setItem(FUND_STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    await setItem('communityProjects', project);
     
     return { success: true, totalVotes: project.totalVotes };
 }
 
-function fundProject(projectId) {
-    const projects = getProjects('all');
-    const project = projects.find(p => p.id === projectId);
+export async function fundProject(projectId) {
+    const project = await getItem('communityProjects', projectId);
     
     if (!project) return { success: false, reason: 'Project not found' };
     if (project.status !== 'approved') {
         return { success: false, reason: 'Project not approved' };
     }
     
-    const allocation = allocateFromFund(
+    const allocation = await allocateFromFund(
         project.cost,
         project.category || FUND_CATEGORIES.PUBLIC_PROJECTS,
         'Community Project',
@@ -317,14 +337,13 @@ function fundProject(projectId) {
     project.fundedDate = Date.now();
     project.fundingTransaction = allocation.allocation.id;
     
-    localStorage.setItem(FUND_STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    await setItem('communityProjects', project);
     
     return { success: true, allocation };
 }
 
-function approveProject(projectId) {
-    const projects = getProjects('all');
-    const project = projects.find(p => p.id === projectId);
+export async function approveProject(projectId) {
+    const project = await getItem('communityProjects', projectId);
     
     if (!project) return { success: false, reason: 'Project not found' };
     if (project.status !== 'proposed') {
@@ -334,25 +353,24 @@ function approveProject(projectId) {
     project.status = 'approved';
     project.approvedDate = Date.now();
     
-    localStorage.setItem(FUND_STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    await setItem('communityProjects', project);
     
     return { success: true };
 }
 
-// ===== NEW PLAYER GRANTS =====
-function getGrants(status = 'all') {
-    const grants = localStorage.getItem(FUND_STORAGE_KEYS.GRANTS);
-    const allGrants = grants ? JSON.parse(grants) : [];
+// ===== NEW PLAYER GRANTS (IndexedDB) =====
+export async function getGrants(status = 'all') {
+    const allGrants = await getAll('communityGrants') || [];
     
     if (status === 'all') return allGrants;
     return allGrants.filter(g => g.status === status);
 }
 
-function issueNewPlayerGrant(playerId, playerName, amount = null) {
+export async function issueNewPlayerGrant(playerId, playerName, amount = null) {
     const settings = getFundSettings();
     const grantAmount = amount || 5000; // Default 5000⭐
     
-    const allocation = allocateFromFund(
+    const allocation = await allocateFromFund(
         grantAmount,
         FUND_CATEGORIES.NEW_PLAYER_GRANTS,
         'New Player Grant',
@@ -376,9 +394,7 @@ function issueNewPlayerGrant(playerId, playerName, amount = null) {
         notes: 'Welcome to Voidfarer!'
     };
     
-    const grants = getGrants('all');
-    grants.push(grant);
-    localStorage.setItem(FUND_STORAGE_KEYS.GRANTS, JSON.stringify(grants));
+    await setItem('communityGrants', grant);
     
     return {
         success: true,
@@ -387,14 +403,14 @@ function issueNewPlayerGrant(playerId, playerName, amount = null) {
     };
 }
 
-function getPlayerGrant(playerId) {
-    const grants = getGrants('all');
+export async function getPlayerGrant(playerId) {
+    const grants = await getGrants('all');
     return grants.find(g => g.playerId === playerId && g.status === 'issued');
 }
 
 // ===== EMERGENCY AID =====
-function issueEmergencyAid(playerId, playerName, amount, reason) {
-    const allocation = allocateFromFund(
+export async function issueEmergencyAid(playerId, playerName, amount, reason) {
+    const allocation = await allocateFromFund(
         amount,
         FUND_CATEGORIES.EMERGENCY_AID,
         'Emergency Aid',
@@ -417,16 +433,18 @@ function issueEmergencyAid(playerId, playerName, amount, reason) {
 }
 
 // ===== FUND SUMMARY =====
-function getFundSummary() {
-    const fund = getCommunityFund();
+export async function getFundSummary() {
+    const fund = await getCommunityFund();
     const settings = getFundSettings();
-    const projects = getProjects('approved');
-    const pendingProjects = getProjects('proposed');
-    const grants = getGrants('issued');
+    const projects = await getProjects('approved');
+    const pendingProjects = await getProjects('proposed');
+    const grants = await getGrants('issued');
+    
+    if (!fund) return null;
     
     // Calculate category percentages
     const categoryPercentages = {};
-    Object.keys(fund.categories).forEach(cat => {
+    Object.keys(fund.categories || {}).forEach(cat => {
         if (fund.totalContributions > 0) {
             categoryPercentages[cat] = (fund.categories[cat] / fund.totalContributions) * 100;
         } else {
@@ -456,30 +474,32 @@ function getFundSummary() {
         activeProjects: projects.length,
         pendingProjects: pendingProjects.length,
         activeGrants: grants.length,
-        reserveRatio: (fund.balance / fund.totalContributions * 100).toFixed(1) + '%',
+        reserveRatio: fund.totalContributions > 0 ? 
+            ((fund.balance / fund.totalContributions) * 100).toFixed(1) + '%' : '0%',
         lastUpdated: new Date(fund.lastUpdated).toLocaleString()
     };
 }
 
 // ===== MONTHLY ALLOCATION =====
-function performMonthlyAllocation() {
+export async function performMonthlyAllocation() {
     const settings = getFundSettings();
     if (!settings.autoAllocate) {
         return { success: false, reason: 'Auto-allocation disabled' };
     }
     
-    const fund = getCommunityFund();
+    const fund = await getCommunityFund();
+    if (!fund) return { success: false, reason: 'Fund not initialized' };
+    
     const monthlyBudget = fund.balance * 0.3; // Allocate 30% of current balance
     
     const results = [];
     
     // Allocate according to targets
-    Object.keys(settings.allocationTargets).forEach(category => {
-        const targetPercent = settings.allocationTargets[category];
+    for (const [category, targetPercent] of Object.entries(settings.allocationTargets)) {
         const categoryAmount = Math.floor(monthlyBudget * targetPercent);
         
         if (categoryAmount > 1000) { // Minimum allocation
-            const result = allocateFromFund(
+            const result = await allocateFromFund(
                 categoryAmount,
                 category,
                 'Monthly Allocation',
@@ -495,7 +515,7 @@ function performMonthlyAllocation() {
                 });
             }
         }
-    });
+    }
     
     addToAllocationLog({
         type: 'MONTHLY_ALLOCATION',
@@ -512,12 +532,14 @@ function performMonthlyAllocation() {
 }
 
 // ===== TRANSPARENCY REPORT =====
-function getTransparencyReport() {
-    const fund = getCommunityFund();
+export async function getTransparencyReport() {
+    const fund = await getCommunityFund();
     const settings = getFundSettings();
     const log = getAllocationLog(500);
-    const projects = getProjects('funded');
-    const grants = getGrants('issued');
+    const projects = await getProjects('funded');
+    const grants = await getGrants('issued');
+    
+    if (!fund) return null;
     
     // Calculate recent activity
     const now = Date.now();
@@ -556,7 +578,7 @@ function getTransparencyReport() {
 }
 
 // ===== FORMATTING =====
-function formatMoney(amount) {
+export function formatMoney(amount) {
     if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B⭐';
     if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M⭐';
     if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K⭐';
@@ -564,33 +586,28 @@ function formatMoney(amount) {
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        FUND_CATEGORIES,
-        ALLOCATION_TARGETS,
-        initializeCommunityFund,
-        getCommunityFund,
-        addToFund,
-        allocateFromFund,
-        getAllocationLog,
-        getFundSettings,
-        saveFundSettings,
-        updateAllocationTarget,
-        getProjects,
-        addProject,
-        voteOnProject,
-        fundProject,
-        approveProject,
-        getGrants,
-        issueNewPlayerGrant,
-        getPlayerGrant,
-        issueEmergencyAid,
-        getFundSummary,
-        performMonthlyAllocation,
-        getTransparencyReport,
-        formatMoney
-    };
-}
-
-// Initialize on load
-initializeCommunityFund();
+export default {
+    FUND_CATEGORIES,
+    ALLOCATION_TARGETS,
+    initializeCommunityFund,
+    getCommunityFund,
+    addToFund,
+    allocateFromFund,
+    getAllocationLog,
+    getFundSettings,
+    saveFundSettings,
+    updateAllocationTarget,
+    getProjects,
+    addProject,
+    voteOnProject,
+    fundProject,
+    approveProject,
+    getGrants,
+    issueNewPlayerGrant,
+    getPlayerGrant,
+    issueEmergencyAid,
+    getFundSummary,
+    performMonthlyAllocation,
+    getTransparencyReport,
+    formatMoney
+};
