@@ -6,6 +6,8 @@
     <title>Voidfarer - Cargo Hold</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
@@ -47,6 +49,58 @@
             padding: 20px 20px 30px 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
         }
         
         /* Header */
@@ -588,50 +642,19 @@
             background: #6a8ac0;
             transform: translateX(-50%) scale(0.96);
         }
-        
-        /* Loading Overlay */
-        .loading-overlay {
+
+        /* Migration status (debug) */
+        .migration-status {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
             display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-            opacity: 1;
-            pointer-events: all;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #6a8ac0;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'WindSong', cursive;
-            font-size: 24px;
-            text-shadow: 0 0 30px #6a8ac0;
-            margin-top: 15px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -647,10 +670,10 @@
             <!-- Stats Bar -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> 5,000
+                    <span>⭐</span> --
                 </div>
                 <div class="cargo-capacity" id="cargoCapacityDisplay">
-                    Used: 0/100
+                    Used: --/100
                 </div>
             </div>
             
@@ -658,7 +681,7 @@
             <div class="capacity-card">
                 <div class="capacity-header">
                     <span class="capacity-label">Ship Storage</span>
-                    <span class="capacity-numbers" id="capacityText">0 / 100</span>
+                    <span class="capacity-numbers" id="capacityText">-- / 100</span>
                 </div>
                 <div class="capacity-bar-bg">
                     <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
@@ -691,7 +714,7 @@
                     <span>Used: <span id="propertyUsed">0</span></span>
                     <span>Capacity: <span id="propertyCapacity">0</span></span>
                 </div>
-                <button class="transfer-btn" id="transferBtn" onclick="transferSelectedItem()" disabled>TRANSFER</button>
+                <button class="transfer-btn" id="transferBtn" disabled>TRANSFER</button>
             </div>
             
             <!-- Filter Bar -->
@@ -725,13 +748,13 @@
             
             <!-- Cargo Grid -->
             <div class="cargo-grid" id="cargoGrid">
-                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading cargo...</div>
             </div>
             
             <!-- Quick Actions -->
             <div class="quick-actions">
-                <button class="action-btn" id="sellCommonBtn" onclick="sellAllCommon()">💰 SELL ALL COMMON</button>
-                <button class="action-btn sell" id="quickSellBtn" onclick="quickSell()">⚡ QUICK SELL (500⭐)</button>
+                <button class="action-btn" id="sellCommonBtn" onclick="sellAllCommon()" disabled>💰 SELL ALL COMMON</button>
+                <button class="action-btn sell" id="quickSellBtn" onclick="quickSell()" disabled>⚡ QUICK SELL (500⭐)</button>
             </div>
             
             <!-- Back Button -->
@@ -747,7 +770,7 @@
                     <div class="modal-buttons">
                         <button class="modal-btn" onclick="closeModal()">CANCEL</button>
                         <button class="modal-btn sell" id="modalSellBtn" onclick="sellFromModal()">SELL 1</button>
-                        <button class="modal-btn transfer" id="modalTransferBtn" onclick="showTransferFromModal()">TRANSFER</button>
+                        <button class="modal-btn transfer" id="modalTransferBtn" style="display: none;">TRANSFER</button>
                     </div>
                 </div>
             </div>
@@ -755,16 +778,33 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">updating...</div>
+                <div class="loading-text" id="loadingText">loading cargo...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/market-dynamics.js"></script>
-    
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCredits, 
+            getCollection,
+            safeSellElement,
+            getRealEstate,
+            transferToProperty,
+            getItem
+        } from './js/storage.js';
+        import { 
+            getLatestPrice, 
+            calculatePriceChange, 
+            updateDailyPrices,
+            recordTrade
+        } from './js/market-dynamics.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -772,22 +812,25 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Modal
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
         const modal = document.getElementById('itemModal');
+
+        // ===== STATE =====
+        let cargoItems = [];
+        let filteredItems = [];
+        let currentFilter = 'all';
+        let currentSearch = '';
+        let currentSort = 'name-asc';
+        let properties = [];
         let currentItem = null;
-        let transferMode = false;
         let selectedPropertyId = null;
-        
-        // Navigation
-        function returnToBridge() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'ship-bridge.html';
-        }
-        
+        let currentCollection = {};
+        let currentCredits = 0;
+
         // ===== ELEMENT DATABASE =====
         const elementDatabase = {
             // Common
@@ -822,61 +865,82 @@
             'Technetium': { icon: '🧪', rarity: 'legendary', size: 5 },
             'Astatine': { icon: '☣️', rarity: 'legendary', size: 5 }
         };
-        
-        // ===== STATE =====
-        let cargoItems = [];
-        let filteredItems = [];
-        let currentFilter = 'all';
-        let currentSearch = '';
-        let currentSort = 'name-asc';
-        let properties = [];
-        
+
+        // ===== NAVIGATION =====
+        window.returnToBridge = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        };
+
         // ===== LOAD DATA =====
-        function loadData() {
-            const collection = getCollection();
-            const credits = getCredits();
-            const realEstate = getRealEstate();
-            properties = realEstate.properties || [];
-            
-            // Update header
-            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-            
-            // Build cargo items with market data
-            cargoItems = [];
-            Object.keys(collection).forEach(name => {
-                const elementData = elementDatabase[name] || {
-                    icon: '🔹',
-                    rarity: 'common',
-                    size: 1
-                };
-                const count = collection[name].count || 1;
-                const marketPrice = typeof getLatestPrice === 'function' ? 
-                    (getLatestPrice(name) || 100) : 100;
-                const priceChange = typeof calculatePriceChange === 'function' ? 
-                    calculatePriceChange(name, 1) : 0;
+        async function loadData() {
+            try {
+                loadingText.textContent = 'loading cargo...';
                 
-                cargoItems.push({
-                    name: name,
-                    count: count,
-                    icon: elementData.icon,
-                    rarity: elementData.rarity,
-                    size: elementData.size,
-                    marketPrice: marketPrice,
-                    priceChange: priceChange,
-                    totalValue: count * marketPrice
-                });
-            });
-            
-            updateStats();
-            applyFilters();
-            updatePropertySelector();
-            
-            // Enable/disable quick action buttons
-            const hasItems = cargoItems.length > 0;
-            document.getElementById('sellCommonBtn').disabled = !hasItems;
-            document.getElementById('quickSellBtn').disabled = !hasItems;
+                // Update daily prices if needed
+                await updateDailyPrices();
+
+                // Load all data in parallel
+                const [credits, collection, realEstateData] = await Promise.all([
+                    getCredits(),
+                    getCollection(),
+                    getRealEstate()
+                ]);
+
+                // Store in global state
+                currentCredits = credits;
+                currentCollection = collection;
+                properties = realEstateData.properties || [];
+
+                // Update header
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+
+                // Build cargo items with market data
+                cargoItems = [];
+                for (const [name, data] of Object.entries(collection)) {
+                    const elementData = elementDatabase[name] || {
+                        icon: '🔹',
+                        rarity: 'common',
+                        size: 1
+                    };
+                    const count = data.count || 1;
+                    const marketPrice = await getLatestPrice(name) || 100;
+                    const priceChange = await calculatePriceChange(name, 1) || 0;
+                    
+                    cargoItems.push({
+                        name: name,
+                        count: count,
+                        icon: elementData.icon,
+                        rarity: elementData.rarity,
+                        size: elementData.size,
+                        marketPrice: marketPrice,
+                        priceChange: priceChange,
+                        totalValue: count * marketPrice
+                    });
+                }
+
+                // Update stats and UI
+                updateStats();
+                applyFilters();
+                updatePropertySelector();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loadingText.textContent = 'error loading cargo';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
         }
-        
+
         // ===== UPDATE STATS =====
         function updateStats() {
             const totalItems = cargoItems.reduce((sum, item) => sum + item.count, 0);
@@ -894,7 +958,7 @@
             document.getElementById('cargoCapacityDisplay').textContent = `Used: ${cargoUsed}/${cargoMax}`;
             document.getElementById('capacityBar').style.width = Math.min(100, (cargoUsed / cargoMax) * 100) + '%';
         }
-        
+
         // ===== UPDATE PROPERTY SELECTOR =====
         function updatePropertySelector() {
             const selector = document.getElementById('propertySelector');
@@ -922,7 +986,7 @@
             document.getElementById('propertyUsed').textContent = '0';
             document.getElementById('propertyCapacity').textContent = '0';
         }
-        
+
         // ===== PROPERTY SELECTION =====
         document.getElementById('propertySelect').addEventListener('change', function(e) {
             selectedPropertyId = e.target.value;
@@ -944,9 +1008,9 @@
                 transferBtn.disabled = true;
             }
         });
-        
+
         // ===== FILTER CARGO =====
-        function filterCargo(rarity) {
+        window.filterCargo = function(rarity) {
             // Update active filter button
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
@@ -957,20 +1021,20 @@
             applyFilters();
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== SEARCH CARGO =====
-        function searchCargo() {
+        window.searchCargo = function() {
             currentSearch = document.getElementById('searchInput').value.toLowerCase();
             applyFilters();
-        }
-        
+        };
+
         // ===== SORT CARGO =====
-        function sortCargo() {
+        window.sortCargo = function() {
             currentSort = document.getElementById('sortSelect').value;
             applyFilters();
-        }
-        
+        };
+
         // ===== APPLY FILTERS =====
         function applyFilters() {
             // Apply rarity filter
@@ -1017,7 +1081,7 @@
             filteredItems = filtered;
             renderCargo();
         }
-        
+
         // ===== RENDER CARGO =====
         function renderCargo() {
             const grid = document.getElementById('cargoGrid');
@@ -1061,14 +1125,13 @@
                 grid.appendChild(card);
             });
         }
-        
+
         // ===== MODAL FUNCTIONS =====
-        function showItemModal(itemName) {
+        window.showItemModal = async function(itemName) {
             const item = cargoItems.find(i => i.name === itemName);
             if (!item) return;
             
             currentItem = item;
-            transferMode = false;
             
             const changeClass = item.priceChange >= 0 ? 'price-up' : 'price-down';
             const changeSymbol = item.priceChange >= 0 ? '▲' : '▼';
@@ -1079,249 +1142,210 @@
             document.getElementById('modalPriceChange').textContent = `${changeSymbol} ${Math.abs(item.priceChange)}% (24h)`;
             document.getElementById('modalPriceChange').className = `modal-price-change ${changeClass}`;
             
-            document.getElementById('modalSellBtn').style.display = 'block';
-            document.getElementById('modalTransferBtn').style.display = properties.length > 0 ? 'block' : 'none';
+            // Show transfer button if properties exist
+            const transferBtn = document.getElementById('modalTransferBtn');
+            if (properties.length > 0) {
+                transferBtn.style.display = 'block';
+            } else {
+                transferBtn.style.display = 'none';
+            }
             
             modal.classList.add('active');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function showTransferFromModal() {
-            transferMode = true;
-            document.getElementById('propertySelector').style.display = 'block';
-            document.getElementById('modalSellBtn').style.display = 'none';
-            document.getElementById('modalTransferBtn').style.display = 'none';
-        }
-        
-        function closeModal() {
+        };
+
+        window.closeModal = function() {
             modal.classList.remove('active');
             document.getElementById('propertySelector').style.display = 'none';
             currentItem = null;
-            transferMode = false;
-        }
-        
-        function sellFromModal() {
+        };
+
+        window.sellFromModal = async function() {
             if (!currentItem) return;
-            sellItem(currentItem.name, 1);
+            await sellItem(currentItem.name, 1);
             closeModal();
-        }
-        
-        function transferSelectedItem() {
+        };
+
+        window.showTransferFromModal = function() {
+            document.getElementById('propertySelector').style.display = 'block';
+        };
+
+        window.transferSelectedItem = async function() {
             if (!currentItem || !selectedPropertyId) return;
             
-            const quantity = 1; // Default to 1 for now, could add quantity input later
-            
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'transferring...';
             
-            setTimeout(() => {
-                const result = transferToProperty(selectedPropertyId, currentItem.name, quantity);
+            try {
+                const quantity = 1;
+                const result = await transferToProperty(selectedPropertyId, currentItem.name, quantity);
                 
                 if (result.success) {
-                    // Remove from ship cargo
-                    const collection = getCollection();
-                    collection[currentItem.name].count -= quantity;
-                    if (collection[currentItem.name].count <= 0) {
-                        delete collection[currentItem.name];
-                    }
-                    saveCollection(collection);
-                    
-                    loadData();
-                    
+                    await loadData();
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
                     alert('Transfer failed: ' + (result.reason || 'unknown error'));
                 }
-                
-                loadingOverlay.classList.remove('active');
-                closeModal();
-            }, 300);
-        }
-        
-        // ===== SELL ITEM =====
-        function sellItem(itemName, quantity) {
-            let collection = getCollection();
-            let credits = getCredits();
+            } catch (error) {
+                console.error('Transfer error:', error);
+                alert('Error during transfer');
+            }
             
-            if (!collection[itemName] || collection[itemName].count < quantity) {
+            loadingOverlay.classList.remove('active');
+            closeModal();
+        };
+
+        // ===== SELL ITEM =====
+        async function sellItem(itemName, quantity) {
+            const item = cargoItems.find(i => i.name === itemName);
+            if (!item || item.count < quantity) {
                 alert('Not enough items to sell!');
                 return;
             }
             
-            const marketPrice = typeof getLatestPrice === 'function' ? 
-                (getLatestPrice(itemName) || 100) : 100;
-            const earnings = quantity * marketPrice;
-            
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selling...';
             
-            setTimeout(() => {
-                // Update collection
-                collection[itemName].count -= quantity;
-                if (collection[itemName].count <= 0) {
-                    delete collection[itemName];
+            try {
+                const result = await safeSellElement(itemName, quantity, item.marketPrice);
+                
+                if (result.success) {
+                    await recordTrade(itemName, quantity, item.marketPrice);
+                    await loadData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Sale failed: ' + (result.reason || 'unknown error'));
                 }
-                saveCollection(collection);
-                
-                // Update credits
-                credits += earnings;
-                saveCredits(credits);
-                
-                // Record trade for market dynamics
-                if (typeof recordTrade === 'function') {
-                    recordTrade(itemName, quantity, marketPrice);
-                }
-                
-                // Reload data
-                loadData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-            }, 300);
+            } catch (error) {
+                console.error('Sell error:', error);
+                alert('Error selling item');
+            }
+            
+            loadingOverlay.classList.remove('active');
         }
-        
+
         // ===== SELL ALL COMMON =====
-        function sellAllCommon() {
-            let collection = getCollection();
-            let credits = getCredits();
+        window.sellAllCommon = async function() {
+            const commonItems = cargoItems.filter(item => item.rarity === 'common');
             
-            let totalEarnings = 0;
-            let itemsSold = 0;
-            let soldItems = [];
-            
-            Object.keys(collection).forEach(name => {
-                const rarity = (elementDatabase[name]?.rarity) || 
-                    (typeof getElementRarity === 'function' ? getElementRarity(name) : 'common');
-                
-                if (rarity === 'common') {
-                    const marketPrice = typeof getLatestPrice === 'function' ? 
-                        (getLatestPrice(name) || 100) : 100;
-                    const quantity = collection[name].count;
-                    
-                    totalEarnings += quantity * marketPrice;
-                    itemsSold += quantity;
-                    soldItems.push({ name: name, quantity: quantity, price: marketPrice });
-                    
-                    delete collection[name];
-                }
-            });
-            
-            if (itemsSold === 0) {
+            if (commonItems.length === 0) {
                 alert('No common items to sell');
                 return;
             }
             
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selling commons...';
             
-            setTimeout(() => {
-                saveCollection(collection);
-                credits += totalEarnings;
-                saveCredits(credits);
+            try {
+                let totalEarnings = 0;
+                let itemsSold = 0;
                 
-                // Record trades
-                if (typeof recordTrade === 'function') {
-                    soldItems.forEach(item => {
-                        recordTrade(item.name, item.quantity, item.price);
-                    });
+                for (const item of commonItems) {
+                    if (item.count > 0) {
+                        const result = await safeSellElement(item.name, item.count, item.marketPrice);
+                        if (result.success) {
+                            totalEarnings += result.earnings;
+                            itemsSold += item.count;
+                            await recordTrade(item.name, item.count, item.marketPrice);
+                        }
+                    }
                 }
                 
-                loadData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-                
-                alert(`Sold ${itemsSold} common items for ${totalEarnings}⭐`);
-            }, 300);
-        }
-        
-        // ===== QUICK SELL =====
-        function quickSell() {
-            let collection = getCollection();
-            let credits = getCredits();
+                if (itemsSold > 0) {
+                    await loadData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`Sold ${itemsSold} common items for ${totalEarnings}⭐`);
+                }
+            } catch (error) {
+                console.error('Sell all common error:', error);
+                alert('Error selling common items');
+            }
             
+            loadingOverlay.classList.remove('active');
+        };
+
+        // ===== QUICK SELL =====
+        window.quickSell = async function() {
             const targetAmount = 500;
             let earned = 0;
             let soldItems = [];
             
-            // Flatten all elements
-            const allElements = [];
-            Object.keys(collection).forEach(name => {
-                const marketPrice = typeof getLatestPrice === 'function' ? 
-                    (getLatestPrice(name) || 100) : 100;
-                allElements.push({
-                    name: name,
-                    count: collection[name].count,
-                    price: marketPrice
-                });
-            });
+            // Sort by value (cheapest first)
+            const sortedItems = [...cargoItems].sort((a, b) => a.marketPrice - b.marketPrice);
             
-            if (allElements.length === 0) {
+            if (sortedItems.length === 0) {
                 alert('No items to sell');
                 return;
             }
             
-            // Sort by value (cheapest first)
-            allElements.sort((a, b) => a.price - b.price);
-            
-            for (let element of allElements) {
-                if (earned >= targetAmount) break;
-                
-                const maxNeeded = Math.ceil((targetAmount - earned) / element.price);
-                const sellQuantity = Math.min(maxNeeded, element.count);
-                
-                if (sellQuantity > 0) {
-                    earned += sellQuantity * element.price;
-                    soldItems.push({ name: element.name, quantity: sellQuantity, price: element.price });
-                }
-            }
-            
-            if (earned === 0) {
-                alert('Not enough items to quick sell');
-                return;
-            }
-            
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'quick selling...';
             
-            setTimeout(() => {
-                // Update collection
-                soldItems.forEach(sold => {
-                    collection[sold.name].count -= sold.quantity;
-                    if (collection[sold.name].count <= 0) {
-                        delete collection[sold.name];
+            try {
+                for (const item of sortedItems) {
+                    if (earned >= targetAmount) break;
+                    
+                    const maxNeeded = Math.ceil((targetAmount - earned) / item.marketPrice);
+                    const sellQuantity = Math.min(maxNeeded, item.count);
+                    
+                    if (sellQuantity > 0) {
+                        const result = await safeSellElement(item.name, sellQuantity, item.marketPrice);
+                        if (result.success) {
+                            earned += result.earnings;
+                            soldItems.push({ name: item.name, quantity: sellQuantity });
+                            await recordTrade(item.name, sellQuantity, item.marketPrice);
+                        }
                     }
-                    if (typeof recordTrade === 'function') {
-                        recordTrade(sold.name, sold.quantity, sold.price);
-                    }
-                });
+                }
                 
-                saveCollection(collection);
-                credits += earned;
-                saveCredits(credits);
-                
-                loadData();
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                loadingOverlay.classList.remove('active');
-                
-                alert(`Quick sold for ${earned}⭐`);
-            }, 300);
-        }
-        
+                if (earned > 0) {
+                    await loadData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`Quick sold for ${earned}⭐`);
+                } else {
+                    alert('Not enough items to quick sell');
+                }
+            } catch (error) {
+                console.error('Quick sell error:', error);
+                alert('Error during quick sell');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        };
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'accessing cargo hold...';
+
+                // Check for player data
+                const credits = await getCredits();
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load all data
+                await loadData();
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            // Update daily prices if needed
-            if (typeof updateDailyPrices === 'function') {
-                updateDailyPrices();
-            }
-            
-            loadData();
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
