@@ -1,8 +1,18 @@
-// tax-system.js - Progressive taxation system for Voidfarer
+// js/tax-system.js - Progressive taxation system for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
 // Handles all tax calculations, brackets, and rates
 
+import {
+    getItem,
+    setItem,
+    addTaxRecord as storageAddTaxRecord,
+    getTaxHistory,
+    getCommunityFund,
+    addToCommunityFund
+} from './storage.js';
+
 // ===== TAX TYPES =====
-const TAX_TYPES = {
+export const TAX_TYPES = {
     TRANSACTION: 'transaction',
     PROPERTY: 'property',
     INCOME: 'income',
@@ -13,7 +23,7 @@ const TAX_TYPES = {
 
 // ===== TAX RATES (Dynamic - adjusted by economic-adjuster.js) =====
 // These are base rates - actual rates may be modified by economic conditions
-let CURRENT_TAX_RATES = {
+export let CURRENT_TAX_RATES = {
     [TAX_TYPES.TRANSACTION]: 0.02,      // 2% default
     [TAX_TYPES.PROPERTY]: 0.005,        // 0.5% monthly
     [TAX_TYPES.INCOME]: 0.08,           // 8% on pool income
@@ -23,7 +33,7 @@ let CURRENT_TAX_RATES = {
 };
 
 // ===== TAX BRACKETS (Progressive) =====
-const TAX_BRACKETS = {
+export const TAX_BRACKETS = {
     [TAX_TYPES.INCOME]: [
         { threshold: 0, rate: 0.05 },        // 0-10k: 5%
         { threshold: 10000, rate: 0.08 },    // 10k-50k: 8%
@@ -39,7 +49,7 @@ const TAX_BRACKETS = {
     ]
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (for localStorage fallback) =====
 const TAX_STORAGE_KEYS = {
     CURRENT_RATES: 'voidfarer_tax_rates',
     TAX_HISTORY: 'voidfarer_tax_history',
@@ -49,8 +59,8 @@ const TAX_STORAGE_KEYS = {
 };
 
 // ===== INITIALIZE TAX SYSTEM =====
-function initializeTaxSystem() {
-    // Load saved rates or use defaults
+export async function initializeTaxSystem() {
+    // Load saved rates from localStorage or use defaults
     const savedRates = localStorage.getItem(TAX_STORAGE_KEYS.CURRENT_RATES);
     if (savedRates) {
         CURRENT_TAX_RATES = JSON.parse(savedRates);
@@ -58,31 +68,24 @@ function initializeTaxSystem() {
         saveCurrentRates();
     }
     
-    // Initialize tax history if needed
-    if (!localStorage.getItem(TAX_STORAGE_KEYS.TAX_HISTORY)) {
-        localStorage.setItem(TAX_STORAGE_KEYS.TAX_HISTORY, JSON.stringify([]));
+    // Initialize tax exemptions in localStorage
+    if (!localStorage.getItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS)) {
+        localStorage.setItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS, JSON.stringify({}));
     }
     
-    // Initialize community fund if needed
-    if (!localStorage.getItem(TAX_STORAGE_KEYS.COMMUNITY_FUND)) {
-        localStorage.setItem(TAX_STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify({
-            balance: 0,
-            contributions: [],
-            allocations: []
-        }));
-    }
+    console.log('Tax system initialized');
 }
 
 // ===== RATE MANAGEMENT =====
-function getCurrentRates() {
+export function getCurrentRates() {
     return { ...CURRENT_TAX_RATES };
 }
 
-function saveCurrentRates() {
+export function saveCurrentRates() {
     localStorage.setItem(TAX_STORAGE_KEYS.CURRENT_RATES, JSON.stringify(CURRENT_TAX_RATES));
 }
 
-function updateTaxRate(taxType, newRate) {
+export function updateTaxRate(taxType, newRate) {
     if (CURRENT_TAX_RATES.hasOwnProperty(taxType)) {
         CURRENT_TAX_RATES[taxType] = newRate;
         saveCurrentRates();
@@ -91,7 +94,7 @@ function updateTaxRate(taxType, newRate) {
     return false;
 }
 
-function adjustAllRates(adjustments) {
+export function adjustAllRates(adjustments) {
     Object.keys(adjustments).forEach(taxType => {
         if (CURRENT_TAX_RATES.hasOwnProperty(taxType)) {
             CURRENT_TAX_RATES[taxType] += adjustments[taxType];
@@ -114,27 +117,27 @@ function adjustAllRates(adjustments) {
 }
 
 // ===== TRANSACTION TAX =====
-function calculateTransactionTax(amount) {
+export function calculateTransactionTax(amount) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.TRANSACTION];
     return Math.floor(amount * rate);
 }
 
 // ===== PROPERTY TAX =====
-function calculatePropertyTax(propertyValue) {
+export function calculatePropertyTax(propertyValue) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.PROPERTY];
     return Math.floor(propertyValue * rate);
 }
 
-function calculateMonthlyPropertyTax(properties) {
+export async function calculateMonthlyPropertyTax(properties) {
     let totalTax = 0;
-    properties.forEach(prop => {
+    for (const prop of properties) {
         totalTax += calculatePropertyTax(prop.value || prop.cost || 0);
-    });
+    }
     return totalTax;
 }
 
 // ===== INCOME TAX (Progressive) =====
-function calculateIncomeTax(income) {
+export function calculateIncomeTax(income) {
     const brackets = TAX_BRACKETS[TAX_TYPES.INCOME];
     let tax = 0;
     let remainingIncome = income;
@@ -152,7 +155,7 @@ function calculateIncomeTax(income) {
 }
 
 // ===== LUXURY TAX (Wealth Tax) =====
-function calculateLuxuryTax(totalWealth) {
+export function calculateLuxuryTax(totalWealth) {
     const brackets = TAX_BRACKETS[TAX_TYPES.LUXURY];
     let tax = 0;
     
@@ -168,27 +171,27 @@ function calculateLuxuryTax(totalWealth) {
     return Math.floor(tax);
 }
 
-function calculateAnnualLuxuryTax(totalWealth) {
+export function calculateAnnualLuxuryTax(totalWealth) {
     return calculateLuxuryTax(totalWealth);
 }
 
-function calculateMonthlyLuxuryTax(totalWealth) {
+export function calculateMonthlyLuxuryTax(totalWealth) {
     return Math.floor(calculateLuxuryTax(totalWealth) / 12);
 }
 
 // ===== ESTATE TAX (Inheritance) =====
-function calculateEstateTax(transferAmount) {
+export function calculateEstateTax(transferAmount) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.ESTATE];
     return Math.floor(transferAmount * rate);
 }
 
 // ===== REGISTRATION FEE =====
-function getRegistrationFee() {
+export function getRegistrationFee() {
     return CURRENT_TAX_RATES[TAX_TYPES.REGISTRATION];
 }
 
-// ===== TAX EXEMPTIONS =====
-function getTaxExemptions(playerId) {
+// ===== TAX EXEMPTIONS (keep in localStorage) =====
+export function getTaxExemptions(playerId) {
     const exemptions = localStorage.getItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS);
     const allExemptions = exemptions ? JSON.parse(exemptions) : {};
     return allExemptions[playerId] || {
@@ -200,7 +203,7 @@ function getTaxExemptions(playerId) {
     };
 }
 
-function addTaxExemption(playerId, taxType, amount, reason) {
+export function addTaxExemption(playerId, taxType, amount, reason) {
     const exemptions = localStorage.getItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS);
     const allExemptions = exemptions ? JSON.parse(exemptions) : {};
     
@@ -223,47 +226,17 @@ function addTaxExemption(playerId, taxType, amount, reason) {
     localStorage.setItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS, JSON.stringify(allExemptions));
 }
 
-// ===== TAX HISTORY =====
-function getTaxHistory(playerId, limit = 100) {
-    const history = localStorage.getItem(TAX_STORAGE_KEYS.TAX_HISTORY);
-    const allHistory = history ? JSON.parse(history) : [];
-    
-    if (playerId) {
-        return allHistory.filter(entry => entry.playerId === playerId).slice(-limit);
-    }
-    return allHistory.slice(-limit);
+// ===== TAX HISTORY (now in IndexedDB via storage.js) =====
+export async function getTaxHistory(playerId, limit = 100) {
+    return await storageGetTaxHistory(playerId, limit);
 }
 
-function addTaxRecord(record) {
-    const history = localStorage.getItem(TAX_STORAGE_KEYS.TAX_HISTORY);
-    const allHistory = history ? JSON.parse(history) : [];
-    
-    const taxRecord = {
-        id: 'tax_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        playerId: record.playerId,
-        playerName: record.playerName,
-        taxType: record.taxType,
-        amount: record.amount,
-        rate: record.rate,
-        baseAmount: record.baseAmount,
-        description: record.description,
-        timestamp: Date.now(),
-        date: new Date().toISOString()
-    };
-    
-    allHistory.push(taxRecord);
-    
-    // Keep only last 10000 records
-    if (allHistory.length > 10000) {
-        allHistory.shift();
-    }
-    
-    localStorage.setItem(TAX_STORAGE_KEYS.TAX_HISTORY, JSON.stringify(allHistory));
-    return taxRecord;
+export async function addTaxRecord(record) {
+    return await storageAddTaxRecord(record);
 }
 
-function getPlayerTaxSummary(playerId, playerName, days = 30) {
-    const history = getTaxHistory(playerId);
+export async function getPlayerTaxSummary(playerId, playerName, days = 30) {
+    const history = await getTaxHistory(playerId);
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
     
     const recentHistory = history.filter(h => h.timestamp > cutoff);
@@ -291,7 +264,7 @@ function getPlayerTaxSummary(playerId, playerName, days = 30) {
 }
 
 // ===== TAX PAYMENT FUNCTION =====
-function payTax(playerId, playerName, taxType, baseAmount, description = '') {
+export async function payTax(playerId, playerName, taxType, baseAmount, description = '') {
     let taxAmount = 0;
     let rate = 0;
     
@@ -340,7 +313,7 @@ function payTax(playerId, playerName, taxType, baseAmount, description = '') {
     if (taxAmount <= 0) return { paid: 0, exempt: true };
     
     // Record the tax
-    const record = addTaxRecord({
+    const record = await addTaxRecord({
         playerId,
         playerName,
         taxType,
@@ -351,7 +324,7 @@ function payTax(playerId, playerName, taxType, baseAmount, description = '') {
     });
     
     // Add to community fund
-    addToCommunityFund(taxAmount, record.id);
+    await addToCommunityFund(taxAmount, record.id);
     
     return {
         paid: taxAmount,
@@ -361,70 +334,62 @@ function payTax(playerId, playerName, taxType, baseAmount, description = '') {
     };
 }
 
-// ===== COMMUNITY FUND =====
-function getCommunityFund() {
-    const data = localStorage.getItem(TAX_STORAGE_KEYS.COMMUNITY_FUND);
-    return data ? JSON.parse(data) : { balance: 0, contributions: [], allocations: [] };
+// ===== COMMUNITY FUND (now in IndexedDB via storage.js) =====
+export async function getCommunityFund() {
+    return await storageGetCommunityFund();
 }
 
-function saveCommunityFund(fund) {
-    localStorage.setItem(TAX_STORAGE_KEYS.COMMUNITY_FUND, JSON.stringify(fund));
+export async function addToCommunityFund(amount, taxRecordId) {
+    return await storageAddToCommunityFund(amount, taxRecordId);
 }
 
-function addToCommunityFund(amount, taxRecordId) {
-    const fund = getCommunityFund();
-    fund.balance += amount;
-    fund.contributions.push({
-        amount,
-        taxRecordId,
-        timestamp: Date.now()
-    });
-    saveCommunityFund(fund);
-}
-
-function allocateFromCommunityFund(amount, purpose, description) {
-    const fund = getCommunityFund();
-    if (fund.balance < amount) return false;
+export async function allocateFromCommunityFund(amount, purpose, description) {
+    const fund = await getCommunityFund();
+    if (!fund || fund.balance < amount) return false;
     
     fund.balance -= amount;
+    fund.allocations = fund.allocations || [];
     fund.allocations.push({
         amount,
         purpose,
         description,
         timestamp: Date.now()
     });
-    saveCommunityFund(fund);
+    
+    await setItem('communityFund', fund);
     return true;
 }
 
-function getCommunityFundSummary() {
-    const fund = getCommunityFund();
+export async function getCommunityFundSummary() {
+    const fund = await getCommunityFund();
+    if (!fund) return null;
+    
     const now = Date.now();
     const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
     
-    const recentContributions = fund.contributions.filter(c => c.timestamp > monthAgo);
-    const recentAllocations = fund.allocations.filter(a => a.timestamp > monthAgo);
+    const recentContributions = (fund.contributions || []).filter(c => c.timestamp > monthAgo);
+    const recentAllocations = (fund.allocations || []).filter(a => a.timestamp > monthAgo);
     
     return {
         balance: fund.balance,
-        totalContributions: fund.contributions.reduce((sum, c) => sum + c.amount, 0),
-        totalAllocations: fund.allocations.reduce((sum, a) => sum + a.amount, 0),
+        totalContributions: (fund.contributions || []).reduce((sum, c) => sum + c.amount, 0),
+        totalAllocations: (fund.allocations || []).reduce((sum, a) => sum + a.amount, 0),
         monthlyContributions: recentContributions.reduce((sum, c) => sum + c.amount, 0),
         monthlyAllocations: recentAllocations.reduce((sum, a) => sum + a.amount, 0),
-        contributionCount: fund.contributions.length,
-        allocationCount: fund.allocations.length
+        contributionCount: (fund.contributions || []).length,
+        allocationCount: (fund.allocations || []).length
     };
 }
 
 // ===== TAX RATE FORMATTING =====
-function formatTaxRate(rate, type) {
+export function formatTaxRate(rate, type) {
     if (type === TAX_TYPES.REGISTRATION) {
         return rate + '⭐';
     }
     return (rate * 100).toFixed(1) + '%';
 }
 
-function getTaxDescription(taxType) {
+export function getTaxDescription(taxType) {
     const descriptions = {
         [TAX_TYPES.TRANSACTION]: 'Transaction tax on sales',
         [TAX_TYPES.PROPERTY]: 'Monthly property tax',
@@ -437,36 +402,52 @@ function getTaxDescription(taxType) {
 }
 
 // ===== EXPORT =====
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        TAX_TYPES,
-        TAX_BRACKETS,
-        initializeTaxSystem,
-        getCurrentRates,
-        updateTaxRate,
-        adjustAllRates,
-        calculateTransactionTax,
-        calculatePropertyTax,
-        calculateMonthlyPropertyTax,
-        calculateIncomeTax,
-        calculateLuxuryTax,
-        calculateMonthlyLuxuryTax,
-        calculateAnnualLuxuryTax,
-        calculateEstateTax,
-        getRegistrationFee,
-        getTaxExemptions,
-        addTaxExemption,
-        getTaxHistory,
-        getPlayerTaxSummary,
-        payTax,
-        getCommunityFund,
-        addToCommunityFund,
-        allocateFromCommunityFund,
-        getCommunityFundSummary,
-        formatTaxRate,
-        getTaxDescription
-    };
+export default {
+    TAX_TYPES,
+    TAX_BRACKETS,
+    initializeTaxSystem,
+    getCurrentRates,
+    updateTaxRate,
+    adjustAllRates,
+    calculateTransactionTax,
+    calculatePropertyTax,
+    calculateMonthlyPropertyTax,
+    calculateIncomeTax,
+    calculateLuxuryTax,
+    calculateMonthlyLuxuryTax,
+    calculateAnnualLuxuryTax,
+    calculateEstateTax,
+    getRegistrationFee,
+    getTaxExemptions,
+    addTaxExemption,
+    getTaxHistory,
+    getPlayerTaxSummary,
+    payTax,
+    getCommunityFund,
+    addToCommunityFund,
+    allocateFromCommunityFund,
+    getCommunityFundSummary,
+    formatTaxRate,
+    getTaxDescription
+};
+
+// Helper imports for functions used above
+async function storageGetCommunityFund() {
+    return await getItem('communityFund', 'main');
 }
 
-// Initialize on load
-initializeTaxSystem();
+async function storageAddToCommunityFund(amount, taxRecordId) {
+    const fund = await storageGetCommunityFund();
+    if (!fund) return false;
+    
+    fund.balance += amount;
+    fund.contributions = fund.contributions || [];
+    fund.contributions.push({
+        amount,
+        taxRecordId,
+        timestamp: Date.now()
+    });
+    
+    await setItem('communityFund', fund);
+    return true;
+}
