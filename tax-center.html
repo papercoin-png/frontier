@@ -1,1 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Tax Center</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .tax-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'WindSong', cursive;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8ac0;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #4a8ac0;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .tax-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .tax-title {
+            font-family: 'WindSong', cursive;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #4a8ac0, 0 0 40px #2a5a8a;
+            margin-bottom: 5px;
+        }
+        
+        .tax-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Player Info Card */
+        .player-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .player-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4a8ac0, #6aa0e0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+        }
+        
+        .player-info {
+            flex: 1;
+        }
+        
+        .player-name {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'WindSong', cursive;
+            margin-bottom: 4px;
+        }
+        
+        .player-stats {
+            display: flex;
+            gap: 15px;
+            color: #a0c0ff;
+            font-size: 13px;
+        }
+        
+        .player-stat-value {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 10px 40px 10px;
+            padding: 16px 12px;
+            text-align: center;
+        }
+        
+        .summary-label {
+            color: #a0c0ff;
+            font-size: 12px;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'WindSong', cursive;
+        }
+        
+        .summary-unit {
+            color: #4a8ac0;
+            font-size: 12px;
+            margin-left: 2px;
+        }
+        
+        .summary-period {
+            color: #6a8ac0;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        /* Tax Breakdown */
+        .breakdown-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-family: 'WindSong', cursive;
+            border-bottom: 1px solid #4a8ac0;
+            padding-bottom: 8px;
+        }
+        
+        .tax-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(74, 138, 192, 0.3);
+        }
+        
+        .tax-item:last-child {
+            border-bottom: none;
+        }
+        
+        .tax-info {
+            flex: 1;
+        }
+        
+        .tax-name {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .tax-description {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .tax-amount {
+            text-align: right;
+        }
+        
+        .tax-amount-value {
+            color: #ffd966;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .tax-amount-period {
+            color: #6a8ac0;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        
+        /* Tax Chart */
+        .chart-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .chart-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .chart-period {
+            color: #ffd966;
+            font-size: 13px;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 180px;
+            position: relative;
+        }
+        
+        /* Tax Rates Card */
+        .rates-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .rates-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .rate-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .rate-label {
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .rate-value {
+            color: #ffd966;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .rate-bracket {
+            color: #6a8ac0;
+            font-size: 10px;
+            margin-top: 2px;
+        }
+        
+        /* Tax History */
+        .history-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .history-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(74, 138, 192, 0.2);
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-date {
+            color: #a0c0ff;
+            font-size: 12px;
+            min-width: 70px;
+        }
+        
+        .history-type {
+            color: #ffffff;
+            font-size: 13px;
+            flex: 1;
+            padding: 0 10px;
+        }
+        
+        .history-amount {
+            color: #ffd966;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .view-all-btn {
+            width: 100%;
+            background: rgba(74, 138, 192, 0.2);
+            border: 1px solid #4a8ac0;
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 15px;
+            transition: all 0.1s;
+        }
+        
+        .view-all-btn:active {
+            background: #4a8ac0;
+            transform: scale(0.98);
+        }
+        
+        /* Exemptions Section */
+        .exemptions-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .exemptions-title {
+            color: #4affaa;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .exemption-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(74, 255, 170, 0.2);
+        }
+        
+        .exemption-item:last-child {
+            border-bottom: none;
+        }
+        
+        .exemption-name {
+            color: #ffffff;
+        }
+        
+        .exemption-value {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 50, 80, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #9ac0ff;
+            color: #ffffff;
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Libre Baskerville', serif;
+            transition: all 0.1s;
+            width: fit-content;
+            box-shadow: 0 0 30px #3a5a8a;
+            z-index: 100;
+            margin-top: 10px;
+        }
+        
+        .back-button:active {
+            background: #6a8ac0;
+            transform: translateX(-50%) scale(0.96);
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="tax-view" id="taxView">
+            <!-- Header -->
+            <div class="tax-header">
+                <div class="tax-title">Tax Center</div>
+                <div class="tax-subtitle">✦ your contribution to the community ✦</div>
+            </div>
+            
+            <!-- Player Info Card -->
+            <div class="player-card" id="playerCard">
+                <div class="player-avatar" id="playerAvatar">👤</div>
+                <div class="player-info">
+                    <div class="player-name" id="playerName">Loading...</div>
+                    <div class="player-stats">
+                        <span>Paid: <span class="player-stat-value" id="totalPaid">0⭐</span></span>
+                        <span>Rate: <span class="player-stat-value" id="effectiveRate">0%</span></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">This Month</div>
+                    <div class="summary-value" id="monthlyTax">0</div>
+                    <div class="summary-unit">⭐</div>
+                    <div class="summary-period" id="monthlyChange"></div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-label">This Year</div>
+                    <div class="summary-value" id="yearlyTax">0</div>
+                    <div class="summary-unit">⭐</div>
+                    <div class="summary-period" id="yearlyChange"></div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-label">Lifetime</div>
+                    <div class="summary-value" id="lifetimeTax">0</div>
+                    <div class="summary-unit">⭐</div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-label">Next Due</div>
+                    <div class="summary-value" id="nextDue">-</div>
+                    <div class="summary-period" id="nextDueDate"></div>
+                </div>
+            </div>
+            
+            <!-- Tax Breakdown -->
+            <div class="breakdown-section">
+                <div class="section-title">Tax Breakdown</div>
+                <div id="taxBreakdown">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Tax History Chart -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <span class="chart-title">Tax History</span>
+                    <span class="chart-period" id="chartPeriod">Last 30 days</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="taxChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Current Tax Rates -->
+            <div class="rates-section">
+                <div class="section-title">Current Tax Rates</div>
+                <div class="rates-grid" id="taxRates">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Tax Exemptions -->
+            <div class="exemptions-section" id="exemptionsSection" style="display: none;">
+                <div class="exemptions-title">✨ Your Tax Exemptions</div>
+                <div id="exemptionsList">
+                    <!-- Filled by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Recent Tax History -->
+            <div class="history-section">
+                <div class="section-title">Recent Transactions</div>
+                <div class="history-list" id="historyList">
+                    <!-- Filled by JavaScript -->
+                </div>
+                <button class="view-all-btn" onclick="viewAllHistory()">VIEW ALL HISTORY</button>
+            </div>
+            
+            <!-- Back Button -->
+            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">updating...</div>
+            </div>
+        </div>
+    </div>
 
+    <script src="js/storage.js"></script>
+    <script src="js/tax-system.js"></script>
+    <script src="js/tax-collector.js"></script>
+    <script src="js/tax-history.js"></script>
+    
+    <script>
+        // Telegram Mini App
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+        
+        // Loading overlay
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // Chart instance
+        let taxChart = null;
+        
+        // Player ID (would come from login system)
+        const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'player_1';
+        const PLAYER_NAME = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+        
+        // Navigation
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+        
+        function viewAllHistory() {
+            alert('Full tax history would open here');
+        }
+        
+        // ===== LOAD TAX DATA =====
+        function loadTaxData() {
+            loadingOverlay.classList.add('active');
+            
+            setTimeout(() => {
+                // Get player data
+                document.getElementById('playerName').textContent = PLAYER_NAME;
+                
+                // Get tax summary
+                const summary = getPlayerTaxSummary(PLAYER_ID, PLAYER_NAME);
+                const history = getPlayerTransactions(PLAYER_ID, 50);
+                const rates = getCurrentRates();
+                const exemptions = getTaxExemptions(PLAYER_ID);
+                
+                // Calculate totals
+                const now = Date.now();
+                const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
+                const yearAgo = now - (365 * 24 * 60 * 60 * 1000);
+                
+                const monthlyTransactions = history.filter(t => t.timestamp > monthAgo);
+                const yearlyTransactions = history.filter(t => t.timestamp > yearAgo);
+                
+                const monthlyTotal = monthlyTransactions.reduce((sum, t) => sum + t.amount, 0);
+                const yearlyTotal = yearlyTransactions.reduce((sum, t) => sum + t.amount, 0);
+                const lifetimeTotal = summary?.totalPaid || 0;
+                
+                // Calculate effective rate
+                const totalIncome = estimatePlayerIncome(); // Placeholder
+                const effectiveRate = totalIncome > 0 ? (lifetimeTotal / totalIncome) * 100 : 0;
+                
+                // Update summary cards
+                document.getElementById('monthlyTax').textContent = formatMoney(monthlyTotal);
+                document.getElementById('yearlyTax').textContent = formatMoney(yearlyTotal);
+                document.getElementById('lifetimeTax').textContent = formatMoney(lifetimeTotal);
+                document.getElementById('totalPaid').textContent = formatMoney(lifetimeTotal);
+                document.getElementById('effectiveRate').textContent = effectiveRate.toFixed(1) + '%';
+                
+                // Update monthly change (simulated)
+                const lastMonth = monthlyTotal * 0.85; // Placeholder
+                const monthlyChange = ((monthlyTotal - lastMonth) / lastMonth) * 100;
+                document.getElementById('monthlyChange').textContent = 
+                    (monthlyChange > 0 ? '+' : '') + monthlyChange.toFixed(1) + '% vs last month';
+                document.getElementById('monthlyChange').className = 
+                    monthlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
+                
+                // Update yearly change (simulated)
+                const lastYear = yearlyTotal * 0.9; // Placeholder
+                const yearlyChange = ((yearlyTotal - lastYear) / lastYear) * 100;
+                document.getElementById('yearlyChange').textContent = 
+                    (yearlyChange > 0 ? '+' : '') + yearlyChange.toFixed(1) + '% vs last year';
+                document.getElementById('yearlyChange').className = 
+                    yearlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
+                
+                // Next due date (simulated)
+                const nextDate = new Date();
+                nextDate.setDate(nextDate.getDate() + 15);
+                document.getElementById('nextDue').textContent = 'Property Tax';
+                document.getElementById('nextDueDate').textContent = nextDate.toLocaleDateString();
+                
+                // Update tax breakdown
+                updateTaxBreakdown(summary?.byType || {});
+                
+                // Update tax rates
+                updateTaxRates(rates);
+                
+                // Update exemptions
+                updateExemptions(exemptions);
+                
+                // Update history
+                updateHistoryList(history.slice(0, 10));
+                
+                // Update chart
+                updateTaxChart(history);
+                
+                loadingOverlay.classList.remove('active');
+            }, 500);
+        }
+        
+        // ===== UPDATE TAX BREAKDOWN =====
+        function updateTaxBreakdown(byType) {
+            const container = document.getElementById('taxBreakdown');
+            container.innerHTML = '';
+            
+            const taxTypes = [
+                { key: 'transaction', name: 'Transaction Tax', desc: 'On all sales' },
+                { key: 'property', name: 'Property Tax', desc: 'Monthly on owned property' },
+                { key: 'income', name: 'Income Tax', desc: 'On professional earnings' },
+                { key: 'luxury', name: 'Luxury Tax', desc: 'On high net worth' },
+                { key: 'estate', name: 'Estate Tax', desc: 'On transfers' },
+                { key: 'registration', name: 'Registration', desc: 'One-time fees' }
+            ];
+            
+            let hasAny = false;
+            
+            taxTypes.forEach(type => {
+                const amount = byType[type.key] || 0;
+                if (amount > 0) hasAny = true;
+                
+                const item = document.createElement('div');
+                item.className = 'tax-item';
+                item.innerHTML = `
+                    <div class="tax-info">
+                        <div class="tax-name">${type.name}</div>
+                        <div class="tax-description">${type.desc}</div>
+                    </div>
+                    <div class="tax-amount">
+                        <div class="tax-amount-value">${formatMoney(amount)}</div>
+                        <div class="tax-amount-period">lifetime</div>
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+            
+            if (!hasAny) {
+                container.innerHTML = `
+                    <div style="color: #a0c0ff; text-align: center; padding: 20px;">
+                        No taxes paid yet
+                    </div>
+                `;
+            }
+        }
+        
+        // ===== UPDATE TAX RATES =====
+        function updateTaxRates(rates) {
+            const container = document.getElementById('taxRates');
+            container.innerHTML = '';
+            
+            const rateItems = [
+                { key: 'transaction', name: 'Transaction', rate: rates.transaction, bracket: 'on all sales' },
+                { key: 'property', name: 'Property', rate: rates.property, bracket: 'monthly' },
+                { key: 'income', name: 'Income', rate: rates.income, bracket: 'progressive' },
+                { key: 'luxury', name: 'Luxury', rate: rates.luxury, bracket: 'wealth >1M' },
+                { key: 'estate', name: 'Estate', rate: rates.estate, bracket: 'on transfers' },
+                { key: 'registration', name: 'Registration', rate: rates.registration, bracket: 'one-time' }
+            ];
+            
+            rateItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'rate-item';
+                
+                let rateDisplay = item.key === 'registration' ? 
+                    item.rate + '⭐' : 
+                    (item.rate * 100).toFixed(1) + '%';
+                
+                div.innerHTML = `
+                    <div class="rate-label">${item.name}</div>
+                    <div class="rate-value">${rateDisplay}</div>
+                    <div class="rate-bracket">${item.bracket}</div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // ===== UPDATE EXEMPTIONS =====
+        function updateExemptions(exemptions) {
+            const section = document.getElementById('exemptionsSection');
+            const list = document.getElementById('exemptionsList');
+            
+            let hasExemptions = false;
+            list.innerHTML = '';
+            
+            if (exemptions.transaction > 0) {
+                hasExemptions = true;
+                const item = document.createElement('div');
+                item.className = 'exemption-item';
+                item.innerHTML = `
+                    <span class="exemption-name">Transaction Tax Exemption</span>
+                    <span class="exemption-value">${formatMoney(exemptions.transaction)} remaining</span>
+                `;
+                list.appendChild(item);
+            }
+            
+            if (exemptions.property > 0) {
+                hasExemptions = true;
+                const item = document.createElement('div');
+                item.className = 'exemption-item';
+                item.innerHTML = `
+                    <span class="exemption-name">Property Tax Exemption</span>
+                    <span class="exemption-value">${formatMoney(exemptions.property)} remaining</span>
+                `;
+                list.appendChild(item);
+            }
+            
+            if (exemptions.income > 0) {
+                hasExemptions = true;
+                const item = document.createElement('div');
+                item.className = 'exemption-item';
+                item.innerHTML = `
+                    <span class="exemption-name">Income Tax Exemption</span>
+                    <span class="exemption-value">${formatMoney(exemptions.income)} remaining</span>
+                `;
+                list.appendChild(item);
+            }
+            
+            if (exemptions.luxury) {
+                hasExemptions = true;
+                const item = document.createElement('div');
+                item.className = 'exemption-item';
+                item.innerHTML = `
+                    <span class="exemption-name">Luxury Tax Exemption</span>
+                    <span class="exemption-value">Active</span>
+                `;
+                list.appendChild(item);
+            }
+            
+            if (hasExemptions) {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+        
+        // ===== UPDATE HISTORY LIST =====
+        function updateHistoryList(history) {
+            const container = document.getElementById('historyList');
+            container.innerHTML = '';
+            
+            if (history.length === 0) {
+                container.innerHTML = `
+                    <div style="color: #a0c0ff; text-align: center; padding: 20px;">
+                        No tax transactions yet
+                    </div>
+                `;
+                return;
+            }
+            
+            history.forEach(tx => {
+                const date = new Date(tx.timestamp);
+                const formattedDate = date.toLocaleDateString();
+                
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = `
+                    <span class="history-date">${formattedDate}</span>
+                    <span class="history-type">${getTaxTypeName(tx.taxType)}</span>
+                    <span class="history-amount">${formatMoney(tx.amount)}</span>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+        
+        // ===== UPDATE TAX CHART =====
+        function updateTaxChart(history) {
+            const ctx = document.getElementById('taxChart').getContext('2d');
+            
+            // Group by day for last 30 days
+            const now = Date.now();
+            const dayMs = 24 * 60 * 60 * 1000;
+            const labels = [];
+            const data = [];
+            
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(now - (i * dayMs));
+                labels.push(`${date.getMonth()+1}/${date.getDate()}`);
+                
+                const dayStart = now - (i * dayMs);
+                const dayEnd = dayStart + dayMs;
+                
+                const dayTotal = history
+                    .filter(tx => tx.timestamp >= dayStart && tx.timestamp < dayEnd)
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+                
+                data.push(dayTotal);
+            }
+            
+            if (taxChart) {
+                taxChart.destroy();
+            }
+            
+            taxChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Taxes Paid (⭐)',
+                        data: data,
+                        backgroundColor: '#4a8ac0',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0a1a2a',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0c0ff',
+                            borderColor: '#4a8ac0',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Paid: ${formatMoney(context.raw)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(74, 138, 192, 0.1)' },
+                            ticks: { 
+                                color: '#a0c0ff',
+                                callback: function(value) {
+                                    return formatMoney(value);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#a0c0ff', maxRotation: 45 }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // ===== HELPER FUNCTIONS =====
+        function getTaxTypeName(type) {
+            const names = {
+                'transaction': 'Transaction',
+                'property': 'Property',
+                'income': 'Income',
+                'luxury': 'Luxury',
+                'estate': 'Estate',
+                'registration': 'Registration'
+            };
+            return names[type] || type;
+        }
+        
+        function formatMoney(amount) {
+            if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B';
+            if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M';
+            if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K';
+            return amount.toString();
+        }
+        
+        function estimatePlayerIncome() {
+            // Placeholder - in real implementation, would calculate from player data
+            return 50000;
+        }
+        
+        // ===== INITIALIZE =====
+        function init() {
+            const player = localStorage.getItem('voidfarer_player');
+            if (!player) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Store player info
+            const playerData = JSON.parse(player);
+            localStorage.setItem('voidfarer_player_id', 'player_1');
+            localStorage.setItem('voidfarer_player_name', playerData.name || 'Voidfarer');
+            
+            loadTaxData();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
