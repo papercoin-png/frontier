@@ -6,6 +6,8 @@
     <title>Voidfarer - Starlight Settings</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -63,6 +65,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -71,12 +75,26 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
             font-family: 'WindSong', cursive;
             font-size: 24px;
-            text-shadow: 0 0 30px #4a8a9a;
+            text-shadow: 0 0 30px #4a8ac0;
             animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         @keyframes pulse {
@@ -414,6 +432,20 @@
             color: #ffd700;
             font-size: 12px;
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -425,7 +457,7 @@
                 <div class="settings-subtitle">✦ tune your journey ✦</div>
             </div>
             
-            <!-- Universe Info Card - NEW -->
+            <!-- Universe Info Card -->
             <div class="universe-card">
                 <div class="universe-header">
                     <span class="universe-icon">🌌</span>
@@ -547,16 +579,14 @@
                         <span class="setting-name">Save Data</span>
                     </div>
                     <div class="data-stats" id="saveStats">
-                        <span>Elements: 0/118</span>
-                        <span>Credits: 0⭐</span>
+                        <span>Loading...</span>
                     </div>
                     <div class="data-stats" id="explorationStats" style="margin-top: 5px;">
-                        <span>Sectors: 0</span>
-                        <span>Colonies: 0</span>
+                        <span>Loading...</span>
                     </div>
                 </div>
                 
-                <!-- Export/Import Buttons - NEW -->
+                <!-- Export/Import Buttons -->
                 <button class="data-button" onclick="exportSave()">
                     <span class="data-icon">📤</span>
                     <span>Export Save Data</span>
@@ -581,13 +611,41 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">saving...</div>
+                <div class="loading-text" id="loadingText">saving...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script>
-        // Telegram Mini App
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getPlayer,
+            getCollection,
+            getCredits,
+            getColonies,
+            exportGameData,
+            importGameData,
+            resetGame,
+            getHapticsEnabled,
+            setHapticsEnabled,
+            getAutoGatherEnabled,
+            setAutoGatherEnabled,
+            getOrbitSpeed,
+            setOrbitSpeed,
+            getMusicVolume,
+            setMusicVolume,
+            getAmbientVolume,
+            setAmbientVolume
+        } from './js/storage.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -595,30 +653,23 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // ===== CONSTANTS =====
-        const UNIVERSE_SEED = 42793;
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Navigation
-        function goBack() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'ship-bridge.html';
-        }
-        
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
         // ===== SLIDER HANDLING =====
         let activeSlider = null;
         let isDragging = false;
-        
-        function startDrag(slider) {
+
+        window.startDrag = function(slider) {
             activeSlider = slider;
             isDragging = true;
             event.preventDefault();
-        }
-        
-        function setMusicSlider(event) {
+        };
+
+        window.setMusicSlider = function(event) {
             const track = document.getElementById('musicTrack');
             const rect = track.getBoundingClientRect();
             let x = event.clientX - rect.left;
@@ -627,12 +678,12 @@
             
             document.getElementById('musicFill').style.width = percent + '%';
             document.getElementById('musicValue').textContent = percent + '%';
-            localStorage.setItem('voidfarer_music', percent.toString());
+            setMusicVolume(percent);
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function setAmbientSlider(event) {
+        };
+
+        window.setAmbientSlider = function(event) {
             const track = document.getElementById('ambientTrack');
             const rect = track.getBoundingClientRect();
             let x = event.clientX - rect.left;
@@ -641,11 +692,11 @@
             
             document.getElementById('ambientFill').style.width = percent + '%';
             document.getElementById('ambientValue').textContent = percent + '%';
-            localStorage.setItem('voidfarer_ambient', percent.toString());
+            setAmbientVolume(percent);
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // Global mouse/touch handlers
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || !activeSlider) return;
@@ -659,6 +710,7 @@
                 
                 document.getElementById('musicFill').style.width = percent + '%';
                 document.getElementById('musicValue').textContent = percent + '%';
+                setMusicVolume(percent);
             } else if (activeSlider === 'ambient') {
                 const track = document.getElementById('ambientTrack');
                 const rect = track.getBoundingClientRect();
@@ -668,9 +720,10 @@
                 
                 document.getElementById('ambientFill').style.width = percent + '%';
                 document.getElementById('ambientValue').textContent = percent + '%';
+                setAmbientVolume(percent);
             }
         });
-        
+
         document.addEventListener('mouseup', () => {
             if (isDragging && activeSlider && tg?.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('medium');
@@ -678,7 +731,7 @@
             isDragging = false;
             activeSlider = null;
         });
-        
+
         document.addEventListener('touchmove', (e) => {
             if (!isDragging || !activeSlider) return;
             e.preventDefault();
@@ -694,6 +747,7 @@
                 
                 document.getElementById('musicFill').style.width = percent + '%';
                 document.getElementById('musicValue').textContent = percent + '%';
+                setMusicVolume(percent);
             } else if (activeSlider === 'ambient') {
                 const track = document.getElementById('ambientTrack');
                 const rect = track.getBoundingClientRect();
@@ -703,9 +757,10 @@
                 
                 document.getElementById('ambientFill').style.width = percent + '%';
                 document.getElementById('ambientValue').textContent = percent + '%';
+                setAmbientVolume(percent);
             }
         });
-        
+
         document.addEventListener('touchend', () => {
             if (isDragging && activeSlider && tg?.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('medium');
@@ -713,9 +768,9 @@
             isDragging = false;
             activeSlider = null;
         });
-        
+
         // ===== TOGGLE HANDLERS =====
-        function setHaptic(on) {
+        window.setHaptic = async function(on) {
             const options = document.querySelectorAll('.toggle-container')[0].children;
             options[0].classList.remove('active');
             options[1].classList.remove('active');
@@ -723,17 +778,17 @@
             if (on) {
                 options[0].classList.add('active');
                 document.getElementById('hapticValue').textContent = 'On';
-                localStorage.setItem('voidfarer_haptics', 'true');
+                await setHapticsEnabled(true);
             } else {
                 options[1].classList.add('active');
                 document.getElementById('hapticValue').textContent = 'Off';
-                localStorage.setItem('voidfarer_haptics', 'false');
+                await setHapticsEnabled(false);
             }
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function setAutoGather(on) {
+        };
+
+        window.setAutoGather = async function(on) {
             const options = document.querySelectorAll('.toggle-container')[1].children;
             options[0].classList.remove('active');
             options[1].classList.remove('active');
@@ -741,17 +796,17 @@
             if (on) {
                 options[0].classList.add('active');
                 document.getElementById('gatherValue').textContent = 'On';
-                localStorage.setItem('voidfarer_auto_gather', 'true');
+                await setAutoGatherEnabled(true);
             } else {
                 options[1].classList.add('active');
                 document.getElementById('gatherValue').textContent = 'Off';
-                localStorage.setItem('voidfarer_auto_gather', 'false');
+                await setAutoGatherEnabled(false);
             }
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
-        function setMotion(speed) {
+        };
+
+        window.setMotion = async function(speed) {
             const options = document.querySelectorAll('.toggle-container')[2].children;
             for (let opt of options) {
                 opt.classList.remove('active');
@@ -770,180 +825,261 @@
             }
             
             document.getElementById('motionValue').textContent = value;
-            localStorage.setItem('voidfarer_orbit_speed', speed);
+            await setOrbitSpeed(speed);
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== DATA MANAGEMENT =====
-        function loadSaveStats() {
-            const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-            const elementCount = Object.keys(collection).length;
-            const credits = localStorage.getItem('voidfarer_credits') || '12450';
-            
-            // Calculate exploration stats
-            const sectors = new Set();
-            const colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
-            
-            Object.values(collection).forEach(item => {
-                if (item.location?.sector) sectors.add(item.location.sector);
-            });
-            
-            document.getElementById('saveStats').innerHTML = `
-                <span>Elements: ${elementCount}/118</span>
-                <span>Credits: ${Number(credits).toLocaleString()}⭐</span>
-            `;
-            
-            document.getElementById('explorationStats').innerHTML = `
-                <span>Sectors: ${sectors.size}/12</span>
-                <span>Colonies: ${colonies.length}</span>
-            `;
+        async function loadSaveStats() {
+            try {
+                const [collection, credits, colonies, player] = await Promise.all([
+                    getCollection(),
+                    getCredits(),
+                    getColonies(),
+                    getPlayer()
+                ]);
+
+                const elementCount = Object.keys(collection || {}).length;
+                
+                document.getElementById('saveStats').innerHTML = `
+                    <span>Elements: ${elementCount}/118</span>
+                    <span>Credits: ${(credits || 0).toLocaleString()}⭐</span>
+                `;
+                
+                document.getElementById('explorationStats').innerHTML = `
+                    <span>Colonies: ${(colonies || []).length}</span>
+                    <span>Ship: ${player?.ship || 'Prospector'}</span>
+                `;
+            } catch (error) {
+                console.error('Error loading save stats:', error);
+                document.getElementById('saveStats').innerHTML = '<span>Error loading stats</span>';
+                document.getElementById('explorationStats').innerHTML = '<span>Please refresh</span>';
+            }
         }
-        
+
         // Export save data
-        function exportSave() {
-            const saveData = {
-                player: JSON.parse(localStorage.getItem('voidfarer_player')),
-                collection: JSON.parse(localStorage.getItem('voidfarer_collection')),
-                missions: JSON.parse(localStorage.getItem('voidfarer_missions')),
-                credits: localStorage.getItem('voidfarer_credits'),
-                colonies: JSON.parse(localStorage.getItem('voidfarer_colonies')),
-                discovered: JSON.parse(localStorage.getItem('voidfarer_discovered_locations')),
-                seed: UNIVERSE_SEED,
-                exportDate: new Date().toISOString()
-            };
+        window.exportSave = async function() {
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'exporting data...';
             
-            const dataStr = JSON.stringify(saveData, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
+            try {
+                const saveData = await exportGameData();
+                
+                const blob = new Blob([saveData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `voidfarer-save-${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                alert('Save data exported!');
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Failed to export save data');
+            }
             
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `voidfarer-save-${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            alert('Save data exported!');
-        }
-        
+            loadingOverlay.classList.remove('active');
+        };
+
         // Import save data
-        function importSave() {
+        window.importSave = function() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
             
-            input.onchange = function(e) {
+            input.onchange = async function(e) {
                 const file = e.target.files[0];
                 const reader = new FileReader();
                 
-                reader.onload = function(e) {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'importing data...';
+                
+                reader.onload = async function(e) {
                     try {
-                        const saveData = JSON.parse(e.target.result);
+                        const success = await importGameData(e.target.result);
                         
-                        if (saveData.seed !== UNIVERSE_SEED) {
-                            if (!confirm('Warning: This save is from a different universe seed. Importing may cause inconsistencies. Continue?')) {
-                                return;
-                            }
+                        if (success) {
+                            alert('Save data imported successfully!');
+                            await loadSaveStats();
+                            await loadSettings();
+                            
+                            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
+                        } else {
+                            alert('Invalid save file');
                         }
-                        
-                        // Restore data
-                        if (saveData.player) localStorage.setItem('voidfarer_player', JSON.stringify(saveData.player));
-                        if (saveData.collection) localStorage.setItem('voidfarer_collection', JSON.stringify(saveData.collection));
-                        if (saveData.missions) localStorage.setItem('voidfarer_missions', JSON.stringify(saveData.missions));
-                        if (saveData.credits) localStorage.setItem('voidfarer_credits', saveData.credits);
-                        if (saveData.colonies) localStorage.setItem('voidfarer_colonies', JSON.stringify(saveData.colonies));
-                        if (saveData.discovered) localStorage.setItem('voidfarer_discovered_locations', JSON.stringify(saveData.discovered));
-                        
-                        alert('Save data imported successfully!');
-                        loadSaveStats();
-                        
-                        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
                     } catch (error) {
-                        alert('Invalid save file');
+                        console.error('Import error:', error);
+                        alert('Failed to import save data');
                     }
+                    
+                    loadingOverlay.classList.remove('active');
                 };
                 
                 reader.readAsText(file);
             };
             
             input.click();
-        }
-        
+        };
+
         // ===== RESET PROGRESS =====
-        function resetProgress() {
+        window.resetProgress = async function() {
             if (confirm('⚠️ WARNING ⚠️\n\nThis will erase ALL your progress:\n• Element collection\n• Credits\n• Missions\n• Colonies\n• Ship upgrades\n\nThis cannot be undone. Continue?')) {
                 
                 if (confirm('Are you absolutely sure? All your discoveries will be lost forever.')) {
                     
                     loadingOverlay.classList.add('active');
+                    loadingText.textContent = 'resetting universe...';
                     
-                    setTimeout(() => {
-                        // Clear all game data but keep settings
-                        const settings = {
-                            haptics: localStorage.getItem('voidfarer_haptics'),
-                            autoGather: localStorage.getItem('voidfarer_auto_gather'),
-                            orbitSpeed: localStorage.getItem('voidfarer_orbit_speed'),
-                            music: localStorage.getItem('voidfarer_music'),
-                            ambient: localStorage.getItem('voidfarer_ambient')
-                        };
+                    try {
+                        await resetGame();
                         
-                        localStorage.clear();
-                        
-                        // Restore settings
-                        localStorage.setItem('voidfarer_haptics', settings.haptics || 'true');
-                        localStorage.setItem('voidfarer_auto_gather', settings.autoGather || 'true');
-                        localStorage.setItem('voidfarer_orbit_speed', settings.orbitSpeed || 'gentle');
-                        localStorage.setItem('voidfarer_music', settings.music || '50');
-                        localStorage.setItem('voidfarer_ambient', settings.ambient || '50');
-                        
-                        // Reset to main menu
-                        window.location.href = 'index.html';
-                    }, 1500);
+                        setTimeout(() => {
+                            window.location.href = 'index.html';
+                        }, 1500);
+                    } catch (error) {
+                        console.error('Reset error:', error);
+                        loadingOverlay.classList.remove('active');
+                        alert('Failed to reset game');
+                    }
                 }
             }
+        };
+
+        // ===== LOAD SETTINGS =====
+        async function loadSettings() {
+            try {
+                // Display universe seed
+                document.getElementById('universeSeed').textContent = UNIVERSE_SEED;
+                
+                // Load audio settings
+                const music = await getMusicVolume() || 50;
+                document.getElementById('musicFill').style.width = music + '%';
+                document.getElementById('musicValue').textContent = music + '%';
+                
+                const ambient = await getAmbientVolume() || 50;
+                document.getElementById('ambientFill').style.width = ambient + '%';
+                document.getElementById('ambientValue').textContent = ambient + '%';
+                
+                // Load haptics
+                const haptics = await getHapticsEnabled() !== false;
+                setHapticDisplay(haptics);
+                
+                // Load auto gather
+                const autoGather = await getAutoGatherEnabled() !== false;
+                setAutoGatherDisplay(autoGather);
+                
+                // Load orbit speed
+                const orbitSpeed = await getOrbitSpeed() || 'gentle';
+                setMotionDisplay(orbitSpeed);
+                
+                // Load save stats
+                await loadSaveStats();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
         }
-        
-        // ===== LOAD SAVED SETTINGS =====
-        function loadSettings() {
-            // Display universe seed
-            document.getElementById('universeSeed').textContent = UNIVERSE_SEED;
+
+        function setHapticDisplay(on) {
+            const options = document.querySelectorAll('.toggle-container')[0].children;
+            options[0].classList.remove('active');
+            options[1].classList.remove('active');
             
-            // Load audio settings
-            const music = parseInt(localStorage.getItem('voidfarer_music')) || 50;
-            document.getElementById('musicFill').style.width = music + '%';
-            document.getElementById('musicValue').textContent = music + '%';
-            
-            const ambient = parseInt(localStorage.getItem('voidfarer_ambient')) || 50;
-            document.getElementById('ambientFill').style.width = ambient + '%';
-            document.getElementById('ambientValue').textContent = ambient + '%';
-            
-            // Load haptics
-            const haptics = localStorage.getItem('voidfarer_haptics') !== 'false';
-            setHaptic(haptics);
-            
-            // Load auto gather
-            const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
-            setAutoGather(autoGather);
-            
-            // Load orbit speed
-            const orbitSpeed = localStorage.getItem('voidfarer_orbit_speed') || 'gentle';
-            setMotion(orbitSpeed);
-            
-            // Load save stats
-            loadSaveStats();
+            if (on) {
+                options[0].classList.add('active');
+                document.getElementById('hapticValue').textContent = 'On';
+            } else {
+                options[1].classList.add('active');
+                document.getElementById('hapticValue').textContent = 'Off';
+            }
         }
-        
-        // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+
+        function setAutoGatherDisplay(on) {
+            const options = document.querySelectorAll('.toggle-container')[1].children;
+            options[0].classList.remove('active');
+            options[1].classList.remove('active');
+            
+            if (on) {
+                options[0].classList.add('active');
+                document.getElementById('gatherValue').textContent = 'On';
+            } else {
+                options[1].classList.add('active');
+                document.getElementById('gatherValue').textContent = 'Off';
+            }
+        }
+
+        function setMotionDisplay(speed) {
+            const options = document.querySelectorAll('.toggle-container')[2].children;
+            for (let opt of options) {
+                opt.classList.remove('active');
             }
             
-            loadSettings();
+            let value = 'Gentle';
+            if (speed === 'gentle') {
+                options[0].classList.add('active');
+                value = 'Gentle';
+            } else if (speed === 'medium') {
+                options[1].classList.add('active');
+                value = 'Medium';
+            } else if (speed === 'real') {
+                options[2].classList.add('active');
+                value = 'Real';
+            }
+            
+            document.getElementById('motionValue').textContent = value;
         }
-        
+
+        // ===== NAVIGATION =====
+        window.goBack = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        };
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading settings...';
+
+                // Check for player data
+                const player = await getPlayer();
+                if (!player) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load settings
+                await loadSettings();
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
         init();
     </script>
 </body>
