@@ -1,7 +1,18 @@
-// missions.js - Active mission tracking for Voidfarer
+// js/missions.js - Active mission tracking for Voidfarer
+// Now using IndexedDB via storage.js for unlimited storage
+
+import {
+    getItem,
+    setItem,
+    getAll,
+    deleteItem,
+    getCollection,
+    addCredits,
+    getCredits
+} from './storage.js';
 
 // ===== DEFAULT MISSIONS =====
-const DEFAULT_MISSIONS = [
+export const DEFAULT_MISSIONS = [
     { 
         id: 'mission-gold-1',
         element: 'Gold', 
@@ -44,7 +55,7 @@ const DEFAULT_MISSIONS = [
 ];
 
 // ===== AVAILABLE MISSIONS =====
-const AVAILABLE_MISSIONS = [
+export const AVAILABLE_MISSIONS = [
     {
         id: 'mission-carbon-1',
         element: 'Carbon',
@@ -157,46 +168,73 @@ const AVAILABLE_MISSIONS = [
     }
 ];
 
+// ===== STORAGE KEYS (for IndexedDB stores) =====
+const MISSION_STORES = {
+    ACTIVE: 'missions',
+    COMPLETED: 'completedMissions'
+};
+
 // ===== MISSION HELPER FUNCTIONS =====
 
-// Get active missions from localStorage or set defaults
-function getActiveMissions() {
-    const missions = localStorage.getItem('voidfarer_missions');
-    if (missions) {
-        return JSON.parse(missions);
-    } else {
+// Get active missions from IndexedDB or set defaults
+export async function getActiveMissions() {
+    const missions = await getAll(MISSION_STORES.ACTIVE);
+    
+    if (missions.length === 0) {
         // Initialize with default missions
         const defaults = DEFAULT_MISSIONS.map(m => ({
             ...m,
             dateAssigned: new Date().toISOString()
         }));
-        localStorage.setItem('voidfarer_missions', JSON.stringify(defaults));
+        
+        for (const mission of defaults) {
+            await setItem(MISSION_STORES.ACTIVE, mission);
+        }
+        
         return defaults;
     }
+    
+    return missions.sort((a, b) => a.dateAssigned.localeCompare(b.dateAssigned));
 }
 
 // Save active missions
-function saveActiveMissions(missions) {
-    localStorage.setItem('voidfarer_missions', JSON.stringify(missions));
+export async function saveActiveMissions(missions) {
+    // Clear and rebuild
+    const db = await getDb();
+    const tx = db.transaction(MISSION_STORES.ACTIVE, 'readwrite');
+    await tx.objectStore(MISSION_STORES.ACTIVE).clear();
+    
+    for (const mission of missions) {
+        await tx.objectStore(MISSION_STORES.ACTIVE).put(mission);
+    }
+    await tx.done;
 }
 
 // Get completed missions
-function getCompletedMissions() {
-    const completed = localStorage.getItem('voidfarer_completed_missions');
-    return completed ? JSON.parse(completed) : [];
+export async function getCompletedMissions() {
+    const missions = await getAll(MISSION_STORES.COMPLETED);
+    return missions.sort((a, b) => b.dateCompleted.localeCompare(a.dateCompleted));
 }
 
 // Save completed missions
-function saveCompletedMissions(missions) {
-    localStorage.setItem('voidfarer_completed_missions', JSON.stringify(missions));
+export async function saveCompletedMissions(missions) {
+    const db = await getDb();
+    const tx = db.transaction(MISSION_STORES.COMPLETED, 'readwrite');
+    await tx.objectStore(MISSION_STORES.COMPLETED).clear();
+    
+    for (const mission of missions) {
+        await tx.objectStore(MISSION_STORES.COMPLETED).put(mission);
+    }
+    await tx.done;
 }
 
 // Add a new mission to active list
-function addMission(missionId) {
+export async function addMission(missionId) {
     const available = AVAILABLE_MISSIONS.find(m => m.id === missionId);
     if (!available) return false;
     
-    const active = getActiveMissions();
+    const active = await getActiveMissions();
+    const completed = await getCompletedMissions();
     
     // Check if already active
     if (active.some(m => m.id === missionId)) {
@@ -204,7 +242,6 @@ function addMission(missionId) {
     }
     
     // Check if already completed
-    const completed = getCompletedMissions();
     if (completed.some(m => m.id === missionId)) {
         return false;
     }
@@ -216,17 +253,17 @@ function addMission(missionId) {
         dateAssigned: new Date().toISOString()
     };
     
-    active.push(newMission);
-    saveActiveMissions(active);
+    await setItem(MISSION_STORES.ACTIVE, newMission);
     return true;
 }
 
 // Update mission progress
-function updateMissionProgress(elementName, amount = 1) {
-    const active = getActiveMissions();
+export async function updateMissionProgress(elementName, amount = 1) {
+    const active = await getActiveMissions();
     let updated = false;
+    let completedMissions = [];
     
-    active.forEach(mission => {
+    for (const mission of active) {
         if (mission.element === elementName && !mission.completed && mission.current < mission.target) {
             mission.current = Math.min(mission.current + amount, mission.target);
             updated = true;
@@ -237,35 +274,38 @@ function updateMissionProgress(elementName, amount = 1) {
                 mission.dateCompleted = new Date().toISOString();
                 
                 // Award reward
-                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
-                localStorage.setItem('voidfarer_credits', (credits + mission.reward).toString());
+                const credits = await getCredits();
+                await addCredits(mission.reward);
                 
                 // Move to completed missions
-                const completed = getCompletedMissions();
-                completed.push(mission);
-                saveCompletedMissions(completed);
+                completedMissions.push(mission);
             }
         }
-    });
+    }
     
     if (updated) {
         // Filter out completed missions from active
         const newActive = active.filter(m => !m.completed);
-        saveActiveMissions(newActive);
+        await saveActiveMissions(newActive);
+        
+        // Add completed missions to completed store
+        for (const mission of completedMissions) {
+            await setItem(MISSION_STORES.COMPLETED, mission);
+        }
     }
     
     return updated;
 }
 
 // Get mission progress percentage
-function getMissionProgress(mission) {
+export function getMissionProgress(mission) {
     return (mission.current / mission.target) * 100;
 }
 
 // Get total mission count
-function getMissionCounts() {
-    const active = getActiveMissions();
-    const completed = getCompletedMissions();
+export async function getMissionCounts() {
+    const active = await getActiveMissions();
+    const completed = await getCompletedMissions();
     
     return {
         active: active.length,
@@ -275,29 +315,27 @@ function getMissionCounts() {
 }
 
 // Get missions by planet
-function getMissionsByPlanet(planetName) {
-    const active = getActiveMissions();
+export async function getMissionsByPlanet(planetName) {
+    const active = await getActiveMissions();
     return active.filter(m => m.planet === planetName);
 }
 
 // Get missions by element
-function getMissionsByElement(elementName) {
-    const active = getActiveMissions();
+export async function getMissionsByElement(elementName) {
+    const active = await getActiveMissions();
     return active.filter(m => m.element === elementName);
 }
 
 // Remove a mission (abandon)
-function abandonMission(missionId) {
-    const active = getActiveMissions();
-    const newActive = active.filter(m => m.id !== missionId);
-    saveActiveMissions(newActive);
+export async function abandonMission(missionId) {
+    await deleteItem(MISSION_STORES.ACTIVE, missionId);
     return true;
 }
 
 // Get available missions (not active and not completed)
-function getAvailableMissions() {
-    const active = getActiveMissions();
-    const completed = getCompletedMissions();
+export async function getAvailableMissions() {
+    const active = await getActiveMissions();
+    const completed = await getCompletedMissions();
     const activeIds = active.map(m => m.id);
     const completedIds = completed.map(m => m.id);
     
@@ -307,23 +345,21 @@ function getAvailableMissions() {
 }
 
 // Get mission by ID
-function getMissionById(missionId) {
+export async function getMissionById(missionId) {
     // Check active
-    const active = getActiveMissions();
-    const activeMission = active.find(m => m.id === missionId);
-    if (activeMission) return activeMission;
+    const active = await getItem(MISSION_STORES.ACTIVE, missionId);
+    if (active) return active;
     
     // Check completed
-    const completed = getCompletedMissions();
-    const completedMission = completed.find(m => m.id === missionId);
-    if (completedMission) return completedMission;
+    const completed = await getItem(MISSION_STORES.COMPLETED, missionId);
+    if (completed) return completed;
     
     // Check available
     return AVAILABLE_MISSIONS.find(m => m.id === missionId) || null;
 }
 
 // Get next milestone for a mission
-function getNextMilestone(mission) {
+export function getNextMilestone(mission) {
     if (!mission) return null;
     
     const progress = mission.current / mission.target;
@@ -337,29 +373,30 @@ function getNextMilestone(mission) {
 }
 
 // Format mission time remaining (if we had time limits)
-function formatTimeRemaining(mission) {
+export function formatTimeRemaining(mission) {
     // Placeholder for future timed missions
     return 'No time limit';
 }
 
 // Get mission reward text
-function getMissionRewardText(mission) {
+export function getMissionRewardText(mission) {
     return `${mission.reward.toLocaleString()}⭐`;
 }
 
 // Check if any missions are ready to turn in
-function getCompletableMissions() {
-    const active = getActiveMissions();
+export async function getCompletableMissions() {
+    const active = await getActiveMissions();
     return active.filter(m => m.current >= m.target);
 }
 
 // Bulk update missions from collection
-function updateAllMissionsFromCollection() {
-    const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-    const active = getActiveMissions();
+export async function updateAllMissionsFromCollection() {
+    const collection = await getCollection();
+    const active = await getActiveMissions();
     let updated = false;
+    let completedMissions = [];
     
-    active.forEach(mission => {
+    for (const mission of active) {
         const elementData = collection[mission.element];
         if (elementData) {
             const count = elementData.count || 1;
@@ -373,65 +410,126 @@ function updateAllMissionsFromCollection() {
                     mission.dateCompleted = new Date().toISOString();
                     
                     // Award reward
-                    const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 12450;
-                    localStorage.setItem('voidfarer_credits', (credits + mission.reward).toString());
+                    const credits = await getCredits();
+                    await addCredits(mission.reward);
                     
                     // Move to completed
-                    const completed = getCompletedMissions();
-                    completed.push(mission);
-                    saveCompletedMissions(completed);
+                    completedMissions.push(mission);
                 }
             }
         }
-    });
+    }
     
     if (updated) {
         const newActive = active.filter(m => !m.completed);
-        saveActiveMissions(newActive);
+        await saveActiveMissions(newActive);
+        
+        for (const mission of completedMissions) {
+            await setItem(MISSION_STORES.COMPLETED, mission);
+        }
     }
     
     return updated;
 }
 
 // Reset all missions (for new game)
-function resetMissions() {
-    localStorage.removeItem('voidfarer_missions');
-    localStorage.removeItem('voidfarer_completed_missions');
+export async function resetMissions() {
+    const db = await getDb();
+    const tx = db.transaction([MISSION_STORES.ACTIVE, MISSION_STORES.COMPLETED], 'readwrite');
+    
+    await tx.objectStore(MISSION_STORES.ACTIVE).clear();
+    await tx.objectStore(MISSION_STORES.COMPLETED).clear();
     
     // Initialize with defaults
     const defaults = DEFAULT_MISSIONS.map(m => ({
         ...m,
         dateAssigned: new Date().toISOString()
     }));
-    localStorage.setItem('voidfarer_missions', JSON.stringify(defaults));
-    localStorage.setItem('voidfarer_completed_missions', JSON.stringify([]));
     
+    for (const mission of defaults) {
+        await tx.objectStore(MISSION_STORES.ACTIVE).put(mission);
+    }
+    
+    await tx.done;
     return defaults;
 }
 
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        DEFAULT_MISSIONS,
-        AVAILABLE_MISSIONS,
-        getActiveMissions,
-        saveActiveMissions,
-        getCompletedMissions,
-        saveCompletedMissions,
-        addMission,
-        updateMissionProgress,
-        getMissionProgress,
-        getMissionCounts,
-        getMissionsByPlanet,
-        getMissionsByElement,
-        abandonMission,
-        getAvailableMissions,
-        getMissionById,
-        getNextMilestone,
-        formatTimeRemaining,
-        getMissionRewardText,
-        getCompletableMissions,
-        updateAllMissionsFromCollection,
-        resetMissions
-    };
+// Generate new random mission (for daily missions)
+export async function generateDailyMission() {
+    const available = await getAvailableMissions();
+    
+    if (available.length === 0) {
+        // All missions completed or active, create a custom one
+        const elements = ['Gold', 'Silver', 'Platinum', 'Uranium', 'Promethium'];
+        const planets = ['Pyros', 'Verdant Prime', 'Glacier-7', 'Aether'];
+        const rarities = ['rare', 'rare', 'very-rare', 'legendary'];
+        const rewards = [25000, 50000, 100000, 250000];
+        
+        const randomIndex = Math.floor(Math.random() * elements.length);
+        const randomRarity = Math.floor(Math.random() * rarities.length);
+        
+        const newMission = {
+            id: 'daily_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            element: elements[randomIndex],
+            target: Math.floor(Math.random() * 20) + 10,
+            planet: planets[Math.floor(Math.random() * planets.length)],
+            reward: rewards[randomRarity],
+            description: `Daily: Collect ${elements[randomIndex]}`,
+            icon: getElementIcon(elements[randomIndex]),
+            rarity: rarities[randomRarity]
+        };
+        
+        return newMission;
+    }
+    
+    // Return random available mission
+    return available[Math.floor(Math.random() * available.length)];
 }
+
+// Helper to get element icon
+function getElementIcon(elementName) {
+    const icons = {
+        'Gold': '🟡',
+        'Silver': '⚪',
+        'Platinum': '⬜',
+        'Uranium': '🟣',
+        'Promethium': '✨',
+        'Carbon': '⚫',
+        'Iron': '⚙️',
+        'Titanium': '🔷',
+        'Ice': '❄️',
+        'Methane': '💨',
+        'Helium': '🎈',
+        'Hydrogen': '💧'
+    };
+    return icons[elementName] || '🔹';
+}
+
+// ===== EXPORT =====
+export default {
+    DEFAULT_MISSIONS,
+    AVAILABLE_MISSIONS,
+    getActiveMissions,
+    saveActiveMissions,
+    getCompletedMissions,
+    saveCompletedMissions,
+    addMission,
+    updateMissionProgress,
+    getMissionProgress,
+    getMissionCounts,
+    getMissionsByPlanet,
+    getMissionsByElement,
+    abandonMission,
+    getAvailableMissions,
+    getMissionById,
+    getNextMilestone,
+    formatTimeRemaining,
+    getMissionRewardText,
+    getCompletableMissions,
+    updateAllMissionsFromCollection,
+    resetMissions,
+    generateDailyMission
+};
+
+// Need to import getDb for some functions
+import { getDb } from './db.js';
