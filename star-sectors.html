@@ -6,6 +6,8 @@
     <title>Voidfarer - Star Sectors</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
     
     <style>
@@ -348,15 +350,29 @@
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
             .sector-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
         }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="sector-view">
-        <div class="ui-header" id="regionTitle">Orion Sector</div>
+        <div class="ui-header" id="regionTitle">Loading Sector...</div>
         
         <div class="current-location" id="currentLocation">
             <span class="current-dot"></span>
-            <span id="currentLocationText">Orion Molecular Cloud</span>
+            <span id="currentLocationText">Loading location...</span>
         </div>
         
         <button class="back-btn" onclick="returnToGalaxy()">← GALAXY</button>
@@ -366,24 +382,24 @@
         
         <!-- Sector Info Panel -->
         <div class="sector-panel" id="sectorPanel">
-            <div class="sector-name" id="selectedSectorName">Orion Molecular Cloud</div>
-            <div class="sector-type" id="selectedSectorType">Star-forming region</div>
-            <div class="stars-count" id="selectedStarCount">⭐ 85 stars</div>
+            <div class="sector-name" id="selectedSectorName">Loading...</div>
+            <div class="sector-type" id="selectedSectorType">---</div>
+            <div class="stars-count" id="selectedStarCount">⭐ -- stars</div>
             <div class="distance-row">
                 <span class="distance-label">Distance:</span>
-                <span class="distance-value" id="sectorDistance">2.3 LY</span>
+                <span class="distance-value" id="sectorDistance">-- LY</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Warp Cycles:</span>
-                <span class="time-value" id="warpCycles">1 cycle</span>
+                <span class="time-value" id="warpCycles">-- cycle</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Travel Time:</span>
-                <span class="time-value" id="travelTime">2 sec</span>
+                <span class="time-value" id="travelTime">-- sec</span>
             </div>
             <div class="distance-row">
                 <span class="distance-label">Fuel Required:</span>
-                <span class="fuel-value" id="fuelCost">10 ⭐</span>
+                <span class="fuel-value" id="fuelCost">-- ⭐</span>
             </div>
             <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 EXPLORE</button>
         </div>
@@ -392,33 +408,53 @@
         
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text">warping...</div>
+            <div class="loading-text" id="loadingText">loading sectors...</div>
         </div>
+
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('sectorCanvas');
-        const ctx = canvas.getContext('2d');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const sectorPanel = document.getElementById('sectorPanel');
-        const markersContainer = document.getElementById('sectorMarkers');
-        
+    <script type="module">
+        // ===== IMPORTS =====
+        import { 
+            getCurrentRegion,
+            getCurrentSectorName,
+            getCurrentSectorX,
+            getCurrentSectorY,
+            setCurrentNebula,
+            setWarpData,
+            getCredits
+        } from './js/storage.js';
+        import { calculateNebulaTrip } from './js/warp-calculator.js';
+        import { isMigrationComplete } from './js/db.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
-        
-        // ===== LOAD REGION DATA =====
-        const currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
-        const currentSector = localStorage.getItem('voidfarer_current_sector_name') || 'Orion Molecular Cloud';
-        const currentSectorX = parseFloat(localStorage.getItem('voidfarer_current_sector_x')) || 30;
-        const currentSectorY = parseFloat(localStorage.getItem('voidfarer_current_sector_y')) || 40;
-        
-        document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
-        document.getElementById('currentLocationText').textContent = currentSector;
-        
-        // ===== SECTOR DATA =====
+
+        // ===== DOM ELEMENTS =====
+        const canvas = document.getElementById('sectorCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+        const sectorPanel = document.getElementById('sectorPanel');
+        const markersContainer = document.getElementById('sectorMarkers');
+
+        // ===== STATE =====
+        let currentRegion = 'Orion';
+        let currentSector = 'Orion Molecular Cloud';
+        let currentSectorX = 30;
+        let currentSectorY = 40;
+        let sectors = [];
+        let selectedSector = null;
+        let selectedIndex = -1;
+
+        // ===== SECTOR DATA BY REGION =====
         const sectorData = {
             'Orion': [
                 { name: 'Orion Molecular Cloud', x: 30, y: 40, stars: 85, type: 'Star-forming' },
@@ -477,14 +513,50 @@
                 { name: 'Galactic Center', x: 60, y: 55, stars: 450, type: 'Core Region' }
             ]
         };
-        
-        const sectors = sectorData[currentRegion] || sectorData['Orion'];
-        
-        // ===== SELECTED SECTOR =====
-        let selectedSector = null;
-        let selectedIndex = -1;
-        
-        function selectSector(index) {
+
+        // ===== LOAD REGION DATA =====
+        async function loadRegionData() {
+            try {
+                // Load all data in parallel
+                const [
+                    region,
+                    sector,
+                    x,
+                    y
+                ] = await Promise.all([
+                    getCurrentRegion(),
+                    getCurrentSectorName(),
+                    getCurrentSectorX(),
+                    getCurrentSectorY()
+                ]);
+
+                currentRegion = region || 'Orion';
+                currentSector = sector || 'Orion Molecular Cloud';
+                currentSectorX = x || 30;
+                currentSectorY = y || 40;
+
+                // Update UI
+                document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
+                document.getElementById('currentLocationText').textContent = currentSector;
+
+                // Get sectors for this region
+                sectors = sectorData[currentRegion] || sectorData['Orion'];
+
+                return true;
+
+            } catch (error) {
+                console.error('Error loading region data:', error);
+                // Use defaults
+                currentRegion = 'Orion';
+                sectors = sectorData['Orion'];
+                document.getElementById('regionTitle').textContent = 'Orion Sector';
+                document.getElementById('currentLocationText').textContent = 'Orion Molecular Cloud';
+                return false;
+            }
+        }
+
+        // ===== SELECT SECTOR =====
+        window.selectSector = function(index) {
             const sector = sectors[index];
             if (!sector) return;
             
@@ -507,18 +579,19 @@
                 currentSectorX, currentSectorY,
                 sector.x, sector.y
             );
-            const cycles = calculateWarpCycles(distance);
-            const fuel = calculateFuel(distance);
-            const time = cycles * 2;
+            const trip = calculateNebulaTrip(
+                currentSectorX, currentSectorY,
+                sector.x, sector.y
+            );
             
             // Update panel
             document.getElementById('selectedSectorName').textContent = sector.name;
             document.getElementById('selectedSectorType').textContent = sector.type;
             document.getElementById('selectedStarCount').innerHTML = '⭐ ' + sector.stars + ' stars';
-            document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
-            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
-            document.getElementById('travelTime').textContent = time + ' sec';
-            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
+            document.getElementById('sectorDistance').textContent = trip.distanceFormatted;
+            document.getElementById('warpCycles').textContent = trip.cyclesFormatted;
+            document.getElementById('travelTime').textContent = trip.timeFormatted;
+            document.getElementById('fuelCost').innerHTML = trip.fuelFormatted;
             
             // Enable/disable based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
@@ -533,8 +606,8 @@
             sectorPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-        
+        };
+
         // ===== DISTANCE CALCULATION =====
         function calculateDistance(x1, y1, x2, y2) {
             // Euclidean distance between percentage points
@@ -542,53 +615,55 @@
             const dy = (y1 - y2) / 10;
             return Math.sqrt(dx*dx + dy*dy) * 5;
         }
-        
-        function calculateWarpCycles(distance) {
-            if (distance <= 2) return 1;
-            if (distance <= 4) return 2;
-            if (distance <= 6) return 3;
-            if (distance <= 8) return 4;
-            return 5;
-        }
-        
-        function calculateFuel(distance) {
-            return Math.floor(distance * 3) + 5;
-        }
-        
-        // ===== TRAVEL =====
-        function travelToSector() {
+
+        // ===== TRAVEL TO SECTOR =====
+        window.travelToSector = async function() {
             if (!selectedSector || selectedSector.name === currentSector) return;
             
             loadingOverlay.classList.add('active');
+            loadingText.textContent = 'calculating warp...';
             
-            // Calculate warp details
-            const distance = calculateDistance(
-                currentSectorX, currentSectorY,
-                selectedSector.x, selectedSector.y
-            );
-            const cycles = calculateWarpCycles(distance);
-            
-            // Save destination
-            localStorage.setItem('voidfarer_current_nebula', selectedSector.name);
-            localStorage.setItem('voidfarer_current_sector_name', selectedSector.name);
-            localStorage.setItem('voidfarer_current_sector_type', selectedSector.type);
-            localStorage.setItem('voidfarer_current_sector_stars', selectedSector.stars);
-            localStorage.setItem('voidfarer_current_sector_x', selectedSector.x);
-            localStorage.setItem('voidfarer_current_sector_y', selectedSector.y);
-            
-            localStorage.setItem('voidfarer_warp_destination', selectedSector.name);
-            localStorage.setItem('voidfarer_warp_cycles', cycles);
-            localStorage.setItem('voidfarer_warp_return', 'star-sectors.html');
-            
-            setTimeout(() => {
-                window.location.href = 'warp.html';
-            }, 500);
-        }
-        
-        function returnToGalaxy() {
+            try {
+                // Calculate warp details
+                const trip = calculateNebulaTrip(
+                    currentSectorX, currentSectorY,
+                    selectedSector.x, selectedSector.y
+                );
+                
+                // Save destination
+                await setCurrentNebula(
+                    selectedSector.name,
+                    selectedSector.type,
+                    selectedSector.stars,
+                    selectedSector.x,
+                    selectedSector.y
+                );
+                
+                // Save warp data
+                setWarpData(
+                    selectedSector.name,
+                    'star-sectors.html',
+                    trip.cycles,
+                    trip.distance,
+                    trip.fuel
+                );
+                
+                setTimeout(() => {
+                    window.location.href = 'warp.html';
+                }, 500);
+
+            } catch (error) {
+                console.error('Error traveling to sector:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to travel. Please try again.');
+            }
+        };
+
+        // ===== RETURN TO GALAXY =====
+        window.returnToGalaxy = function() {
             window.location.href = 'galaxy-map.html';
-        }
-        
+        };
+
         // ===== CREATE SECTOR MARKERS =====
         function createSectorMarkers() {
             markersContainer.innerHTML = '';
@@ -616,14 +691,14 @@
                 markersContainer.appendChild(marker);
             });
         }
-        
+
         // ===== DRAW BACKGROUND =====
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             drawBackground();
         }
-        
+
         function drawBackground() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -663,24 +738,54 @@
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-        
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            resizeCanvas();
-            createSectorMarkers();
-            
-            window.addEventListener('resize', () => {
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading star sectors...';
+
+                // Check for player data
+                const credits = await getCredits();
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Load region data
+                await loadRegionData();
+
+                // Resize canvas and draw background
                 resizeCanvas();
-                // Markers reposition automatically with percentage
-            });
+                window.addEventListener('resize', resizeCanvas);
+
+                // Create sector markers
+                createSectorMarkers();
+
+                // Check migration status
+                const migrated = await isMigrationComplete();
+                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
+                migrationStatus.style.display = 'block';
+                setTimeout(() => {
+                    migrationStatus.style.display = 'none';
+                }, 3000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
         }
-        
+
+        // ===== START =====
         init();
     </script>
 </body>
