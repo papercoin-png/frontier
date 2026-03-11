@@ -1,15 +1,16 @@
-// coordinates.js - Universal coordinate and distance system for Voidfarer
+// js/coordinates.js - Universal coordinate and distance system for Voidfarer
 // All distances are abstract "light years" (LY) for gameplay feel, not realistic
+// Pure calculation module - no storage dependencies
 
 // ===== CONSTANTS =====
-const UNIVERSE_SEED = 42793;
-const WARP_CYCLE_DURATION = 2000; // 2 seconds per cycle
-const FUEL_PER_LY = 4; // Base fuel cost per light year
-const BASE_FUEL_COST = 5; // Minimum fuel cost for any jump
+export const UNIVERSE_SEED = 42793;
+export const WARP_CYCLE_DURATION = 2000; // 2 seconds per cycle
+export const FUEL_PER_LY = 4; // Base fuel cost per light year
+export const BASE_FUEL_COST = 5; // Minimum fuel cost for any jump
 
 // ===== SECTOR COORDINATES (Galaxy Map Level) =====
 // 3x4 grid of sectors (A1 through C4)
-const SECTOR_COORDS = {
+export const SECTOR_COORDS = {
     // Row 1 (top)
     'A1': { x: 0, y: 0, name: 'Cygnus Arm' },
     'B1': { x: 1, y: 0, name: 'Perseus Arm' },
@@ -33,7 +34,7 @@ const SECTOR_COORDS = {
 
 // ===== GALAXY-LEVEL DISTANCE CALCULATION =====
 // Calculate distance between two sectors
-function getSectorDistance(sector1, sector2) {
+export function getSectorDistance(sector1, sector2) {
     const s1 = SECTOR_COORDS[sector1] || SECTOR_COORDS['B2'];
     const s2 = SECTOR_COORDS[sector2] || SECTOR_COORDS['B2'];
     
@@ -49,7 +50,7 @@ function getSectorDistance(sector1, sector2) {
 
 // ===== NEBULA/SECTOR LEVEL DISTANCE CALCULATION =====
 // Calculate distance between two nebulae/star sectors (using percentage positions)
-function getNebulaDistance(x1, y1, x2, y2) {
+export function getNebulaDistance(x1, y1, x2, y2) {
     // Convert percentage positions (0-100) to relative coordinates
     const dx = (x1 - x2) / 10; // Scale down to 0-10 range
     const dy = (y1 - y2) / 10;
@@ -62,7 +63,7 @@ function getNebulaDistance(x1, y1, x2, y2) {
 
 // ===== STAR CLUSTER LEVEL DISTANCE CALCULATION =====
 // Calculate distance between two stars (using percentage positions within cluster)
-function getStarDistance(x1, y1, x2, y2) {
+export function getStarDistance(x1, y1, x2, y2) {
     // Stars are much closer together
     const dx = (x1 - x2) / 50; // Scale down more
     const dy = (y1 - y2) / 50;
@@ -74,7 +75,7 @@ function getStarDistance(x1, y1, x2, y2) {
 
 // ===== WARP CYCLE CALCULATION =====
 // Convert distance to warp cycles (1 cycle = 2 seconds)
-function getWarpCycles(distance) {
+export function getWarpCycles(distance) {
     if (distance <= 1.0) return 1;      // Very close
     if (distance <= 2.5) return 2;      // Close
     if (distance <= 4.5) return 3;      // Medium
@@ -84,40 +85,40 @@ function getWarpCycles(distance) {
 
 // ===== FUEL COST CALCULATION =====
 // Calculate fuel cost based on distance
-function getFuelCost(distance) {
+export function getFuelCost(distance) {
     return Math.floor(distance * FUEL_PER_LY) + BASE_FUEL_COST;
 }
 
 // ===== TRAVEL TIME CALCULATION =====
 // Get total travel time in seconds
-function getTravelTime(cycles) {
+export function getTravelTime(cycles) {
     return cycles * (WARP_CYCLE_DURATION / 1000);
 }
 
 // ===== FORMATTING HELPERS =====
 // Format distance for display
-function formatDistance(distance) {
+export function formatDistance(distance) {
     return distance.toFixed(1) + ' LY';
 }
 
 // Format cycles for display
-function formatCycles(cycles) {
+export function formatCycles(cycles) {
     return cycles + ' cycle' + (cycles > 1 ? 's' : '');
 }
 
 // Format fuel for display
-function formatFuel(fuel) {
+export function formatFuel(fuel) {
     return fuel + ' ⭐';
 }
 
 // Format time for display
-function formatTime(seconds) {
+export function formatTime(seconds) {
     return seconds + ' sec';
 }
 
 // ===== COMPLETE TRIP CALCULATION =====
 // Get all trip data at once
-function calculateTrip(distance) {
+export function calculateTrip(distance) {
     const cycles = getWarpCycles(distance);
     const fuel = getFuelCost(distance);
     const time = getTravelTime(cycles);
@@ -137,40 +138,40 @@ function calculateTrip(distance) {
 
 // ===== SECTOR TRIP =====
 // Calculate trip between two sectors
-function calculateSectorTrip(sector1, sector2) {
+export function calculateSectorTrip(sector1, sector2) {
     const distance = getSectorDistance(sector1, sector2);
     return calculateTrip(distance);
 }
 
 // ===== NEBULA TRIP =====
 // Calculate trip between two nebulae
-function calculateNebulaTrip(x1, y1, x2, y2) {
+export function calculateNebulaTrip(x1, y1, x2, y2) {
     const distance = getNebulaDistance(x1, y1, x2, y2);
     return calculateTrip(distance);
 }
 
 // ===== STAR TRIP =====
 // Calculate trip between two stars
-function calculateStarTrip(x1, y1, x2, y2) {
+export function calculateStarTrip(x1, y1, x2, y2) {
     const distance = getStarDistance(x1, y1, x2, y2);
     return calculateTrip(distance);
 }
 
-// ===== CURRENT LOCATION HELPERS =====
-// Get current sector from localStorage
-function getCurrentSector() {
+// ===== CURRENT LOCATION HELPERS (uses localStorage) =====
+// These are the only functions that interact with storage
+// They remain synchronous as they use localStorage directly
+
+export function getCurrentSector() {
     return localStorage.getItem('voidfarer_current_sector') || 'B2';
 }
 
-// Get current nebula coordinates from localStorage
-function getCurrentNebulaCoords() {
+export function getCurrentNebulaCoords() {
     const x = parseFloat(localStorage.getItem('voidfarer_current_sector_x')) || 30;
     const y = parseFloat(localStorage.getItem('voidfarer_current_sector_y')) || 40;
     return { x, y };
 }
 
-// Get current star coordinates from localStorage
-function getCurrentStarCoords() {
+export function getCurrentStarCoords() {
     const x = parseFloat(localStorage.getItem('voidfarer_current_star_x')) || 50;
     const y = parseFloat(localStorage.getItem('voidfarer_current_star_y')) || 50;
     return { x, y };
@@ -178,7 +179,7 @@ function getCurrentStarCoords() {
 
 // ===== SAVE TRIP FOR WARP =====
 // Save trip data to localStorage for warp.html
-function saveWarpData(destination, returnPage, tripData) {
+export function saveWarpData(destination, returnPage, tripData) {
     localStorage.setItem('voidfarer_warp_destination', destination);
     localStorage.setItem('voidfarer_warp_return', returnPage);
     localStorage.setItem('voidfarer_warp_cycles', tripData.cycles);
@@ -186,30 +187,58 @@ function saveWarpData(destination, returnPage, tripData) {
     localStorage.setItem('voidfarer_warp_fuel', tripData.fuel);
 }
 
-// ===== EXPORT =====
-// Make all functions available globally
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        UNIVERSE_SEED,
-        WARP_CYCLE_DURATION,
-        SECTOR_COORDS,
-        getSectorDistance,
-        getNebulaDistance,
-        getStarDistance,
-        getWarpCycles,
-        getFuelCost,
-        getTravelTime,
-        formatDistance,
-        formatCycles,
-        formatFuel,
-        formatTime,
-        calculateTrip,
-        calculateSectorTrip,
-        calculateNebulaTrip,
-        calculateStarTrip,
-        getCurrentSector,
-        getCurrentNebulaCoords,
-        getCurrentStarCoords,
-        saveWarpData
-    };
+// ===== UTILITY FUNCTIONS =====
+// Get distance between two points in 2D space
+export function getEuclideanDistance(x1, y1, x2, y2) {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    return Math.sqrt(dx*dx + dy*dy);
 }
+
+// Get Manhattan distance between two points
+export function getManhattanDistance(x1, y1, x2, y2) {
+    return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+}
+
+// Convert light years to a readable string with appropriate units
+export function lightYearsToString(ly) {
+    if (ly < 0.1) return (ly * 1000).toFixed(0) + ' mLY';
+    if (ly < 1) return (ly * 100).toFixed(0) + ' cLY';
+    return ly.toFixed(1) + ' LY';
+}
+
+// Parse a light years string back to number
+export function stringToLightYears(str) {
+    if (str.includes('mLY')) return parseFloat(str) / 1000;
+    if (str.includes('cLY')) return parseFloat(str) / 100;
+    return parseFloat(str);
+}
+
+// ===== EXPORT =====
+export default {
+    UNIVERSE_SEED,
+    WARP_CYCLE_DURATION,
+    SECTOR_COORDS,
+    getSectorDistance,
+    getNebulaDistance,
+    getStarDistance,
+    getWarpCycles,
+    getFuelCost,
+    getTravelTime,
+    formatDistance,
+    formatCycles,
+    formatFuel,
+    formatTime,
+    calculateTrip,
+    calculateSectorTrip,
+    calculateNebulaTrip,
+    calculateStarTrip,
+    getCurrentSector,
+    getCurrentNebulaCoords,
+    getCurrentStarCoords,
+    saveWarpData,
+    getEuclideanDistance,
+    getManhattanDistance,
+    lightYearsToString,
+    stringToLightYears
+};
