@@ -9,7 +9,7 @@
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -87,10 +87,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a8ac0;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -110,11 +111,12 @@
         }
         
         .tax-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 36px;
             color: #e0f0ff;
             text-shadow: 0 0 20px #4a8ac0, 0 0 40px #2a5a8a;
             margin-bottom: 5px;
+            font-weight: 600;
         }
         
         .tax-subtitle {
@@ -156,7 +158,7 @@
             color: #ffffff;
             font-size: 20px;
             font-weight: 600;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             margin-bottom: 4px;
         }
         
@@ -200,7 +202,7 @@
             color: #ffffff;
             font-size: 24px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .summary-unit {
@@ -230,7 +232,7 @@
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 15px;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             border-bottom: 1px solid #4a8ac0;
             padding-bottom: 8px;
         }
@@ -473,12 +475,13 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             width: fit-content;
             box-shadow: 0 0 30px #3a5a8a;
             z-index: 100;
             margin-top: 10px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -612,20 +615,9 @@
         </div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getPlayer,
-            getPlayerId,
-            getPlayerName,
-            getTaxHistory,
-            getPlayerTaxSummary as storageGetPlayerTaxSummary,
-            getCurrentRates,
-            getTaxExemptions,
-            getCredits
-        } from './js/storage.js';
-        import { getTaxAnalytics, getPlayerAnalytics麺 } from './js/tax-history.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -643,17 +635,17 @@
 
         // ===== STATE =====
         let taxChart = null;
-        const PLAYER_ID = getPlayerId();
+        const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'player_1';
 
         // ===== NAVIGATION =====
-        window.returnToEarthHub = function() {
+        function returnToEarthHub() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'earth-hub.html';
-        };
+        }
 
-        window.viewAllHistory = function() {
+        function viewAllHistory() {
             alert('Full tax history would open here');
-        };
+        }
 
         // ===== LOAD TAX DATA =====
         async function loadTaxData() {
@@ -662,24 +654,28 @@
                 loadingText.textContent = 'calculating taxes...';
 
                 // Get player data
-                const player = await getPlayer();
-                const playerName = player?.name || 'Voidfarer';
+                let playerName = 'Voidfarer';
+                if (typeof getPlayer === 'function') {
+                    const player = await getPlayer();
+                    playerName = player?.name || 'Voidfarer';
+                }
                 document.getElementById('playerName').textContent = playerName;
 
-                // Load all tax data in parallel
-                const [
-                    history,
-                    rates,
-                    exemptions,
-                    analytics,
-                    playerAnalytics
-                ] = await Promise.all([
-                    getTaxHistory(PLAYER_ID, 100),
-                    getCurrentRates(),
-                    getTaxExemptions(PLAYER_ID),
-                    getTaxAnalytics(),
-                    getPlayerAnalytics(PLAYER_ID)
-                ]);
+                // Load tax data
+                let history = [];
+                if (typeof getTaxHistory === 'function') {
+                    history = await getTaxHistory(PLAYER_ID, 100) || [];
+                }
+
+                let rates = { transaction: 0.02, property: 0.005, income: 0.08, luxury: 0.03, estate: 0.10, registration: 5000 };
+                if (typeof getCurrentRates === 'function') {
+                    rates = await getCurrentRates() || rates;
+                }
+
+                let exemptions = { transaction: 0, property: 0, income: 0, luxury: false };
+                if (typeof getTaxExemptions === 'function') {
+                    exemptions = await getTaxExemptions(PLAYER_ID) || exemptions;
+                }
 
                 // Calculate totals
                 const now = Date.now();
@@ -693,8 +689,8 @@
                 const yearlyTotal = yearlyTransactions.reduce((sum, t) => sum + t.amount, 0);
                 const lifetimeTotal = history.reduce((sum, t) => sum + t.amount, 0);
 
-                // Calculate effective rate (placeholder)
-                const totalIncome = 50000; // Would come from player data
+                // Calculate effective rate
+                const totalIncome = 50000;
                 const effectiveRate = totalIncome > 0 ? (lifetimeTotal / totalIncome) * 100 : 0;
 
                 // Update summary cards
@@ -704,7 +700,7 @@
                 document.getElementById('totalPaid').textContent = formatMoney(lifetimeTotal);
                 document.getElementById('effectiveRate').textContent = effectiveRate.toFixed(1) + '%';
 
-                // Update monthly change (compare to previous month)
+                // Update monthly change
                 const prevMonth = monthAgo - (30 * 24 * 60 * 60 * 1000);
                 const prevMonthTransactions = history.filter(t => t.timestamp > prevMonth && t.timestamp <= monthAgo);
                 const prevMonthTotal = prevMonthTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -718,7 +714,7 @@
                 document.getElementById('monthlyChange').className = 
                     monthlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
 
-                // Update yearly change (compare to previous year)
+                // Update yearly change
                 const prevYear = yearAgo - (365 * 24 * 60 * 60 * 1000);
                 const prevYearTransactions = history.filter(t => t.timestamp > prevYear && t.timestamp <= yearAgo);
                 const prevYearTotal = prevYearTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -732,14 +728,20 @@
                 document.getElementById('yearlyChange').className = 
                     yearlyChange >= 0 ? 'summary-period positive' : 'summary-period negative';
 
-                // Next due date (simulated)
+                // Next due date
                 const nextDate = new Date();
                 nextDate.setDate(nextDate.getDate() + 15);
                 document.getElementById('nextDue').textContent = 'Property Tax';
                 document.getElementById('nextDueDate').textContent = nextDate.toLocaleDateString();
 
+                // Calculate by type
+                const byType = {};
+                history.forEach(t => {
+                    byType[t.taxType] = (byType[t.taxType] || 0) + t.amount;
+                });
+
                 // Update tax breakdown
-                updateTaxBreakdown(playerAnalytics?.byType || {});
+                updateTaxBreakdown(byType);
 
                 // Update tax rates
                 updateTaxRates(rates);
@@ -752,14 +754,6 @@
 
                 // Update chart
                 updateTaxChart(history);
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
                 loadingOverlay.classList.remove('active');
 
@@ -1042,13 +1036,6 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'accessing tax center...';
 
-                // Check for player data
-                const credits = await getCredits();
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-
                 // Load tax data
                 await loadTaxData();
 
@@ -1069,5 +1056,12 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/tax-system.js"></script>
+    <script src="js/tax-history.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
