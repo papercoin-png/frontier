@@ -4,21 +4,21 @@
 
 // ===== CONSTANTS =====
 export const WARP_CONFIG = {
-    CYCLE_DURATION: 2000,           // 2 seconds per cycle
-    BASE_FUEL_COST: 5,               // Minimum fuel for any jump
-    FUEL_PER_LY: 4,                   // Fuel cost per light year
-    MAX_CYCLES: 5,                    // Maximum warp cycles
-    LY_PER_CYCLE: 2.3,                 // Average light years per cycle
-    SPEED_FACTOR: 1.0,                 // Base speed multiplier
+    CYCLE_DURATION: 2000, // 2 seconds per cycle
+    BASE_FUEL_COST: 5, // Minimum fuel for any jump
+    FUEL_PER_LY: 4, // Fuel cost per light year
+    MAX_CYCLES: 5, // Maximum warp cycles
+    LY_PER_CYCLE: 2.3, // Average light years per cycle
+    SPEED_FACTOR: 1.0, // Base speed multiplier
 };
 
 // ===== DISTANCE TO CYCLES MAPPING =====
 export function getWarpCyclesFromDistance(distance) {
-    if (distance <= 1.0) return 1;      // Very close (0-1 LY)
-    if (distance <= 2.5) return 2;      // Close (1-2.5 LY)
-    if (distance <= 4.5) return 3;      // Medium (2.5-4.5 LY)
-    if (distance <= 7.0) return 4;      // Far (4.5-7 LY)
-    return 5;                            // Maximum distance (7+ LY)
+    if (distance <= 1.0) return 1; // Very close (0-1 LY)
+    if (distance <= 2.5) return 2; // Close (1-2.5 LY)
+    if (distance <= 4.5) return 3; // Medium (2.5-4.5 LY)
+    if (distance <= 7.0) return 4; // Far (4.5-7 LY)
+    return 5; // Maximum distance (7+ LY)
 }
 
 // ===== FUEL COST CALCULATION =====
@@ -152,6 +152,7 @@ export function useFuelForTrip(currentFuel, tripData, fuelUpdateCallback) {
     }
     
     const newFuel = currentFuel - tripData.fuel;
+    
     if (fuelUpdateCallback) {
         fuelUpdateCallback(newFuel);
     }
@@ -263,7 +264,6 @@ export function getWarpStatusMessage(cycle, totalCycles) {
 }
 
 // ===== UTILITY FUNCTIONS =====
-
 // Calculate the visual "streak" length for warp effect
 export function getStreakLength(speedFactor, distance) {
     return Math.min(50, 10 + speedFactor * 20 + (distance / 10));
