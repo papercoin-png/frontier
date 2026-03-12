@@ -9,10 +9,9 @@
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ... keep all your existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -88,10 +87,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -111,11 +111,12 @@
         }
         
         .earth-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 36px;
             color: #c0e0ff;
             text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
             margin-bottom: 4px;
+            font-weight: 600;
         }
         
         .earth-subtitle {
@@ -541,7 +542,7 @@
             color: #ffffff;
             padding: 10px;
             border-radius: 40px 10px 40px 10px;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             font-size: 13px;
             outline: none;
         }
@@ -650,12 +651,13 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
             box-shadow: 0 0 30px #2a5a5a;
             z-index: 100;
             margin-top: 10px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -883,17 +885,46 @@
                     await updateDailyPrices();
                 }
 
-                // Load all data in parallel
-                const [credits, collection, planet, star, sector, nebula, events, rates] = await Promise.all([
-                    typeof getCredits === 'function' ? getCredits() : 5000,
-                    typeof getCollection === 'function' ? getCollection() : {},
-                    typeof getCurrentPlanet === 'function' ? getCurrentPlanet() : 'Earth',
-                    typeof getCurrentStar === 'function' ? getCurrentStar() : 'Sol',
-                    typeof getCurrentSector === 'function' ? getCurrentSector() : 'B2',
-                    typeof getCurrentNebula === 'function' ? getCurrentNebula() : 'Orion Nebula',
-                    typeof getActiveEvents === 'function' ? getActiveEvents() : [],
-                    typeof getCurrentRates === 'function' ? getCurrentRates() : { transaction: 0.02 }
-                ]);
+                // Load all data with fallbacks
+                let credits = 5000;
+                if (typeof getCredits === 'function') {
+                    credits = await getCredits();
+                }
+
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                }
+
+                let planet = 'Earth';
+                if (typeof getCurrentPlanet === 'function') {
+                    planet = await getCurrentPlanet();
+                }
+
+                let star = 'Sol';
+                if (typeof getCurrentStar === 'function') {
+                    star = await getCurrentStar();
+                }
+
+                let sector = 'B2';
+                if (typeof getCurrentSector === 'function') {
+                    sector = await getCurrentSector();
+                }
+
+                let nebula = 'Orion Nebula';
+                if (typeof getCurrentNebula === 'function') {
+                    nebula = await getCurrentNebula();
+                }
+
+                let events = [];
+                if (typeof getActiveEvents === 'function') {
+                    events = await getActiveEvents();
+                }
+
+                let rates = { transaction: 0.02 };
+                if (typeof getCurrentRates === 'function') {
+                    rates = await getCurrentRates();
+                }
 
                 loadingText.textContent = 'updating displays...';
 
@@ -1137,11 +1168,7 @@
                         alert('Sale failed: ' + (result.reason || 'unknown error'));
                     }
                 } else {
-                    // Fallback for testing
-                    alert(`Sold ${quantity} ${elementName} for ${price * quantity}⭐`);
-                    setTimeout(() => {
-                        loadingOverlay.classList.remove('active');
-                    }, 500);
+                    alert('Sale function not available');
                 }
             } catch (error) {
                 console.error('Sell error:', error);
@@ -1415,7 +1442,7 @@
         init();
     </script>
     
-    <!-- Load storage.js and other modules after the main script -->
+    <!-- Load all JS files -->
     <script src="js/storage.js"></script>
     <script src="js/market-dynamics.js"></script>
     <script src="js/economic-events.js"></script>
