@@ -34,7 +34,7 @@
             background: #000;
         }
         
-        /* Starfield canvas (background) */
+        /* Starfield canvas */
         #starfieldCanvas {
             position: absolute;
             top: 0;
@@ -44,7 +44,7 @@
             z-index: 1;
         }
         
-        /* Map canvas (overlay with path and ship) */
+        /* Map canvas */
         #mapCanvas {
             position: absolute;
             top: 0;
@@ -53,6 +53,18 @@
             height: 100%;
             z-index: 2;
             pointer-events: none;
+        }
+        
+        /* Ripple canvas - appears at the end */
+        #rippleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            pointer-events: none;
+            display: none;
         }
         
         .warp-overlay {
@@ -65,7 +77,7 @@
             z-index: 10;
         }
         
-        /* Start/Destination Panel */
+        /* Journey Panel */
         .journey-panel {
             position: absolute;
             top: max(20px, env(safe-area-inset-top));
@@ -140,7 +152,7 @@
             100% { opacity: 0.5; transform: translateX(0); }
         }
         
-        /* Distance Info */
+        /* Distance Panel */
         .distance-panel {
             position: absolute;
             top: max(120px, env(safe-area-inset-top) + 80px);
@@ -199,7 +211,7 @@
             font-weight: 600;
         }
         
-        /* Cycle Info */
+        /* Cycle Panel */
         .cycle-panel {
             position: absolute;
             bottom: max(150px, env(safe-area-inset-bottom) + 80px);
@@ -270,14 +282,17 @@
 </head>
 <body>
     <div class="warp-container">
-        <!-- Starfield background -->
+        <!-- Starfield canvas -->
         <canvas id="starfieldCanvas"></canvas>
         
-        <!-- Map overlay with path and ship -->
+        <!-- Map canvas -->
         <canvas id="mapCanvas"></canvas>
         
+        <!-- Ripple canvas - appears at the end -->
+        <canvas id="rippleCanvas"></canvas>
+        
         <div class="warp-overlay">
-            <!-- Journey Panel - Shows start and destination -->
+            <!-- Journey Panel -->
             <div class="journey-panel">
                 <div class="journey-title">✦ WARP JOURNEY ✦</div>
                 <div class="journey-points">
@@ -343,6 +358,8 @@
         const starfieldCtx = starfieldCanvas.getContext('2d');
         const mapCanvas = document.getElementById('mapCanvas');
         const mapCtx = mapCanvas.getContext('2d');
+        const rippleCanvas = document.getElementById('rippleCanvas');
+        const rippleCtx = rippleCanvas.getContext('2d');
 
         // ===== DOM ELEMENTS =====
         const statusMessage = document.getElementById('statusMessage');
@@ -381,22 +398,39 @@
 
         // ===== STARS FOR BACKGROUND =====
         const stars = [];
-        const STAR_COUNT = 300;
+        const STAR_COUNT = 400;
+
+        // Star colors for variety
+        const starColors = [
+            '#ffffff', '#ffe6b0', '#b0e0ff', '#ffb0b0', '#e0b0ff', '#b0ffb0'
+        ];
 
         // Initialize stars
         for (let i = 0; i < STAR_COUNT; i++) {
             stars.push({
                 x: Math.random(),
                 y: Math.random(),
-                size: Math.random() * 2 + 1,
-                brightness: Math.random() * 0.5 + 0.3
+                z: Math.random() * 1000,
+                size: Math.random() * 2 + 0.5,
+                baseBrightness: Math.random() * 0.7 + 0.3,
+                color: starColors[Math.floor(Math.random() * starColors.length)],
+                pulseSpeed: Math.random() * 0.02 + 0.01,
+                pulsePhase: Math.random() * Math.PI * 2
             });
         }
+
+        // ===== WATER COLORS FOR RIPPLE =====
+        const waterColors = {
+            deep: '#0a1a2a',
+            mid: '#1a3a5a',
+            light: '#2a5a7a',
+            ripple: '#3a6a8a',
+            highlight: '#5a9ac0'
+        };
 
         // ===== LOAD WARP DATA =====
         function loadWarpData() {
             try {
-                // Try to get warp data from localStorage
                 const savedData = localStorage.getItem('voidfarer_warp_data');
                 if (savedData) {
                     warpData = JSON.parse(savedData);
@@ -420,7 +454,7 @@
                 destName.textContent = warpData.destination;
                 destType.textContent = warpData.destinationType;
                 
-                // Set appropriate icon based on destination type
+                // Set icon based on destination type
                 if (warpData.destinationType.includes('gas')) {
                     destIcon.textContent = '🌪️';
                 } else if (warpData.destinationType.includes('lush') || warpData.destinationType.includes('verdant')) {
@@ -454,50 +488,98 @@
             starfieldCanvas.height = window.innerHeight;
             mapCanvas.width = window.innerWidth;
             mapCanvas.height = window.innerHeight;
+            rippleCanvas.width = window.innerWidth;
+            rippleCanvas.height = window.innerHeight;
         }
         resizeCanvases();
         window.addEventListener('resize', resizeCanvases);
 
-        // ===== DRAW STATIC STARFIELD =====
-        function drawStarfield() {
+        // ===== DRAW STARFIELD =====
+        function drawStarfield(progress, speedFactor) {
             starfieldCtx.clearRect(0, 0, starfieldCanvas.width, starfieldCanvas.height);
             
+            const w = starfieldCanvas.width;
+            const h = starfieldCanvas.height;
+            const centerX = w / 2;
+            const centerY = h / 2;
+            
             stars.forEach(star => {
-                starfieldCtx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                const pulse = Math.sin(Date.now() * star.pulseSpeed + star.pulsePhase) * 0.2 + 0.8;
+                const brightness = star.baseBrightness * pulse;
+                
+                // Calculate movement based on warp speed
+                if (speedFactor > 0.1) {
+                    const dx = star.x * w - centerX;
+                    const dy = star.y * h - centerY;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (distance > 0) {
+                        const moveX = (dx / distance) * speedFactor * 15;
+                        const moveY = (dy / distance) * speedFactor * 15;
+                        
+                        star.x = (star.x * w - moveX) / w;
+                        star.y = (star.y * h - moveY) / h;
+                        
+                        if (star.x < 0 || star.x > 1 || star.y < 0 || star.y > 1) {
+                            star.x = Math.random();
+                            star.y = Math.random();
+                            star.z = Math.random() * 1000;
+                        }
+                    }
+                }
+                
+                let x = star.x * w;
+                let y = star.y * h;
+                
+                // Streak effect
+                let streakLength = 0;
+                if (speedFactor > 0.3) {
+                    streakLength = speedFactor * 30 * (1 - star.z / 1000);
+                }
+                
+                if (streakLength > 2) {
+                    const angle = Math.atan2(y - centerY, x - centerX);
+                    const streakX = Math.cos(angle) * streakLength;
+                    const streakY = Math.sin(angle) * streakLength;
+                    
+                    starfieldCtx.beginPath();
+                    starfieldCtx.strokeStyle = star.color;
+                    starfieldCtx.lineWidth = star.size * 1.5;
+                    starfieldCtx.globalAlpha = brightness * 0.3;
+                    starfieldCtx.moveTo(x, y);
+                    starfieldCtx.lineTo(x - streakX, y - streakY);
+                    starfieldCtx.stroke();
+                }
+                
+                // Draw star core
                 starfieldCtx.beginPath();
-                starfieldCtx.arc(
-                    star.x * starfieldCanvas.width,
-                    star.y * starfieldCanvas.height,
-                    star.size,
-                    0,
-                    Math.PI * 2
-                );
+                starfieldCtx.fillStyle = star.color;
+                starfieldCtx.globalAlpha = brightness;
+                starfieldCtx.arc(x, y, star.size * (1 + speedFactor * 0.5), 0, Math.PI * 2);
                 starfieldCtx.fill();
             });
+            
+            starfieldCtx.globalAlpha = 1;
         }
 
-        // ===== DRAW MAP WITH PATH AND SHIP =====
-        function drawMap() {
+        // ===== DRAW MAP =====
+        function drawMap(progress, speedFactor) {
             mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
             
             const w = mapCanvas.width;
             const h = mapCanvas.height;
             
-            // Draw faint grid lines (galactic reference)
+            // Grid lines
             mapCtx.strokeStyle = 'rgba(74, 138, 192, 0.1)';
             mapCtx.lineWidth = 1;
             
-            // Vertical lines
             for (let i = 0; i <= 10; i++) {
                 const x = (i / 10) * w;
                 mapCtx.beginPath();
                 mapCtx.moveTo(x, 0);
                 mapCtx.lineTo(x, h);
                 mapCtx.stroke();
-            }
-            
-            // Horizontal lines
-            for (let i = 0; i <= 10; i++) {
+                
                 const y = (i / 10) * h;
                 mapCtx.beginPath();
                 mapCtx.moveTo(0, y);
@@ -505,18 +587,32 @@
                 mapCtx.stroke();
             }
             
-            // Draw path line (dotted)
+            // Path line
             mapCtx.beginPath();
             mapCtx.strokeStyle = '#4a8ac0';
             mapCtx.lineWidth = 3;
             mapCtx.setLineDash([10, 15]);
-            
             mapCtx.moveTo(startPos.x * w, startPos.y * h);
             mapCtx.lineTo(destPos.x * w, destPos.y * h);
             mapCtx.stroke();
             mapCtx.setLineDash([]);
             
-            // Draw start marker
+            // Energy pulses
+            const pulseCount = 3;
+            for (let i = 0; i < pulseCount; i++) {
+                const pulsePos = (progress + i / pulseCount) % 1;
+                const pulseX = startPos.x + (destPos.x - startPos.x) * pulsePos;
+                const pulseY = startPos.y + (destPos.y - startPos.y) * pulsePos;
+                
+                mapCtx.beginPath();
+                mapCtx.fillStyle = '#4affaa';
+                mapCtx.globalAlpha = 0.3 * (1 - pulsePos);
+                mapCtx.arc(pulseX * w, pulseY * h, 5, 0, Math.PI * 2);
+                mapCtx.fill();
+            }
+            mapCtx.globalAlpha = 1;
+            
+            // Start marker
             mapCtx.shadowColor = '#4affaa';
             mapCtx.shadowBlur = 20;
             mapCtx.fillStyle = '#4affaa';
@@ -524,7 +620,6 @@
             mapCtx.arc(startPos.x * w, startPos.y * h, 12, 0, Math.PI * 2);
             mapCtx.fill();
             
-            // Draw start label
             mapCtx.shadowBlur = 0;
             mapCtx.font = 'bold 14px "Exo 2", sans-serif';
             mapCtx.fillStyle = '#ffffff';
@@ -532,7 +627,7 @@
             mapCtx.shadowBlur = 4;
             mapCtx.fillText('START', startPos.x * w + 20, startPos.y * h - 15);
             
-            // Draw destination marker
+            // Destination marker
             mapCtx.shadowColor = '#ffaa4a';
             mapCtx.shadowBlur = 20;
             mapCtx.fillStyle = '#ffaa4a';
@@ -540,7 +635,6 @@
             mapCtx.arc(destPos.x * w, destPos.y * h, 12, 0, Math.PI * 2);
             mapCtx.fill();
             
-            // Draw destination label
             mapCtx.shadowBlur = 0;
             mapCtx.font = 'bold 14px "Exo 2", sans-serif';
             mapCtx.fillStyle = '#ffffff';
@@ -548,15 +642,27 @@
             mapCtx.shadowBlur = 4;
             mapCtx.fillText('DESTINATION', destPos.x * w - 100, destPos.y * h - 15);
             
-            // Draw ship (moving along path)
+            // Ship with trail
             const shipX = shipPos.x * w;
             const shipY = shipPos.y * h;
             
-            // Ship glow
+            const trailLength = 10;
+            for (let i = 1; i <= trailLength; i++) {
+                const trailFactor = i / trailLength;
+                const trailX = shipX - (destPos.x - startPos.x) * w * speedFactor * trailFactor * 0.5;
+                const trailY = shipY - (destPos.y - startPos.y) * h * speedFactor * trailFactor * 0.5;
+                
+                mapCtx.beginPath();
+                mapCtx.fillStyle = '#4affaa';
+                mapCtx.globalAlpha = 0.1 * (1 - trailFactor);
+                mapCtx.arc(trailX, trailY, 6 * (1 - trailFactor), 0, Math.PI * 2);
+                mapCtx.fill();
+            }
+            mapCtx.globalAlpha = 1;
+            
+            // Ship
             mapCtx.shadowColor = '#4affaa';
             mapCtx.shadowBlur = 30;
-            
-            // Draw ship as a small spacecraft
             mapCtx.fillStyle = '#ffffff';
             mapCtx.beginPath();
             mapCtx.moveTo(shipX, shipY - 12);
@@ -565,51 +671,172 @@
             mapCtx.lineTo(shipX - 10, shipY + 6);
             mapCtx.closePath();
             mapCtx.fill();
-            
-            // Reset shadow
             mapCtx.shadowBlur = 0;
         }
 
         // ===== UPDATE SHIP POSITION =====
         function updateShipPosition(progress) {
-            // Interpolate between start and destination
             shipPos.x = startPos.x + (destPos.x - startPos.x) * progress;
             shipPos.y = startPos.y + (destPos.y - startPos.y) * progress;
         }
 
+        // ===== GET SPEED FACTOR =====
+        function getSpeedFactor(cycleProgress) {
+            if (cycleProgress < 0.2) {
+                return 0.3 + (cycleProgress / 0.2) * 0.7;
+            } else if (cycleProgress > 0.8) {
+                return 1.0 - ((cycleProgress - 0.8) / 0.2) * 0.7;
+            } else {
+                return 1.0;
+            }
+        }
+
+        // ===== WATER RIPPLE EFFECT =====
+        function showWaterRipple() {
+            return new Promise((resolve) => {
+                // Hide other canvases
+                starfieldCanvas.style.opacity = '0.3';
+                mapCanvas.style.opacity = '0.3';
+                
+                // Show ripple canvas
+                rippleCanvas.style.display = 'block';
+                
+                const startTime = Date.now();
+                const duration = 3000; // 3 seconds
+                
+                function drawRipple() {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    rippleCtx.clearRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+                    
+                    const centerX = rippleCanvas.width / 2;
+                    const centerY = rippleCanvas.height / 2;
+                    
+                    // Dark deep water background
+                    rippleCtx.fillStyle = waterColors.deep;
+                    rippleCtx.fillRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+                    
+                    // Calculate ring size
+                    const ringSize = 30 + progress * 500;
+                    const opacity = Math.max(0, 1 - progress * 0.6);
+                    
+                    // Draw multiple ripples
+                    for (let i = 0; i < 5; i++) {
+                        const offset = i * 15;
+                        const rippleSize = ringSize - offset;
+                        if (rippleSize < 20) continue;
+                        
+                        const ringOpacity = opacity * (1 - i * 0.15);
+                        
+                        // Main ripple ring
+                        rippleCtx.beginPath();
+                        rippleCtx.arc(centerX, centerY, rippleSize, 0, Math.PI * 2);
+                        rippleCtx.strokeStyle = `rgba(42, 90, 122, ${ringOpacity * 0.8})`;
+                        rippleCtx.lineWidth = 3 - i * 0.5;
+                        rippleCtx.stroke();
+                        
+                        // Inner glow
+                        rippleCtx.beginPath();
+                        rippleCtx.arc(centerX, centerY, rippleSize - 2, 0, Math.PI * 2);
+                        rippleCtx.strokeStyle = `rgba(74, 138, 192, ${ringOpacity * 0.4})`;
+                        rippleCtx.lineWidth = 1.5;
+                        rippleCtx.stroke();
+                    }
+                    
+                    // Center splash
+                    const splashSize = 20 * (1 - progress * 0.5);
+                    
+                    const gradient = rippleCtx.createRadialGradient(
+                        centerX, centerY, 0,
+                        centerX, centerY, splashSize * 3
+                    );
+                    gradient.addColorStop(0, `rgba(90, 154, 192, ${opacity * 0.6})`);
+                    gradient.addColorStop(0.5, `rgba(42, 90, 122, ${opacity * 0.3})`);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    rippleCtx.fillStyle = gradient;
+                    rippleCtx.beginPath();
+                    rippleCtx.arc(centerX, centerY, splashSize * 3, 0, Math.PI * 2);
+                    rippleCtx.fill();
+                    
+                    // Water droplets
+                    for (let i = 0; i < 16; i++) {
+                        const angle = (i / 16) * Math.PI * 2 + (elapsed * 0.001);
+                        const distance = ringSize * 0.8 + Math.sin(elapsed * 0.005 + i) * 10;
+                        const x = centerX + Math.cos(angle) * distance;
+                        const y = centerY + Math.sin(angle) * distance;
+                        
+                        const dropletOpacity = opacity * 0.5 * (1 - distance / ringSize);
+                        
+                        rippleCtx.beginPath();
+                        rippleCtx.fillStyle = `rgba(100, 180, 220, ${dropletOpacity})`;
+                        rippleCtx.arc(x, y, 2 + Math.sin(elapsed * 0.01 + i) * 1, 0, Math.PI * 2);
+                        rippleCtx.fill();
+                    }
+                    
+                    // Secondary ripples
+                    for (let j = 0; j < 3; j++) {
+                        const secondarySize = ringSize * 0.6 + Math.sin(elapsed * 0.003 + j) * 20;
+                        
+                        rippleCtx.beginPath();
+                        rippleCtx.arc(centerX, centerY, secondarySize, 0, Math.PI * 2);
+                        rippleCtx.strokeStyle = `rgba(32, 70, 102, ${opacity * 0.3})`;
+                        rippleCtx.lineWidth = 2;
+                        rippleCtx.stroke();
+                    }
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(drawRipple);
+                    } else {
+                        // Fade out ripple and resolve
+                        setTimeout(() => {
+                            rippleCanvas.style.display = 'none';
+                            starfieldCanvas.style.opacity = '1';
+                            mapCanvas.style.opacity = '1';
+                            resolve();
+                        }, 500);
+                    }
+                }
+                
+                drawRipple();
+            });
+        }
+
         // ===== UPDATE CYCLE =====
-        function updateCycle() {
+        async function updateCycle() {
             const elapsed = Date.now() - startTime;
             const totalDuration = warpData.warpCycles * CYCLE_DURATION;
             const progress = Math.min(elapsed / totalDuration, 1);
 
-            // Calculate current cycle
+            const cycleElapsed = elapsed % CYCLE_DURATION;
+            const cycleProgress = cycleElapsed / CYCLE_DURATION;
+            const speedFactor = getSpeedFactor(cycleProgress);
+
             const newCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
             if (newCycle <= warpData.warpCycles && newCycle !== currentCycle) {
                 currentCycle = newCycle;
                 currentCycleSpan.textContent = currentCycle;
                 
-                // Update status message based on progress
                 statusMessage.textContent = getStatusMessage(progress);
                 statusMessage.classList.add('visible');
                 setTimeout(() => {
                     statusMessage.classList.remove('visible');
                 }, 800);
 
-                // Haptic feedback
                 if (tg?.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('light');
                 }
             }
 
-            // Update ship position
             updateShipPosition(progress);
-
-            // Redraw map
-            drawMap();
+            drawStarfield(progress, speedFactor);
+            drawMap(progress, speedFactor);
 
             // Check if warp complete
             if (elapsed >= totalDuration) {
+                // Show water ripple effect before navigating
+                await showWaterRipple();
                 completeWarp();
             }
 
@@ -618,10 +845,15 @@
 
         // ===== GET STATUS MESSAGE =====
         function getStatusMessage(progress) {
-            if (progress < 0.2) return 'DEPARTING';
-            if (progress < 0.4) return 'INTERSTELLAR SPACE';
-            if (progress < 0.6) return 'CROSSING VOID';
-            if (progress < 0.8) return 'APPROACHING DESTINATION';
+            if (progress < 0.1) return 'INITIATING WARP';
+            if (progress < 0.2) return 'ACCELERATING';
+            if (progress < 0.3) return 'LEAVING SYSTEM';
+            if (progress < 0.4) return 'INTERSTELLAR VOID';
+            if (progress < 0.5) return 'CROSSING NEBULA';
+            if (progress < 0.6) return 'MAXIMUM WARP';
+            if (progress < 0.7) return 'PASSING PULSAR';
+            if (progress < 0.8) return 'APPROACHING';
+            if (progress < 0.9) return 'DECELERATING';
             if (progress < 1) return 'FINAL APPROACH';
             return 'ARRIVING';
         }
@@ -629,31 +861,23 @@
         // ===== ANIMATION LOOP =====
         function animate() {
             updateCycle();
-            drawStarfield();
-            
             animationFrame = requestAnimationFrame(animate);
         }
 
         // ===== COMPLETE WARP =====
         function completeWarp() {
-            // Clear warp data
             localStorage.removeItem('voidfarer_warp_data');
-            
-            // Navigate to destination (surface)
             window.location.href = warpData.returnPage || 'surface.html';
         }
 
         // ===== INITIALIZE =====
         function init() {
             try {
-                // Load warp data
                 loadWarpData();
                 
-                // Draw initial map
-                drawMap();
-                drawStarfield();
+                drawStarfield(0, 0);
+                drawMap(0, 0);
                 
-                // Start animation
                 setTimeout(() => {
                     statusMessage.classList.add('visible');
                     setTimeout(() => {
