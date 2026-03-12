@@ -259,6 +259,22 @@
             background: linear-gradient(90deg, #ffaa4a, #ffcc6a);
         }
         
+        .fill-mass {
+            background: linear-gradient(90deg, #4affaa, #ffaa4a, #ff6b6b);
+        }
+        
+        /* Mass warning */
+        .mass-warning {
+            color: #ffaa4a;
+            font-size: 12px;
+            margin-top: 5px;
+            text-align: right;
+        }
+        
+        .mass-critical {
+            color: #ff6b6b;
+        }
+        
         /* Upgrades Grid */
         .upgrades-grid {
             display: grid;
@@ -444,8 +460,12 @@
             color: #ffd966;
         }
         
-        .element-value {
+        .element-mass {
             color: #4affaa;
+        }
+        
+        .element-value {
+            color: #ffaa4a;
         }
         
         .element-rarity-badge {
@@ -552,6 +572,7 @@
             box-shadow: 0 0 30px #3a5a8a;
             z-index: 100;
             margin-top: 20px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -598,7 +619,7 @@
                         <div class="stat-item">
                             <div class="stat-label">FUEL</div>
                             <div class="stat-value" id="fuelValue">--</div>
-                            <span class="stat-unit">⭐</span>
+                            <span class="stat-unit">%</span>
                         </div>
                         <div class="stat-item">
                             <div class="stat-label">POWER</div>
@@ -606,14 +627,14 @@
                             <span class="stat-unit">%</span>
                         </div>
                         <div class="stat-item">
-                            <div class="stat-label">CARGO</div>
+                            <div class="stat-label">CARGO MASS</div>
                             <div class="stat-value" id="cargoValue">--</div>
-                            <span class="stat-unit">/100</span>
+                            <span class="stat-unit">AMU</span>
                         </div>
                         <div class="stat-item">
-                            <div class="stat-label">VALUE</div>
-                            <div class="stat-value" id="portfolioValue">--</div>
-                            <span class="stat-unit">⭐</span>
+                            <div class="stat-label">CARGO LIMIT</div>
+                            <div class="stat-value" id="cargoLimit">1000</div>
+                            <span class="stat-unit">AMU</span>
                         </div>
                     </div>
                 </div>
@@ -649,12 +670,23 @@
                     </div>
                 </div>
                 
+                <div class="progress-section">
+                    <div class="progress-header">
+                        <span>Cargo Mass</span>
+                        <span id="cargoPercent">--%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-fill fill-mass" id="cargoBar" style="width: 0%"></div>
+                    </div>
+                    <div class="mass-warning" id="massWarning"></div>
+                </div>
+                
                 <!-- Property Summary -->
                 <div class="property-summary">
                     <div class="property-summary-title">🏢 Real Estate Summary</div>
                     <div class="property-summary-stats">
                         <span>Properties Owned: <span class="property-summary-value" id="propertyCount">--</span></span>
-                        <span>Total Storage: <span class="property-summary-value" id="totalPropertyStorage">--</span></span>
+                        <span>Total Storage: <span class="property-summary-value" id="totalPropertyStorage">--</span> AMU</span>
                     </div>
                 </div>
                 
@@ -675,15 +707,15 @@
                     <div class="journal-stats-grid">
                         <div class="journal-stat">
                             <div class="journal-stat-value" id="totalElements">--</div>
-                            <div class="journal-stat-label">TOTAL</div>
+                            <div class="journal-stat-label">TOTAL ITEMS</div>
                         </div>
                         <div class="journal-stat">
                             <div class="journal-stat-value" id="uniqueElements">--</div>
                             <div class="journal-stat-label">UNIQUE</div>
                         </div>
                         <div class="journal-stat">
-                            <div class="journal-stat-value" id="completionPct">--%</div>
-                            <div class="journal-stat-label">COMPLETE</div>
+                            <div class="journal-stat-value" id="totalMass">--</div>
+                            <div class="journal-stat-label">TOTAL MASS</div>
                         </div>
                     </div>
                 </div>
@@ -743,6 +775,9 @@
         // ===== MAKE SURE idb IS AVAILABLE =====
         const { openDB } = idb;
 
+        // ===== CONSTANTS =====
+        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -761,6 +796,65 @@
         let currentFilter = 'all';
         let portfolioChart = null;
         let elements = [];
+
+        // ===== ELEMENT MASS DATABASE =====
+        const elementDatabase = {
+            // Common
+            'Hydrogen': { icon: '💧', rarity: 'common', mass: 1.008 },
+            'Helium': { icon: '🎈', rarity: 'common', mass: 4.003 },
+            'Lithium': { icon: '🔋', rarity: 'common', mass: 6.94 },
+            'Beryllium': { icon: '💎', rarity: 'common', mass: 9.012 },
+            'Boron': { icon: '🧪', rarity: 'common', mass: 10.81 },
+            'Sodium': { icon: '🧂', rarity: 'common', mass: 22.99 },
+            'Magnesium': { icon: '✨', rarity: 'common', mass: 24.31 },
+            'Aluminum': { icon: '🥫', rarity: 'common', mass: 26.98 },
+            'Silicon': { icon: '💻', rarity: 'common', mass: 28.09 },
+            'Potassium': { icon: '🍌', rarity: 'common', mass: 39.10 },
+            'Calcium': { icon: '🥛', rarity: 'common', mass: 40.08 },
+            
+            // Uncommon
+            'Carbon': { icon: '⚫', rarity: 'uncommon', mass: 12.01 },
+            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', mass: 14.01 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', mass: 16.00 },
+            'Fluorine': { icon: '🧪', rarity: 'uncommon', mass: 19.00 },
+            'Neon': { icon: '💡', rarity: 'uncommon', mass: 20.18 },
+            'Phosphorus': { icon: '✨', rarity: 'uncommon', mass: 30.97 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', mass: 32.06 },
+            'Chlorine': { icon: '🧪', rarity: 'uncommon', mass: 35.45 },
+            'Argon': { icon: '🎈', rarity: 'uncommon', mass: 39.95 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', mass: 55.85 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', mass: 58.69 },
+            'Lead': { icon: '🔘', rarity: 'uncommon', mass: 207.2 },
+            
+            // Rare
+            'Gold': { icon: '🟡', rarity: 'rare', mass: 197.0 },
+            'Silver': { icon: '⚪', rarity: 'rare', mass: 107.9 },
+            'Platinum': { icon: '⬜', rarity: 'rare', mass: 195.1 },
+            'Titanium': { icon: '🔷', rarity: 'rare', mass: 47.87 },
+            'Copper': { icon: '🔴', rarity: 'rare', mass: 63.55 },
+            'Zinc': { icon: '⚪', rarity: 'rare', mass: 65.38 },
+            'Tin': { icon: '🥫', rarity: 'rare', mass: 118.7 },
+            'Cobalt': { icon: '🔵', rarity: 'rare', mass: 58.93 },
+            'Chromium': { icon: '✨', rarity: 'rare', mass: 52.00 },
+            
+            // Very Rare
+            'Uranium': { icon: '🟣', rarity: 'very-rare', mass: 238.0 },
+            'Thorium': { icon: '🔮', rarity: 'very-rare', mass: 232.0 },
+            'Plutonium': { icon: '☢️', rarity: 'very-rare', mass: 244.0 },
+            'Radium': { icon: '💀', rarity: 'very-rare', mass: 226.0 },
+            'Polonium': { icon: '💀', rarity: 'very-rare', mass: 209.0 },
+            
+            // Legendary
+            'Promethium': { icon: '✨', rarity: 'legendary', mass: 145.0 },
+            'Technetium': { icon: '🧪', rarity: 'legendary', mass: 98.0 },
+            'Astatine': { icon: '☣️', rarity: 'legendary', mass: 210.0 },
+            'Francium': { icon: '💥', rarity: 'legendary', mass: 223.0 }
+        };
+
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            return elementDatabase[elementName]?.mass || 100.0;
+        }
 
         // ===== TAB SWITCHING =====
         function switchTab(tabName) {
@@ -792,15 +886,50 @@
         async function loadShipData() {
             try {
                 // Load all ship data with fallbacks
-                const player = typeof getPlayer === 'function' ? await getPlayer() : { ship: 'Prospector' };
-                const fuel = typeof getShipFuel === 'function' ? await getShipFuel() : 100;
-                const power = typeof getShipPower === 'function' ? await getShipPower() : 100;
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
-                const collection = typeof getCollection === 'function' ? await getCollection() : {};
-                const realEstate = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
-                const upgrades = typeof getShipUpgrades === 'function' ? await getShipUpgrades() : {
+                let player = { ship: 'Prospector' };
+                if (typeof getPlayer === 'function') {
+                    player = await getPlayer() || player;
+                }
+
+                let fuel = 100;
+                if (typeof getShipFuel === 'function') {
+                    fuel = await getShipFuel();
+                }
+
+                let power = 100;
+                if (typeof getShipPower === 'function') {
+                    power = await getShipPower();
+                }
+
+                let credits = 5000;
+                if (typeof getCredits === 'function') {
+                    credits = await getCredits();
+                }
+
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                }
+
+                let realEstate = { properties: [] };
+                if (typeof getRealEstate === 'function') {
+                    realEstate = await getRealEstate();
+                }
+
+                let upgrades = {
                     engine: 1, shields: 1, miningLaser: 1, cargoHold: 1, warpDrive: 1, scanner: 1
                 };
+                if (typeof getShipUpgrades === 'function') {
+                    upgrades = await getShipUpgrades();
+                }
+
+                // Calculate cargo mass
+                let cargoMass = 0;
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = data.count || 1;
+                    const mass = getElementMass(name);
+                    cargoMass += count * mass;
+                }
 
                 // Ship name
                 document.getElementById('shipName').textContent = player?.ship || 'Prospector';
@@ -819,17 +948,24 @@
                 document.getElementById('hullPercent').textContent = '100%';
                 document.getElementById('hullBar').style.width = '100%';
 
-                // Collection stats
-                const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
-                
-                // Calculate cargo usage
-                let cargoUsed = 0;
-                Object.keys(collection).forEach(name => {
-                    const size = getElementSize(name);
-                    cargoUsed += (collection[name].count || 1) * size;
-                });
+                // Cargo mass
+                const cargoPercent = (cargoMass / CARGO_MASS_LIMIT) * 100;
+                document.getElementById('cargoValue').textContent = cargoMass.toFixed(1);
+                document.getElementById('cargoLimit').textContent = CARGO_MASS_LIMIT;
+                document.getElementById('cargoPercent').textContent = cargoPercent.toFixed(1) + '%';
+                document.getElementById('cargoBar').style.width = Math.min(100, cargoPercent) + '%';
 
-                document.getElementById('cargoValue').textContent = Math.min(cargoUsed, 100);
+                // Mass warning
+                const warningEl = document.getElementById('massWarning');
+                if (cargoPercent > 90) {
+                    warningEl.textContent = '⚠️ CRITICAL: Cargo nearly full!';
+                    warningEl.classList.add('mass-critical');
+                } else if (cargoPercent > 75) {
+                    warningEl.textContent = '⚠️ Warning: Cargo approaching limit';
+                    warningEl.classList.remove('mass-critical');
+                } else {
+                    warningEl.textContent = '';
+                }
 
                 // Calculate portfolio value
                 let portfolioValue = 0;
@@ -852,21 +988,7 @@
 
             } catch (error) {
                 console.error('Error loading ship data:', error);
-                // Show error but don't redirect
-                document.getElementById('shipName').textContent = 'Error loading data';
             }
-        }
-
-        // ===== GET ELEMENT SIZE =====
-        function getElementSize(elementName) {
-            const elementDatabase = {
-                'Carbon': 1, 'Silicon': 1, 'Hydrogen': 1, 'Helium': 1,
-                'Iron': 1, 'Oxygen': 1, 'Nickel': 1,
-                'Gold': 2, 'Silver': 2, 'Platinum': 2, 'Titanium': 2,
-                'Uranium': 3, 'Thorium': 3, 'Plutonium': 3,
-                'Promethium': 5, 'Technetium': 5, 'Astatine': 5
-            };
-            return elementDatabase[elementName] || 1;
         }
 
         // ===== LOAD PROPERTY SUMMARY =====
@@ -989,81 +1111,59 @@
 
         // ===== JOURNAL TAB FUNCTIONS =====
         
-        // Element database with icons
-        const elementDatabase = {
-            // Common
-            'Carbon': { icon: '⚫', rarity: 'common' },
-            'Silicon': { icon: '💎', rarity: 'common' },
-            'Hydrogen': { icon: '💧', rarity: 'common' },
-            'Helium': { icon: '🎈', rarity: 'common' },
-            'Sodium': { icon: '🧂', rarity: 'common' },
-            'Lithium': { icon: '🔋', rarity: 'common' },
-            
-            // Uncommon
-            'Iron': { icon: '⚙️', rarity: 'uncommon' },
-            'Oxygen': { icon: '💨', rarity: 'uncommon' },
-            'Nickel': { icon: '🔩', rarity: 'uncommon' },
-            'Sulfur': { icon: '🟡', rarity: 'uncommon' },
-            'Magnesium': { icon: '✨', rarity: 'uncommon' },
-            
-            // Rare
-            'Gold': { icon: '🟡', rarity: 'rare' },
-            'Silver': { icon: '⚪', rarity: 'rare' },
-            'Platinum': { icon: '⬜', rarity: 'rare' },
-            'Titanium': { icon: '🔷', rarity: 'rare' },
-            'Copper': { icon: '🔴', rarity: 'rare' },
-            
-            // Very Rare
-            'Uranium': { icon: '🟣', rarity: 'very-rare' },
-            'Thorium': { icon: '🔮', rarity: 'very-rare' },
-            'Plutonium': { icon: '☢️', rarity: 'very-rare' },
-            
-            // Legendary
-            'Promethium': { icon: '✨', rarity: 'legendary' },
-            'Technetium': { icon: '🧪', rarity: 'legendary' },
-            'Astatine': { icon: '☣️', rarity: 'legendary' }
-        };
-
         // Load journal data
         async function loadJournalData() {
             try {
-                const collection = typeof getCollection === 'function' ? await getCollection() : {};
-                const realEstate = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                }
+
+                let realEstate = { properties: [] };
+                if (typeof getRealEstate === 'function') {
+                    realEstate = await getRealEstate();
+                }
 
                 const properties = realEstate.properties || [];
 
                 elements = [];
                 let shipValue = 0;
                 let propertyValue = 0;
+                let totalMass = 0;
 
-                // Calculate ship cargo value
+                // Calculate ship cargo value and mass
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
                     const marketPrice = typeof getLatestPrice === 'function' ? await getLatestPrice(name) : 100;
+                    const mass = getElementMass(name);
                     const elementValue = count * marketPrice;
+                    const elementMass = count * mass;
+                    
                     shipValue += elementValue;
+                    totalMass += elementMass;
 
                     elements.push({
                         name: name,
                         count: count,
                         icon: elementDatabase[name]?.icon || '🔹',
                         rarity: elementDatabase[name]?.rarity || 'common',
+                        mass: mass,
+                        totalMass: elementMass,
                         marketPrice: marketPrice,
                         value: elementValue
                     });
                 }
 
                 // Calculate property value (estimate)
-                propertyValue = properties.length * 10000; // Rough estimate
+                propertyValue = properties.length * 10000;
 
                 // Calculate stats
-                const totalElements = typeof getTotalElementCount === 'function' ? await getTotalElementCount() : 0;
-                const uniqueElements = typeof getUniqueElementsCount === 'function' ? await getUniqueElementsCount() : 0;
-                const completionPct = Math.round((uniqueElements / 118) * 100);
+                const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
+                const uniqueElements = Object.keys(collection).length;
 
-                document.getElementById('totalElements').textContent = totalElements;
+                document.getElementById('totalElements').textContent = totalItems;
                 document.getElementById('uniqueElements').textContent = uniqueElements;
-                document.getElementById('completionPct').textContent = completionPct + '%';
+                document.getElementById('totalMass').textContent = totalMass.toFixed(1) + ' AMU';
 
                 document.getElementById('shipValue').textContent = shipValue.toLocaleString() + '⭐';
                 document.getElementById('propertyValue').textContent = propertyValue.toLocaleString() + '⭐';
@@ -1168,6 +1268,7 @@
                         <div class="element-name">${element.name}</div>
                         <div class="element-details">
                             <span class="element-count">📦 ${element.count}</span>
+                            <span class="element-mass">⚖️ ${element.totalMass.toFixed(1)} AMU</span>
                             <span class="element-value">💰 ${element.marketPrice}⭐</span>
                         </div>
                     </div>
@@ -1180,7 +1281,6 @@
 
         // Filter journal
         function filterJournal(rarity) {
-            // Update active filter pill
             document.querySelectorAll('.filter-pill').forEach(pill => {
                 pill.classList.remove('active');
             });
@@ -1199,7 +1299,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading ship systems...';
 
-                // Load ship data for status tab - don't check credits, just try to load
+                // Load ship data for status tab
                 await loadShipData();
 
                 // Hide loading
