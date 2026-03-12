@@ -46,7 +46,7 @@
             background: #0a1a2a;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 20px 20px 100px 20px; /* Increased bottom padding for fixed button */
+            padding: 20px 20px 100px 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
@@ -361,6 +361,7 @@
             gap: 15px;
             color: #a0c0ff;
             font-size: 13px;
+            flex-wrap: wrap;
         }
         
         .item-quantity {
@@ -368,8 +369,13 @@
             font-weight: 600;
         }
         
-        .item-value {
+        .item-mass {
             color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .item-value {
+            color: #ffaa4a;
         }
         
         .item-market {
@@ -626,7 +632,7 @@
             text-align: center;
             color: #a0c0ff;
             font-size: 14px;
-            margin: 20px 0 80px; /* Increased bottom margin for fixed button */
+            margin: 20px 0 80px;
             font-style: italic;
             font-family: 'Exo 2', sans-serif;
             animation: fade-in-out 2s infinite;
@@ -695,6 +701,19 @@
             flex: 0 1 auto;
         }
 
+        /* Mass warning */
+        .mass-warning {
+            color: #ff6b6b;
+            font-size: 12px;
+            margin-top: 5px;
+            text-align: center;
+            display: none;
+        }
+        
+        .mass-warning.visible {
+            display: block;
+        }
+
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -716,7 +735,7 @@
             <!-- Header -->
             <div class="cargo-header">
                 <div class="cargo-title">Cargo Hold</div>
-                <div class="cargo-subtitle">✦ inventory management ✦</div>
+                <div class="cargo-subtitle">✦ mass-based storage ✦</div>
             </div>
             
             <!-- Stats Bar -->
@@ -725,18 +744,21 @@
                     <span>⭐</span> --
                 </div>
                 <div class="cargo-capacity" id="cargoCapacityDisplay">
-                    Used: --/100
+                    Mass: --/1000 AMU
                 </div>
             </div>
             
             <!-- Capacity Card -->
             <div class="capacity-card">
                 <div class="capacity-header">
-                    <span class="capacity-label">Ship Storage</span>
-                    <span class="capacity-numbers" id="capacityText">-- / 100</span>
+                    <span class="capacity-label">Mass Capacity</span>
+                    <span class="capacity-numbers" id="capacityText">-- / 1000 AMU</span>
                 </div>
                 <div class="capacity-bar-bg">
                     <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
+                </div>
+                <div class="mass-warning" id="massWarning">
+                    ⚠️ Approaching mass limit
                 </div>
             </div>
             
@@ -763,8 +785,8 @@
                     <option value="">Select a property...</option>
                 </select>
                 <div class="property-stats" id="propertyStats">
-                    <span>Used: <span id="propertyUsed">0</span></span>
-                    <span>Capacity: <span id="propertyCapacity">0</span></span>
+                    <span>Used: <span id="propertyUsed">0</span> AMU</span>
+                    <span>Capacity: <span id="propertyCapacity">0</span> AMU</span>
                 </div>
                 <button class="transfer-btn" id="transferBtn" onclick="transferSelectedItem()" disabled>TRANSFER</button>
             </div>
@@ -791,6 +813,8 @@
                     <option value="name-desc">Name (Z-A)</option>
                     <option value="quantity-desc">Quantity (High-Low)</option>
                     <option value="quantity-asc">Quantity (Low-High)</option>
+                    <option value="mass-desc">Mass (High-Low)</option>
+                    <option value="mass-asc">Mass (Low-High)</option>
                     <option value="value-desc">Value (High-Low)</option>
                     <option value="value-asc">Value (Low-High)</option>
                     <option value="rarity-desc">Rarity (Rarest first)</option>
@@ -812,7 +836,7 @@
             <!-- Scroll Hint -->
             <div class="scroll-hint">▼ scroll down to return to bridge ▼</div>
             
-            <!-- Enhanced Back Button - Fixed position -->
+            <!-- Enhanced Back Button -->
             <button class="back-button" onclick="returnToBridge()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">RETURN TO BRIDGE</span>
@@ -824,6 +848,7 @@
                 <div class="modal-content">
                     <div class="modal-title" id="modalItemName">Item Name</div>
                     <div class="modal-details" id="modalItemDetails">Quantity: 0</div>
+                    <div class="modal-mass" id="modalItemMass">Mass: 0 AMU each</div>
                     <div class="modal-market-price" id="modalMarketPrice">0⭐</div>
                     <div class="modal-price-change" id="modalPriceChange">0%</div>
                     <div class="modal-buttons">
@@ -858,6 +883,9 @@
             tg.setBackgroundColor('#0a1a2a');
         }
 
+        // ===== CONSTANTS =====
+        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -875,46 +903,71 @@
         let selectedPropertyId = null;
         let currentCollection = {};
         let currentCredits = 0;
+        let currentMass = 0;
 
-        // ===== ELEMENT DATABASE =====
+        // ===== ELEMENT DATABASE WITH MASS =====
         const elementDatabase = {
             // Common
-            'Carbon': { icon: '⚫', rarity: 'common', size: 1 },
-            'Silicon': { icon: '💎', rarity: 'common', size: 1 },
-            'Hydrogen': { icon: '💧', rarity: 'common', size: 1 },
-            'Helium': { icon: '🎈', rarity: 'common', size: 1 },
-            'Sodium': { icon: '🧂', rarity: 'common', size: 1 },
-            'Lithium': { icon: '🔋', rarity: 'common', size: 1 },
+            'Hydrogen': { icon: '💧', rarity: 'common', mass: 1.008 },
+            'Helium': { icon: '🎈', rarity: 'common', mass: 4.003 },
+            'Lithium': { icon: '🔋', rarity: 'common', mass: 6.94 },
+            'Beryllium': { icon: '💎', rarity: 'common', mass: 9.012 },
+            'Boron': { icon: '🧪', rarity: 'common', mass: 10.81 },
+            'Sodium': { icon: '🧂', rarity: 'common', mass: 22.99 },
+            'Magnesium': { icon: '✨', rarity: 'common', mass: 24.31 },
+            'Aluminum': { icon: '🥫', rarity: 'common', mass: 26.98 },
+            'Silicon': { icon: '💻', rarity: 'common', mass: 28.09 },
+            'Potassium': { icon: '🍌', rarity: 'common', mass: 39.10 },
+            'Calcium': { icon: '🥛', rarity: 'common', mass: 40.08 },
             
             // Uncommon
-            'Iron': { icon: '⚙️', rarity: 'uncommon', size: 1 },
-            'Oxygen': { icon: '💨', rarity: 'uncommon', size: 1 },
-            'Nickel': { icon: '🔩', rarity: 'uncommon', size: 1 },
-            'Sulfur': { icon: '🟡', rarity: 'uncommon', size: 1 },
-            'Magnesium': { icon: '✨', rarity: 'uncommon', size: 1 },
+            'Carbon': { icon: '⚫', rarity: 'uncommon', mass: 12.01 },
+            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', mass: 14.01 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', mass: 16.00 },
+            'Fluorine': { icon: '🧪', rarity: 'uncommon', mass: 19.00 },
+            'Neon': { icon: '💡', rarity: 'uncommon', mass: 20.18 },
+            'Phosphorus': { icon: '✨', rarity: 'uncommon', mass: 30.97 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', mass: 32.06 },
+            'Chlorine': { icon: '🧪', rarity: 'uncommon', mass: 35.45 },
+            'Argon': { icon: '🎈', rarity: 'uncommon', mass: 39.95 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', mass: 55.85 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', mass: 58.69 },
+            'Lead': { icon: '🔘', rarity: 'uncommon', mass: 207.2 },
             
             // Rare
-            'Gold': { icon: '🟡', rarity: 'rare', size: 2 },
-            'Silver': { icon: '⚪', rarity: 'rare', size: 2 },
-            'Platinum': { icon: '⬜', rarity: 'rare', size: 2 },
-            'Titanium': { icon: '🔷', rarity: 'rare', size: 2 },
-            'Copper': { icon: '🔴', rarity: 'rare', size: 2 },
+            'Gold': { icon: '🟡', rarity: 'rare', mass: 197.0 },
+            'Silver': { icon: '⚪', rarity: 'rare', mass: 107.9 },
+            'Platinum': { icon: '⬜', rarity: 'rare', mass: 195.1 },
+            'Titanium': { icon: '🔷', rarity: 'rare', mass: 47.87 },
+            'Copper': { icon: '🔴', rarity: 'rare', mass: 63.55 },
+            'Zinc': { icon: '⚪', rarity: 'rare', mass: 65.38 },
+            'Tin': { icon: '🥫', rarity: 'rare', mass: 118.7 },
+            'Cobalt': { icon: '🔵', rarity: 'rare', mass: 58.93 },
+            'Chromium': { icon: '✨', rarity: 'rare', mass: 52.00 },
             
             // Very Rare
-            'Uranium': { icon: '🟣', rarity: 'very-rare', size: 3 },
-            'Thorium': { icon: '🔮', rarity: 'very-rare', size: 3 },
-            'Plutonium': { icon: '☢️', rarity: 'very-rare', size: 3 },
+            'Uranium': { icon: '🟣', rarity: 'very-rare', mass: 238.0 },
+            'Thorium': { icon: '🔮', rarity: 'very-rare', mass: 232.0 },
+            'Plutonium': { icon: '☢️', rarity: 'very-rare', mass: 244.0 },
+            'Radium': { icon: '💀', rarity: 'very-rare', mass: 226.0 },
+            'Polonium': { icon: '💀', rarity: 'very-rare', mass: 209.0 },
             
             // Legendary
-            'Promethium': { icon: '✨', rarity: 'legendary', size: 5 },
-            'Technetium': { icon: '🧪', rarity: 'legendary', size: 5 },
-            'Astatine': { icon: '☣️', rarity: 'legendary', size: 5 }
+            'Promethium': { icon: '✨', rarity: 'legendary', mass: 145.0 },
+            'Technetium': { icon: '🧪', rarity: 'legendary', mass: 98.0 },
+            'Astatine': { icon: '☣️', rarity: 'legendary', mass: 210.0 },
+            'Francium': { icon: '💥', rarity: 'legendary', mass: 223.0 }
         };
 
         // ===== NAVIGATION =====
         function returnToBridge() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
+        }
+
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            return elementDatabase[elementName]?.mass || 100.0;
         }
 
         // ===== LOAD DATA =====
@@ -927,36 +980,42 @@
                     await updateDailyPrices();
                 }
 
-                // Load all data with fallbacks - try both storage methods
+                // Load all data with fallbacks
                 let credits = 5000;
                 let collection = {};
                 let realEstateData = { properties: [] };
+                let massLimit = CARGO_MASS_LIMIT;
 
-                // Try to get from storage functions first
+                // Try to get from storage functions
                 if (typeof getCredits === 'function') {
                     try {
                         credits = await getCredits();
-                        console.log('Got credits from function:', credits);
                     } catch (e) {
-                        console.warn('Error getting credits from function:', e);
+                        console.warn('Error getting credits:', e);
                     }
                 }
 
                 if (typeof getCollection === 'function') {
                     try {
                         collection = await getCollection();
-                        console.log('Got collection from function:', collection);
                     } catch (e) {
-                        console.warn('Error getting collection from function:', e);
+                        console.warn('Error getting collection:', e);
                     }
                 }
 
                 if (typeof getRealEstate === 'function') {
                     try {
                         realEstateData = await getRealEstate();
-                        console.log('Got real estate from function');
                     } catch (e) {
-                        console.warn('Error getting real estate from function:', e);
+                        console.warn('Error getting real estate:', e);
+                    }
+                }
+
+                if (typeof getTotalCargoMass === 'function') {
+                    try {
+                        currentMass = await getTotalCargoMass();
+                    } catch (e) {
+                        console.warn('Error getting cargo mass:', e);
                     }
                 }
 
@@ -966,23 +1025,9 @@
                         const localCollection = localStorage.getItem('voidfarer_collection');
                         if (localCollection) {
                             collection = JSON.parse(localCollection);
-                            console.log('Got collection from localStorage:', collection);
                         }
                     } catch (e) {
                         console.warn('Error parsing localStorage collection:', e);
-                    }
-                }
-
-                // If still no credits, try localStorage
-                if (credits === 5000) {
-                    try {
-                        const localCredits = localStorage.getItem('voidfarer_credits');
-                        if (localCredits) {
-                            credits = parseInt(localCredits);
-                            console.log('Got credits from localStorage:', credits);
-                        }
-                    } catch (e) {
-                        console.warn('Error getting credits from localStorage:', e);
                     }
                 }
 
@@ -993,32 +1038,33 @@
                 // Update header
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
 
-                // Build cargo items with market data
+                // Build cargo items with market data and mass
                 cargoItems = [];
+                let calculatedMass = 0;
+                
                 for (const [name, data] of Object.entries(collection)) {
                     const elementData = elementDatabase[name] || {
                         icon: '🔹',
                         rarity: 'common',
-                        size: 1
+                        mass: 100.0
                     };
                     const count = data.count || 1;
+                    const mass = elementData.mass;
+                    const totalMass = count * mass;
+                    calculatedMass += totalMass;
                     
                     let marketPrice = 100;
                     if (typeof getLatestPrice === 'function') {
                         try {
                             marketPrice = await getLatestPrice(name) || 100;
-                        } catch (e) {
-                            console.warn('Error getting price for', name, e);
-                        }
+                        } catch (e) {}
                     }
                     
                     let priceChange = 0;
                     if (typeof calculatePriceChange === 'function') {
                         try {
                             priceChange = await calculatePriceChange(name, 1) || 0;
-                        } catch (e) {
-                            console.warn('Error getting price change for', name, e);
-                        }
+                        } catch (e) {}
                     }
                     
                     cargoItems.push({
@@ -1026,14 +1072,15 @@
                         count: count,
                         icon: elementData.icon,
                         rarity: elementData.rarity,
-                        size: elementData.size,
+                        mass: mass,
+                        totalMass: totalMass,
                         marketPrice: marketPrice,
                         priceChange: priceChange,
                         totalValue: count * marketPrice
                     });
-                    
-                    console.log(`Loaded cargo item: ${name} x${count}`);
                 }
+
+                currentMass = calculatedMass;
 
                 // Update stats and UI
                 updateStats();
@@ -1054,18 +1101,22 @@
             const uniqueItems = cargoItems.length;
             const totalValue = cargoItems.reduce((sum, item) => sum + item.totalValue, 0);
             
-            // Calculate cargo usage (each item takes size * count space)
-            const cargoUsed = cargoItems.reduce((sum, item) => sum + (item.size * item.count), 0);
-            const cargoMax = 100;
-            
             document.getElementById('totalItems').textContent = totalItems;
             document.getElementById('uniqueItems').textContent = uniqueItems;
             document.getElementById('totalValue').textContent = totalValue.toLocaleString();
-            document.getElementById('capacityText').textContent = `${cargoUsed} / ${cargoMax}`;
-            document.getElementById('cargoCapacityDisplay').textContent = `Used: ${cargoUsed}/${cargoMax}`;
-            document.getElementById('capacityBar').style.width = Math.min(100, (cargoUsed / cargoMax) * 100) + '%';
+            document.getElementById('capacityText').textContent = `${currentMass.toFixed(1)} / ${CARGO_MASS_LIMIT} AMU`;
+            document.getElementById('cargoCapacityDisplay').textContent = `Mass: ${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
             
-            console.log(`Stats updated: ${totalItems} total items, ${uniqueItems} unique`);
+            const percentFull = (currentMass / CARGO_MASS_LIMIT) * 100;
+            document.getElementById('capacityBar').style.width = Math.min(100, percentFull) + '%';
+            
+            // Show warning if over 80% full
+            const warning = document.getElementById('massWarning');
+            if (percentFull > 80) {
+                warning.classList.add('visible');
+            } else {
+                warning.classList.remove('visible');
+            }
         }
 
         // ===== UPDATE PROPERTY SELECTOR =====
@@ -1085,7 +1136,7 @@
             properties.forEach(prop => {
                 const option = document.createElement('option');
                 option.value = prop.id;
-                option.textContent = `${prop.name} (${prop.used || 0}/${prop.capacity})`;
+                option.textContent = `${prop.name} (${prop.used || 0}/${prop.capacity} AMU)`;
                 select.appendChild(option);
             });
             
@@ -1108,9 +1159,9 @@
                     document.getElementById('propertyCapacity').textContent = property.capacity;
                     
                     // Check if there's space
-                    const itemSize = (elementDatabase[currentItem.name]?.size || 1) * 1;
+                    const itemMass = currentItem.mass;
                     const spaceLeft = property.capacity - (property.used || 0);
-                    transferBtn.disabled = spaceLeft < itemSize;
+                    transferBtn.disabled = spaceLeft < itemMass;
                 }
                 transferBtn.disabled = false;
             } else {
@@ -1120,7 +1171,6 @@
 
         // ===== FILTER CARGO =====
         function filterCargo(rarity) {
-            // Update active filter button
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -1146,20 +1196,17 @@
 
         // ===== APPLY FILTERS =====
         function applyFilters() {
-            // Apply rarity filter
             let filtered = cargoItems;
             if (currentFilter !== 'all') {
                 filtered = cargoItems.filter(item => item.rarity === currentFilter);
             }
             
-            // Apply search filter
             if (currentSearch) {
                 filtered = filtered.filter(item => 
                     item.name.toLowerCase().includes(currentSearch)
                 );
             }
             
-            // Apply sorting
             filtered.sort((a, b) => {
                 switch(currentSort) {
                     case 'name-asc':
@@ -1170,6 +1217,10 @@
                         return b.count - a.count;
                     case 'quantity-asc':
                         return a.count - b.count;
+                    case 'mass-desc':
+                        return b.totalMass - a.totalMass;
+                    case 'mass-asc':
+                        return a.totalMass - b.totalMass;
                     case 'value-desc':
                         return b.totalValue - a.totalValue;
                     case 'value-asc':
@@ -1221,6 +1272,7 @@
                         <div class="item-name">${item.name}</div>
                         <div class="item-details">
                             <span class="item-quantity">📦 ${item.count}</span>
+                            <span class="item-mass">⚖️ ${item.totalMass.toFixed(1)} AMU</span>
                             <span class="item-value">💰 ${item.marketPrice}⭐</span>
                         </div>
                     </div>
@@ -1247,14 +1299,17 @@
             
             document.getElementById('modalItemName').textContent = item.name;
             document.getElementById('modalItemDetails').textContent = `Quantity: ${item.count}`;
+            document.getElementById('modalItemMass').textContent = `Mass: ${item.mass.toFixed(1)} AMU each`;
             document.getElementById('modalMarketPrice').textContent = `${item.marketPrice}⭐ each`;
             document.getElementById('modalPriceChange').textContent = `${changeSymbol} ${Math.abs(item.priceChange)}% (24h)`;
             document.getElementById('modalPriceChange').className = `modal-price-change ${changeClass}`;
             
-            // Show transfer button if properties exist
             const transferBtn = document.getElementById('modalTransferBtn');
             if (properties.length > 0) {
                 transferBtn.style.display = 'block';
+                transferBtn.onclick = function() { 
+                    document.getElementById('propertySelector').style.display = 'block';
+                };
             } else {
                 transferBtn.style.display = 'none';
             }
@@ -1276,10 +1331,6 @@
             closeModal();
         }
 
-        function showTransferFromModal() {
-            document.getElementById('propertySelector').style.display = 'block';
-        }
-
         async function transferSelectedItem() {
             if (!currentItem || !selectedPropertyId) return;
             
@@ -1288,7 +1339,7 @@
             
             try {
                 const quantity = 1;
-                let result = { success: false, reason: 'function not available' };
+                let result = { success: false };
                 if (typeof transferToProperty === 'function') {
                     result = await transferToProperty(selectedPropertyId, currentItem.name, quantity);
                 }
@@ -1320,32 +1371,9 @@
             loadingText.textContent = 'selling...';
             
             try {
-                let result = { success: false, reason: 'function not available' };
+                let result = { success: false };
                 if (typeof safeSellElement === 'function') {
                     result = await safeSellElement(itemName, quantity, item.marketPrice);
-                } else {
-                    // Fallback: update localStorage directly
-                    console.log('Using localStorage fallback for selling');
-                    let collection = {};
-                    try {
-                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                    } catch (e) {
-                        collection = {};
-                    }
-                    
-                    if (collection[itemName] && collection[itemName].count >= quantity) {
-                        collection[itemName].count -= quantity;
-                        if (collection[itemName].count <= 0) {
-                            delete collection[itemName];
-                        }
-                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                        
-                        let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                        credits += quantity * item.marketPrice;
-                        localStorage.setItem('voidfarer_credits', credits.toString());
-                        
-                        result = { success: true, earnings: quantity * item.marketPrice };
-                    }
                 }
                 
                 if (result.success) {
@@ -1382,25 +1410,8 @@
                 let itemsSold = 0;
                 
                 for (const item of commonItems) {
-                    if (item.count > 0) {
-                        let result = { success: false };
-                        if (typeof safeSellElement === 'function') {
-                            result = await safeSellElement(item.name, item.count, item.marketPrice);
-                        } else {
-                            // Fallback
-                            let collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                            if (collection[item.name]) {
-                                delete collection[item.name];
-                                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                                
-                                let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                                credits += item.count * item.marketPrice;
-                                localStorage.setItem('voidfarer_credits', credits.toString());
-                                
-                                result = { success: true, earnings: item.count * item.marketPrice };
-                            }
-                        }
-                        
+                    if (item.count > 0 && typeof safeSellElement === 'function') {
+                        const result = await safeSellElement(item.name, item.count, item.marketPrice);
                         if (result.success) {
                             totalEarnings += result.earnings;
                             itemsSold += item.count;
@@ -1428,9 +1439,7 @@
         async function quickSell() {
             const targetAmount = 500;
             let earned = 0;
-            let soldItems = [];
             
-            // Sort by value (cheapest first)
             const sortedItems = [...cargoItems].sort((a, b) => a.marketPrice - b.marketPrice);
             
             if (sortedItems.length === 0) {
@@ -1448,31 +1457,10 @@
                     const maxNeeded = Math.ceil((targetAmount - earned) / item.marketPrice);
                     const sellQuantity = Math.min(maxNeeded, item.count);
                     
-                    if (sellQuantity > 0) {
-                        let result = { success: false };
-                        if (typeof safeSellElement === 'function') {
-                            result = await safeSellElement(item.name, sellQuantity, item.marketPrice);
-                        } else {
-                            // Fallback
-                            let collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                            if (collection[item.name] && collection[item.name].count >= sellQuantity) {
-                                collection[item.name].count -= sellQuantity;
-                                if (collection[item.name].count <= 0) {
-                                    delete collection[item.name];
-                                }
-                                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                                
-                                let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                                credits += sellQuantity * item.marketPrice;
-                                localStorage.setItem('voidfarer_credits', credits.toString());
-                                
-                                result = { success: true, earnings: sellQuantity * item.marketPrice };
-                            }
-                        }
-                        
+                    if (sellQuantity > 0 && typeof safeSellElement === 'function') {
+                        const result = await safeSellElement(item.name, sellQuantity, item.marketPrice);
                         if (result.success) {
                             earned += result.earnings;
-                            soldItems.push({ name: item.name, quantity: sellQuantity });
                             if (typeof recordTrade === 'function') {
                                 await recordTrade(item.name, sellQuantity, item.marketPrice);
                             }
@@ -1498,14 +1486,11 @@
         // ===== INITIALIZE =====
         async function init() {
             try {
-                // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'accessing cargo hold...';
 
-                // Load all data
                 await loadData();
 
-                // Hide loading
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
@@ -1519,7 +1504,6 @@
             }
         }
 
-        // ===== START =====
         init();
     </script>
     
