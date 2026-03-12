@@ -109,6 +109,35 @@
             font-weight: 600;
         }
         
+        .journey-total {
+            position: absolute;
+            top: max(130px, env(safe-area-inset-top) + 100px);
+            right: 20px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            z-index: 30;
+            display: none;
+        }
+        
+        .journey-total.visible {
+            display: block;
+        }
+        
+        .journey-total-label {
+            color: #a0c0ff;
+            margin-right: 5px;
+        }
+        
+        .journey-total-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .back-btn {
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
@@ -145,7 +174,7 @@
             padding: 20px;
             border-radius: 40px 15px 40px 15px;
             z-index: 40;
-            min-width: 240px;
+            min-width: 260px;
             display: none;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
@@ -158,7 +187,7 @@
             font-family: 'Exo 2', sans-serif;
             font-size: 22px;
             color: #ffffff;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.2);
             padding-bottom: 8px;
@@ -202,6 +231,30 @@
             margin: 10px 0;
         }
         
+        .warp-info {
+            background: rgba(74, 138, 192, 0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #4a8ac0;
+        }
+        
+        .warp-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .warp-label {
+            color: #a0c0ff;
+        }
+        
+        .warp-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .travel-btn {
             width: 100%;
             background: #4a8ac0;
@@ -212,7 +265,7 @@
             font-size: 18px;
             font-family: 'Exo 2', sans-serif;
             cursor: pointer;
-            margin-top: 15px;
+            margin-top: 10px;
             transition: all 0.1s;
             font-weight: 600;
         }
@@ -226,6 +279,15 @@
             background: #2a4a6a;
             opacity: 0.5;
             cursor: not-allowed;
+        }
+        
+        .travel-btn.primary {
+            background: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .travel-btn.primary:active {
+            background: #ffcc6a;
         }
         
         /* Sector markers */
@@ -369,6 +431,7 @@
             .ui-header { top: max(15px, env(safe-area-inset-top)); }
             .current-location { top: max(80px, env(safe-area-inset-top) + 50px); left: max(20px, env(safe-area-inset-left)); }
             .journey-info { top: max(80px, env(safe-area-inset-top) + 50px); right: max(20px, env(safe-area-inset-right)); }
+            .journey-total { top: max(130px, env(safe-area-inset-top) + 100px); right: max(20px, env(safe-area-inset-right)); }
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
             .sector-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
         }
@@ -401,6 +464,11 @@
             <span>Journey: <span class="journey-distance" id="journeyDistance">0.0</span> LY</span>
         </div>
         
+        <div class="journey-total" id="journeyTotal">
+            <span class="journey-total-label">Total journey:</span>
+            <span class="journey-total-value" id="totalJourneyDistance">0.0 LY</span>
+        </div>
+        
         <button class="back-btn" onclick="returnToGalaxy()">← GALAXY</button>
         
         <!-- Sector markers will be added here -->
@@ -414,11 +482,25 @@
                 <span class="info-label">Stars:</span>
                 <span class="info-value" id="selectedStarCount">0</span>
             </div>
-            <div class="info-row">
-                <span class="info-label">Distance:</span>
-                <span class="distance-value" id="sectorDistance">0.0 LY</span>
+            
+            <!-- Warp Information -->
+            <div class="warp-info">
+                <div class="warp-row">
+                    <span class="warp-label">Distance:</span>
+                    <span class="warp-value" id="sectorDistance">0.0 LY</span>
+                </div>
+                <div class="warp-row">
+                    <span class="warp-label">Warp cycles:</span>
+                    <span class="warp-value" id="warpCycles">0</span>
+                </div>
+                <div class="warp-row">
+                    <span class="warp-label">Fuel cost:</span>
+                    <span class="warp-value" id="fuelCost">0⭐</span>
+                </div>
             </div>
-            <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 EXPLORE</button>
+            
+            <!-- Dynamic button based on mode -->
+            <button class="travel-btn" id="actionBtn" onclick="handleSectorAction()">🚀 EXPLORE</button>
         </div>
         
         <canvas id="sectorCanvas"></canvas>
@@ -451,6 +533,8 @@
         const migrationStatus = document.getElementById('migrationStatus');
         const sectorPanel = document.getElementById('sectorPanel');
         const markersContainer = document.getElementById('sectorMarkers');
+        const journeyTotalEl = document.getElementById('journeyTotal');
+        const totalJourneyDistanceEl = document.getElementById('totalJourneyDistance');
 
         // ===== STATE =====
         let currentRegion = 'Orion Arm';
@@ -460,8 +544,26 @@
         let selectedSector = null;
         let selectedIndex = -1;
         let journeyDistance = 0;
+        
+        // ===== CHECK FOR PLOT MODE =====
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPlotMode = urlParams.get('mode') === 'plot';
+        
+        // ===== PLOT MODE DATA =====
+        let plotData = {
+            fromSector: null,
+            fromRegion: null,
+            fromNebula: null,
+            fromStar: null,
+            fromPlanet: null,
+            destSector: null,
+            destRegion: null,
+            sectorDistance: 0,
+            sectorCycles: 0,
+            sectorFuel: 0
+        };
 
-        // ===== SECTOR DATA BY REGION (Mapped by display name) =====
+        // ===== SECTOR DATA BY REGION =====
         const sectorData = {
             'Cygnus Arm': [
                 { name: 'Cygnus OB2', stars: 150, type: 'Association', icon: '🌌', distance: 0.0, x: 35, y: 30 },
@@ -561,6 +663,43 @@
             ]
         };
 
+        // ===== WARP CALCULATION FUNCTIONS =====
+        function getWarpCyclesFromDistance(distance) {
+            if (distance <= 1.0) return 1;
+            if (distance <= 2.5) return 2;
+            if (distance <= 4.5) return 3;
+            if (distance <= 7.0) return 4;
+            return 5;
+        }
+
+        function getFuelCostFromDistance(distance) {
+            return Math.floor(distance * 4) + 5;
+        }
+
+        // ===== LOAD PLOT DATA =====
+        function loadPlotData() {
+            plotData = {
+                fromSector: localStorage.getItem('voidfarer_plot_from_sector'),
+                fromRegion: localStorage.getItem('voidfarer_plot_from_region'),
+                fromNebula: localStorage.getItem('voidfarer_plot_from_nebula'),
+                fromStar: localStorage.getItem('voidfarer_plot_from_star'),
+                fromPlanet: localStorage.getItem('voidfarer_plot_from_planet'),
+                destSector: localStorage.getItem('voidfarer_plot_sector'),
+                destRegion: localStorage.getItem('voidfarer_plot_region'),
+                sectorDistance: parseFloat(localStorage.getItem('voidfarer_plot_sector_distance') || '0'),
+                sectorCycles: parseInt(localStorage.getItem('voidfarer_plot_sector_cycles') || '0'),
+                sectorFuel: parseInt(localStorage.getItem('voidfarer_plot_sector_fuel') || '0')
+            };
+            
+            // Show total journey so far
+            if (plotData.sectorDistance > 0) {
+                journeyTotalEl.classList.add('visible');
+                totalJourneyDistanceEl.textContent = plotData.sectorDistance.toFixed(1) + ' LY';
+            }
+            
+            console.log('Plot data loaded:', plotData);
+        }
+
         // ===== LOAD JOURNEY DISTANCE =====
         function loadJourneyDistance() {
             const saved = localStorage.getItem('voidfarer_journey_distance');
@@ -571,9 +710,9 @@
         // ===== LOAD REGION DATA =====
         async function loadRegionData() {
             try {
-                // Load data from storage - get both sector ID and display name
-                const sectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                // Load data from storage
                 const regionName = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
+                const sectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 
                 // Also try storage functions if available
                 if (typeof getCurrentSector === 'function') {
@@ -597,11 +736,16 @@
                 document.getElementById('regionTitle').textContent = currentRegion;
                 document.getElementById('currentLocationText').textContent = currentSectorName;
 
-                // Get sectors for this region using the display name
+                // Get sectors for this region
                 sectors = sectorData[currentRegion] || sectorData['Orion Arm'];
 
                 // Load journey distance
                 loadJourneyDistance();
+                
+                // Load plot data if in plot mode
+                if (isPlotMode) {
+                    loadPlotData();
+                }
 
                 return true;
 
@@ -634,20 +778,36 @@
             selectedSector = sector;
             selectedIndex = index;
             
+            // Calculate warp info
+            const cycles = getWarpCyclesFromDistance(sector.distance);
+            const fuel = getFuelCostFromDistance(sector.distance);
+            
             // Update panel
             document.getElementById('selectedSectorName').textContent = sector.name;
             document.getElementById('selectedSectorType').textContent = sector.type;
             document.getElementById('selectedStarCount').textContent = sector.stars;
             document.getElementById('sectorDistance').textContent = sector.distance.toFixed(1) + ' LY';
+            document.getElementById('warpCycles').textContent = cycles;
+            document.getElementById('fuelCost').textContent = fuel + '⭐';
             
-            // Enable/disable based on whether it's current location
-            const travelBtn = document.getElementById('travelBtn');
-            if (sector.name === currentSectorName) {
-                travelBtn.disabled = true;
-                travelBtn.textContent = '📍 CURRENT LOCATION';
+            // Update action button based on mode
+            const actionBtn = document.getElementById('actionBtn');
+            
+            if (isPlotMode) {
+                // In plot mode, button selects this nebula for the journey
+                actionBtn.disabled = false;
+                actionBtn.classList.add('primary');
+                actionBtn.textContent = '⭐ SELECT THIS NEBULA';
             } else {
-                travelBtn.disabled = false;
-                travelBtn.textContent = '🚀 EXPLORE';
+                // Normal mode - explore or current location
+                actionBtn.classList.remove('primary');
+                if (sector.name === currentSectorName) {
+                    actionBtn.disabled = true;
+                    actionBtn.textContent = '📍 CURRENT LOCATION';
+                } else {
+                    actionBtn.disabled = false;
+                    actionBtn.textContent = '🚀 EXPLORE NEBULA';
+                }
             }
             
             sectorPanel.classList.add('visible');
@@ -655,8 +815,19 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== TRAVEL TO SECTOR =====
-        async function travelToSector() {
+        // ===== HANDLE SECTOR ACTION =====
+        function handleSectorAction() {
+            if (!selectedSector) return;
+            
+            if (isPlotMode) {
+                selectNebulaForJourney();
+            } else {
+                exploreNebula();
+            }
+        }
+
+        // ===== EXPLORE NEBULA (normal mode) =====
+        async function exploreNebula() {
             if (!selectedSector || selectedSector.name === currentSectorName) return;
             
             loadingOverlay.classList.add('active');
@@ -667,7 +838,7 @@
                 const newTotal = journeyDistance + selectedSector.distance;
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
                 
-                // Save destination - store both the nebula name and the region it belongs to
+                // Save destination
                 if (typeof setCurrentNebula === 'function') {
                     await setCurrentNebula(
                         selectedSector.name,
@@ -675,14 +846,13 @@
                         selectedSector.stars,
                         selectedSector.x || 50,
                         selectedSector.y || 50,
-                        currentRegion // Pass the region name
+                        currentRegion
                     );
                 } else {
                     localStorage.setItem('voidfarer_current_nebula', selectedSector.name);
                     localStorage.setItem('voidfarer_current_sector_name', selectedSector.name);
                     localStorage.setItem('voidfarer_current_sector_type', selectedSector.type);
                     localStorage.setItem('voidfarer_current_sector_stars', selectedSector.stars.toString());
-                    localStorage.setItem('voidfarer_current_region', currentRegion); // Keep region
                 }
                 
                 // Navigate to star cluster
@@ -691,15 +861,55 @@
                 }, 500);
 
             } catch (error) {
-                console.error('Error traveling to sector:', error);
+                console.error('Error exploring nebula:', error);
                 loadingOverlay.classList.remove('active');
-                alert('Failed to enter sector. Please try again.');
+                alert('Failed to enter nebula. Please try again.');
+            }
+        }
+
+        // ===== SELECT NEBULA FOR JOURNEY (plot mode) =====
+        async function selectNebulaForJourney() {
+            if (!selectedSector) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selecting nebula...';
+            
+            try {
+                // Save selected nebula
+                localStorage.setItem('voidfarer_plot_nebula', selectedSector.name);
+                localStorage.setItem('voidfarer_plot_nebula_type', selectedSector.type);
+                localStorage.setItem('voidfarer_plot_nebula_distance', selectedSector.distance.toString());
+                localStorage.setItem('voidfarer_plot_nebula_stars', selectedSector.stars.toString());
+                localStorage.setItem('voidfarer_plot_nebula_x', (selectedSector.x || 50).toString());
+                localStorage.setItem('voidfarer_plot_nebula_y', (selectedSector.y || 50).toString());
+                
+                // Calculate cumulative distance so far
+                const totalSoFar = plotData.sectorDistance + selectedSector.distance;
+                localStorage.setItem('voidfarer_plot_cumulative_distance', totalSoFar.toString());
+                
+                console.log(`Selected nebula: ${selectedSector.name} at ${selectedSector.distance} LY`);
+                console.log(`Total so far: ${totalSoFar.toFixed(1)} LY`);
+                
+                // Navigate to star cluster in plot mode
+                setTimeout(() => {
+                    window.location.href = 'star-cluster.html?mode=plot';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error selecting nebula:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to select nebula. Please try again.');
             }
         }
 
         // ===== RETURN TO GALAXY =====
         function returnToGalaxy() {
-            window.location.href = 'galaxy-map.html';
+            if (isPlotMode) {
+                // If in plot mode, go back to galaxy map with plot data intact
+                window.location.href = 'galaxy-map.html';
+            } else {
+                window.location.href = 'galaxy-map.html';
+            }
         }
 
         // ===== CREATE SECTOR MARKERS =====
@@ -717,7 +927,7 @@
                 marker.onclick = function() { selectSector(index); };
                 
                 // Highlight current location
-                if (sector.name === currentSectorName) {
+                if (!isPlotMode && sector.name === currentSectorName) {
                     marker.classList.add('selected');
                 }
                 
