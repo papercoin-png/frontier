@@ -45,7 +45,7 @@
             background: #0a2a3a;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 20px 20px 30px 20px;
+            padding: 20px 20px 100px 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
@@ -152,6 +152,13 @@
         
         .property-capacity {
             color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .property-capacity-unit {
+            color: #4affaa;
+            font-size: 11px;
+            margin-left: 2px;
         }
         
         /* Transfer Controls */
@@ -227,6 +234,12 @@
             font-size: 14px;
         }
         
+        .item-mass {
+            color: #4affaa;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
         .item-controls {
             display: flex;
             align-items: center;
@@ -265,6 +278,44 @@
         .transfer-item-btn:disabled {
             opacity: 0.3;
             pointer-events: none;
+        }
+        
+        /* Mass Summary */
+        .mass-summary {
+            background: rgba(30, 60, 70, 0.5);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .mass-summary-label {
+            color: #a0d0c0;
+        }
+        
+        .mass-summary-value {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .mass-summary-unit {
+            color: #a0d0c0;
+            font-size: 11px;
+            margin-left: 2px;
+        }
+        
+        .mass-summary-warning {
+            color: #ffaa4a;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .mass-summary-critical {
+            color: #ff6b6b;
         }
         
         /* Quick Actions */
@@ -309,32 +360,78 @@
             font-style: italic;
         }
         
-        /* Back button */
+        /* Scroll Hint */
+        .scroll-hint {
+            text-align: center;
+            color: #a0c0ff;
+            font-size: 14px;
+            margin: 20px 0 80px;
+            font-style: italic;
+            font-family: 'Exo 2', sans-serif;
+            animation: fade-in-out 2s infinite;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes fade-in-out {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        /* Enhanced Back Button - Fixed positioning */
         .back-button {
-            position: sticky;
+            position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(30, 60, 70, 0.9);
-            backdrop-filter: blur(15px);
-            border: 2px solid #6aa0a0;
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
             color: #ffffff;
-            padding: 12px 30px;
+            padding: 18px 35px;
             border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
+            font-size: 20px;
+            font-weight: 600;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
-            box-shadow: 0 0 30px #2a5a5a;
-            z-index: 100;
-            margin-top: 10px;
-            font-weight: 500;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+            pointer-events: auto;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
         }
         
         .back-button:active {
-            background: #4a9a8a;
-            transform: translateX(-50%) scale(0.98);
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
         }
 
         /* Migration status (debug) */
@@ -358,16 +455,26 @@
             <!-- Header -->
             <div class="transfer-header">
                 <div class="transfer-title">Transfer Items</div>
-                <div class="transfer-subtitle">✦ move cargo ✦</div>
+                <div class="transfer-subtitle">✦ mass-based transfer ✦</div>
             </div>
             
             <!-- Property Info -->
             <div class="property-info" id="propertyInfo">
                 <div class="property-name" id="propertyName">Loading...</div>
                 <div class="property-stats">
-                    <span>Used: <span class="property-capacity" id="propertyUsed">0</span></span>
-                    <span>Capacity: <span class="property-capacity" id="propertyCapacity">0</span></span>
+                    <span>Used: <span class="property-capacity" id="propertyUsed">0</span> <span class="property-capacity-unit">AMU</span></span>
+                    <span>Capacity: <span class="property-capacity" id="propertyCapacity">0</span> <span class="property-capacity-unit">AMU</span></span>
                 </div>
+            </div>
+            
+            <!-- Mass Summary -->
+            <div class="mass-summary" id="massSummary">
+                <span class="mass-summary-label">Transfer Mass:</span>
+                <span>
+                    <span class="mass-summary-value" id="transferMass">0</span>
+                    <span class="mass-summary-unit">AMU</span>
+                </span>
+                <span class="mass-summary-warning" id="massWarning"></span>
             </div>
             
             <!-- Transfer Direction -->
@@ -387,8 +494,15 @@
                 <button class="quick-btn" id="resetBtn" onclick="resetQuantities()">⟲ RESET</button>
             </div>
             
+            <!-- Scroll Hint -->
+            <div class="scroll-hint">▼ scroll down to return to properties ▼</div>
+            
             <!-- Back button -->
-            <button class="back-button" onclick="returnToRealEstate()">← BACK TO PROPERTIES</button>
+            <button class="back-button" onclick="returnToRealEstate()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">BACK TO PROPERTIES</span>
+                <span class="back-icon">🏢</span>
+            </button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -414,6 +528,9 @@
             tg.setBackgroundColor('#0a2a3a');
         }
 
+        // ===== CONSTANTS =====
+        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -429,22 +546,130 @@
         let propertyItems = [];
         let currentDirection = 'toProperty'; // 'toProperty' or 'toShip'
         let propertyData = null;
+        let currentShipMass = 0;
+        let transferTotalMass = 0;
 
-        // ===== ELEMENT ICONS DATABASE =====
-        const elementIcons = {
-            'Carbon': '⚫', 'Silicon': '💎', 'Hydrogen': '💧', 'Helium': '🎈',
-            'Iron': '⚙️', 'Oxygen': '💨', 'Nickel': '🔩', 'Gold': '🟡',
-            'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷', 'Uranium': '🟣',
-            'Promethium': '✨', 'Technetium': '🧪', 'Astatine': '☣️',
-            'Sodium': '🧂', 'Lithium': '🔋', 'Magnesium': '✨',
-            'Sulfur': '🟡', 'Copper': '🔴', 'Lead': '🔘', 'Mercury': '💧',
-            'Thorium': '🔮', 'Plutonium': '☢️'
+        // ===== ELEMENT DATABASE WITH MASS =====
+        const elementDatabase = {
+            // Common
+            'Hydrogen': { icon: '💧', rarity: 'common', mass: 1.008 },
+            'Helium': { icon: '🎈', rarity: 'common', mass: 4.003 },
+            'Lithium': { icon: '🔋', rarity: 'common', mass: 6.94 },
+            'Beryllium': { icon: '💎', rarity: 'common', mass: 9.012 },
+            'Boron': { icon: '🧪', rarity: 'common', mass: 10.81 },
+            'Sodium': { icon: '🧂', rarity: 'common', mass: 22.99 },
+            'Magnesium': { icon: '✨', rarity: 'common', mass: 24.31 },
+            'Aluminum': { icon: '🥫', rarity: 'common', mass: 26.98 },
+            'Silicon': { icon: '💻', rarity: 'common', mass: 28.09 },
+            'Potassium': { icon: '🍌', rarity: 'common', mass: 39.10 },
+            'Calcium': { icon: '🥛', rarity: 'common', mass: 40.08 },
+            
+            // Uncommon
+            'Carbon': { icon: '⚫', rarity: 'uncommon', mass: 12.01 },
+            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', mass: 14.01 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', mass: 16.00 },
+            'Fluorine': { icon: '🧪', rarity: 'uncommon', mass: 19.00 },
+            'Neon': { icon: '💡', rarity: 'uncommon', mass: 20.18 },
+            'Phosphorus': { icon: '✨', rarity: 'uncommon', mass: 30.97 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', mass: 32.06 },
+            'Chlorine': { icon: '🧪', rarity: 'uncommon', mass: 35.45 },
+            'Argon': { icon: '🎈', rarity: 'uncommon', mass: 39.95 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', mass: 55.85 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', mass: 58.69 },
+            'Lead': { icon: '🔘', rarity: 'uncommon', mass: 207.2 },
+            
+            // Rare
+            'Gold': { icon: '🟡', rarity: 'rare', mass: 197.0 },
+            'Silver': { icon: '⚪', rarity: 'rare', mass: 107.9 },
+            'Platinum': { icon: '⬜', rarity: 'rare', mass: 195.1 },
+            'Titanium': { icon: '🔷', rarity: 'rare', mass: 47.87 },
+            'Copper': { icon: '🔴', rarity: 'rare', mass: 63.55 },
+            'Zinc': { icon: '⚪', rarity: 'rare', mass: 65.38 },
+            'Tin': { icon: '🥫', rarity: 'rare', mass: 118.7 },
+            'Cobalt': { icon: '🔵', rarity: 'rare', mass: 58.93 },
+            'Chromium': { icon: '✨', rarity: 'rare', mass: 52.00 },
+            
+            // Very Rare
+            'Uranium': { icon: '🟣', rarity: 'very-rare', mass: 238.0 },
+            'Thorium': { icon: '🔮', rarity: 'very-rare', mass: 232.0 },
+            'Plutonium': { icon: '☢️', rarity: 'very-rare', mass: 244.0 },
+            'Radium': { icon: '💀', rarity: 'very-rare', mass: 226.0 },
+            'Polonium': { icon: '💀', rarity: 'very-rare', mass: 209.0 },
+            
+            // Legendary
+            'Promethium': { icon: '✨', rarity: 'legendary', mass: 145.0 },
+            'Technetium': { icon: '🧪', rarity: 'legendary', mass: 98.0 },
+            'Astatine': { icon: '☣️', rarity: 'legendary', mass: 210.0 },
+            'Francium': { icon: '💥', rarity: 'legendary', mass: 223.0 }
         };
+
+        // Default icon for unknown elements
+        const DEFAULT_ICON = '🔹';
+
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            return elementDatabase[elementName]?.mass || 100.0;
+        }
+
+        // ===== GET ELEMENT ICON =====
+        function getElementIcon(elementName) {
+            return elementDatabase[elementName]?.icon || DEFAULT_ICON;
+        }
 
         // ===== NAVIGATION =====
         function returnToRealEstate() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'real-estate.html';
+        }
+
+        // ===== CALCULATE SHIP MASS =====
+        async function calculateShipMass(collection) {
+            let totalMass = 0;
+            for (const [name, data] of Object.entries(collection)) {
+                const count = data.count || 1;
+                const mass = getElementMass(name);
+                totalMass += count * mass;
+            }
+            return totalMass;
+        }
+
+        // ===== UPDATE TRANSFER MASS DISPLAY =====
+        function updateTransferMass() {
+            const inputs = document.querySelectorAll('.quantity-input');
+            let totalMass = 0;
+            
+            inputs.forEach(input => {
+                const itemName = input.id.replace('qty_', '').replace(/_/g, ' ');
+                const item = [...shipItems, ...propertyItems].find(i => i.name === itemName);
+                if (item && input.value) {
+                    const qty = parseInt(input.value) || 0;
+                    totalMass += qty * item.mass;
+                }
+            });
+            
+            transferTotalMass = totalMass;
+            document.getElementById('transferMass').textContent = totalMass.toFixed(1);
+            
+            const warningEl = document.getElementById('massWarning');
+            if (currentDirection === 'toProperty') {
+                const remainingSpace = (currentProperty?.capacity || 0) - (currentProperty?.used || 0);
+                if (totalMass > remainingSpace) {
+                    warningEl.textContent = '⚠️ Exceeds capacity!';
+                    warningEl.classList.add('mass-summary-critical');
+                } else {
+                    warningEl.textContent = '';
+                    warningEl.classList.remove('mass-summary-critical');
+                }
+            } else {
+                const remainingSpace = CARGO_MASS_LIMIT - currentShipMass;
+                if (totalMass > remainingSpace) {
+                    warningEl.textContent = '⚠️ Exceeds cargo limit!';
+                    warningEl.classList.add('mass-summary-critical');
+                } else {
+                    warningEl.textContent = '';
+                    warningEl.classList.remove('mass-summary-critical');
+                }
+            }
         }
 
         // ===== LOAD DATA =====
@@ -456,15 +681,27 @@
                     return;
                 }
 
-                // Load all data
+                // Load all data with fallbacks
                 let collection = {};
                 if (typeof getCollection === 'function') {
                     collection = await getCollection();
+                } else {
+                    try {
+                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                    } catch (e) {
+                        collection = {};
+                    }
                 }
 
                 let propertyDataResult = { properties: [] };
                 if (typeof getRealEstate === 'function') {
                     propertyDataResult = await getRealEstate();
+                } else {
+                    try {
+                        propertyDataResult = JSON.parse(localStorage.getItem('voidfarer_real_estate')) || { properties: [] };
+                    } catch (e) {
+                        propertyDataResult = { properties: [] };
+                    }
                 }
 
                 propertyData = propertyDataResult;
@@ -476,18 +713,25 @@
                     return;
                 }
 
+                // Calculate ship mass
+                currentShipMass = await calculateShipMass(collection);
+
                 // Initialize items if not exists
                 if (!currentProperty.items) {
                     currentProperty.items = {};
                 }
 
-                // Calculate used space
-                const propertyUsed = Object.values(currentProperty.items).reduce((sum, item) => sum + (item.count || 0), 0);
+                // Calculate used space in mass
+                let propertyUsed = 0;
+                for (const [name, item] of Object.entries(currentProperty.items)) {
+                    const mass = getElementMass(name);
+                    propertyUsed += (item.count || 1) * mass;
+                }
                 currentProperty.used = propertyUsed;
 
                 // Update UI
                 document.getElementById('propertyName').textContent = currentProperty.name;
-                document.getElementById('propertyUsed').textContent = propertyUsed;
+                document.getElementById('propertyUsed').textContent = propertyUsed.toFixed(1);
                 document.getElementById('propertyCapacity').textContent = currentProperty.capacity;
 
                 // Load items
@@ -505,13 +749,15 @@
             shipItems = Object.keys(collection).map(name => ({
                 name: name,
                 count: collection[name].count || 1,
-                icon: elementIcons[name] || '🔹'
+                icon: getElementIcon(name),
+                mass: getElementMass(name)
             }));
 
             propertyItems = Object.keys(currentProperty.items || {}).map(name => ({
                 name: name,
                 count: currentProperty.items[name].count || 1,
-                icon: elementIcons[name] || '🔹'
+                icon: getElementIcon(name),
+                mass: getElementMass(name)
             }));
 
             renderItems();
@@ -526,11 +772,11 @@
             
             const targetUsed = currentDirection === 'toProperty' ? 
                 (currentProperty.used || 0) : 
-                shipItems.reduce((sum, item) => sum + item.count, 0);
+                currentShipMass;
 
             const targetCapacity = currentDirection === 'toProperty' ? 
                 currentProperty.capacity : 
-                Infinity; // Ship has no capacity limit in this view
+                CARGO_MASS_LIMIT;
 
             if (sourceItems.length === 0) {
                 grid.innerHTML = '<div class="empty-state">No items available to transfer</div>';
@@ -544,13 +790,14 @@
                 card.className = 'item-card';
 
                 const availableSpace = targetCapacity - targetUsed;
-                const maxTransfer = Math.min(item.count, availableSpace);
+                const maxTransferByMass = Math.floor(availableSpace / item.mass);
+                const maxTransfer = Math.min(item.count, maxTransferByMass);
 
                 card.innerHTML = `
                     <div class="item-icon">${item.icon}</div>
                     <div class="item-info">
                         <div class="item-name">${item.name}</div>
-                        <div class="item-quantity">Available: ${item.count}</div>
+                        <div class="item-quantity">Available: ${item.count} <span class="item-mass">(⚖️ ${item.mass.toFixed(1)} AMU each)</span></div>
                     </div>
                     <div class="item-controls">
                         <input type="number" class="quantity-input" id="qty_${item.name.replace(/\s/g, '_')}" value="1" min="1" max="${item.count}" ${maxTransfer <= 0 ? 'disabled' : ''}>
@@ -564,6 +811,13 @@
 
                 grid.appendChild(card);
             });
+
+            // Add input event listeners to update mass summary
+            document.querySelectorAll('.quantity-input').forEach(input => {
+                input.addEventListener('input', updateTransferMass);
+            });
+            
+            updateTransferMass();
         }
 
         // ===== SET TRANSFER DIRECTION =====
@@ -583,6 +837,13 @@
             if (typeof getCollection === 'function') {
                 const collection = await getCollection();
                 loadItems(collection);
+            } else {
+                try {
+                    const collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                    loadItems(collection);
+                } catch (e) {
+                    loadItems({});
+                }
             }
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -603,6 +864,24 @@
             if (!quantity || quantity < 1) {
                 alert('Please enter a valid quantity');
                 return;
+            }
+
+            // Check mass limits
+            const itemMass = getElementMass(itemName);
+            const transferMass = quantity * itemMass;
+
+            if (currentDirection === 'toProperty') {
+                const remainingSpace = (currentProperty?.capacity || 0) - (currentProperty?.used || 0);
+                if (transferMass > remainingSpace) {
+                    alert(`Transfer failed: Exceeds property capacity by ${(transferMass - remainingSpace).toFixed(1)} AMU`);
+                    return;
+                }
+            } else {
+                const remainingSpace = CARGO_MASS_LIMIT - currentShipMass;
+                if (transferMass > remainingSpace) {
+                    alert(`Transfer failed: Exceeds ship cargo limit by ${(transferMass - remainingSpace).toFixed(1)} AMU`);
+                    return;
+                }
             }
 
             loadingOverlay.classList.add('active');
@@ -637,12 +916,18 @@
                         currentProperty = propertyData.properties?.find(p => p.id === propertyId);
                         
                         if (currentProperty) {
-                            const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                            // Recalculate property used mass
+                            let propertyUsed = 0;
+                            for (const [name, item] of Object.entries(currentProperty.items || {})) {
+                                const mass = getElementMass(name);
+                                propertyUsed += (item.count || 1) * mass;
+                            }
                             currentProperty.used = propertyUsed;
                             
-                            document.getElementById('propertyUsed').textContent = propertyUsed;
+                            document.getElementById('propertyUsed').textContent = propertyUsed.toFixed(1);
                         }
 
+                        currentShipMass = await calculateShipMass(collection);
                         loadItems(collection);
                     }
 
@@ -666,6 +951,29 @@
             if (sourceItems.length === 0) {
                 alert('No items to move');
                 return;
+            }
+
+            // Calculate total mass to move
+            let totalMass = 0;
+            sourceItems.forEach(item => {
+                totalMass += item.count * item.mass;
+            });
+
+            // Check mass limits
+            if (currentDirection === 'toProperty') {
+                const remainingSpace = (currentProperty?.capacity || 0) - (currentProperty?.used || 0);
+                if (totalMass > remainingSpace) {
+                    if (!confirm(`Warning: Transfer requires ${totalMass.toFixed(1)} AMU but only ${remainingSpace.toFixed(1)} AMU available. Transfer as much as possible?`)) {
+                        return;
+                    }
+                }
+            } else {
+                const remainingSpace = CARGO_MASS_LIMIT - currentShipMass;
+                if (totalMass > remainingSpace) {
+                    if (!confirm(`Warning: Transfer requires ${totalMass.toFixed(1)} AMU but only ${remainingSpace.toFixed(1)} AMU available on ship. Transfer as much as possible?`)) {
+                        return;
+                    }
+                }
             }
 
             loadingOverlay.classList.add('active');
@@ -710,18 +1018,24 @@
                     currentProperty = propertyData.properties?.find(p => p.id === propertyId);
 
                     if (currentProperty) {
-                        const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                        // Recalculate property used mass
+                        let propertyUsed = 0;
+                        for (const [name, item] of Object.entries(currentProperty.items || {})) {
+                            const mass = getElementMass(name);
+                            propertyUsed += (item.count || 1) * mass;
+                        }
                         currentProperty.used = propertyUsed;
-                        document.getElementById('propertyUsed').textContent = propertyUsed;
+                        document.getElementById('propertyUsed').textContent = propertyUsed.toFixed(1);
                     }
 
+                    currentShipMass = await calculateShipMass(collection);
                     loadItems(collection);
                 }
 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 
                 if (failCount > 0) {
-                    alert(`Moved ${successCount} items, ${failCount} failed`);
+                    alert(`Moved ${successCount} items, ${failCount} failed (mass limit reached)`);
                 } else {
                     alert(`Successfully moved ${successCount} items`);
                 }
@@ -740,6 +1054,7 @@
             inputs.forEach(input => {
                 input.value = '1';
             });
+            updateTransferMass();
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
