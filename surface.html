@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ... keep all existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -107,10 +106,53 @@
             font-family: 'Exo 2', sans-serif;
         }
         
+        /* Cargo Mass Indicator */
+        .cargo-mass {
+            position: absolute;
+            top: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 20, 30, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid #4affaa;
+            color: #e0f0f0;
+            padding: 6px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            z-index: 15;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .cargo-mass.warning {
+            border-color: #ffaa4a;
+            color: #ffaa4a;
+        }
+        
+        .cargo-mass.critical {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        .cargo-mass-value {
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .cargo-mass.warning .cargo-mass-value {
+            color: #ffaa4a;
+        }
+        
+        .cargo-mass.critical .cargo-mass-value {
+            color: #ff6b6b;
+        }
+        
         /* Auto-extractor notice */
         .auto-notice {
             position: absolute;
-            top: 160px;
+            top: 220px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10, 20, 30, 0.8);
@@ -215,7 +257,7 @@
         /* Resource indicator */
         .resource-indicator {
             position: absolute;
-            top: 210px;
+            top: 280px;
             right: 20px;
             z-index: 15;
             background: rgba(10, 20, 30, 0.6);
@@ -340,6 +382,12 @@
             <!-- Location Info -->
             <div class="location-info" id="locationInfo">Loading location...</div>
             
+            <!-- Cargo Mass Indicator -->
+            <div class="cargo-mass" id="cargoMass">
+                <span>📦 Cargo:</span>
+                <span class="cargo-mass-value" id="cargoMassValue">0/1000 AMU</span>
+            </div>
+            
             <!-- Colony Button -->
             <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
             
@@ -385,6 +433,9 @@
             tg.expand();
         }
 
+        // ===== CONSTANTS =====
+        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -400,40 +451,63 @@
         let currentNebula = 'Orion Nebula';
         let planetType = 'lush';
         let availableResources = [];
+        let currentCargoMass = 0;
 
-        // ===== ELEMENT DATABASE =====
+        // ===== ELEMENT DATABASE WITH MASS =====
         const elementDatabase = {
             // Common
-            'Carbon': { value: 100, rarity: 'common', color: '#ffffff', icon: '⚫' },
-            'Silicon': { value: 100, rarity: 'common', color: '#ffffff', icon: '💎' },
-            'Hydrogen': { value: 100, rarity: 'common', color: '#ffffff', icon: '💧' },
-            'Helium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🎈' },
-            'Sodium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🧂' },
-            'Lithium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🔋' },
-            'Magnesium': { value: 100, rarity: 'common', color: '#ffffff', icon: '✨' },
+            'Hydrogen': { value: 100, rarity: 'common', color: '#ffffff', icon: '💧', mass: 1.008 },
+            'Helium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🎈', mass: 4.003 },
+            'Lithium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🔋', mass: 6.94 },
+            'Beryllium': { value: 100, rarity: 'common', color: '#ffffff', icon: '💎', mass: 9.012 },
+            'Boron': { value: 100, rarity: 'common', color: '#ffffff', icon: '🧪', mass: 10.81 },
+            'Sodium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🧂', mass: 22.99 },
+            'Magnesium': { value: 100, rarity: 'common', color: '#ffffff', icon: '✨', mass: 24.31 },
+            'Aluminum': { value: 100, rarity: 'common', color: '#ffffff', icon: '🥫', mass: 26.98 },
+            'Silicon': { value: 100, rarity: 'common', color: '#ffffff', icon: '💻', mass: 28.09 },
+            'Potassium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🍌', mass: 39.10 },
+            'Calcium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🥛', mass: 40.08 },
             
             // Uncommon
-            'Iron': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '⚙️' },
-            'Oxygen': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '💨' },
-            'Nickel': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🔩' },
-            'Sulfur': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🟡' },
+            'Carbon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '⚫', mass: 12.01 },
+            'Nitrogen': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🌬️', mass: 14.01 },
+            'Oxygen': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '💨', mass: 16.00 },
+            'Fluorine': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🧪', mass: 19.00 },
+            'Neon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '💡', mass: 20.18 },
+            'Phosphorus': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '✨', mass: 30.97 },
+            'Sulfur': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🟡', mass: 32.06 },
+            'Chlorine': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🧪', mass: 35.45 },
+            'Argon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🎈', mass: 39.95 },
+            'Iron': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '⚙️', mass: 55.85 },
+            'Nickel': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🔩', mass: 58.69 },
+            'Lead': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🔘', mass: 207.2 },
             
             // Rare
-            'Gold': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🟡' },
-            'Silver': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⚪' },
-            'Platinum': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⬜' },
-            'Titanium': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔷' },
+            'Gold': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🟡', mass: 197.0 },
+            'Silver': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⚪', mass: 107.9 },
+            'Platinum': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⬜', mass: 195.1 },
+            'Titanium': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔷', mass: 47.87 },
+            'Copper': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔴', mass: 63.55 },
+            'Zinc': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⚪', mass: 65.38 },
+            'Tin': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🥫', mass: 118.7 },
+            'Cobalt': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔵', mass: 58.93 },
+            'Chromium': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '✨', mass: 52.00 },
             
             // Very Rare
-            'Uranium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🟣' },
-            'Thorium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🔮' },
+            'Uranium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🟣', mass: 238.0 },
+            'Thorium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🔮', mass: 232.0 },
+            'Plutonium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '☢️', mass: 244.0 },
+            'Radium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '💀', mass: 226.0 },
+            'Polonium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '💀', mass: 209.0 },
             
             // Legendary
-            'Promethium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '✨' },
-            'Technetium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '🧪' }
+            'Promethium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '✨', mass: 145.0 },
+            'Technetium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '🧪', mass: 98.0 },
+            'Astatine': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '☣️', mass: 210.0 },
+            'Francium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '💥', mass: 223.0 }
         };
 
-        // Planet-specific resources (fallback if none provided)
+        // Planet-specific resources
         const planetResourcesMap = {
             'Verdant Prime': ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen', 'Titanium'],
             'Pyros': ['Iron', 'Gold', 'Silver', 'Uranium', 'Sulfur', 'Copper'],
@@ -445,6 +519,69 @@
             'Titanis': ['Promethium', 'Titanium', 'Iron']
         };
 
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            return elementDatabase[elementName]?.mass || 100.0;
+        }
+
+        // ===== UPDATE CARGO MASS DISPLAY =====
+        async function updateCargoMass() {
+            try {
+                let totalMass = 0;
+                if (typeof getTotalCargoMass === 'function') {
+                    totalMass = await getTotalCargoMass();
+                } else {
+                    // Fallback calculation
+                    let collection = {};
+                    if (typeof getCollection === 'function') {
+                        collection = await getCollection();
+                    } else {
+                        try {
+                            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                        } catch (e) {
+                            collection = {};
+                        }
+                    }
+                    
+                    for (const [name, data] of Object.entries(collection)) {
+                        const count = data.count || 1;
+                        const mass = getElementMass(name);
+                        totalMass += count * mass;
+                    }
+                }
+                
+                currentCargoMass = totalMass;
+                const percentFull = (totalMass / CARGO_MASS_LIMIT) * 100;
+                
+                const cargoElement = document.getElementById('cargoMass');
+                const cargoValue = document.getElementById('cargoMassValue');
+                
+                cargoValue.textContent = `${totalMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
+                
+                // Update warning classes
+                cargoElement.classList.remove('warning', 'critical');
+                if (percentFull > 90) {
+                    cargoElement.classList.add('critical');
+                } else if (percentFull > 75) {
+                    cargoElement.classList.add('warning');
+                }
+                
+                return totalMass;
+            } catch (error) {
+                console.error('Error updating cargo mass:', error);
+                return 0;
+            }
+        }
+
+        // ===== CHECK IF CAN ADD TO CARGO =====
+        async function canAddToCargo(elementName, quantity = 1) {
+            const currentMass = await updateCargoMass();
+            const elementMass = getElementMass(elementName);
+            const requiredMass = elementMass * quantity;
+            
+            return (currentMass + requiredMass) <= CARGO_MASS_LIMIT;
+        }
+
         // ===== LOAD LOCATION DATA =====
         async function loadLocationData() {
             try {
@@ -455,7 +592,6 @@
                 } else {
                     planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
                 }
-                console.log('Surface loading planet:', planet);
 
                 let star = 'Sol';
                 if (typeof getCurrentStar === 'function') {
@@ -495,7 +631,6 @@
                         resources = [];
                     }
                 }
-                console.log('Loaded resources:', resources);
 
                 currentPlanet = planet || 'Verdant Prime';
                 currentStar = star || 'Sol';
@@ -506,11 +641,9 @@
                 // Determine available resources
                 if (resources && resources.length > 0) {
                     availableResources = resources;
-                    console.log('Using provided resources:', availableResources);
                 } else {
                     availableResources = planetResourcesMap[currentPlanet] || 
                         ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen'];
-                    console.log('Using fallback resources:', availableResources);
                 }
 
                 // Update UI
@@ -555,7 +688,9 @@
                 }
                 const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
                 document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
-                console.log('Collection updated, total items:', totalItems);
+                
+                await updateCargoMass();
+                
                 return collection;
             } catch (error) {
                 console.error('Error updating display:', error);
@@ -564,8 +699,13 @@
         }
 
         // ===== SHOW NOTICE =====
-        function showNotice(message) {
+        function showNotice(message, isWarning = false) {
             autoNotice.textContent = message;
+            if (isWarning) {
+                autoNotice.style.color = '#ffaa4a';
+            } else {
+                autoNotice.style.color = '#e0f0f0';
+            }
             autoNotice.classList.add('show');
             setTimeout(() => autoNotice.classList.remove('show'), 2000);
         }
@@ -578,19 +718,33 @@
                 value: 100, 
                 rarity: 'common', 
                 color: '#ffffff',
-                icon: '🔹'
+                icon: '🔹',
+                mass: 100.0
             };
 
             try {
-                console.log('Extracting:', elementName);
+                // Check if we have enough cargo space
+                const canAdd = await canAddToCargo(elementName, 1);
                 
-                // Add element to collection using the storage function
+                if (!canAdd) {
+                    showNotice('⚠️ Cargo full! Cannot extract', true);
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('error');
+                    }
+                    return;
+                }
+
+                // Add element to collection
                 if (typeof addElementToCollection === 'function') {
-                    await addElementToCollection(elementName, 1);
-                    console.log('Added to collection via function:', elementName);
+                    const result = await addElementToCollection(elementName, 1);
+                    if (!result.success) {
+                        if (result.reason === 'insufficient_cargo_space') {
+                            showNotice('⚠️ Cargo full! Cannot extract', true);
+                            return;
+                        }
+                    }
                 } else {
                     // Fallback: manually update localStorage
-                    console.log('Using localStorage fallback for extraction');
                     let collection = {};
                     try {
                         collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
@@ -606,12 +760,10 @@
                     
                     localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
                     
-                    // Also add credits
+                    // Add credits
                     let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                     credits += elementData.value;
                     localStorage.setItem('voidfarer_credits', credits.toString());
-                    
-                    console.log('Saved to localStorage:', elementName);
                 }
                 
                 // Update mission progress
@@ -619,21 +771,16 @@
                     await updateMissionProgress(elementName, 1);
                 }
 
-                // Update display and get updated collection
-                const updatedCollection = await updateDisplay();
+                // Update display
+                await updateDisplay();
                 sessionElements++;
-
-                // Verify the element was added
-                if (updatedCollection[elementName]) {
-                    console.log(`Verification: ${elementName} count is now ${updatedCollection[elementName].count}`);
-                }
 
                 // Add to log
                 const log = document.getElementById('resourceLog');
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
                 entry.style.color = elementData.color;
-                entry.innerHTML = `✨ +1 ${elementName} (${elementData.value}⭐)`;
+                entry.innerHTML = `✨ +1 ${elementName} (${elementData.value}⭐) • ⚖️ ${elementData.mass.toFixed(1)} AMU`;
                 
                 log.insertBefore(entry, log.firstChild);
                 while (log.children.length > 5) {
@@ -648,7 +795,7 @@
 
             } catch (error) {
                 console.error('Extraction error:', error);
-                showNotice('⚠️ Extraction failed');
+                showNotice('⚠️ Extraction failed', true);
             }
         }
 
@@ -659,7 +806,7 @@
             const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
             
             if (!autoGather) {
-                showNotice('⚠️ Auto-extractor disabled');
+                showNotice('⚠️ Auto-extractor disabled', true);
                 return;
             }
 
@@ -767,7 +914,7 @@
             } catch (error) {
                 console.error('Colony error:', error);
                 loadingOverlay.classList.remove('active');
-                showNotice('⚠️ Colony operation failed');
+                showNotice('⚠️ Colony operation failed', true);
             }
         }
 
@@ -823,10 +970,10 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'scanning surface...';
 
-                // Load location data - this will get the planet you selected
+                // Load location data
                 await loadLocationData();
 
-                // Update display
+                // Update display (includes cargo mass)
                 await updateDisplay();
 
                 // Check for existing colony
