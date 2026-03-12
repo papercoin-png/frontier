@@ -1,5 +1,5 @@
 // js/storage.js - Save/load player progress for Voidfarer
-// Now using IndexedDB via db.js for unlimited storage
+// Now using IndexedDB via db.js for unlimited storage with mass-based cargo
 
 import { 
   getItem,
@@ -20,6 +20,9 @@ import {
   isMigrationComplete,
   resetAllData as dbResetAll
 } from './db.js';
+
+// ===== CONSTANTS =====
+export const CARGO_MASS_LIMIT = 1000; // Maximum atomic mass units the ship can carry
 
 // ===== STORAGE KEYS (kept for reference, but not used for storage) =====
 export const STORAGE_KEYS = {
@@ -108,6 +111,141 @@ export const STORAGE_KEYS = {
 // ===== UNIVERSE CONSTANTS =====
 export const UNIVERSE_SEED = 42793;
 
+// ===== ELEMENT MASS DATABASE =====
+// Atomic masses for calculating cargo capacity
+export const ELEMENT_MASS = {
+    // Common
+    'Hydrogen': 1.008,
+    'Helium': 4.003,
+    'Lithium': 6.94,
+    'Beryllium': 9.012,
+    'Boron': 10.81,
+    'Sodium': 22.99,
+    'Magnesium': 24.31,
+    'Aluminum': 26.98,
+    'Silicon': 28.09,
+    'Potassium': 39.10,
+    'Calcium': 40.08,
+    
+    // Uncommon
+    'Carbon': 12.01,
+    'Nitrogen': 14.01,
+    'Oxygen': 16.00,
+    'Fluorine': 19.00,
+    'Neon': 20.18,
+    'Phosphorus': 30.97,
+    'Sulfur': 32.06,
+    'Chlorine': 35.45,
+    'Argon': 39.95,
+    'Iron': 55.85,
+    'Nickel': 58.69,
+    'Lead': 207.2,
+    
+    // Rare
+    'Scandium': 44.96,
+    'Titanium': 47.87,
+    'Vanadium': 50.94,
+    'Chromium': 52.00,
+    'Manganese': 54.94,
+    'Cobalt': 58.93,
+    'Copper': 63.55,
+    'Zinc': 65.38,
+    'Gallium': 69.72,
+    'Germanium': 72.63,
+    'Arsenic': 74.92,
+    'Selenium': 78.97,
+    'Bromine': 79.90,
+    'Krypton': 83.80,
+    'Rubidium': 85.47,
+    'Strontium': 87.62,
+    'Yttrium': 88.91,
+    'Zirconium': 91.22,
+    'Niobium': 92.91,
+    'Molybdenum': 95.95,
+    'Ruthenium': 101.1,
+    'Rhodium': 102.9,
+    'Palladium': 106.4,
+    'Silver': 107.9,
+    'Cadmium': 112.4,
+    'Indium': 114.8,
+    'Tin': 118.7,
+    'Antimony': 121.8,
+    'Tellurium': 127.6,
+    'Iodine': 126.9,
+    'Xenon': 131.3,
+    'Cesium': 132.9,
+    'Barium': 137.3,
+    'Lanthanum': 138.9,
+    'Cerium': 140.1,
+    'Praseodymium': 140.9,
+    'Neodymium': 144.2,
+    'Samarium': 150.4,
+    'Europium': 152.0,
+    'Gadolinium': 157.3,
+    'Terbium': 158.9,
+    'Dysprosium': 162.5,
+    'Holmium': 164.9,
+    'Erbium': 167.3,
+    'Thulium': 168.9,
+    'Ytterbium': 173.0,
+    'Lutetium': 175.0,
+    'Hafnium': 178.5,
+    'Tantalum': 180.9,
+    'Tungsten': 183.8,
+    'Rhenium': 186.2,
+    'Osmium': 190.2,
+    'Iridium': 192.2,
+    'Platinum': 195.1,
+    'Gold': 197.0,
+    'Mercury': 200.6,
+    'Thallium': 204.4,
+    'Bismuth': 209.0,
+    
+    // Very Rare
+    'Polonium': 209.0,
+    'Radon': 222.0,
+    'Radium': 226.0,
+    'Actinium': 227.0,
+    'Thorium': 232.0,
+    'Protactinium': 231.0,
+    'Uranium': 238.0,
+    
+    // Legendary
+    'Technetium': 98.0,
+    'Promethium': 145.0,
+    'Astatine': 210.0,
+    'Francium': 223.0,
+    'Neptunium': 237.0,
+    'Plutonium': 244.0,
+    'Americium': 243.0,
+    'Curium': 247.0,
+    'Berkelium': 247.0,
+    'Californium': 251.0,
+    'Einsteinium': 252.0,
+    'Fermium': 257.0,
+    'Mendelevium': 258.0,
+    'Nobelium': 259.0,
+    'Lawrencium': 262.0,
+    'Rutherfordium': 267.0,
+    'Dubnium': 268.0,
+    'Seaborgium': 269.0,
+    'Bohrium': 270.0,
+    'Hassium': 277.0,
+    'Meitnerium': 278.0,
+    'Darmstadtium': 281.0,
+    'Roentgenium': 282.0,
+    'Copernicium': 285.0,
+    'Nihonium': 286.0,
+    'Flerovium': 289.0,
+    'Moscovium': 290.0,
+    'Livermorium': 293.0,
+    'Tennessine': 294.0,
+    'Oganesson': 294.0
+};
+
+// Default mass for unknown elements
+const DEFAULT_MASS = 100.0;
+
 // ===== HELPER: Settings storage (keep in localStorage for simplicity) =====
 function getSetting(key, defaultValue) {
     const value = localStorage.getItem(key);
@@ -177,10 +315,45 @@ export async function createDefaultPlayer(name = 'Voidfarer') {
         totalCreditsEarned: 5000,
         totalDistanceTraveled: 0,
         totalWarps: 0,
-        credits: 5000
+        credits: 5000,
+        cargoMassLimit: CARGO_MASS_LIMIT // Store the ship's cargo mass limit
     };
     await savePlayer(player);
     return player;
+}
+
+// ===== CARGO MASS UTILITIES =====
+export function getElementMass(elementName) {
+    return ELEMENT_MASS[elementName] || DEFAULT_MASS;
+}
+
+export async function getTotalCargoMass() {
+    const collection = await getCollection();
+    let totalMass = 0;
+    
+    for (const [name, data] of Object.entries(collection)) {
+        const count = data.count || 1;
+        const mass = getElementMass(name);
+        totalMass += count * mass;
+    }
+    
+    return totalMass;
+}
+
+export async function getRemainingCargoMass() {
+    const totalMass = await getTotalCargoMass();
+    const player = await getPlayer();
+    const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
+    
+    return Math.max(0, massLimit - totalMass);
+}
+
+export async function canAddToCargo(elementName, quantity = 1) {
+    const remainingMass = await getRemainingCargoMass();
+    const elementMass = getElementMass(elementName);
+    const requiredMass = elementMass * quantity;
+    
+    return remainingMass >= requiredMass;
 }
 
 // ===== COLLECTION DATA =====
@@ -197,7 +370,8 @@ export async function saveCollection(collection) {
             count: data.count || 1,
             firstFound: data.firstFound || new Date().toISOString(),
             rarity: data.rarity || 'common',
-            value: data.value || 100
+            value: data.value || 100,
+            mass: getElementMass(name) // Store mass for quick reference
         });
     }
     
@@ -215,6 +389,22 @@ export async function saveCollection(collection) {
 }
 
 export async function addElementToCollection(elementName, count = 1) {
+    // Check if we have enough cargo space
+    const canAdd = await canAddToCargo(elementName, count);
+    if (!canAdd) {
+        const remaining = await getRemainingCargoMass();
+        const elementMass = getElementMass(elementName);
+        const maxCanAdd = Math.floor(remaining / elementMass);
+        
+        return { 
+            success: false, 
+            reason: 'insufficient_cargo_space',
+            remainingMass: remaining,
+            elementMass: elementMass,
+            maxCanAdd: maxCanAdd
+        };
+    }
+    
     const result = await dbAddElement(elementName, count);
     
     // Update player stats
@@ -652,7 +842,8 @@ export async function saveRealEstate(realEstateData) {
                     id: `item_${property.id}_${elementName}`,
                     propertyId: property.id,
                     elementName: elementName,
-                    count: itemData.count || 1
+                    count: itemData.count || 1,
+                    mass: getElementMass(elementName) // Store mass for property items too
                 });
             }
         }
@@ -691,6 +882,12 @@ export async function deleteProperty(propertyId) {
 }
 
 export async function transferToProperty(propertyId, elementName, quantity) {
+    // Check if we have enough of the element in ship cargo
+    const collection = await getCollection();
+    if (!collection[elementName] || collection[elementName].count < quantity) {
+        return { success: false, reason: 'insufficient_elements', available: collection[elementName]?.count || 0 };
+    }
+    
     return await dbAddItemToProperty(propertyId, elementName, quantity);
 }
 
@@ -723,6 +920,22 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
         return { success: false, reason: 'insufficient', available: item.count };
     }
     
+    // Check if there's enough cargo space on ship
+    const elementMass = getElementMass(elementName);
+    const currentShipMass = await getTotalCargoMass();
+    const player = await getPlayer();
+    const shipMassLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
+    
+    if (currentShipMass + (elementMass * quantity) > shipMassLimit) {
+        await tx.done;
+        return { 
+            success: false, 
+            reason: 'insufficient_cargo_space',
+            remainingMass: shipMassLimit - currentShipMass,
+            elementMass: elementMass
+        };
+    }
+    
     // Update or delete the property item
     item.count -= quantity;
     if (item.count <= 0) {
@@ -737,16 +950,17 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
         collectionItem = {
             name: elementName,
             count: quantity,
-            firstFound: new Date().toISOString()
+            firstFound: new Date().toISOString(),
+            mass: elementMass
         };
     } else {
         collectionItem.count += quantity;
     }
     await collectionStore.put(collectionItem);
     
-    // Update property used space
+    // Update property used space (now using mass)
     const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
-    property.used = remainingItems.reduce((sum, i) => sum + i.count, 0);
+    property.used = remainingItems.reduce((sum, i) => sum + (i.count * (i.mass || getElementMass(i.elementName))), 0);
     await propertyStore.put(property);
     
     await tx.done;
@@ -842,9 +1056,25 @@ export async function upgradeShip(component) {
     if (upgrades[component] < 5) {
         upgrades[component]++;
         await saveShipUpgrades(upgrades);
+        
+        // If upgrading cargo hold, increase mass limit
+        if (component === 'cargoHold') {
+            await upgradeCargoHold(upgrades[component]);
+        }
+        
         return true;
     }
     return false;
+}
+
+// Special function for cargo hold upgrades to increase mass limit
+async function upgradeCargoHold(newLevel) {
+    const player = await getPlayer();
+    if (player) {
+        // Base limit 1000, increase by 500 per level
+        player.cargoMassLimit = CARGO_MASS_LIMIT + (newLevel - 1) * 500;
+        await savePlayer(player);
+    }
 }
 
 // ===== SAVE TIMESTAMP =====
@@ -904,7 +1134,7 @@ export async function resetGame() {
 // ===== EXPORT / UTILITY =====
 export async function exportGameData() {
     const gameData = {
-        version: '1.0',
+        version: '2.0', // Updated version for mass-based cargo
         exportDate: new Date().toISOString(),
         universeSeed: UNIVERSE_SEED,
         player: await getPlayer(),
@@ -917,6 +1147,7 @@ export async function exportGameData() {
         dailyMetrics: await getAll('dailyMetrics'),
         activeEvents: await getAll('activeEvents'),
         shipUpgrades: await getShipUpgrades(),
+        cargoMassLimit: CARGO_MASS_LIMIT,
         
         // Include localStorage settings
         settings: {
@@ -955,7 +1186,8 @@ export async function importGameData(jsonString) {
                 await setItem('collection', {
                     name: name,
                     count: data.count || 1,
-                    firstFound: data.firstFound || new Date().toISOString()
+                    firstFound: data.firstFound || new Date().toISOString(),
+                    mass: getElementMass(name)
                 });
             }
         }
