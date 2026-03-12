@@ -1,6 +1,7 @@
 // js/market-dynamics.js - Dynamic pricing engine for Voidfarer
 // Now using IndexedDB via storage.js for unlimited storage
 // Handles supply/demand calculations, price history, and market trends
+// Updated to consider element mass in pricing
 
 import {
     getItem,
@@ -12,79 +13,186 @@ import {
     getCollection,
     getCredits,
     addCredits,
-    spendCredits
+    spendCredits,
+    getElementMass
 } from './storage.js';
 
 // ===== BASE PRICES =====
 export const BASE_PRICES = {
     // Common
-    'Carbon': 100,
-    'Silicon': 100,
     'Hydrogen': 100,
     'Helium': 100,
-    'Sodium': 100,
     'Lithium': 100,
+    'Beryllium': 100,
+    'Boron': 100,
+    'Sodium': 100,
     'Magnesium': 100,
     'Aluminum': 100,
+    'Silicon': 100,
     'Potassium': 100,
     'Calcium': 100,
     
     // Uncommon
-    'Iron': 250,
+    'Carbon': 250,
+    'Nitrogen': 250,
     'Oxygen': 250,
-    'Nickel': 250,
-    'Sulfur': 250,
+    'Fluorine': 250,
+    'Neon': 250,
     'Phosphorus': 250,
+    'Sulfur': 250,
     'Chlorine': 250,
     'Argon': 250,
+    'Iron': 250,
+    'Nickel': 250,
     'Lead': 250,
     
     // Rare
-    'Gold': 1000,
-    'Silver': 1000,
-    'Platinum': 1000,
-    'Copper': 1000,
+    'Scandium': 1000,
     'Titanium': 1000,
-    'Zinc': 1000,
-    'Tin': 1000,
-    'Cobalt': 1000,
+    'Vanadium': 1000,
     'Chromium': 1000,
+    'Manganese': 1000,
+    'Cobalt': 1000,
+    'Copper': 1000,
+    'Zinc': 1000,
+    'Gallium': 1000,
+    'Germanium': 1000,
+    'Arsenic': 1000,
+    'Selenium': 1000,
+    'Bromine': 1000,
+    'Krypton': 1000,
+    'Rubidium': 1000,
+    'Strontium': 1000,
+    'Yttrium': 1000,
+    'Zirconium': 1000,
+    'Niobium': 1000,
+    'Molybdenum': 1000,
+    'Ruthenium': 1000,
+    'Rhodium': 1000,
+    'Palladium': 1000,
+    'Silver': 1000,
+    'Cadmium': 1000,
+    'Indium': 1000,
+    'Tin': 1000,
+    'Antimony': 1000,
+    'Tellurium': 1000,
+    'Iodine': 1000,
+    'Xenon': 1000,
+    'Cesium': 1000,
+    'Barium': 1000,
+    'Lanthanum': 1000,
+    'Cerium': 1000,
+    'Praseodymium': 1000,
+    'Neodymium': 1000,
+    'Samarium': 1000,
+    'Europium': 1000,
+    'Gadolinium': 1000,
+    'Terbium': 1000,
+    'Dysprosium': 1000,
+    'Holmium': 1000,
+    'Erbium': 1000,
+    'Thulium': 1000,
+    'Ytterbium': 1000,
+    'Lutetium': 1000,
+    'Hafnium': 1000,
+    'Tantalum': 1000,
+    'Tungsten': 1000,
+    'Rhenium': 1000,
+    'Osmium': 1000,
+    'Iridium': 1000,
+    'Platinum': 1000,
+    'Gold': 1000,
+    'Mercury': 1000,
+    'Thallium': 1000,
+    'Bismuth': 1000,
     
     // Very Rare
-    'Uranium': 5000,
-    'Thorium': 5000,
-    'Plutonium': 5000,
-    'Radium': 5000,
     'Polonium': 5000,
+    'Radon': 5000,
+    'Radium': 5000,
+    'Actinium': 5000,
+    'Thorium': 5000,
+    'Protactinium': 5000,
+    'Uranium': 5000,
     
     // Legendary
-    'Promethium': 25000,
     'Technetium': 25000,
+    'Promethium': 25000,
     'Astatine': 25000,
-    'Francium': 25000
+    'Francium': 25000,
+    'Neptunium': 25000,
+    'Plutonium': 25000,
+    'Americium': 25000,
+    'Curium': 25000,
+    'Berkelium': 25000,
+    'Californium': 25000,
+    'Einsteinium': 25000,
+    'Fermium': 25000,
+    'Mendelevium': 25000,
+    'Nobelium': 25000,
+    'Lawrencium': 25000,
+    'Rutherfordium': 25000,
+    'Dubnium': 25000,
+    'Seaborgium': 25000,
+    'Bohrium': 25000,
+    'Hassium': 25000,
+    'Meitnerium': 25000,
+    'Darmstadtium': 25000,
+    'Roentgenium': 25000,
+    'Copernicium': 25000,
+    'Nihonium': 25000,
+    'Flerovium': 25000,
+    'Moscovium': 25000,
+    'Livermorium': 25000,
+    'Tennessine': 25000,
+    'Oganesson': 25000
 };
 
 // ===== RARITY MAPPING =====
 export const ELEMENT_RARITY = {
     // Common
-    'Carbon': 'common', 'Silicon': 'common', 'Hydrogen': 'common', 'Helium': 'common',
-    'Sodium': 'common', 'Lithium': 'common', 'Magnesium': 'common', 'Aluminum': 'common',
-    'Potassium': 'common', 'Calcium': 'common',
+    'Hydrogen': 'common', 'Helium': 'common', 'Lithium': 'common', 'Beryllium': 'common',
+    'Boron': 'common', 'Sodium': 'common', 'Magnesium': 'common', 'Aluminum': 'common',
+    'Silicon': 'common', 'Potassium': 'common', 'Calcium': 'common',
     
     // Uncommon
-    'Iron': 'uncommon', 'Oxygen': 'uncommon', 'Nickel': 'uncommon', 'Sulfur': 'uncommon',
-    'Phosphorus': 'uncommon', 'Chlorine': 'uncommon', 'Argon': 'uncommon', 'Lead': 'uncommon',
+    'Carbon': 'uncommon', 'Nitrogen': 'uncommon', 'Oxygen': 'uncommon', 'Fluorine': 'uncommon',
+    'Neon': 'uncommon', 'Phosphorus': 'uncommon', 'Sulfur': 'uncommon', 'Chlorine': 'uncommon',
+    'Argon': 'uncommon', 'Iron': 'uncommon', 'Nickel': 'uncommon', 'Lead': 'uncommon',
     
     // Rare
-    'Gold': 'rare', 'Silver': 'rare', 'Platinum': 'rare', 'Copper': 'rare',
-    'Titanium': 'rare', 'Zinc': 'rare', 'Tin': 'rare', 'Cobalt': 'rare', 'Chromium': 'rare',
+    'Scandium': 'rare', 'Titanium': 'rare', 'Vanadium': 'rare', 'Chromium': 'rare',
+    'Manganese': 'rare', 'Cobalt': 'rare', 'Copper': 'rare', 'Zinc': 'rare',
+    'Gallium': 'rare', 'Germanium': 'rare', 'Arsenic': 'rare', 'Selenium': 'rare',
+    'Bromine': 'rare', 'Krypton': 'rare', 'Rubidium': 'rare', 'Strontium': 'rare',
+    'Yttrium': 'rare', 'Zirconium': 'rare', 'Niobium': 'rare', 'Molybdenum': 'rare',
+    'Ruthenium': 'rare', 'Rhodium': 'rare', 'Palladium': 'rare', 'Silver': 'rare',
+    'Cadmium': 'rare', 'Indium': 'rare', 'Tin': 'rare', 'Antimony': 'rare',
+    'Tellurium': 'rare', 'Iodine': 'rare', 'Xenon': 'rare', 'Cesium': 'rare',
+    'Barium': 'rare', 'Lanthanum': 'rare', 'Cerium': 'rare', 'Praseodymium': 'rare',
+    'Neodymium': 'rare', 'Samarium': 'rare', 'Europium': 'rare', 'Gadolinium': 'rare',
+    'Terbium': 'rare', 'Dysprosium': 'rare', 'Holmium': 'rare', 'Erbium': 'rare',
+    'Thulium': 'rare', 'Ytterbium': 'rare', 'Lutetium': 'rare', 'Hafnium': 'rare',
+    'Tantalum': 'rare', 'Tungsten': 'rare', 'Rhenium': 'rare', 'Osmium': 'rare',
+    'Iridium': 'rare', 'Platinum': 'rare', 'Gold': 'rare', 'Mercury': 'rare',
+    'Thallium': 'rare', 'Bismuth': 'rare',
     
     // Very Rare
-    'Uranium': 'very-rare', 'Thorium': 'very-rare', 'Plutonium': 'very-rare',
-    'Radium': 'very-rare', 'Polonium': 'very-rare',
+    'Polonium': 'very-rare', 'Radon': 'very-rare', 'Radium': 'very-rare',
+    'Actinium': 'very-rare', 'Thorium': 'very-rare', 'Protactinium': 'very-rare',
+    'Uranium': 'very-rare',
     
     // Legendary
-    'Promethium': 'legendary', 'Technetium': 'legendary', 'Astatine': 'legendary', 'Francium': 'legendary'
+    'Technetium': 'legendary', 'Promethium': 'legendary', 'Astatine': 'legendary',
+    'Francium': 'legendary', 'Neptunium': 'legendary', 'Plutonium': 'legendary',
+    'Americium': 'legendary', 'Curium': 'legendary', 'Berkelium': 'legendary',
+    'Californium': 'legendary', 'Einsteinium': 'legendary', 'Fermium': 'legendary',
+    'Mendelevium': 'legendary', 'Nobelium': 'legendary', 'Lawrencium': 'legendary',
+    'Rutherfordium': 'legendary', 'Dubnium': 'legendary', 'Seaborgium': 'legendary',
+    'Bohrium': 'legendary', 'Hassium': 'legendary', 'Meitnerium': 'legendary',
+    'Darmstadtium': 'legendary', 'Roentgenium': 'legendary', 'Copernicium': 'legendary',
+    'Nihonium': 'legendary', 'Flerovium': 'legendary', 'Moscovium': 'legendary',
+    'Livermorium': 'legendary', 'Tennessine': 'legendary', 'Oganesson': 'legendary'
 };
 
 // ===== VOLATILITY BY RARITY =====
@@ -95,6 +203,10 @@ export const VOLATILITY = {
     'very-rare': 0.25,   // 25%
     'legendary': 0.35    // 35%
 };
+
+// ===== MASS PRICE FACTOR =====
+// Heavier elements cost more to transport, affecting price
+export const MASS_PRICE_FACTOR = 0.05; // 5% price increase per 100 AMU
 
 // ===== MARKET TRENDS =====
 export const TREND_TYPES = {
@@ -120,6 +232,16 @@ export function getElementRarity(elementName) {
 
 export function getBasePrice(elementName) {
     return BASE_PRICES[elementName] || 100;
+}
+
+// Calculate mass-adjusted price
+export function getMassAdjustedPrice(elementName, basePrice) {
+    const mass = typeof getElementMass === 'function' ? 
+        getElementMass(elementName) : 100;
+    
+    // Heavier elements cost more to transport
+    const massFactor = 1 + (mass / 100) * MASS_PRICE_FACTOR;
+    return Math.round(basePrice * massFactor);
 }
 
 // ===== PRICE HISTORY MANAGEMENT (IndexedDB) =====
@@ -178,7 +300,8 @@ export async function getLatestPrice(elementName) {
     if (history.length > 0) {
         return history[history.length - 1].price;
     }
-    return getBasePrice(elementName);
+    // If no history, calculate from base price with mass adjustment
+    return getMassAdjustedPrice(elementName, getBasePrice(elementName));
 }
 
 // ===== TRADE HISTORY MANAGEMENT (IndexedDB) =====
@@ -189,12 +312,16 @@ export async function getTradeHistory(elementName) {
 }
 
 export async function recordTrade(elementName, quantity, price) {
+    const mass = typeof getElementMass === 'function' ? 
+        getElementMass(elementName) : 100;
+    
     const trade = {
         id: 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         elementName: elementName,
         quantity: quantity,
         price: price,
         totalValue: quantity * price,
+        totalMass: quantity * mass,
         timestamp: Date.now(),
         date: new Date().toISOString().split('T')[0]
     };
@@ -299,10 +426,13 @@ export async function calculateMarketPrice(elementName) {
     if (trend === TREND_TYPES.BULL) trendFactor = 1.05;
     if (trend === TREND_TYPES.BEAR) trendFactor = 0.95;
     
-    // Calculate final price
+    // Calculate base market price
     const marketPrice = basePrice * supplyFactor * demandFactor * randomWalk * trendFactor;
     
-    return Math.round(marketPrice);
+    // Apply mass adjustment
+    const massAdjustedPrice = getMassAdjustedPrice(elementName, marketPrice);
+    
+    return Math.round(massAdjustedPrice);
 }
 
 // ===== UPDATE ALL PRICES =====
@@ -338,6 +468,8 @@ export async function getMarketSummary() {
         const change30d = await calculatePriceChange(elementName, 30);
         const trend = await detectTrend(elementName);
         const rarity = getElementRarity(elementName);
+        const mass = typeof getElementMass === 'function' ? 
+            getElementMass(elementName) : 100;
         
         summary[elementName] = {
             currentPrice: currentPrice,
@@ -345,7 +477,9 @@ export async function getMarketSummary() {
             change30d: change30d,
             trend: trend,
             rarity: rarity,
-            basePrice: BASE_PRICES[elementName]
+            basePrice: BASE_PRICES[elementName],
+            mass: mass,
+            pricePerAMU: (currentPrice / mass).toFixed(2) // Price per atomic mass unit
         };
     }
     
@@ -359,7 +493,8 @@ export async function getTopMovers(limit = 5) {
         name: elementName,
         change: parseFloat(summary[elementName].change7d),
         price: summary[elementName].currentPrice,
-        trend: summary[elementName].trend
+        trend: summary[elementName].trend,
+        mass: summary[elementName].mass
     }));
     
     // Sort by absolute change
@@ -375,6 +510,23 @@ export async function getTopMovers(limit = 5) {
 export async function buyElement(elementName, quantity, pricePerUnit) {
     const totalCost = quantity * pricePerUnit;
     const credits = await getCredits();
+    const mass = typeof getElementMass === 'function' ? 
+        getElementMass(elementName) : 100;
+    const totalMass = quantity * mass;
+    
+    // Check if player has enough cargo space
+    const currentMass = typeof getTotalCargoMass === 'function' ? 
+        await getTotalCargoMass() : 0;
+    const cargoLimit = 1000; // Should come from player data
+    
+    if (currentMass + totalMass > cargoLimit) {
+        return { 
+            success: false, 
+            reason: 'insufficient_cargo_space',
+            requiredMass: totalMass,
+            availableMass: cargoLimit - currentMass
+        };
+    }
     
     if (credits < totalCost) {
         return { success: false, reason: 'insufficient_credits', required: totalCost };
@@ -396,12 +548,16 @@ export async function buyElement(elementName, quantity, pricePerUnit) {
         success: true,
         quantity,
         totalCost,
+        totalMass,
         newCredits: credits - totalCost
     };
 }
 
 export async function sellElement(elementName, quantity, pricePerUnit) {
     const collection = await getCollection();
+    const mass = typeof getElementMass === 'function' ? 
+        getElementMass(elementName) : 100;
+    const totalMass = quantity * mass;
     
     if (!collection[elementName] || collection[elementName].count < quantity) {
         return { 
@@ -426,8 +582,26 @@ export async function sellElement(elementName, quantity, pricePerUnit) {
         success: true,
         quantity,
         totalEarnings,
+        totalMass,
         newCredits: (await getCredits())
     };
+}
+
+// ===== GET BEST VALUE BY MASS =====
+export async function getBestValueByMass() {
+    const summary = await getMarketSummary();
+    const elements = Object.keys(summary).map(name => ({
+        name: name,
+        pricePerAMU: parseFloat(summary[name].pricePerAMU),
+        currentPrice: summary[name].currentPrice,
+        mass: summary[name].mass,
+        rarity: summary[name].rarity
+    }));
+    
+    // Sort by price per AMU (highest value per unit mass)
+    elements.sort((a, b) => b.pricePerAMU - a.pricePerAMU);
+    
+    return elements.slice(0, 10);
 }
 
 // ===== PRICE ALERTS (keep in localStorage) =====
@@ -509,7 +683,7 @@ export async function getMarketStats() {
         
         const currentPrice = elementPrices.length > 0 ? 
             elementPrices[elementPrices.length - 1].price : 
-            BASE_PRICES[elementName];
+            getMassAdjustedPrice(elementName, BASE_PRICES[elementName]);
         
         const prices = elementPrices.map(p => p.price);
         const avgPrice = prices.length > 0 ? 
@@ -517,15 +691,21 @@ export async function getMarketStats() {
             BASE_PRICES[elementName];
         
         const volume = elementTrades.reduce((sum, t) => sum + Math.abs(t.quantity), 0);
+        const mass = typeof getElementMass === 'function' ? 
+            getElementMass(elementName) : 100;
+        const massVolume = elementTrades.reduce((sum, t) => sum + (t.totalMass || 0), 0);
         const tradeCount = elementTrades.length;
         
         stats[elementName] = {
             currentPrice,
             averagePrice: Math.round(avgPrice),
             volume,
+            massVolume: massVolume.toFixed(1),
             tradeCount,
             volatility: VOLATILITY[getElementRarity(elementName)],
-            basePrice: BASE_PRICES[elementName]
+            basePrice: BASE_PRICES[elementName],
+            mass: mass,
+            pricePerAMU: (currentPrice / mass).toFixed(2)
         };
     }
     
@@ -538,8 +718,10 @@ export default {
     ELEMENT_RARITY,
     VOLATILITY,
     TREND_TYPES,
+    MASS_PRICE_FACTOR,
     getElementRarity,
     getBasePrice,
+    getMassAdjustedPrice,
     getPriceHistory,
     recordPrice,
     getLatestPrice,
@@ -553,6 +735,7 @@ export default {
     updateDailyPrices,
     getMarketSummary,
     getTopMovers,
+    getBestValueByMass,
     buyElement,
     sellElement,
     setPriceAlert,
