@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -97,24 +97,26 @@
             left: 20px;
             color: #ffffff;
             font-size: 20px;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             text-shadow: 0 0 15px #000, 0 0 30px #4a8a9a;
             background: rgba(0,0,0,0.3);
             padding: 5px 20px;
             border-radius: 40px 5px 40px 5px;
             backdrop-filter: blur(5px);
             border: 1px solid #8ac0d0;
+            font-weight: 500;
         }
         
         /* Title */
         .game-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 48px;
             color: #e0f0ff;
             text-shadow: 0 0 30px #4a8a9a, 0 0 60px #2a5a6a;
             text-align: center;
             margin-bottom: 20px;
             letter-spacing: 4px;
+            font-weight: 700;
         }
         
         /* Menu Buttons */
@@ -160,6 +162,35 @@
             font-weight: 500;
             letter-spacing: 1px;
             text-align: left;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        /* Start Button (special styling) */
+        .start-button {
+            background: rgba(74, 154, 138, 0.8);
+            border: 2px solid #4affaa;
+            box-shadow: 0 0 30px #4affaa;
+            margin-bottom: 20px;
+        }
+        
+        .start-button .button-icon {
+            filter: drop-shadow(0 0 10px #4affaa);
+        }
+        
+        /* Settings Button */
+        .settings-button {
+            background: rgba(30, 60, 80, 0.6);
+            border: 2px solid #4a9a9a;
+        }
+        
+        /* Credits Button */
+        .credits-button {
+            background: rgba(30, 60, 80, 0.6);
+            border: 2px solid #ffd966;
+        }
+        
+        .credits-button .button-icon {
+            filter: drop-shadow(0 0 10px #ffd966);
         }
         
         /* Tagline */
@@ -170,6 +201,7 @@
             font-style: italic;
             margin-bottom: 15px;
             text-shadow: 0 0 10px #2a5a6a;
+            font-family: 'Exo 2', sans-serif;
         }
         
         /* Version */
@@ -178,6 +210,7 @@
             font-size: 12px;
             text-align: center;
             margin-top: auto;
+            font-family: 'Exo 2', sans-serif;
         }
         
         /* Loading overlay for transitions */
@@ -216,10 +249,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a8a9a;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -286,22 +320,18 @@
             
             <!-- Menu Buttons -->
             <div class="menu-buttons">
-                <div class="menu-button" id="newGameBtn">
-                    <span class="button-icon">🌙</span>
-                    <span class="button-text">New Journey</span>
-                </div>
-                
-                <div class="menu-button" id="continueBtn">
+                <!-- Single Start Button (combines New Journey and Continue) -->
+                <div class="menu-button start-button" id="startBtn">
                     <span class="button-icon">🚀</span>
-                    <span class="button-text">Continue</span>
+                    <span class="button-text">Start Journey</span>
                 </div>
                 
-                <div class="menu-button" id="settingsBtn">
+                <div class="menu-button settings-button" id="settingsBtn">
                     <span class="button-icon">⚙️</span>
                     <span class="button-text">Settings</span>
                 </div>
                 
-                <div class="menu-button" id="creditsBtn">
+                <div class="menu-button credits-button" id="creditsBtn">
                     <span class="button-icon">✨</span>
                     <span class="button-text">Credits</span>
                 </div>
@@ -328,10 +358,10 @@
         </div>
     </div>
 
-    <script type="module">
-        // ===== SIMPLIFIED INITIALIZATION FOR TESTING =====
-        console.log('Index.html loaded');
-        
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -339,7 +369,6 @@
             tg.expand();
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
-            console.log('Telegram initialized');
         }
 
         // ===== DOM ELEMENTS =====
@@ -350,8 +379,7 @@
         const errorMessage = document.getElementById('errorMessage');
         
         // Menu buttons
-        const newGameBtn = document.getElementById('newGameBtn');
-        const continueBtn = document.getElementById('continueBtn');
+        const startBtn = document.getElementById('startBtn');
         const settingsBtn = document.getElementById('settingsBtn');
         const creditsBtn = document.getElementById('creditsBtn');
 
@@ -376,54 +404,137 @@
             hideLoading();
         }
 
-        // ===== SIMPLE BUTTON HANDLERS FOR TESTING =====
-        newGameBtn.addEventListener('click', () => {
-            console.log('New Game clicked');
-            showLoading('starting new journey...');
-            setTimeout(() => {
-                window.location.href = 'earth-hub.html';
-            }, 500);
-        });
+        // ===== NAVIGATION =====
+        function navigateTo(screen, useWarp = false) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            if (useWarp) {
+                showLoading('warping...');
+                migrationProgressFill.style.width = '0%';
+                migrationStatus.textContent = '';
+                
+                setTimeout(() => {
+                    window.location.href = screen;
+                }, 800);
+            } else {
+                window.location.href = screen;
+            }
+        }
 
-        continueBtn.addEventListener('click', () => {
-            console.log('Continue clicked');
-            showLoading('loading your journey...');
-            setTimeout(() => {
-                window.location.href = 'earth-hub.html';
-            }, 500);
-        });
+        // ===== UNIVERSE SEED =====
+        function initializeUniverse() {
+            if (!localStorage.getItem('voidfarer_universe_seed')) {
+                // Fixed seed - everyone gets the same universe
+                localStorage.setItem('voidfarer_universe_seed', '42793');
+            }
+        }
+
+        // ===== CHECK FOR EXISTING SAVE =====
+        function hasExistingSave() {
+            return localStorage.getItem('voidfarer_player') !== null;
+        }
+
+        // ===== CREATE OR LOAD SAVE =====
+        async function startGame() {
+            showLoading('starting your journey...');
+            migrationProgressFill.style.width = '30%';
+            
+            try {
+                const hasSave = hasExistingSave();
+                
+                if (!hasSave) {
+                    // First time playing - create default save
+                    migrationStatus.textContent = 'creating new save...';
+                    
+                    // Set default player
+                    localStorage.setItem('voidfarer_player', JSON.stringify({
+                        name: 'Voidfarer',
+                        ship: 'Prospector',
+                        credits: 1000,
+                        created: new Date().toISOString()
+                    }));
+                    
+                    // Initialize universe seed
+                    initializeUniverse();
+                    
+                    // Set starting location
+                    localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
+                    localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
+                    localStorage.setItem('voidfarer_current_star', 'Sol');
+                    localStorage.setItem('voidfarer_current_planet', 'Earth');
+                    
+                    // Default missions
+                    localStorage.setItem('voidfarer_missions', JSON.stringify([
+                        { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
+                        { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
+                        { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
+                    ]));
+                    
+                    localStorage.setItem('voidfarer_credits', '12450');
+                    
+                    migrationStatus.textContent = 'new save created!';
+                } else {
+                    migrationStatus.textContent = 'loading existing save...';
+                }
+                
+                migrationProgressFill.style.width = '70%';
+                
+                // Small delay for visual feedback
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                migrationProgressFill.style.width = '100%';
+                migrationStatus.textContent = 'welcome back, voidfarer...';
+                
+                // Navigate to Earth Hub with warp effect
+                navigateTo('earth-hub.html', true);
+                
+            } catch (error) {
+                console.error('Error starting game:', error);
+                showError('Failed to start game');
+            }
+        }
+
+        // ===== BUTTON CLICK HANDLERS =====
+        startBtn.addEventListener('click', startGame);
 
         settingsBtn.addEventListener('click', () => {
             console.log('Settings clicked');
-            window.location.href = 'settings.html';
+            navigateTo('settings.html');
         });
 
         creditsBtn.addEventListener('click', () => {
             console.log('Credits clicked');
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
         });
 
-        // ===== SIMPLE INITIALIZATION =====
-        async function initializeGame() {
-            try {
-                console.log('Starting initialization...');
-                showLoading('initializing...');
-                
-                // Simple timeout to show loading works
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                console.log('Initialization complete');
-                hideLoading();
-                
-            } catch (error) {
-                console.error('Initialization failed:', error);
-                showError('Failed to initialize: ' + error.message);
-            }
+        // ===== PRELOAD SCREENS =====
+        function preloadScreen(url) {
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.href = url;
+            link.as = 'document';
+            document.head.appendChild(link);
         }
 
-        // ===== START =====
-        console.log('Calling initializeGame...');
-        initializeGame();
+        // ===== INITIALIZE =====
+        window.addEventListener('load', async () => {
+            console.log('Index.html loaded');
+            
+            // Preload next screen for faster transition
+            preloadScreen('earth-hub.html');
+            
+            // Initialize universe seed
+            initializeUniverse();
+            
+            // Hide loading overlay initially
+            hideLoading();
+        });
     </script>
+    
+    <!-- Load JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
