@@ -206,22 +206,23 @@
             font-weight: 500;
         }
         
+        /* Planet Info Panel - Now with SET COURSE button */
         .planet-info {
             position: absolute;
             bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(10,10,26,0.9);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
+            background: rgba(10,10,26,0.95);
+            backdrop-filter: blur(15px);
+            border: 2px solid #ffaa4a;
             color: white;
             padding: 20px;
             border-radius: 40px 15px 40px 15px;
             z-index: 40;
             display: none;
-            min-width: 260px;
+            min-width: 280px;
             text-align: center;
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            box-shadow: 0 0 30px rgba(255, 170, 74, 0.3);
         }
         
         .planet-info.visible {
@@ -248,50 +249,110 @@
             margin: 10px 0;
         }
         
+        .distance-calculator {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #4a8ac0;
+        }
+        
+        .distance-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .distance-label {
+            color: #a0c0ff;
+        }
+        
+        .distance-value {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .total-distance {
+            font-size: 18px;
+            border-top: 1px solid #4a8ac0;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        
+        .total-distance .distance-value {
+            color: #ffd966;
+            font-size: 20px;
+        }
+        
+        .warp-estimate {
+            background: rgba(74, 138, 192, 0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .warp-cycles {
+            color: #ffaa4a;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
         .planet-info .warning-text {
             color: #ffaa4a;
             font-size: 12px;
             margin: 5px 0;
         }
         
-        .planet-info button {
-            margin-top: 15px;
-            padding: 10px 25px;
-            background: #4a8ac0;
+        .planet-info .set-course-btn {
+            width: 100%;
+            background: #4affaa;
             border: none;
-            border-radius: 30px;
-            color: white;
+            color: #0a0a1a;
+            padding: 16px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 20px;
+            font-weight: 700;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
-            font-size: 16px;
-            font-weight: 500;
             transition: all 0.1s;
+            margin-top: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px #4affaa;
         }
         
-        .planet-info button:hover {
-            background: #5a9ad0;
+        .planet-info .set-course-btn:active {
+            transform: scale(0.96);
+            background: #6affcc;
         }
         
-        .planet-info button:active {
-            transform: scale(0.95);
-        }
-        
-        .planet-info button:disabled {
+        .planet-info .set-course-btn:disabled {
             background: #2a4a6a;
+            color: #a0c0ff;
+            box-shadow: none;
             opacity: 0.5;
             cursor: not-allowed;
         }
         
-        .planet-info button.secondary {
+        .planet-info .close-btn {
             background: transparent;
             border: 1px solid #6a8ac0;
-            margin-left: 10px;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            margin-top: 10px;
         }
         
-        .planet-info button.secondary:active {
+        .planet-info .close-btn:active {
             background: rgba(106, 138, 192, 0.3);
         }
         
+        /* Loading overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -388,7 +449,7 @@
             <div id="planetCount">-- planets</div>
         </div>
         
-        <!-- Planet Info Panel -->
+        <!-- Planet Info Panel with SET COURSE button -->
         <div class="planet-info" id="planetInfo">
             <h2 id="planetName"></h2>
             <p id="planetType"></p>
@@ -396,17 +457,42 @@
             <p id="planetAtmos"></p>
             <p id="planetGravity"></p>
             <p class="planet-resources" id="planetResources"></p>
-            <p class="warning-text" id="planetWarning"></p>
-            <div>
-                <button id="landBtn" onclick="landOnPlanet()">🚀 LAND</button>
-                <button class="secondary" onclick="hidePlanetInfo()">CLOSE</button>
+            
+            <!-- Distance Calculator -->
+            <div class="distance-calculator">
+                <div class="distance-row">
+                    <span class="distance-label">From current location:</span>
+                    <span class="distance-value" id="distanceFromCurrent">0.0 LY</span>
+                </div>
+                <div class="distance-row">
+                    <span class="distance-label">Orbital descent:</span>
+                    <span class="distance-value" id="descentDistance">0.5 LY</span>
+                </div>
+                <div class="distance-row total-distance">
+                    <span class="distance-label">TOTAL JOURNEY:</span>
+                    <span class="distance-value" id="totalDistance">0.0 LY</span>
+                </div>
             </div>
+            
+            <!-- Warp Estimate -->
+            <div class="warp-estimate">
+                <span>Warp cycles: </span>
+                <span class="warp-cycles" id="warpCycles">0</span>
+                <span> | Fuel: </span>
+                <span class="warp-cycles" id="fuelCost">0</span><span>⭐</span>
+            </div>
+            
+            <p class="warning-text" id="planetWarning"></p>
+            
+            <!-- ONE BUTTON - SET COURSE -->
+            <button class="set-course-btn" id="setCourseBtn" onclick="setCourseToPlanet()">🚀 SET COURSE</button>
+            <button class="close-btn" onclick="hidePlanetInfo()">CLOSE</button>
         </div>
         
         <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loadingText">preparing descent...</div>
+            <div class="loading-text" id="loadingText">plotting course...</div>
         </div>
 
         <!-- Migration status (debug) -->
@@ -432,10 +518,15 @@
         let starData = null;
         let planets = [];
         let currentPlanet = null;
+        let currentLocation = {
+            sector: 'Orion Arm',
+            nebula: 'Orion Nebula',
+            star: 'Unknown Star'
+        };
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
-        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+        const ORBITAL_DESCENT = 0.5; // Fixed descent distance
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -519,16 +610,18 @@
             return prefix + '-' + number;
         }
 
-        // ===== ELEMENT MASS DATABASE =====
-        const elementMass = {
-            'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Carbon': 12.01,
-            'Oxygen': 16.00, 'Iron': 55.85, 'Gold': 197.0, 'Uranium': 238.0,
-            'Promethium': 145.0, 'Technetium': 98.0, 'Silver': 107.9, 'Platinum': 195.1,
-            'Titanium': 47.87, 'Copper': 63.55, 'Lead': 207.2, 'Nickel': 58.69
-        };
+        // ===== DISTANCE CALCULATION =====
+        function calculateWarpCycles(distance) {
+            if (distance <= 1) return 2;
+            if (distance <= 3) return 4;
+            if (distance <= 7) return 8;
+            if (distance <= 12) return 15;
+            if (distance <= 20) return 25;
+            return Math.floor(distance * 1.5);
+        }
 
-        function getElementMass(elementName) {
-            return elementMass[elementName] || 100.0;
+        function calculateFuelCost(distance) {
+            return Math.floor(distance * 4) + 5;
         }
 
         // ===== LOAD STAR DATA =====
@@ -538,6 +631,16 @@
                 const starName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
                 const starType = typeof getCurrentStarType === 'function' ? await getCurrentStarType() : 'Main Sequence';
                 const starIndex = typeof getCurrentStarIndex === 'function' ? await getCurrentStarIndex() : 0;
+
+                // Load location context
+                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
+                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Nebula';
+                
+                currentLocation = {
+                    sector: sector,
+                    nebula: nebula,
+                    star: starName
+                };
 
                 // Generate star system
                 const starSeed = UNIVERSE_SEED + (starName ? hashString(starName) : 0);
@@ -573,11 +676,9 @@
                         }
                     }
                     
-                    // Calculate total mass of resources for cargo check
-                    let totalMass = 0;
-                    resources.forEach(r => {
-                        totalMass += getElementMass(r);
-                    });
+                    // Random distance from current location (simulated)
+                    // In a real game, this would be calculated based on actual position
+                    const distanceFromCurrent = (Math.random() * 5 + 1).toFixed(1);
                     
                     planets.push({
                         index: i,
@@ -590,7 +691,7 @@
                         gravity: planetType.gravity,
                         landable: planetType.landable,
                         resources: resources,
-                        resourceMass: totalMass,
+                        distanceFromCurrent: parseFloat(distanceFromCurrent),
                         orbitRadius: orbitRadii[i],
                         orbitSpeed: 0.002 - (i * 0.0002),
                         angle: Math.random() * Math.PI * 2
@@ -613,30 +714,6 @@
             } catch (error) {
                 console.error('Error loading star data:', error);
                 return false;
-            }
-        }
-
-        // ===== CHECK CARGO SPACE =====
-        async function checkCargoSpace(planet) {
-            try {
-                let currentMass = 0;
-                if (typeof getTotalCargoMass === 'function') {
-                    currentMass = await getTotalCargoMass();
-                }
-                
-                const remainingSpace = CARGO_MASS_LIMIT - currentMass;
-                const canLand = remainingSpace >= planet.resourceMass * 0.5; // Need at least half the planet's resource mass in space
-                
-                return {
-                    canLand,
-                    remainingSpace,
-                    requiredSpace: planet.resourceMass * 0.5,
-                    warning: remainingSpace < planet.resourceMass * 0.5 ? 
-                        '⚠️ Low cargo space. Some resources may be left behind.' : ''
-                };
-            } catch (error) {
-                console.error('Error checking cargo space:', error);
-                return { canLand: true, remainingSpace: 1000, requiredSpace: 0, warning: '' };
             }
         }
 
@@ -689,14 +766,16 @@
         }
 
         // ===== SHOW PLANET INFO =====
-        async function showPlanetInfo(index) {
+        function showPlanetInfo(index) {
             const planet = planets[index];
             if (!planet) return;
             
             currentPlanet = planet;
             
-            // Check cargo space
-            const cargoCheck = await checkCargoSpace(planet);
+            // Calculate total journey distance
+            const totalDistance = planet.distanceFromCurrent + ORBITAL_DESCENT;
+            const warpCycles = calculateWarpCycles(totalDistance);
+            const fuelCost = calculateFuelCost(totalDistance);
             
             document.getElementById('planetName').textContent = planet.name;
             document.getElementById('planetType').textContent = 'Type: ' + planet.typeName;
@@ -704,19 +783,24 @@
             document.getElementById('planetAtmos').textContent = 'Atmosphere: ' + planet.atmos;
             document.getElementById('planetGravity').textContent = 'Gravity: ' + planet.gravity;
             document.getElementById('planetResources').textContent = 'Resources: ' + (planet.resources.length ? planet.resources.join(', ') : 'None');
-            document.getElementById('planetWarning').textContent = cargoCheck.warning;
             
-            // Enable/disable land button
-            const landBtn = document.getElementById('landBtn');
+            // Update distance display
+            document.getElementById('distanceFromCurrent').textContent = planet.distanceFromCurrent.toFixed(1) + ' LY';
+            document.getElementById('descentDistance').textContent = ORBITAL_DESCENT.toFixed(1) + ' LY';
+            document.getElementById('totalDistance').textContent = totalDistance.toFixed(1) + ' LY';
+            document.getElementById('warpCycles').textContent = warpCycles;
+            document.getElementById('fuelCost').textContent = fuelCost;
+            
+            // Enable/disable set course button
+            const setCourseBtn = document.getElementById('setCourseBtn');
             if (!planet.landable) {
-                landBtn.disabled = true;
-                landBtn.textContent = '⛔ CANNOT LAND';
-            } else if (!cargoCheck.canLand) {
-                landBtn.disabled = true;
-                landBtn.textContent = '⚠️ CARGO FULL';
+                setCourseBtn.disabled = true;
+                setCourseBtn.textContent = '⛔ CANNOT LAND';
+                document.getElementById('planetWarning').textContent = 'Gas giants cannot be landed on';
             } else {
-                landBtn.disabled = false;
-                landBtn.textContent = '🚀 LAND';
+                setCourseBtn.disabled = false;
+                setCourseBtn.textContent = '🚀 SET COURSE TO ' + planet.name.toUpperCase();
+                document.getElementById('planetWarning').textContent = '';
             }
             
             planetInfo.classList.add('visible');
@@ -730,8 +814,8 @@
             currentPlanet = null;
         }
 
-        // ===== LAND ON PLANET (ONLY WARP HERE!) =====
-        async function landOnPlanet() {
+        // ===== SET COURSE TO PLANET (ONE BUTTON - GO TO WARP) =====
+        async function setCourseToPlanet() {
             if (!currentPlanet) return;
             
             if (!currentPlanet.landable) {
@@ -739,18 +823,31 @@
                 return;
             }
             
-            // Double-check cargo space
-            const cargoCheck = await checkCargoSpace(currentPlanet);
-            if (!cargoCheck.canLand) {
-                alert('Cargo hold full! Cannot land.');
-                return;
-            }
-            
             loadingOverlay.classList.add('active');
-            loadingText.textContent = 'preparing descent...';
+            loadingText.textContent = 'plotting course...';
             
             try {
-                // Save current planet to storage
+                // Calculate total journey distance
+                const totalDistance = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
+                const warpCycles = calculateWarpCycles(totalDistance);
+                const fuelCost = calculateFuelCost(totalDistance);
+                
+                // Prepare warp data - SIMPLE! Just start and destination
+                const warpData = {
+                    destination: currentPlanet.name,
+                    destinationType: currentPlanet.typeName,
+                    startLocation: currentLocation.star + ' System',
+                    startLocationType: 'star system',
+                    totalDistance: totalDistance,
+                    warpCycles: warpCycles,
+                    fuelCost: fuelCost,
+                    returnPage: 'surface.html'
+                };
+                
+                // Save warp data
+                localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
+                
+                // Also save planet data for surface
                 if (typeof setCurrentPlanet === 'function') {
                     await setCurrentPlanet(
                         currentPlanet.name,
@@ -763,31 +860,15 @@
                     localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
                 }
                 
-                // Calculate warp data (short descent)
-                const distance = 0.5; // Close approach
-                const cycles = 1;
-                const fuel = Math.floor(distance * 4) + 5;
-                
-                // Save warp data - ONLY TIME WE WARP!
-                if (typeof setWarpData === 'function') {
-                    setWarpData(currentPlanet.name, 'surface.html', cycles, distance, fuel);
-                } else {
-                    localStorage.setItem('voidfarer_warp_destination', currentPlanet.name);
-                    localStorage.setItem('voidfarer_warp_return', 'surface.html');
-                    localStorage.setItem('voidfarer_warp_cycles', cycles);
-                    localStorage.setItem('voidfarer_warp_distance', distance);
-                    localStorage.setItem('voidfarer_warp_fuel', fuel);
-                }
-                
-                // Navigate to warp screen
+                // GO TO WARP!
                 setTimeout(() => {
                     window.location.href = 'warp.html';
                 }, 500);
                 
             } catch (error) {
-                console.error('Error landing:', error);
+                console.error('Error plotting course:', error);
                 loadingOverlay.classList.remove('active');
-                alert('Failed to land. Please try again.');
+                alert('Failed to plot course. Please try again.');
             }
         }
 
