@@ -101,6 +101,35 @@
             font-weight: 600;
         }
         
+        .journey-total {
+            position: sticky;
+            top: 170px;
+            z-index: 25;
+            margin: 10px 15px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: none;
+            justify-content: space-between;
+            color: white;
+        }
+        
+        .journey-total.visible {
+            display: flex;
+        }
+        
+        .journey-total-label {
+            color: #a0c0ff;
+        }
+        
+        .journey-total-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .back-btn {
             position: fixed;
             bottom: 30px;
@@ -259,6 +288,35 @@
             font-size: 20px;
         }
         
+        .cumulative-info {
+            background: rgba(255, 170, 74, 0.15);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ffaa4a;
+            display: none;
+        }
+        
+        .cumulative-info.visible {
+            display: block;
+        }
+        
+        .cumulative-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .cumulative-label {
+            color: #a0c0ff;
+        }
+        
+        .cumulative-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .star-info-buttons {
             display: flex;
             gap: 10px;
@@ -281,6 +339,15 @@
         .star-info-btn:active {
             background: #6aa0e0;
             transform: scale(0.96);
+        }
+        
+        .star-info-btn.primary {
+            background: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .star-info-btn.primary:active {
+            background: #ffcc6a;
         }
         
         .star-info-btn.secondary {
@@ -355,7 +422,7 @@
 <body>
     <div class="cluster-view">
         <div class="ui-header">
-            <h1 id="clusterTitle">Loading Cluster...</h1>
+            <h1 id="clusterTitle">Loading Star Cluster...</h1>
         </div>
         
         <div class="current-location" id="currentLocation">
@@ -368,11 +435,16 @@
             <span class="journey-distance" id="journeyDistance">0.0 LY</span>
         </div>
         
+        <div class="journey-total" id="journeyTotal">
+            <span class="journey-total-label">Total with star leg:</span>
+            <span class="journey-total-value" id="totalJourneyDistance">0.0 LY</span>
+        </div>
+        
         <div class="stars-grid" id="starsGrid">
             <div style="color: white; text-align: center; padding: 50px;">Loading stars...</div>
         </div>
         
-        <button class="back-btn" onclick="returnToSectors()">← SECTORS</button>
+        <button class="back-btn" onclick="returnToSectors()">← STAR SECTORS</button>
         
         <!-- Star Info Panel -->
         <div class="star-info-panel" id="starInfoPanel">
@@ -383,8 +455,21 @@
                 <div>Distance from current:</div>
                 <span class="distance-value" id="starDistance">0.0</span> LY
             </div>
+            
+            <!-- Cumulative info (shown only in plot mode) -->
+            <div class="cumulative-info" id="cumulativeInfo">
+                <div class="cumulative-row">
+                    <span class="cumulative-label">Previous legs:</span>
+                    <span class="cumulative-value" id="previousDistance">0.0 LY</span>
+                </div>
+                <div class="cumulative-row">
+                    <span class="cumulative-label">After this leg:</span>
+                    <span class="cumulative-value" id="afterThisLeg">0.0 LY</span>
+                </div>
+            </div>
+            
             <div class="star-info-buttons">
-                <button class="star-info-btn" id="enterSystemBtn" onclick="enterSystem()">🚀 VIEW SYSTEM</button>
+                <button class="star-info-btn" id="actionBtn" onclick="handleStarAction()">🚀 VIEW SYSTEM</button>
                 <button class="star-info-btn secondary" onclick="hideStarInfo()">CLOSE</button>
             </div>
         </div>
@@ -416,6 +501,11 @@
         const starsGrid = document.getElementById('starsGrid');
         const starInfoPanel = document.getElementById('starInfoPanel');
         const journeyDistanceSpan = document.getElementById('journeyDistance');
+        const journeyTotalEl = document.getElementById('journeyTotal');
+        const totalJourneyDistanceEl = document.getElementById('totalJourneyDistance');
+        const cumulativeInfoEl = document.getElementById('cumulativeInfo');
+        const previousDistanceEl = document.getElementById('previousDistance');
+        const afterThisLegEl = document.getElementById('afterThisLeg');
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
@@ -427,6 +517,11 @@
         let starCount = 50;
         let selectedStar = null;
         let journeyDistance = 0;
+        let cumulativeBefore = 0;
+        
+        // ===== CHECK FOR PLOT MODE =====
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPlotMode = urlParams.get('mode') === 'plot';
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -494,6 +589,19 @@
             return prefix + ' ' + suffix;
         }
 
+        // ===== WARP CALCULATION FUNCTIONS =====
+        function getWarpCyclesFromDistance(distance) {
+            if (distance <= 1.0) return 1;
+            if (distance <= 2.5) return 2;
+            if (distance <= 4.5) return 3;
+            if (distance <= 7.0) return 4;
+            return 5;
+        }
+
+        function getFuelCostFromDistance(distance) {
+            return Math.floor(distance * 4) + 5;
+        }
+
         // ===== LOAD JOURNEY DISTANCE =====
         function loadJourneyDistance() {
             const saved = localStorage.getItem('voidfarer_journey_distance');
@@ -501,15 +609,21 @@
             journeyDistanceSpan.textContent = journeyDistance.toFixed(1) + ' LY';
         }
 
-        // ===== GENERATE REAL STAR DISTANCE =====
+        // ===== LOAD CUMULATIVE DISTANCE (for plot mode) =====
+        function loadCumulativeDistance() {
+            cumulativeBefore = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
+            
+            if (isPlotMode && cumulativeBefore > 0) {
+                journeyTotalEl.classList.add('visible');
+                totalJourneyDistanceEl.textContent = cumulativeBefore.toFixed(1) + ' LY';
+            }
+        }
+
+        // ===== GENERATE STAR DISTANCE =====
         function generateStarDistance(index, isCurrent) {
             if (isCurrent) return 0;
             
-            // Stars farther from the center are more distant
-            // This creates a realistic range from 0.5 to 3.5 LY
             const baseDistance = 0.5 + (index / starCount) * 3.0;
-            
-            // Add some randomness but keep it deterministic
             const seed = UNIVERSE_SEED + index * 100;
             const randomFactor = seededRandom(seed, 0) * 0.5;
             
@@ -521,27 +635,32 @@
             try {
                 // Load data from storage
                 const star = typeof getCurrentStar === 'function' ? await getCurrentStar() : '';
-                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Molecular Cloud';
+                const starSector = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Molecular Cloud';
                 const count = typeof getCurrentSectorStars === 'function' ? await getCurrentSectorStars() : 85;
 
                 currentStarName = star || '';
-                clusterName = nebula || 'Orion Molecular Cloud';
+                clusterName = starSector || 'Orion Molecular Cloud';
                 starCount = count || 85;
 
                 // Update UI
-                document.getElementById('clusterTitle').textContent = clusterName;
+                document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
                 document.getElementById('currentLocationText').textContent = 
                     currentStarName || 'No star selected';
 
                 // Load journey distance
                 loadJourneyDistance();
+                
+                // Load cumulative distance for plot mode
+                if (isPlotMode) {
+                    loadCumulativeDistance();
+                }
 
                 return true;
 
             } catch (error) {
                 console.error('Error loading cluster data:', error);
                 clusterName = 'Orion Molecular Cloud';
-                document.getElementById('clusterTitle').textContent = clusterName;
+                document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
                 return false;
             }
         }
@@ -550,24 +669,18 @@
         function generateStars() {
             stars = [];
             
-            // Generate cluster seed
             const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 100000;
             
-            // Generate stars
             for (let i = 0; i < starCount; i++) {
                 const starSeed = clusterSeed + i * 1000;
                 const starType = getStarType(starSeed, i);
                 
-                // Calculate planet count
                 let planetCount = 0;
                 if (starType.maxPlanets > 0) {
                     planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
                 }
                 
-                // Check if this is the current star
                 const isCurrent = (starType.name === currentStarName);
-                
-                // Generate real distance
                 const distance = generateStarDistance(i, isCurrent);
                 
                 stars.push({
@@ -600,6 +713,27 @@
             document.getElementById('starInfoPlanets').textContent = star.planets + ' planets';
             document.getElementById('starDistance').textContent = star.distance.toFixed(1);
             
+            // Update cumulative info for plot mode
+            if (isPlotMode) {
+                const afterThisLeg = cumulativeBefore + star.distance;
+                previousDistanceEl.textContent = cumulativeBefore.toFixed(1) + ' LY';
+                afterThisLegEl.textContent = afterThisLeg.toFixed(1) + ' LY';
+                cumulativeInfoEl.classList.add('visible');
+            } else {
+                cumulativeInfoEl.classList.remove('visible');
+            }
+            
+            // Update action button based on mode
+            const actionBtn = document.getElementById('actionBtn');
+            
+            if (isPlotMode) {
+                actionBtn.classList.add('primary');
+                actionBtn.textContent = '⭐ SELECT THIS STAR';
+            } else {
+                actionBtn.classList.remove('primary');
+                actionBtn.textContent = '🚀 VIEW SYSTEM';
+            }
+            
             starInfoPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -611,8 +745,19 @@
             selectedStar = null;
         }
 
-        // ===== ENTER SYSTEM =====
-        async function enterSystem() {
+        // ===== HANDLE STAR ACTION =====
+        function handleStarAction() {
+            if (!selectedStar) return;
+            
+            if (isPlotMode) {
+                selectStarForJourney();
+            } else {
+                viewSystem();
+            }
+        }
+
+        // ===== VIEW SYSTEM (normal mode) =====
+        async function viewSystem() {
             if (!selectedStar) return;
             
             loadingOverlay.classList.add('active');
@@ -649,6 +794,51 @@
             }
         }
 
+        // ===== SELECT STAR FOR JOURNEY (plot mode) =====
+        async function selectStarForJourney() {
+            if (!selectedStar) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'adding star leg...';
+            
+            try {
+                // Get current cumulative distance
+                const currentCumulative = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
+                
+                // Calculate new cumulative
+                const newCumulative = currentCumulative + selectedStar.distance;
+                
+                console.log('Star leg:', {
+                    star: selectedStar.name,
+                    distance: selectedStar.distance,
+                    previousCumulative: currentCumulative,
+                    newCumulative: newCumulative
+                });
+                
+                // Save star data using navigation.js if available
+                if (typeof savePlotStar === 'function') {
+                    savePlotStar(selectedStar.name, selectedStar.distance);
+                } else {
+                    // Fallback to direct localStorage
+                    localStorage.setItem('voidfarer_plot_star', selectedStar.name);
+                    localStorage.setItem('voidfarer_plot_star_distance', selectedStar.distance.toString());
+                    
+                    // CRITICAL: Update cumulative distance
+                    localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
+                }
+                
+                // Navigate to system view in plot mode
+                setTimeout(() => {
+                    window.location.href = 'system-view.html?mode=plot';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error selecting star:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to select star. Please try again.');
+            }
+        }
+
         // ===== RENDER STARS =====
         function renderStars() {
             starsGrid.innerHTML = '';
@@ -666,7 +856,6 @@
                 }
                 card.onclick = function() { showStarInfo(star); };
                 
-                // Show distance badge for all stars
                 let distanceDisplay = '';
                 if (star.isCurrent) {
                     distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
@@ -688,35 +877,31 @@
             });
         }
 
-        // ===== RETURN TO SECTORS =====
+        // ===== RETURN TO STAR SECTORS =====
         function returnToSectors() {
-            window.location.href = 'star-sectors.html';
+            if (isPlotMode) {
+                window.location.href = 'star-sectors.html?mode=plot';
+            } else {
+                window.location.href = 'star-sectors.html';
+            }
         }
 
         // ===== INITIALIZE =====
         async function init() {
             try {
-                // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star cluster...';
 
-                // Check for player data
                 const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
                 }
 
-                // Load cluster data
                 await loadClusterData();
-
-                // Generate stars with real distances
                 generateStars();
-
-                // Render stars
                 renderStars();
 
-                // Hide loading
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
@@ -730,12 +915,12 @@
             }
         }
 
-        // ===== START =====
         init();
     </script>
     
     <!-- Load all JS files -->
     <script src="js/storage.js"></script>
+    <script src="js/navigation.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
 </body>
