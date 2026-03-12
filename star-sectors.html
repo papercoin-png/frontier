@@ -453,24 +453,17 @@
         const markersContainer = document.getElementById('sectorMarkers');
 
         // ===== STATE =====
-        let currentRegion = 'Orion';
-        let currentSector = 'Orion Molecular Cloud';
+        let currentRegion = 'Orion Arm';
+        let currentSectorId = 'B2';
+        let currentSectorName = 'Orion Molecular Cloud';
         let sectors = [];
         let selectedSector = null;
         let selectedIndex = -1;
         let journeyDistance = 0;
 
-        // ===== SECTOR DATA BY REGION WITH REAL DISTANCES =====
+        // ===== SECTOR DATA BY REGION (Mapped by display name) =====
         const sectorData = {
-            'Orion': [
-                { name: 'Orion Molecular Cloud', stars: 85, type: 'Star-forming', icon: '🌌', distance: 0.0, x: 30, y: 40 },
-                { name: 'Barnard\'s Loop', stars: 62, type: 'Emission', icon: '🌀', distance: 2.3, x: 60, y: 30 },
-                { name: 'Lambda Orionis', stars: 48, type: 'Cluster', icon: '✨', distance: 3.1, x: 45, y: 60 },
-                { name: 'Sigma Orionis', stars: 55, type: 'Multiple', icon: '⭐', distance: 4.2, x: 70, y: 55 },
-                { name: 'Trapezium', stars: 120, type: 'Young', icon: '🔥', distance: 5.0, x: 25, y: 65 },
-                { name: 'NGC 1980', stars: 40, type: 'Reflection', icon: '💫', distance: 5.8, x: 55, y: 70 }
-            ],
-            'Cygnus': [
+            'Cygnus Arm': [
                 { name: 'Cygnus OB2', stars: 150, type: 'Association', icon: '🌌', distance: 0.0, x: 35, y: 30 },
                 { name: 'Veil Nebula', stars: 45, type: 'Supernova', icon: '💥', distance: 2.8, x: 65, y: 35 },
                 { name: 'North America', stars: 70, type: 'Emission', icon: '🌀', distance: 3.5, x: 40, y: 60 },
@@ -478,15 +471,7 @@
                 { name: 'Crescent', stars: 35, type: 'Wolf-Rayet', icon: '⭐', distance: 5.2, x: 75, y: 45 },
                 { name: 'Butterfly', stars: 25, type: 'Planetary', icon: '🦋', distance: 6.0, x: 25, y: 70 }
             ],
-            'Sagittarius': [
-                { name: 'Lagoon', stars: 95, type: 'Emission', icon: '🌌', distance: 0.0, x: 30, y: 35 },
-                { name: 'Trifid', stars: 65, type: 'Mixed', icon: '🌀', distance: 2.5, x: 55, y: 30 },
-                { name: 'Omega', stars: 110, type: 'Star-forming', icon: '✨', distance: 3.8, x: 45, y: 60 },
-                { name: 'Eagle', stars: 130, type: 'Star-forming', icon: '✨', distance: 4.5, x: 70, y: 55 },
-                { name: 'M18', stars: 40, type: 'Cluster', icon: '⭐', distance: 5.3, x: 25, y: 65 },
-                { name: 'M25', stars: 55, type: 'Cluster', icon: '⭐', distance: 6.1, x: 60, y: 70 }
-            ],
-            'Perseus': [
+            'Perseus Arm': [
                 { name: 'Double Cluster', stars: 200, type: 'Open Cluster', icon: '✨', distance: 0.0, x: 35, y: 30 },
                 { name: 'California', stars: 75, type: 'Emission', icon: '🌀', distance: 2.7, x: 60, y: 35 },
                 { name: 'Heart', stars: 90, type: 'Emission', icon: '❤️', distance: 3.9, x: 45, y: 60 },
@@ -494,15 +479,15 @@
                 { name: 'Little Dumbbell', stars: 25, type: 'Planetary', icon: '🔮', distance: 5.5, x: 25, y: 65 },
                 { name: 'M34', stars: 60, type: 'Cluster', icon: '⭐', distance: 6.2, x: 55, y: 70 }
             ],
-            'Carina': [
-                { name: 'Eta Carinae', stars: 180, type: 'Hypergiant', icon: '🔥', distance: 0.0, x: 35, y: 30 },
-                { name: 'Keyhole', stars: 95, type: 'Emission', icon: '🌀', distance: 2.9, x: 60, y: 35 },
-                { name: 'Homunculus', stars: 30, type: 'Bipolar', icon: '💫', distance: 4.0, x: 45, y: 60 },
-                { name: 'Southern Pleiades', stars: 70, type: 'Cluster', icon: '✨', distance: 5.1, x: 70, y: 55 },
-                { name: 'Wishing Well', stars: 85, type: 'Cluster', icon: '⭐', distance: 5.9, x: 25, y: 65 },
-                { name: 'NGC 3293', stars: 65, type: 'Cluster', icon: '⭐', distance: 6.5, x: 55, y: 70 }
+            'Galactic Core': [
+                { name: 'Central Cluster', stars: 500, type: 'Galactic Core', icon: '🌌', distance: 0.0, x: 35, y: 30 },
+                { name: 'Quintuplet', stars: 85, type: 'Compact', icon: '✨', distance: 3.2, x: 60, y: 35 },
+                { name: 'Arches', stars: 120, type: 'Massive', icon: '⭐', distance: 4.4, x: 45, y: 60 },
+                { name: 'Sagittarius A*', stars: 200, type: 'Black Hole', icon: '⚫', distance: 5.6, x: 70, y: 55 },
+                { name: 'Nuclear Bulge', stars: 350, type: 'Old Stars', icon: '🌟', distance: 6.8, x: 25, y: 65 },
+                { name: 'Galactic Center', stars: 450, type: 'Core Region', icon: '💫', distance: 7.2, x: 55, y: 70 }
             ],
-            'Outer': [
+            'Outer Arm': [
                 { name: 'Ghost', stars: 45, type: 'Reflection', icon: '👻', distance: 0.0, x: 35, y: 30 },
                 { name: 'Witch Head', stars: 55, type: 'Reflection', icon: '🧙', distance: 2.6, x: 60, y: 35 },
                 { name: 'Monkey Head', stars: 60, type: 'Emission', icon: '🐒', distance: 3.7, x: 45, y: 60 },
@@ -510,13 +495,69 @@
                 { name: 'Christmas Tree', stars: 50, type: 'Cluster', icon: '🎄', distance: 5.7, x: 25, y: 65 },
                 { name: 'Iris', stars: 40, type: 'Reflection', icon: '🌸', distance: 6.3, x: 55, y: 70 }
             ],
-            'Core': [
-                { name: 'Central Cluster', stars: 500, type: 'Galactic Core', icon: '🌌', distance: 0.0, x: 35, y: 30 },
-                { name: 'Quintuplet', stars: 85, type: 'Compact', icon: '✨', distance: 3.2, x: 60, y: 35 },
-                { name: 'Arches', stars: 120, type: 'Massive', icon: '⭐', distance: 4.4, x: 45, y: 60 },
-                { name: 'Sagittarius A*', stars: 200, type: 'Black Hole', icon: '⚫', distance: 5.6, x: 70, y: 55 },
-                { name: 'Nuclear Bulge', stars: 350, type: 'Old Stars', icon: '🌟', distance: 6.8, x: 25, y: 65 },
-                { name: 'Galactic Center', stars: 450, type: 'Core Region', icon: '💫', distance: 7.2, x: 55, y: 70 }
+            'Orion Arm': [
+                { name: 'Orion Molecular Cloud', stars: 85, type: 'Star-forming', icon: '🌌', distance: 0.0, x: 30, y: 40 },
+                { name: 'Barnard\'s Loop', stars: 62, type: 'Emission', icon: '🌀', distance: 2.3, x: 60, y: 30 },
+                { name: 'Lambda Orionis', stars: 48, type: 'Cluster', icon: '✨', distance: 3.1, x: 45, y: 60 },
+                { name: 'Sigma Orionis', stars: 55, type: 'Multiple', icon: '⭐', distance: 4.2, x: 70, y: 55 },
+                { name: 'Trapezium', stars: 120, type: 'Young', icon: '🔥', distance: 5.0, x: 25, y: 65 },
+                { name: 'NGC 1980', stars: 40, type: 'Reflection', icon: '💫', distance: 5.8, x: 55, y: 70 }
+            ],
+            'Sagittarius Arm': [
+                { name: 'Lagoon', stars: 95, type: 'Emission', icon: '🌌', distance: 0.0, x: 30, y: 35 },
+                { name: 'Trifid', stars: 65, type: 'Mixed', icon: '🌀', distance: 2.5, x: 55, y: 30 },
+                { name: 'Omega', stars: 110, type: 'Star-forming', icon: '✨', distance: 3.8, x: 45, y: 60 },
+                { name: 'Eagle', stars: 130, type: 'Star-forming', icon: '✨', distance: 4.5, x: 70, y: 55 },
+                { name: 'M18', stars: 40, type: 'Cluster', icon: '⭐', distance: 5.3, x: 25, y: 65 },
+                { name: 'M25', stars: 55, type: 'Cluster', icon: '⭐', distance: 6.1, x: 60, y: 70 }
+            ],
+            'Carina Arm': [
+                { name: 'Eta Carinae', stars: 180, type: 'Hypergiant', icon: '🔥', distance: 0.0, x: 35, y: 30 },
+                { name: 'Keyhole', stars: 95, type: 'Emission', icon: '🌀', distance: 2.9, x: 60, y: 35 },
+                { name: 'Homunculus', stars: 30, type: 'Bipolar', icon: '💫', distance: 4.0, x: 45, y: 60 },
+                { name: 'Southern Pleiades', stars: 70, type: 'Cluster', icon: '✨', distance: 5.1, x: 70, y: 55 },
+                { name: 'Wishing Well', stars: 85, type: 'Cluster', icon: '⭐', distance: 5.9, x: 25, y: 65 },
+                { name: 'NGC 3293', stars: 65, type: 'Cluster', icon: '⭐', distance: 6.5, x: 55, y: 70 }
+            ],
+            'Norma Arm': [
+                { name: 'Norma Cluster', stars: 120, type: 'Open Cluster', icon: '✨', distance: 0.0, x: 35, y: 30 },
+                { name: 'Dragonfish', stars: 80, type: 'Nebula', icon: '🐉', distance: 2.8, x: 60, y: 35 },
+                { name: 'Lobster', stars: 65, type: 'Emission', icon: '🦞', distance: 3.9, x: 45, y: 60 },
+                { name: 'Cat\'s Paw', stars: 75, type: 'Emission', icon: '🐱', distance: 4.7, x: 70, y: 55 },
+                { name: 'War and Peace', stars: 45, type: 'Nebula', icon: '☮️', distance: 5.6, x: 25, y: 65 },
+                { name: 'NGC 6188', stars: 55, type: 'Emission', icon: '🌀', distance: 6.4, x: 55, y: 70 }
+            ],
+            'Scutum Arm': [
+                { name: 'Eagle Nebula', stars: 110, type: 'Star-forming', icon: '🦅', distance: 0.0, x: 35, y: 30 },
+                { name: 'Omega Nebula', stars: 95, type: 'Emission', icon: 'Ω', distance: 2.6, x: 60, y: 35 },
+                { name: 'Swan Nebula', stars: 85, type: 'Emission', icon: '🦢', distance: 3.8, x: 45, y: 60 },
+                { name: 'Lobster Claw', stars: 60, type: 'Nebula', icon: '🦞', distance: 4.9, x: 70, y: 55 },
+                { name: 'Star Queen', stars: 70, type: 'Cluster', icon: '👑', distance: 5.7, x: 25, y: 65 },
+                { name: 'M16', stars: 50, type: 'Cluster', icon: '⭐', distance: 6.3, x: 55, y: 70 }
+            ],
+            'Far Arm': [
+                { name: 'Andromeda Nebula', stars: 200, type: 'Galaxy', icon: '🌌', distance: 0.0, x: 35, y: 30 },
+                { name: 'Triangulum', stars: 150, type: 'Galaxy', icon: '✨', distance: 3.1, x: 60, y: 35 },
+                { name: 'Sculptor', stars: 90, type: 'Dwarf', icon: '🗿', distance: 4.2, x: 45, y: 60 },
+                { name: 'Fornax', stars: 80, type: 'Cluster', icon: '🔥', distance: 5.3, x: 70, y: 55 },
+                { name: 'Eridanus Loop', stars: 60, type: 'Superbubble', icon: '🌀', distance: 6.1, x: 25, y: 65 },
+                { name: 'NGC 55', stars: 70, type: 'Galaxy', icon: '⭐', distance: 6.8, x: 55, y: 70 }
+            ],
+            'Outer Reach': [
+                { name: 'Ghost Nebula', stars: 40, type: 'Reflection', icon: '👻', distance: 0.0, x: 35, y: 30 },
+                { name: 'Witch Head', stars: 55, type: 'Reflection', icon: '🧙', distance: 2.5, x: 60, y: 35 },
+                { name: 'Monkey Head', stars: 60, type: 'Emission', icon: '🐒', distance: 3.6, x: 45, y: 60 },
+                { name: 'Cone', stars: 70, type: 'Emission', icon: '📐', distance: 4.8, x: 70, y: 55 },
+                { name: 'Christmas Tree', stars: 50, type: 'Cluster', icon: '🎄', distance: 5.7, x: 25, y: 65 },
+                { name: 'Iris', stars: 40, type: 'Reflection', icon: '🌸', distance: 6.4, x: 55, y: 70 }
+            ],
+            'The Fringe': [
+                { name: 'Spider Nebula', stars: 65, type: 'Emission', icon: '🕷️', distance: 0.0, x: 35, y: 30 },
+                { name: 'Tarantula', stars: 120, type: 'Emission', icon: '🕸️', distance: 2.9, x: 60, y: 35 },
+                { name: 'Tadpole', stars: 45, type: 'Nebula', icon: '🐸', distance: 4.0, x: 45, y: 60 },
+                { name: 'Elephant Trunk', stars: 55, type: 'Nebula', icon: '🐘', distance: 5.1, x: 70, y: 55 },
+                { name: 'Iris', stars: 40, type: 'Reflection', icon: '🌸', distance: 6.0, x: 25, y: 65 },
+                { name: 'NGC 7023', stars: 35, type: 'Reflection', icon: '✨', distance: 6.7, x: 55, y: 70 }
             ]
         };
 
@@ -530,19 +571,34 @@
         // ===== LOAD REGION DATA =====
         async function loadRegionData() {
             try {
-                // Load data from storage
-                const region = typeof getCurrentRegion === 'function' ? await getCurrentRegion() : 'Orion';
-                const sector = typeof getCurrentSectorName === 'function' ? await getCurrentSectorName() : 'Orion Molecular Cloud';
-
-                currentRegion = region || 'Orion';
-                currentSector = sector || 'Orion Molecular Cloud';
+                // Load data from storage - get both sector ID and display name
+                const sectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                const regionName = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
+                
+                // Also try storage functions if available
+                if (typeof getCurrentSector === 'function') {
+                    const storedSector = await getCurrentSector();
+                    if (storedSector) currentSectorId = storedSector;
+                }
+                if (typeof getCurrentRegion === 'function') {
+                    const storedRegion = await getCurrentRegion();
+                    if (storedRegion) currentRegion = storedRegion;
+                }
+                
+                // Set current values
+                currentSectorId = sectorId;
+                currentRegion = regionName;
+                
+                // Get the first sector name as current location
+                const regionSectors = sectorData[currentRegion] || sectorData['Orion Arm'];
+                currentSectorName = regionSectors[0]?.name || 'Orion Molecular Cloud';
 
                 // Update UI
-                document.getElementById('regionTitle').textContent = currentRegion + ' Sector';
-                document.getElementById('currentLocationText').textContent = currentSector;
+                document.getElementById('regionTitle').textContent = currentRegion;
+                document.getElementById('currentLocationText').textContent = currentSectorName;
 
-                // Get sectors for this region
-                sectors = sectorData[currentRegion] || sectorData['Orion'];
+                // Get sectors for this region using the display name
+                sectors = sectorData[currentRegion] || sectorData['Orion Arm'];
 
                 // Load journey distance
                 loadJourneyDistance();
@@ -551,9 +607,9 @@
 
             } catch (error) {
                 console.error('Error loading region data:', error);
-                currentRegion = 'Orion';
-                sectors = sectorData['Orion'];
-                document.getElementById('regionTitle').textContent = 'Orion Sector';
+                currentRegion = 'Orion Arm';
+                sectors = sectorData['Orion Arm'];
+                document.getElementById('regionTitle').textContent = 'Orion Arm';
                 document.getElementById('currentLocationText').textContent = 'Orion Molecular Cloud';
                 return false;
             }
@@ -586,7 +642,7 @@
             
             // Enable/disable based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
-            if (sector.name === currentSector) {
+            if (sector.name === currentSectorName) {
                 travelBtn.disabled = true;
                 travelBtn.textContent = '📍 CURRENT LOCATION';
             } else {
@@ -601,7 +657,7 @@
 
         // ===== TRAVEL TO SECTOR =====
         async function travelToSector() {
-            if (!selectedSector || selectedSector.name === currentSector) return;
+            if (!selectedSector || selectedSector.name === currentSectorName) return;
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'entering star cluster...';
@@ -611,20 +667,22 @@
                 const newTotal = journeyDistance + selectedSector.distance;
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
                 
-                // Save destination
+                // Save destination - store both the nebula name and the region it belongs to
                 if (typeof setCurrentNebula === 'function') {
                     await setCurrentNebula(
                         selectedSector.name,
                         selectedSector.type,
                         selectedSector.stars,
                         selectedSector.x || 50,
-                        selectedSector.y || 50
+                        selectedSector.y || 50,
+                        currentRegion // Pass the region name
                     );
                 } else {
                     localStorage.setItem('voidfarer_current_nebula', selectedSector.name);
                     localStorage.setItem('voidfarer_current_sector_name', selectedSector.name);
                     localStorage.setItem('voidfarer_current_sector_type', selectedSector.type);
                     localStorage.setItem('voidfarer_current_sector_stars', selectedSector.stars.toString());
+                    localStorage.setItem('voidfarer_current_region', currentRegion); // Keep region
                 }
                 
                 // Navigate to star cluster
@@ -659,7 +717,7 @@
                 marker.onclick = function() { selectSector(index); };
                 
                 // Highlight current location
-                if (sector.name === currentSector) {
+                if (sector.name === currentSectorName) {
                     marker.classList.add('selected');
                 }
                 
@@ -707,12 +765,13 @@
             );
             
             let color;
-            switch(currentRegion) {
-                case 'Orion': color = 'rgba(100, 80, 200, 0.1)'; break;
-                case 'Cygnus': color = 'rgba(200, 80, 150, 0.1)'; break;
-                case 'Sagittarius': color = 'rgba(200, 150, 80, 0.1)'; break;
-                default: color = 'rgba(100, 100, 150, 0.1)';
-            }
+            if (currentRegion.includes('Cygnus')) color = 'rgba(200, 80, 150, 0.1)';
+            else if (currentRegion.includes('Perseus')) color = 'rgba(74, 255, 170, 0.1)';
+            else if (currentRegion.includes('Core')) color = 'rgba(200, 150, 80, 0.15)';
+            else if (currentRegion.includes('Orion')) color = 'rgba(138, 106, 255, 0.1)';
+            else if (currentRegion.includes('Sagittarius')) color = 'rgba(192, 106, 255, 0.1)';
+            else if (currentRegion.includes('Carina')) color = 'rgba(106, 138, 255, 0.1)';
+            else color = 'rgba(100, 100, 150, 0.1)';
             
             gradient.addColorStop(0, color);
             gradient.addColorStop(0.7, 'transparent');
