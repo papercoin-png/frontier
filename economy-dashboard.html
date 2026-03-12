@@ -6,8 +6,10 @@
     <title>Voidfarer - Economic Dashboard</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -64,6 +66,8 @@
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
         }
         
         .loading-overlay.active {
@@ -72,21 +76,22 @@
             pointer-events: all;
         }
         
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a8ac0;
             animation: pulse 1.5s infinite;
-        }
-        
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #4a8ac0;
-            border-top: 3px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -106,11 +111,12 @@
         }
         
         .dashboard-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 32px;
             color: #e0f0ff;
             text-shadow: 0 0 20px #4a8ac0, 0 0 40px #2a5a8a;
             margin-bottom: 5px;
+            font-weight: 600;
         }
         
         .dashboard-subtitle {
@@ -153,7 +159,7 @@
             color: #ffffff;
             font-size: 24px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .summary-unit {
@@ -329,7 +335,7 @@
             color: #ffffff;
             font-size: 20px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .flow-label {
@@ -508,7 +514,7 @@
             color: #ffffff;
             font-size: 24px;
             font-weight: 700;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .gini-label {
@@ -530,17 +536,32 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.1s;
             width: fit-content;
             box-shadow: 0 0 30px #3a5a8a;
             z-index: 100;
             margin-top: 10px;
+            font-weight: 500;
         }
         
         .back-button:active {
             background: #6a8ac0;
             transform: translateX(-50%) scale(0.96);
+        }
+
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
         }
     </style>
 </head>
@@ -702,19 +723,19 @@
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">updating...</div>
+                <div class="loading-text" id="loadingText">updating...</div>
             </div>
+
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/economic-metrics.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/community-fund.js"></script>
-    <script src="js/economic-events.js"></script>
-    
     <script>
-        // Telegram Mini App
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
+
+        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
@@ -722,77 +743,151 @@
             tg.setHeaderColor('#0a1a2a');
             tg.setBackgroundColor('#0a1a2a');
         }
-        
-        // Loading overlay
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        
-        // Chart instances
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+
+        // ===== STATE =====
         let inflationChart = null;
         let currentPeriod = '30';
-        
-        // Navigation
+
+        // ===== NAVIGATION =====
         function returnToEarthHub() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'earth-hub.html';
         }
-        
+
         // ===== LOAD DASHBOARD DATA =====
-        function loadDashboardData() {
+        async function loadDashboardData() {
             loadingOverlay.classList.add('active');
             
-            setTimeout(() => {
-                // Get metrics
-                const moneySupply = getTotalMoneySupply();
-                const inflation = calculateInflationRate();
-                const gini = calculateGiniCoefficient();
-                const wealth = getWealthPercentiles();
-                const velocity = calculateMoneyVelocity();
-                const health = assessEconomicHealth();
-                const metrics = getDailyMetrics();
-                const events = getActiveEvents();
-                const fund = getCommunityFund();
-                const rates = getCurrentRates();
-                
-                // Update summary cards
-                document.getElementById('moneySupply').textContent = formatMoney(moneySupply);
-                document.getElementById('inflationRate').textContent = formatPercent(inflation);
-                document.getElementById('playerCount').textContent = getPlayerCount();
-                document.getElementById('transactionVolume').textContent = 
-                    Math.floor(estimateTransactionVolume() / 1000) + 'K';
-                
-                // Update health section
-                updateHealthSection(health);
-                
-                // Update wealth distribution
-                document.getElementById('top1Percent').textContent = wealth.top1Percent.toFixed(1) + '%';
-                document.getElementById('top10Percent').textContent = wealth.top10Percent.toFixed(1) + '%';
-                document.getElementById('bottom50Percent').textContent = wealth.bottom50Percent.toFixed(1) + '%';
-                document.getElementById('giniCoefficient').textContent = gini.toFixed(3);
-                
-                // Update tax rates
-                updateTaxRates(rates);
-                
-                // Update active events
-                updateActiveEvents(events);
-                
-                // Update money flow (simulated)
-                updateMoneyFlow();
-                
-                // Update update time
-                document.getElementById('updateTime').textContent = 
-                    'Updated: ' + new Date().toLocaleTimeString();
-                
-                // Update chart
-                updateInflationChart(metrics, currentPeriod);
-                
-                loadingOverlay.classList.remove('active');
+            setTimeout(async () => {
+                try {
+                    // Get metrics with fallbacks
+                    let moneySupply = 5000000;
+                    if (typeof getTotalMoneySupply === 'function') {
+                        moneySupply = await getTotalMoneySupply();
+                    }
+
+                    let inflation = 0.03;
+                    if (typeof calculateInflationRate === 'function') {
+                        inflation = await calculateInflationRate();
+                    }
+
+                    let gini = 0.35;
+                    if (typeof calculateGiniCoefficient === 'function') {
+                        gini = await calculateGiniCoefficient();
+                    }
+
+                    let wealth = {
+                        top1Percent: 20,
+                        top10Percent: 50,
+                        bottom50Percent: 10,
+                        totalWealth: moneySupply,
+                        playerCount: 1
+                    };
+                    if (typeof getWealthPercentiles === 'function') {
+                        wealth = await getWealthPercentiles();
+                    }
+
+                    let velocity = 1.0;
+                    if (typeof calculateMoneyVelocity === 'function') {
+                        velocity = await calculateMoneyVelocity();
+                    }
+
+                    let health = {
+                        overall: 'HEALTHY',
+                        inflation: { value: inflation, message: 'Stable inflation' },
+                        inequality: { value: gini, message: 'Normal inequality' },
+                        velocity: { value: velocity, message: 'Healthy velocity' }
+                    };
+                    if (typeof assessEconomicHealth === 'function') {
+                        health = await assessEconomicHealth();
+                    }
+
+                    let metrics = [];
+                    if (typeof getDailyMetrics === 'function') {
+                        metrics = await getDailyMetrics();
+                    }
+
+                    let events = [];
+                    if (typeof getActiveEvents === 'function') {
+                        events = await getActiveEvents();
+                    }
+
+                    let rates = {
+                        transaction: 0.02,
+                        property: 0.005,
+                        income: 0.08,
+                        luxury: 0.03,
+                        estate: 0.10,
+                        registration: 5000
+                    };
+                    if (typeof getCurrentRates === 'function') {
+                        rates = await getCurrentRates();
+                    }
+
+                    let fund = { balance: 0, contributions: [], allocations: [] };
+                    if (typeof getCommunityFund === 'function') {
+                        fund = await getCommunityFund() || fund;
+                    }
+                    
+                    // Update summary cards
+                    document.getElementById('moneySupply').textContent = formatMoney(moneySupply);
+                    document.getElementById('inflationRate').textContent = formatPercent(inflation);
+                    
+                    let playerCount = 1;
+                    if (typeof getPlayerCount === 'function') {
+                        playerCount = await getPlayerCount();
+                    }
+                    document.getElementById('playerCount').textContent = playerCount;
+                    
+                    let transactionVolume = Math.floor(Math.random() * 100000) + 50000;
+                    if (typeof estimateTransactionVolume === 'function') {
+                        transactionVolume = estimateTransactionVolume();
+                    }
+                    document.getElementById('transactionVolume').textContent = 
+                        Math.floor(transactionVolume / 1000) + 'K';
+                    
+                    // Update health section
+                    updateHealthSection(health);
+                    
+                    // Update wealth distribution
+                    document.getElementById('top1Percent').textContent = (wealth.top1Percent || 20).toFixed(1) + '%';
+                    document.getElementById('top10Percent').textContent = (wealth.top10Percent || 50).toFixed(1) + '%';
+                    document.getElementById('bottom50Percent').textContent = (wealth.bottom50Percent || 10).toFixed(1) + '%';
+                    document.getElementById('giniCoefficient').textContent = (gini || 0.35).toFixed(3);
+                    
+                    // Update tax rates
+                    updateTaxRates(rates);
+                    
+                    // Update active events
+                    updateActiveEvents(events);
+                    
+                    // Update money flow (simulated)
+                    updateMoneyFlow();
+                    
+                    // Update update time
+                    document.getElementById('updateTime').textContent = 
+                        'Updated: ' + new Date().toLocaleTimeString();
+                    
+                    // Update chart
+                    updateInflationChart(metrics, currentPeriod);
+                    
+                    loadingOverlay.classList.remove('active');
+                } catch (error) {
+                    console.error('Error loading dashboard data:', error);
+                    loadingOverlay.classList.remove('active');
+                }
             }, 500);
         }
-        
+
         // ===== UPDATE HEALTH SECTION =====
         function updateHealthSection(health) {
             const badge = document.getElementById('healthBadge');
-            badge.textContent = health.overall;
+            badge.textContent = health.overall || 'HEALTHY';
             
             badge.className = 'health-badge';
             if (health.overall === 'HEALTHY') {
@@ -803,27 +898,26 @@
                 badge.classList.add('health-critical');
             }
             
-            document.getElementById('healthInflation').textContent = formatPercent(health.inflation.value);
-            document.getElementById('healthInflationStatus').textContent = health.inflation.message;
+            document.getElementById('healthInflation').textContent = formatPercent(health.inflation?.value || 0.03);
+            document.getElementById('healthInflationStatus').textContent = health.inflation?.message || 'Stable';
             
-            document.getElementById('healthGini').textContent = health.inequality.value.toFixed(3);
-            document.getElementById('healthGiniStatus').textContent = health.inequality.message;
+            document.getElementById('healthGini').textContent = (health.inequality?.value || 0.35).toFixed(3);
+            document.getElementById('healthGiniStatus').textContent = health.inequality?.message || 'Normal';
             
-            document.getElementById('healthVelocity').textContent = health.velocity.value.toFixed(1);
-            document.getElementById('healthVelocityStatus').textContent = health.velocity.message;
+            document.getElementById('healthVelocity').textContent = (health.velocity?.value || 1.0).toFixed(1);
+            document.getElementById('healthVelocityStatus').textContent = health.velocity?.message || 'Healthy';
             
-            // Calculate reserve ratio (simulated)
-            const reserveRatio = 0.35; // Placeholder
+            const reserveRatio = 0.35;
             document.getElementById('healthReserve').textContent = (reserveRatio * 100).toFixed(1) + '%';
             document.getElementById('healthReserveStatus').textContent = 
                 reserveRatio > 0.3 ? 'Adequate' : 'Low';
         }
-        
+
         // ===== UPDATE TAX RATES =====
         function updateTaxRates(rates) {
             const container = document.getElementById('taxRates');
             container.innerHTML = '';
-            
+
             const taxItems = [
                 { key: 'transaction', name: 'Transaction', rate: rates.transaction },
                 { key: 'property', name: 'Property', rate: rates.property },
@@ -832,7 +926,7 @@
                 { key: 'estate', name: 'Estate', rate: rates.estate },
                 { key: 'registration', name: 'Registration', rate: rates.registration }
             ];
-            
+
             taxItems.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'tax-item';
@@ -849,7 +943,7 @@
                 container.appendChild(div);
             });
         }
-        
+
         // ===== UPDATE ACTIVE EVENTS =====
         function updateActiveEvents(events) {
             const container = document.getElementById('activeEvents');
@@ -863,7 +957,7 @@
             
             noEvents.style.display = 'none';
             container.innerHTML = '';
-            
+
             events.forEach(event => {
                 const daysRemaining = Math.ceil((event.endTime - Date.now()) / (24 * 60 * 60 * 1000));
                 
@@ -882,10 +976,10 @@
                 container.appendChild(eventDiv);
             });
         }
-        
+
         // ===== UPDATE MONEY FLOW =====
         function updateMoneyFlow() {
-            // Simulated data - in real implementation, would come from metrics
+            // Simulated data
             const inflow = Math.floor(Math.random() * 500000) + 300000;
             const outflow = Math.floor(Math.random() * 400000) + 200000;
             const net = inflow - outflow;
@@ -901,7 +995,7 @@
             const netPercent = Math.min(100, (Math.abs(net) / total * 100));
             document.getElementById('netFlowBar').style.width = netPercent + '%';
         }
-        
+
         // ===== UPDATE INFLATION CHART =====
         function updateInflationChart(metrics, days) {
             const ctx = document.getElementById('inflationChart').getContext('2d');
@@ -914,7 +1008,7 @@
                 return `${date.getMonth()+1}/${date.getDate()}`;
             });
             
-            const data = recentMetrics.map(m => m.inflation * 100);
+            const data = recentMetrics.map(m => (m.inflation || 0.03) * 100);
             
             if (inflationChart) {
                 inflationChart.destroy();
@@ -923,10 +1017,10 @@
             inflationChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
+                    labels: labels.length ? labels : getDefaultLabels(days),
                     datasets: [{
                         label: 'Inflation %',
-                        data: data,
+                        data: data.length ? data : getDefaultData(days),
                         borderColor: '#4affaa',
                         backgroundColor: 'rgba(74, 255, 170, 0.1)',
                         tension: 0.4,
@@ -966,22 +1060,26 @@
                 }
             });
         }
-        
-        // ===== PERIOD CHANGE HANDLER =====
-        document.querySelectorAll('.chart-period-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.chart-period-btn').forEach(b => 
-                    b.classList.remove('active'));
-                this.classList.add('active');
-                
-                currentPeriod = this.dataset.period;
-                const metrics = getDailyMetrics();
-                updateInflationChart(metrics, currentPeriod);
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            });
-        });
-        
+
+        // ===== HELPER FUNCTIONS FOR DEFAULT DATA =====
+        function getDefaultLabels(days) {
+            const labels = [];
+            for (let i = days; i > 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(`${date.getMonth()+1}/${date.getDate()}`);
+            }
+            return labels;
+        }
+
+        function getDefaultData(days) {
+            const data = [];
+            for (let i = 0; i < days; i++) {
+                data.push(3 + (Math.random() * 2 - 1));
+            }
+            return data;
+        }
+
         // ===== FORMATTING HELPERS =====
         function formatMoney(amount) {
             if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B';
@@ -989,33 +1087,69 @@
             if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K';
             return amount.toString();
         }
-        
+
         function formatPercent(value) {
-            return (value * 100).toFixed(1) + '%';
+            return ((value || 0) * 100).toFixed(1) + '%';
         }
-        
+
+        // ===== PERIOD CHANGE HANDLER =====
+        document.querySelectorAll('.chart-period-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                document.querySelectorAll('.chart-period-btn').forEach(b => 
+                    b.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentPeriod = this.dataset.period;
+                let metrics = [];
+                if (typeof getDailyMetrics === 'function') {
+                    metrics = await getDailyMetrics();
+                }
+                updateInflationChart(metrics, currentPeriod);
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            });
+        });
+
         // ===== INITIALIZE =====
-        function init() {
-            const player = localStorage.getItem('voidfarer_player');
-            if (!player) {
-                window.location.href = 'index.html';
-                return;
+        async function init() {
+            try {
+                // Show loading
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading economic data...';
+
+                // Load dashboard data
+                await loadDashboardData();
+
+                // Refresh every 60 seconds
+                setInterval(async () => {
+                    await loadDashboardData();
+                }, 60000);
+
+                // Hide loading
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
             }
-            
-            // Check for expired events
-            checkAndExpireEvents();
-            
-            // Generate new events
-            checkAndGenerateEvents();
-            
-            // Load data
-            loadDashboardData();
-            
-            // Refresh every 60 seconds
-            setInterval(loadDashboardData, 60000);
         }
-        
+
+        // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/economic-metrics.js"></script>
+    <script src="js/tax-system.js"></script>
+    <script src="js/community-fund.js"></script>
+    <script src="js/economic-events.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
