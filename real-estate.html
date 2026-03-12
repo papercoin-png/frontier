@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -86,10 +86,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -109,11 +110,12 @@
         }
         
         .estate-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 36px;
             color: #c0e0ff;
             text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
             margin-bottom: 4px;
+            font-weight: 600;
         }
         
         .estate-subtitle {
@@ -161,7 +163,7 @@
             font-size: 20px;
             font-weight: 600;
             margin-bottom: 15px;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             border-bottom: 1px solid #4a9a8a;
             padding-bottom: 8px;
         }
@@ -193,7 +195,7 @@
             color: #ffffff;
             font-size: 20px;
             font-weight: 600;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .property-type {
@@ -253,6 +255,7 @@
             cursor: pointer;
             text-align: center;
             transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .property-btn:active {
@@ -304,7 +307,7 @@
             color: #ffffff;
             font-size: 20px;
             font-weight: 600;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .market-price {
@@ -342,6 +345,7 @@
             cursor: pointer;
             text-align: center;
             transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .purchase-btn:active {
@@ -379,12 +383,13 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
             box-shadow: 0 0 30px #2a5a5a;
             z-index: 100;
             margin-top: 10px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -452,16 +457,9 @@
         </div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCredits,
-            getRealEstate,
-            addProperty,
-            getPlayer,
-            spendCredits
-        } from './js/storage.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -510,12 +508,12 @@
         };
 
         // ===== NAVIGATION =====
-        window.returnToEarthHub = function() {
+        function returnToEarthHub() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'earth-hub.html';
-        };
+        }
 
-        window.navigateTo = function(screen) {
+        function navigateTo(screen) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'navigating...';
@@ -523,17 +521,26 @@
                 loadingOverlay.classList.remove('active');
                 window.location.href = screen;
             }, 300);
-        };
+        }
 
         // ===== LOAD DATA =====
         async function loadData() {
             try {
-                // Load all data in parallel
-                const [credits, propertyData, player] = await Promise.all([
-                    getCredits(),
-                    getRealEstate(),
-                    getPlayer()
-                ]);
+                // Load all data
+                let credits = 5000;
+                if (typeof getCredits === 'function') {
+                    credits = await getCredits();
+                }
+
+                let propertyData = { properties: [] };
+                if (typeof getRealEstate === 'function') {
+                    propertyData = await getRealEstate();
+                }
+
+                let player = null;
+                if (typeof getPlayer === 'function') {
+                    player = await getPlayer();
+                }
 
                 // Update header
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
@@ -546,14 +553,6 @@
 
                 // Update total capacity
                 updateTotalCapacity(propertyData);
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -652,18 +651,18 @@
         }
 
         // ===== PURCHASE PROPERTY =====
-        window.purchaseProperty = async function(type) {
+        async function purchaseProperty(type) {
             const propType = PROPERTY_TYPES[type];
             if (!propType) return;
 
-            let credits = await getCredits();
+            let credits = typeof getCredits === 'function' ? await getCredits() : 5000;
 
             if (credits < propType.price) {
                 alert('Not enough credits!');
                 return;
             }
 
-            let propertyData = await getRealEstate();
+            let propertyData = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
 
             // Check if already own this type
             if (propertyData.properties?.some(p => p.type === type)) {
@@ -676,9 +675,11 @@
 
             try {
                 // Spend credits
-                const spent = await spendCredits(propType.price);
-                if (!spent) {
-                    throw new Error('Failed to spend credits');
+                if (typeof spendCredits === 'function') {
+                    const spent = await spendCredits(propType.price);
+                    if (!spent) {
+                        throw new Error('Failed to spend credits');
+                    }
                 }
 
                 // Create new property
@@ -700,9 +701,12 @@
                 propertyData.properties.push(newProp);
                 
                 // Save to storage
-                // Note: You'll need to add a saveRealEstate function or use the storage module
-                // For now, we'll assume there's a way to save
-                await saveRealEstate(propertyData);
+                if (typeof saveRealEstate === 'function') {
+                    await saveRealEstate(propertyData);
+                } else {
+                    // Fallback save
+                    localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
+                }
 
                 // Reload data
                 await loadData();
@@ -716,25 +720,17 @@
             }
 
             loadingOverlay.classList.remove('active');
-        };
+        }
 
         // ===== PROPERTY ACTIONS =====
-        window.viewProperty = function(propertyId) {
-            // In a real implementation, this would show property details
+        function viewProperty(propertyId) {
+            // Show property items - could be expanded later
             alert(`View items in property ${propertyId}\n(This would show stored items)`);
-        };
+        }
 
-        window.transferToProperty = function(propertyId) {
+        function transferToProperty(propertyId) {
             // Navigate to transfer page
             navigateTo(`property-transfer.html?property=${propertyId}`);
-        };
-
-        // ===== SAVE REAL ESTATE (helper) =====
-        // This is a temporary function - you should add this to storage.js
-        async function saveRealEstate(propertyData) {
-            // This assumes you have a way to save real estate data
-            // You'll need to implement this in storage.js
-            localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
         }
 
         // ===== INITIALIZE =====
@@ -744,11 +740,9 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading real estate...';
 
-                // Check for player data
-                const player = await getPlayer();
-                if (!player) {
-                    window.location.href = 'index.html';
-                    return;
+                // Check for player data - don't redirect, just show defaults
+                if (typeof getPlayer === 'function') {
+                    await getPlayer();
                 }
 
                 // Load data
@@ -761,9 +755,9 @@
 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
+                loadingText.textContent = 'error loading data';
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    loadingOverlay.classList.remove('active');
                 }, 2000);
             }
         }
@@ -771,5 +765,10 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
