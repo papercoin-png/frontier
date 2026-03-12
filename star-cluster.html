@@ -80,6 +80,27 @@
             box-shadow: 0 0 15px #4affaa;
         }
         
+        .journey-info {
+            position: sticky;
+            top: 130px;
+            z-index: 25;
+            margin: 10px 15px;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+        }
+        
+        .journey-distance {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
         .back-btn {
             position: fixed;
             bottom: 30px;
@@ -169,6 +190,19 @@
             font-size: 14px;
         }
         
+        .distance-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: #ffaa4a;
+            color: black;
+            padding: 5px 15px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: bold;
+            border: 2px solid white;
+        }
+        
         /* Info panel for selected star */
         .star-info-panel {
             position: fixed;
@@ -202,13 +236,27 @@
         .star-info-type {
             color: #a0c0ff;
             font-size: 16px;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
         }
         
         .star-info-planets {
             color: #ffd966;
             font-size: 18px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .star-info-distance {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        
+        .distance-value {
+            color: #4affaa;
+            font-weight: 700;
+            font-size: 20px;
         }
         
         .star-info-buttons {
@@ -315,6 +363,11 @@
             <span id="currentLocationText">Loading current star...</span>
         </div>
         
+        <div class="journey-info" id="journeyInfo">
+            <span>Journey so far:</span>
+            <span class="journey-distance" id="journeyDistance">0.0 LY</span>
+        </div>
+        
         <div class="stars-grid" id="starsGrid">
             <div style="color: white; text-align: center; padding: 50px;">Loading stars...</div>
         </div>
@@ -326,6 +379,10 @@
             <div class="star-info-name" id="starInfoName">Star Name</div>
             <div class="star-info-type" id="starInfoType">Star Type</div>
             <div class="star-info-planets" id="starInfoPlanets">0 planets</div>
+            <div class="star-info-distance">
+                <div>Distance from current:</div>
+                <span class="distance-value" id="starDistance">0.0</span> LY
+            </div>
             <div class="star-info-buttons">
                 <button class="star-info-btn" id="enterSystemBtn" onclick="enterSystem()">🚀 VIEW SYSTEM</button>
                 <button class="star-info-btn secondary" onclick="hideStarInfo()">CLOSE</button>
@@ -358,6 +415,7 @@
         const migrationStatus = document.getElementById('migrationStatus');
         const starsGrid = document.getElementById('starsGrid');
         const starInfoPanel = document.getElementById('starInfoPanel');
+        const journeyDistanceSpan = document.getElementById('journeyDistance');
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
@@ -368,6 +426,7 @@
         let clusterName = 'Unknown Cluster';
         let starCount = 50;
         let selectedStar = null;
+        let journeyDistance = 0;
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -435,6 +494,28 @@
             return prefix + ' ' + suffix;
         }
 
+        // ===== LOAD JOURNEY DISTANCE =====
+        function loadJourneyDistance() {
+            const saved = localStorage.getItem('voidfarer_journey_distance');
+            journeyDistance = saved ? parseFloat(saved) : 0;
+            journeyDistanceSpan.textContent = journeyDistance.toFixed(1) + ' LY';
+        }
+
+        // ===== GENERATE REAL STAR DISTANCE =====
+        function generateStarDistance(index, isCurrent) {
+            if (isCurrent) return 0;
+            
+            // Stars farther from the center are more distant
+            // This creates a realistic range from 0.5 to 3.5 LY
+            const baseDistance = 0.5 + (index / starCount) * 3.0;
+            
+            // Add some randomness but keep it deterministic
+            const seed = UNIVERSE_SEED + index * 100;
+            const randomFactor = seededRandom(seed, 0) * 0.5;
+            
+            return parseFloat((baseDistance + randomFactor).toFixed(1));
+        }
+
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
@@ -452,11 +533,13 @@
                 document.getElementById('currentLocationText').textContent = 
                     currentStarName || 'No star selected';
 
+                // Load journey distance
+                loadJourneyDistance();
+
                 return true;
 
             } catch (error) {
                 console.error('Error loading cluster data:', error);
-                // Use defaults
                 clusterName = 'Orion Molecular Cloud';
                 document.getElementById('clusterTitle').textContent = clusterName;
                 return false;
@@ -467,7 +550,7 @@
         function generateStars() {
             stars = [];
             
-            // Generate cluster seed based on cluster name
+            // Generate cluster seed
             const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 100000;
             
             // Generate stars
@@ -481,6 +564,12 @@
                     planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
                 }
                 
+                // Check if this is the current star
+                const isCurrent = (starType.name === currentStarName);
+                
+                // Generate real distance
+                const distance = generateStarDistance(i, isCurrent);
+                
                 stars.push({
                     index: i,
                     name: generateStarName(starSeed, i + 20),
@@ -488,12 +577,18 @@
                     typeKey: starType.type,
                     icon: starType.icon,
                     color: starType.color,
-                    planets: planetCount
+                    planets: planetCount,
+                    distance: distance,
+                    isCurrent: isCurrent
                 });
             }
 
-            // Sort stars alphabetically
-            stars.sort((a, b) => a.name.localeCompare(b.name));
+            // Sort stars: Current star first, then by distance
+            stars.sort((a, b) => {
+                if (a.isCurrent) return -1;
+                if (b.isCurrent) return 1;
+                return a.distance - b.distance;
+            });
         }
 
         // ===== SHOW STAR INFO =====
@@ -503,6 +598,7 @@
             document.getElementById('starInfoName').textContent = star.name;
             document.getElementById('starInfoType').textContent = star.type;
             document.getElementById('starInfoPlanets').textContent = star.planets + ' planets';
+            document.getElementById('starDistance').textContent = star.distance.toFixed(1);
             
             starInfoPanel.classList.add('visible');
             
@@ -515,7 +611,7 @@
             selectedStar = null;
         }
 
-        // ===== ENTER SYSTEM (SIMPLE NAVIGATION) =====
+        // ===== ENTER SYSTEM =====
         async function enterSystem() {
             if (!selectedStar) return;
             
@@ -523,6 +619,10 @@
             loadingText.textContent = 'entering system...';
             
             try {
+                // Add this star's distance to journey total
+                const newTotal = journeyDistance + selectedStar.distance;
+                localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
+                
                 // Save star data
                 if (typeof setCurrentStar === 'function') {
                     await setCurrentStar(
@@ -558,15 +658,24 @@
                 return;
             }
 
-            stars.forEach((star, index) => {
+            stars.forEach((star) => {
                 const card = document.createElement('div');
                 card.className = 'star-card';
-                if (star.name === currentStarName) {
+                if (star.isCurrent) {
                     card.classList.add('current');
                 }
                 card.onclick = function() { showStarInfo(star); };
                 
+                // Show distance badge for all stars
+                let distanceDisplay = '';
+                if (star.isCurrent) {
+                    distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
+                } else {
+                    distanceDisplay = `<div class="distance-badge">${star.distance.toFixed(1)} LY</div>`;
+                }
+                
                 card.innerHTML = `
+                    ${distanceDisplay}
                     <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
                     <div class="star-info">
                         <div class="star-name" style="color: ${star.color}">${star.name}</div>
@@ -601,7 +710,7 @@
                 // Load cluster data
                 await loadClusterData();
 
-                // Generate stars
+                // Generate stars with real distances
                 generateStars();
 
                 // Render stars
