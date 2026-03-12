@@ -114,7 +114,7 @@
             transform: scale(0.96);
         }
         
-        /* Region Info Panel */
+        /* Region Info Panel - NO VIEW BUTTON, only PLOT COURSE */
         .region-panel {
             position: absolute;
             bottom: max(100px, env(safe-area-inset-bottom) + 70px);
@@ -210,12 +210,6 @@
         .travel-btn:active {
             background: #6aa0e0;
             transform: scale(0.98);
-        }
-        
-        .travel-btn:disabled {
-            background: #2a4a6a;
-            opacity: 0.5;
-            cursor: not-allowed;
         }
         
         .travel-btn.primary {
@@ -365,7 +359,7 @@
         <!-- Region boxes will be dynamically created -->
         <div id="regionBoxes"></div>
         
-        <!-- Region Info Panel -->
+        <!-- Region Info Panel - ONLY PLOT COURSE BUTTON -->
         <div class="region-panel" id="regionPanel">
             <div class="region-name" id="selectedRegionName">Loading...</div>
             <div class="info-row">
@@ -373,7 +367,7 @@
                 <span class="info-value" id="sectorId">---</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Nebulae:</span>
+                <span class="info-label">Star Sectors:</span>
                 <span class="info-value" id="nebulaeCount">6</span>
             </div>
             <div class="info-row">
@@ -382,7 +376,7 @@
             </div>
             
             <!-- Warp Information -->
-            <div class="warp-info" id="warpInfo">
+            <div class="warp-info">
                 <div class="warp-row">
                     <span class="warp-label">Distance:</span>
                     <span class="warp-value" id="sectorDistance">0.0 LY</span>
@@ -397,9 +391,8 @@
                 </div>
             </div>
             
-            <!-- Two buttons: Explore and Plot Course -->
-            <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 ENTER SECTOR</button>
-            <button class="travel-btn primary" id="plotBtn" onclick="plotCourseToPlanet()">🚀 PLOT COURSE TO PLANET</button>
+            <!-- ONLY ONE BUTTON - PLOT COURSE -->
+            <button class="travel-btn primary" id="plotBtn" onclick="plotCourseToSector()">🚀 PLOT COURSE TO SECTOR</button>
         </div>
         
         <canvas id="galaxyCanvas"></canvas>
@@ -435,7 +428,7 @@
 
         // ===== STATE =====
         let currentSector = 'B2';
-        let currentRegion = 'Orion';
+        let currentRegion = 'Orion Arm';
         let selectedRegion = null;
         let selectedSector = null;
 
@@ -496,48 +489,34 @@
             const s1 = sectorCoordinates[sector1] || { x: 1, y: 1 };
             const s2 = sectorCoordinates[sector2] || { x: 1, y: 1 };
             
-            // Manhattan distance
             const dx = Math.abs(s1.x - s2.x);
             const dy = Math.abs(s1.y - s2.y);
             const gridDistance = dx + dy;
             
-            // Convert to light years
             return gridDistance * 2.3;
         }
 
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                // Try to get from storage functions first
                 if (typeof getCurrentSector === 'function') {
-                    currentSector = await getCurrentSector();
+                    currentSector = await getCurrentSector() || 'B2';
                 } else {
-                    currentSector = localStorage.getItem('voidfarer_current_sector');
+                    currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 }
                 
                 if (typeof getCurrentRegion === 'function') {
-                    currentRegion = await getCurrentRegion();
+                    currentRegion = await getCurrentRegion() || 'Orion Arm';
                 } else {
-                    currentRegion = localStorage.getItem('voidfarer_current_region');
+                    currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
                 }
                 
-                // If still null, use defaults
-                if (!currentSector) currentSector = 'B2';
-                if (!currentRegion) currentRegion = 'Orion';
-                
-                // Log for debugging
-                console.log('Galaxy Map loading sector:', currentSector);
-                console.log('Galaxy Map loading region:', currentRegion);
-                
-                // Update display with friendly name
-                const displayName = sectorNames[currentSector] || sectorCoordinates[currentSector]?.displayName || 'Orion Arm';
-                document.getElementById('currentLocationText').textContent = displayName;
+                document.getElementById('currentLocationText').textContent = currentRegion;
                 
             } catch (error) {
                 console.error('Error loading location:', error);
-                // Use defaults on error
                 currentSector = 'B2';
-                currentRegion = 'Orion';
+                currentRegion = 'Orion Arm';
                 document.getElementById('currentLocationText').textContent = 'Orion Arm';
             }
         }
@@ -558,10 +537,8 @@
                 box.style.width = pos.width;
                 box.style.height = pos.height;
                 
-                // Pass display name and sector ID
                 box.onclick = function() { selectRegion(data.displayName, sectorId); };
                 
-                // Highlight current sector
                 if (sectorId === currentSector) {
                     box.style.borderColor = '#4affaa';
                     box.style.boxShadow = '0 0 30px #4affaa';
@@ -579,12 +556,10 @@
 
         // ===== SELECT REGION =====
         function selectRegion(displayName, sector) {
-            // Remove previous selection
             document.querySelectorAll('.region-box').forEach(box => {
                 box.classList.remove('selected');
             });
             
-            // Add selection to clicked box
             const regionName = sectorCoordinates[sector]?.name;
             const box = document.getElementById('region-' + regionName);
             if (box) {
@@ -596,120 +571,65 @@
             
             const sectorData = sectorCoordinates[sector];
             
-            // Calculate distance and warp info
             const distance = getSectorDistance(currentSector, sector);
             const cycles = getWarpCyclesFromDistance(distance);
             const fuel = getFuelCostFromDistance(distance);
             
-            // Update panel
             document.getElementById('selectedRegionName').textContent = displayName;
             document.getElementById('sectorId').textContent = sector;
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
-            
-            // Update warp info
             document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
             document.getElementById('warpCycles').textContent = cycles;
             document.getElementById('fuelCost').textContent = fuel + '⭐';
-            
-            // Change button based on whether it's current location
-            const travelBtn = document.getElementById('travelBtn');
-            if (sector === currentSector) {
-                travelBtn.disabled = false;
-                travelBtn.textContent = '👁️ VIEW SECTOR';
-            } else {
-                travelBtn.disabled = false;
-                travelBtn.textContent = '🚀 ENTER SECTOR';
-            }
             
             regionPanel.classList.add('visible');
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== TRAVEL TO SECTOR =====
-        async function travelToSector() {
-            if (!selectedRegion || !selectedSector) return;
-            
-            // If it's the current sector, just view it
-            if (selectedSector === currentSector) {
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'viewing sector...';
-                setTimeout(() => {
-                    loadingOverlay.classList.remove('active');
-                }, 500);
-                return;
-            }
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'entering sector...';
-            
-            try {
-                // Save current location for next screen
-                if (typeof setCurrentSector === 'function') {
-                    await setCurrentSector(selectedSector, selectedRegion);
-                } else {
-                    localStorage.setItem('voidfarer_current_sector', selectedSector);
-                    localStorage.setItem('voidfarer_current_region', selectedRegion);
-                }
-                
-                // Navigate to star sectors
-                setTimeout(() => {
-                    window.location.href = 'star-sectors.html';
-                }, 500);
-                
-            } catch (error) {
-                console.error('Error entering sector:', error);
-                loadingOverlay.classList.remove('active');
-                alert('Failed to enter sector. Please try again.');
-            }
-        }
-
-        // ===== PLOT COURSE TO PLANET =====
-        async function plotCourseToPlanet() {
+        // ===== PLOT COURSE TO SECTOR (USES NAVIGATION.JS) =====
+        async function plotCourseToSector() {
             if (!selectedSector || !selectedRegion) {
                 alert('Please select a destination sector first');
                 return;
             }
             
             loadingOverlay.classList.add('active');
-            loadingText.textContent = 'calculating course...';
+            loadingText.textContent = 'plotting course...';
             
             try {
-                // Get current location from storage
-                const currentSectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
-                const currentRegionName = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
-                const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Molecular Cloud';
-                const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
-                const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                const distance = getSectorDistance(currentSector, selectedSector);
                 
-                // Get destination (from selected sector)
-                const destSector = selectedSector;
-                const destRegion = selectedRegion;
+                console.log('Plotting course to sector:', {
+                    from: currentSector,
+                    to: selectedSector,
+                    distance: distance
+                });
                 
-                // Calculate sector distance for display
-                const sectorDist = getSectorDistance(currentSectorId, destSector);
-                const sectorCycles = getWarpCyclesFromDistance(sectorDist);
-                const sectorFuel = getFuelCostFromDistance(sectorDist);
+                // Save plot data using navigation.js functions
+                if (typeof savePlotData === 'function') {
+                    // Use navigation.js
+                    savePlotData({
+                        fromSector: currentSector,
+                        fromRegion: currentRegion,
+                        destSector: selectedSector,
+                        destRegion: selectedRegion,
+                        sectorDistance: distance
+                    });
+                } else {
+                    // Fallback to direct localStorage
+                    localStorage.setItem('voidfarer_plot_sector', selectedSector);
+                    localStorage.setItem('voidfarer_plot_region', selectedRegion);
+                    localStorage.setItem('voidfarer_plot_from_sector', currentSector);
+                    localStorage.setItem('voidfarer_plot_from_region', currentRegion);
+                    localStorage.setItem('voidfarer_plot_sector_distance', distance.toString());
+                }
                 
-                console.log(`Plotting course from ${currentRegionName} (${currentSectorId}) to ${destRegion} (${destSector})`);
-                console.log(`Sector distance: ${sectorDist.toFixed(1)} LY, ${sectorCycles} cycles, ${sectorFuel}⭐`);
+                // Set cumulative distance to sector distance (first leg)
+                localStorage.setItem('voidfarer_plot_cumulative_distance', distance.toString());
                 
-                // Save all plot data
-                localStorage.setItem('voidfarer_plot_sector', destSector);
-                localStorage.setItem('voidfarer_plot_region', destRegion);
-                localStorage.setItem('voidfarer_plot_from_sector', currentSectorId);
-                localStorage.setItem('voidfarer_plot_from_region', currentRegionName);
-                localStorage.setItem('voidfarer_plot_from_nebula', currentNebula);
-                localStorage.setItem('voidfarer_plot_from_star', currentStar);
-                localStorage.setItem('voidfarer_plot_from_planet', currentPlanet);
-                
-                // Store sector distance for later calculation
-                localStorage.setItem('voidfarer_plot_sector_distance', sectorDist.toString());
-                localStorage.setItem('voidfarer_plot_sector_cycles', sectorCycles.toString());
-                localStorage.setItem('voidfarer_plot_sector_fuel', sectorFuel.toString());
-                
-                // Go to star-sectors to select destination nebula
+                // Navigate to star sectors to select star sector
                 setTimeout(() => {
                     window.location.href = 'star-sectors.html?mode=plot';
                 }, 500);
@@ -739,7 +659,6 @@
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
-            // Background stars
             for (let i = 0; i < 1000; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
@@ -752,7 +671,6 @@
                 ctx.fill();
             }
             
-            // Galactic core glow
             const gradient = ctx.createRadialGradient(
                 centerX, centerY, 0,
                 centerX, centerY, canvas.width * 0.3
@@ -763,55 +681,27 @@
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw spiral arm hints
-            ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)';
-            ctx.lineWidth = 2;
-            
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2;
-                ctx.beginPath();
-                
-                for (let r = 0.1; r < 0.9; r += 0.1) {
-                    const spiralAngle = angle + r * 10;
-                    const x = centerX + Math.cos(spiralAngle) * r * canvas.width * 0.4;
-                    const y = centerY + Math.sin(spiralAngle) * r * canvas.height * 0.4;
-                    
-                    if (r === 0.1) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                }
-                ctx.stroke();
-            }
         }
 
         // ===== INITIALIZE =====
         async function init() {
             try {
-                // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading galaxy map...';
                 
-                // Check for player data
                 const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
                 }
                 
-                // Load current location FIRST
                 await loadCurrentLocation();
                 
-                // Resize canvas and draw background
                 resizeCanvas();
                 window.addEventListener('resize', resizeCanvas);
                 
-                // Create region boxes
                 createRegionBoxes();
                 
-                // Hide loading
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
@@ -825,12 +715,12 @@
             }
         }
 
-        // ===== START =====
         init();
     </script>
     
     <!-- Load all JS files -->
     <script src="js/storage.js"></script>
+    <script src="js/navigation.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
 </body>
