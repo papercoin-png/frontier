@@ -65,6 +65,8 @@
             z-index: 200;
             pointer-events: none;
             display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
         }
         
         .warp-overlay {
@@ -390,6 +392,7 @@
         let animationFrame;
         let startTime = Date.now();
         const CYCLE_DURATION = 2000; // 2 seconds per cycle
+        let warpComplete = false;
 
         // ===== MAP POSITIONS =====
         let startPos = { x: 0.2, y: 0.5 };
@@ -691,15 +694,25 @@
             }
         }
 
-        // ===== WATER RIPPLE EFFECT =====
+        // ===== FIXED WATER RIPPLE EFFECT =====
         function showWaterRipple() {
             return new Promise((resolve) => {
-                // Hide other canvases
-                starfieldCanvas.style.opacity = '0.3';
-                mapCanvas.style.opacity = '0.3';
+                // Hide other canvases gradually
+                starfieldCanvas.style.transition = 'opacity 0.5s';
+                mapCanvas.style.transition = 'opacity 0.5s';
+                starfieldCanvas.style.opacity = '0.2';
+                mapCanvas.style.opacity = '0.2';
                 
-                // Show ripple canvas
+                // Show and fade in ripple canvas
                 rippleCanvas.style.display = 'block';
+                rippleCanvas.style.opacity = '0';
+                rippleCanvas.style.transition = 'opacity 0.5s';
+                
+                // Force a reflow
+                rippleCanvas.offsetHeight;
+                
+                // Fade in ripple
+                rippleCanvas.style.opacity = '1';
                 
                 const startTime = Date.now();
                 const duration = 3000; // 3 seconds
@@ -717,13 +730,13 @@
                     rippleCtx.fillStyle = waterColors.deep;
                     rippleCtx.fillRect(0, 0, rippleCanvas.width, rippleCanvas.height);
                     
-                    // Calculate ring size
-                    const ringSize = 30 + progress * 500;
-                    const opacity = Math.max(0, 1 - progress * 0.6);
+                    // Calculate ring size - starts small and expands
+                    const ringSize = 50 + progress * 400;
+                    const opacity = Math.max(0, 1 - progress * 0.3);
                     
-                    // Draw multiple ripples
+                    // Draw multiple expanding ripples
                     for (let i = 0; i < 5; i++) {
-                        const offset = i * 15;
+                        const offset = i * 20;
                         const rippleSize = ringSize - offset;
                         if (rippleSize < 20) continue;
                         
@@ -732,56 +745,57 @@
                         // Main ripple ring
                         rippleCtx.beginPath();
                         rippleCtx.arc(centerX, centerY, rippleSize, 0, Math.PI * 2);
-                        rippleCtx.strokeStyle = `rgba(42, 90, 122, ${ringOpacity * 0.8})`;
-                        rippleCtx.lineWidth = 3 - i * 0.5;
+                        rippleCtx.strokeStyle = `rgba(90, 154, 192, ${ringOpacity})`;
+                        rippleCtx.lineWidth = 4 - i * 0.7;
                         rippleCtx.stroke();
                         
-                        // Inner glow
+                        // Inner glow ring
                         rippleCtx.beginPath();
-                        rippleCtx.arc(centerX, centerY, rippleSize - 2, 0, Math.PI * 2);
-                        rippleCtx.strokeStyle = `rgba(74, 138, 192, ${ringOpacity * 0.4})`;
-                        rippleCtx.lineWidth = 1.5;
+                        rippleCtx.arc(centerX, centerY, rippleSize - 5, 0, Math.PI * 2);
+                        rippleCtx.strokeStyle = `rgba(160, 200, 255, ${ringOpacity * 0.6})`;
+                        rippleCtx.lineWidth = 2;
                         rippleCtx.stroke();
                     }
                     
                     // Center splash
-                    const splashSize = 20 * (1 - progress * 0.5);
+                    const splashSize = 30 * (1 - progress * 0.3);
                     
                     const gradient = rippleCtx.createRadialGradient(
                         centerX, centerY, 0,
-                        centerX, centerY, splashSize * 3
+                        centerX, centerY, splashSize * 4
                     );
-                    gradient.addColorStop(0, `rgba(90, 154, 192, ${opacity * 0.6})`);
-                    gradient.addColorStop(0.5, `rgba(42, 90, 122, ${opacity * 0.3})`);
+                    gradient.addColorStop(0, `rgba(100, 180, 220, ${opacity})`);
+                    gradient.addColorStop(0.3, `rgba(50, 120, 170, ${opacity * 0.7})`);
+                    gradient.addColorStop(0.7, `rgba(20, 60, 100, ${opacity * 0.3})`);
                     gradient.addColorStop(1, 'transparent');
                     
                     rippleCtx.fillStyle = gradient;
                     rippleCtx.beginPath();
-                    rippleCtx.arc(centerX, centerY, splashSize * 3, 0, Math.PI * 2);
+                    rippleCtx.arc(centerX, centerY, splashSize * 4, 0, Math.PI * 2);
                     rippleCtx.fill();
                     
                     // Water droplets
-                    for (let i = 0; i < 16; i++) {
-                        const angle = (i / 16) * Math.PI * 2 + (elapsed * 0.001);
-                        const distance = ringSize * 0.8 + Math.sin(elapsed * 0.005 + i) * 10;
+                    for (let i = 0; i < 20; i++) {
+                        const angle = (i / 20) * Math.PI * 2 + (elapsed * 0.002);
+                        const distance = ringSize * 0.9 + Math.sin(elapsed * 0.01 + i) * 15;
                         const x = centerX + Math.cos(angle) * distance;
                         const y = centerY + Math.sin(angle) * distance;
                         
-                        const dropletOpacity = opacity * 0.5 * (1 - distance / ringSize);
+                        const dropletOpacity = opacity * 0.4 * (1 - Math.abs(distance - ringSize) / 100);
                         
                         rippleCtx.beginPath();
-                        rippleCtx.fillStyle = `rgba(100, 180, 220, ${dropletOpacity})`;
-                        rippleCtx.arc(x, y, 2 + Math.sin(elapsed * 0.01 + i) * 1, 0, Math.PI * 2);
+                        rippleCtx.fillStyle = `rgba(140, 200, 255, ${dropletOpacity})`;
+                        rippleCtx.arc(x, y, 3 + Math.sin(elapsed * 0.01 + i) * 1.5, 0, Math.PI * 2);
                         rippleCtx.fill();
                     }
                     
-                    // Secondary ripples
+                    // Secondary expanding rings
                     for (let j = 0; j < 3; j++) {
-                        const secondarySize = ringSize * 0.6 + Math.sin(elapsed * 0.003 + j) * 20;
+                        const secondarySize = ringSize * 0.7 + Math.sin(elapsed * 0.005 + j) * 30;
                         
                         rippleCtx.beginPath();
                         rippleCtx.arc(centerX, centerY, secondarySize, 0, Math.PI * 2);
-                        rippleCtx.strokeStyle = `rgba(32, 70, 102, ${opacity * 0.3})`;
+                        rippleCtx.strokeStyle = `rgba(74, 138, 192, ${opacity * 0.3})`;
                         rippleCtx.lineWidth = 2;
                         rippleCtx.stroke();
                     }
@@ -789,22 +803,28 @@
                     if (progress < 1) {
                         requestAnimationFrame(drawRipple);
                     } else {
-                        // Fade out ripple and resolve
+                        // Fade out ripple and restore view
                         setTimeout(() => {
-                            rippleCanvas.style.display = 'none';
-                            starfieldCanvas.style.opacity = '1';
-                            mapCanvas.style.opacity = '1';
-                            resolve();
+                            rippleCanvas.style.opacity = '0';
+                            setTimeout(() => {
+                                rippleCanvas.style.display = 'none';
+                                starfieldCanvas.style.opacity = '1';
+                                mapCanvas.style.opacity = '1';
+                                resolve();
+                            }, 500);
                         }, 500);
                     }
                 }
                 
+                // Start the ripple animation
                 drawRipple();
             });
         }
 
         // ===== UPDATE CYCLE =====
         async function updateCycle() {
+            if (warpComplete) return;
+            
             const elapsed = Date.now() - startTime;
             const totalDuration = warpData.warpCycles * CYCLE_DURATION;
             const progress = Math.min(elapsed / totalDuration, 1);
@@ -834,13 +854,12 @@
             drawMap(progress, speedFactor);
 
             // Check if warp complete
-            if (elapsed >= totalDuration) {
+            if (elapsed >= totalDuration && !warpComplete) {
+                warpComplete = true;
                 // Show water ripple effect before navigating
                 await showWaterRipple();
                 completeWarp();
             }
-
-            return progress;
         }
 
         // ===== GET STATUS MESSAGE =====
