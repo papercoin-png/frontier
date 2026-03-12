@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ... keep your existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -183,6 +182,87 @@
             border: 2px solid white;
         }
         
+        /* Info panel for selected star */
+        .star-info-panel {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.95);
+            backdrop-filter: blur(15px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            z-index: 50;
+            display: none;
+            width: 280px;
+            text-align: center;
+            box-shadow: 0 0 30px #ffaa4a;
+        }
+        
+        .star-info-panel.visible {
+            display: block;
+        }
+        
+        .star-info-name {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            color: #ffffff;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .star-info-type {
+            color: #a0c0ff;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .star-info-planets {
+            color: #ffd966;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        
+        .star-info-distance {
+            color: #ffaa4a;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .star-info-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .star-info-btn {
+            flex: 1;
+            background: #4a8ac0;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+        }
+        
+        .star-info-btn:active {
+            background: #6aa0e0;
+            transform: scale(0.96);
+        }
+        
+        .star-info-btn.secondary {
+            background: transparent;
+            border: 1px solid #6a8ac0;
+        }
+        
+        .star-info-btn.secondary:active {
+            background: rgba(106, 138, 192, 0.3);
+        }
+        
         /* Loading overlay */
         .loading-overlay {
             position: fixed;
@@ -260,9 +340,21 @@
         
         <button class="back-btn" onclick="returnToSectors()">← SECTORS</button>
         
+        <!-- Star Info Panel -->
+        <div class="star-info-panel" id="starInfoPanel">
+            <div class="star-info-name" id="starInfoName">Star Name</div>
+            <div class="star-info-type" id="starInfoType">Star Type</div>
+            <div class="star-info-planets" id="starInfoPlanets">0 planets</div>
+            <div class="star-info-distance" id="starInfoDistance">0.0 LY away</div>
+            <div class="star-info-buttons">
+                <button class="star-info-btn" id="enterSystemBtn" onclick="enterSystem()">🚀 ENTER SYSTEM</button>
+                <button class="star-info-btn secondary" onclick="hideStarInfo()">CLOSE</button>
+            </div>
+        </div>
+        
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loadingText">warping to system...</div>
+            <div class="loading-text" id="loadingText">entering system...</div>
         </div>
 
         <!-- Migration status (debug) -->
@@ -285,6 +377,7 @@
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
         const starsGrid = document.getElementById('starsGrid');
+        const starInfoPanel = document.getElementById('starInfoPanel');
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
@@ -297,6 +390,7 @@
         let starCount = 50;
         let currentSector = 'B2';
         let clusterSeed = UNIVERSE_SEED;
+        let selectedStar = null;
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -306,6 +400,70 @@
                 hash |= 0;
             }
             return Math.abs(hash);
+        }
+
+        // ===== SEEDED RANDOM =====
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function seededRandomRange(seed, index, min, max) {
+            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+        }
+
+        function seededRandomChoice(seed, index, array) {
+            const choice = Math.floor(seededRandom(seed, index) * array.length);
+            return array[choice];
+        }
+
+        // ===== STAR TYPES =====
+        const starTypes = [
+            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8, icon: '🟡' },
+            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5, icon: '🔴' },
+            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12, icon: '🔵' },
+            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0, icon: '💫' },
+            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0, icon: '⚫' }
+        ];
+
+        function getStarType(seed, index) {
+            const rand = seededRandom(seed, index);
+            let cumulative = 0;
+            
+            for (const type of starTypes) {
+                cumulative += type.prob;
+                if (rand < cumulative) {
+                    return { ...type };
+                }
+            }
+            return { ...starTypes[0] };
+        }
+
+        // ===== NAME GENERATION =====
+        const namePrefixes = [
+            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
+            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
+            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
+        ];
+
+        const nameSuffixes = [
+            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
+            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
+            'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
+        ];
+
+        function generateStarName(seed, index) {
+            const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
+            const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
+            return prefix + ' ' + suffix;
+        }
+
+        // ===== GENERATE STAR DISTANCE =====
+        function generateStarDistance(starIndex) {
+            // Deterministic "random" distance based on star index
+            const seed = clusterSeed + starIndex * 1000;
+            const rand = Math.sin(seed) * 10000;
+            return (Math.abs(rand) % 30 + 5) / 10; // 0.5 to 3.5 LY
         }
 
         // ===== LOAD CLUSTER DATA =====
@@ -345,85 +503,6 @@
             }
         }
 
-        // ===== STAR TYPES =====
-        const starTypes = [
-            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
-            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
-            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
-            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0 },
-            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
-        ];
-
-        // ===== GET STAR TYPE =====
-        function getStarType(seed, index) {
-            const rand = seededRandom(seed, index);
-            let cumulative = 0;
-            
-            for (const type of starTypes) {
-                cumulative += type.prob;
-                if (rand < cumulative) {
-                    return { ...type };
-                }
-            }
-            
-            return { ...starTypes[0] };
-        }
-
-        // ===== SEEDED RANDOM =====
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
-        }
-
-        function seededRandomRange(seed, index, min, max) {
-            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
-        }
-
-        function seededRandomChoice(seed, index, array) {
-            const choice = Math.floor(seededRandom(seed, index) * array.length);
-            return array[choice];
-        }
-
-        // ===== NAME GENERATION =====
-        const namePrefixes = [
-            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
-            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
-        ];
-
-        const nameSuffixes = [
-            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
-            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
-            'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
-        ];
-
-        function generateStarName(seed, index) {
-            const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
-            const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
-            return prefix + ' ' + suffix;
-        }
-
-        // ===== GENERATE STAR =====
-        function generateStar(seed, index) {
-            const starType = getStarType(seed, index);
-            
-            // Calculate planet count based on star type
-            let planetCount = 0;
-            if (starType.maxPlanets > 0) {
-                planetCount = seededRandomRange(seed, index + 10, starType.minPlanets, starType.maxPlanets);
-            }
-            
-            return {
-                index: index,
-                name: generateStarName(seed, index + 20),
-                type: starType.type,
-                typeName: starType.name,
-                color: starType.color,
-                planetCount: planetCount,
-                seed: seed + index * 1000
-            };
-        }
-
         // ===== GENERATE STARS =====
         function generateStars() {
             stars = [];
@@ -431,41 +510,86 @@
             // Generate stars
             for (let i = 0; i < starCount; i++) {
                 const starSeed = clusterSeed + i * 1000;
-                const star = generateStar(starSeed, i);
+                const starType = getStarType(starSeed, i);
                 
-                // Get icon based on type
-                let icon = '⭐';
-                if (star.type === 'main') icon = '🟡';
-                else if (star.type === 'red') icon = '🔴';
-                else if (star.type === 'blue') icon = '🔵';
-                else if (star.type === 'neutron') icon = '💫';
-                else if (star.type === 'blackhole') icon = '⚫';
+                // Calculate planet count
+                let planetCount = 0;
+                if (starType.maxPlanets > 0) {
+                    planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
+                }
                 
                 stars.push({
-                    name: star.name,
-                    type: star.typeName,
-                    icon: icon,
-                    color: star.color,
-                    planets: star.planetCount,
                     index: i,
-                    seed: star.seed
+                    name: generateStarName(starSeed, i + 20),
+                    type: starType.name,
+                    typeKey: starType.type,
+                    icon: starType.icon,
+                    color: starType.color,
+                    planets: planetCount,
+                    distance: generateStarDistance(i)
                 });
             }
 
-            // Sort stars: Current star first, then alphabetically
+            // Sort stars: Current star first, then by distance
             stars.sort((a, b) => {
                 if (a.name === currentStarName) return -1;
                 if (b.name === currentStarName) return 1;
-                return a.name.localeCompare(b.name);
+                return a.distance - b.distance;
             });
         }
 
-        // ===== GENERATE STAR DISTANCE =====
-        function generateStarDistance(starIndex) {
-            // Deterministic "random" distance based on star index
-            const seed = clusterSeed + starIndex * 1000;
-            const rand = Math.sin(seed) * 10000;
-            return (Math.abs(rand) % 30 + 5) / 10; // 0.5 to 3.5 LY
+        // ===== SHOW STAR INFO =====
+        function showStarInfo(star) {
+            selectedStar = star;
+            
+            document.getElementById('starInfoName').textContent = star.name;
+            document.getElementById('starInfoType').textContent = star.type;
+            document.getElementById('starInfoPlanets').textContent = star.planets + ' planets';
+            document.getElementById('starInfoDistance').textContent = star.distance.toFixed(1) + ' LY away';
+            
+            starInfoPanel.classList.add('visible');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== HIDE STAR INFO =====
+        function hideStarInfo() {
+            starInfoPanel.classList.remove('visible');
+            selectedStar = null;
+        }
+
+        // ===== ENTER SYSTEM (NO WARP) =====
+        async function enterSystem() {
+            if (!selectedStar) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'entering system...';
+            
+            try {
+                // Save star data
+                if (typeof setCurrentStar === 'function') {
+                    await setCurrentStar(
+                        selectedStar.name,
+                        selectedStar.type,
+                        selectedStar.index,
+                        selectedStar.planets + ' planets'
+                    );
+                } else {
+                    localStorage.setItem('voidfarer_current_star', selectedStar.name);
+                    localStorage.setItem('voidfarer_current_star_type', selectedStar.type);
+                    localStorage.setItem('voidfarer_current_star_index', selectedStar.index);
+                }
+                
+                // Navigate directly to system view
+                setTimeout(() => {
+                    window.location.href = 'system-view.html';
+                }, 500);
+
+            } catch (error) {
+                console.error('Error entering system:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to enter system. Please try again.');
+            }
         }
 
         // ===== RENDER STARS =====
@@ -483,16 +607,14 @@
                 if (star.name === currentStarName) {
                     card.classList.add('current');
                 }
-                card.onclick = function() { selectStar(star.index); };
+                card.onclick = function() { showStarInfo(star); };
                 
-                // Calculate distance from current star (if any)
+                // Show distance for all stars
                 let distanceDisplay = '';
-                if (currentStarName && star.name !== currentStarName) {
-                    const distance = generateStarDistance(star.index);
-                    const cycles = distance < 1 ? 1 : distance < 2 ? 2 : distance < 3 ? 3 : 4;
-                    distanceDisplay = `<div class="distance-badge">${distance.toFixed(1)} LY • ${cycles} cycle${cycles > 1 ? 's' : ''}</div>`;
-                } else if (star.name === currentStarName) {
+                if (star.name === currentStarName) {
                     distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
+                } else {
+                    distanceDisplay = `<div class="distance-badge">${star.distance.toFixed(1)} LY</div>`;
                 }
                 
                 card.innerHTML = `
@@ -507,59 +629,6 @@
                 
                 starsGrid.appendChild(card);
             });
-        }
-
-        // ===== SELECT STAR =====
-        async function selectStar(index) {
-            const star = stars.find(s => s.index === index);
-            if (!star) return;
-
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'calculating warp...';
-
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-
-            try {
-                // Calculate warp data
-                const distance = generateStarDistance(star.index);
-                const cycles = distance < 1 ? 1 : distance < 2 ? 2 : distance < 3 ? 3 : 4;
-                const fuel = Math.floor(distance * 4) + 5;
-
-                // Save star data
-                if (typeof setCurrentStar === 'function') {
-                    await setCurrentStar(
-                        star.name,
-                        star.type,
-                        star.index,
-                        star.planets + ' planets'
-                    );
-                } else {
-                    localStorage.setItem('voidfarer_current_star', star.name);
-                    localStorage.setItem('voidfarer_current_star_type', star.type);
-                    localStorage.setItem('voidfarer_current_star_index', star.index);
-                }
-
-                // Save warp data - FIXED: Now goes to system-view.html
-                if (typeof setWarpData === 'function') {
-                    setWarpData(star.name, 'system-view.html', cycles, distance, fuel);
-                } else {
-                    localStorage.setItem('voidfarer_warp_destination', star.name);
-                    localStorage.setItem('voidfarer_warp_return', 'system-view.html');  // FIXED HERE
-                    localStorage.setItem('voidfarer_warp_cycles', cycles);
-                    localStorage.setItem('voidfarer_warp_distance', distance);
-                    localStorage.setItem('voidfarer_warp_fuel', fuel);
-                }
-
-                // Navigate to warp
-                setTimeout(() => {
-                    window.location.href = 'warp.html';
-                }, 500);
-
-            } catch (error) {
-                console.error('Error selecting star:', error);
-                loadingOverlay.classList.remove('active');
-                alert('Failed to select star. Please try again.');
-            }
         }
 
         // ===== RETURN TO SECTORS =====
@@ -610,7 +679,6 @@
     
     <!-- Load all JS files -->
     <script src="js/storage.js"></script>
-    <script src="js/warp-calculator.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
 </body>
