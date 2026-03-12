@@ -12,6 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* ... keep all existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -874,26 +875,68 @@
                     await updateDailyPrices();
                 }
 
-                // Load all data with fallbacks
+                // Load all data with fallbacks - try both storage methods
                 let credits = 5000;
-                if (typeof getCredits === 'function') {
-                    credits = await getCredits();
-                }
-
                 let collection = {};
-                if (typeof getCollection === 'function') {
-                    collection = await getCollection();
+                let realEstateData = { properties: [] };
+
+                // Try to get from storage functions first
+                if (typeof getCredits === 'function') {
+                    try {
+                        credits = await getCredits();
+                        console.log('Got credits from function:', credits);
+                    } catch (e) {
+                        console.warn('Error getting credits from function:', e);
+                    }
                 }
 
-                let realEstateData = { properties: [] };
+                if (typeof getCollection === 'function') {
+                    try {
+                        collection = await getCollection();
+                        console.log('Got collection from function:', collection);
+                    } catch (e) {
+                        console.warn('Error getting collection from function:', e);
+                    }
+                }
+
                 if (typeof getRealEstate === 'function') {
-                    realEstateData = await getRealEstate();
+                    try {
+                        realEstateData = await getRealEstate();
+                        console.log('Got real estate from function');
+                    } catch (e) {
+                        console.warn('Error getting real estate from function:', e);
+                    }
+                }
+
+                // If no collection from functions, try localStorage
+                if (Object.keys(collection).length === 0) {
+                    try {
+                        const localCollection = localStorage.getItem('voidfarer_collection');
+                        if (localCollection) {
+                            collection = JSON.parse(localCollection);
+                            console.log('Got collection from localStorage:', collection);
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing localStorage collection:', e);
+                    }
+                }
+
+                // If still no credits, try localStorage
+                if (credits === 5000) {
+                    try {
+                        const localCredits = localStorage.getItem('voidfarer_credits');
+                        if (localCredits) {
+                            credits = parseInt(localCredits);
+                            console.log('Got credits from localStorage:', credits);
+                        }
+                    } catch (e) {
+                        console.warn('Error getting credits from localStorage:', e);
+                    }
                 }
 
                 // Store in global state
                 currentCredits = credits;
                 currentCollection = collection;
-                properties = realEstateData.properties || [];
 
                 // Update header
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
@@ -907,13 +950,23 @@
                         size: 1
                     };
                     const count = data.count || 1;
+                    
                     let marketPrice = 100;
                     if (typeof getLatestPrice === 'function') {
-                        marketPrice = await getLatestPrice(name) || 100;
+                        try {
+                            marketPrice = await getLatestPrice(name) || 100;
+                        } catch (e) {
+                            console.warn('Error getting price for', name, e);
+                        }
                     }
+                    
                     let priceChange = 0;
                     if (typeof calculatePriceChange === 'function') {
-                        priceChange = await calculatePriceChange(name, 1) || 0;
+                        try {
+                            priceChange = await calculatePriceChange(name, 1) || 0;
+                        } catch (e) {
+                            console.warn('Error getting price change for', name, e);
+                        }
                     }
                     
                     cargoItems.push({
@@ -926,11 +979,15 @@
                         priceChange: priceChange,
                         totalValue: count * marketPrice
                     });
+                    
+                    console.log(`Loaded cargo item: ${name} x${count}`);
                 }
 
                 // Update stats and UI
                 updateStats();
                 applyFilters();
+                
+                properties = realEstateData.properties || [];
                 updatePropertySelector();
 
             } catch (error) {
@@ -955,6 +1012,8 @@
             document.getElementById('capacityText').textContent = `${cargoUsed} / ${cargoMax}`;
             document.getElementById('cargoCapacityDisplay').textContent = `Used: ${cargoUsed}/${cargoMax}`;
             document.getElementById('capacityBar').style.width = Math.min(100, (cargoUsed / cargoMax) * 100) + '%';
+            
+            console.log(`Stats updated: ${totalItems} total items, ${uniqueItems} unique`);
         }
 
         // ===== UPDATE PROPERTY SELECTOR =====
@@ -1212,6 +1271,29 @@
                 let result = { success: false, reason: 'function not available' };
                 if (typeof safeSellElement === 'function') {
                     result = await safeSellElement(itemName, quantity, item.marketPrice);
+                } else {
+                    // Fallback: update localStorage directly
+                    console.log('Using localStorage fallback for selling');
+                    let collection = {};
+                    try {
+                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                    } catch (e) {
+                        collection = {};
+                    }
+                    
+                    if (collection[itemName] && collection[itemName].count >= quantity) {
+                        collection[itemName].count -= quantity;
+                        if (collection[itemName].count <= 0) {
+                            delete collection[itemName];
+                        }
+                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                        
+                        let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                        credits += quantity * item.marketPrice;
+                        localStorage.setItem('voidfarer_credits', credits.toString());
+                        
+                        result = { success: true, earnings: quantity * item.marketPrice };
+                    }
                 }
                 
                 if (result.success) {
@@ -1248,8 +1330,25 @@
                 let itemsSold = 0;
                 
                 for (const item of commonItems) {
-                    if (item.count > 0 && typeof safeSellElement === 'function') {
-                        const result = await safeSellElement(item.name, item.count, item.marketPrice);
+                    if (item.count > 0) {
+                        let result = { success: false };
+                        if (typeof safeSellElement === 'function') {
+                            result = await safeSellElement(item.name, item.count, item.marketPrice);
+                        } else {
+                            // Fallback
+                            let collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                            if (collection[item.name]) {
+                                delete collection[item.name];
+                                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                                
+                                let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                                credits += item.count * item.marketPrice;
+                                localStorage.setItem('voidfarer_credits', credits.toString());
+                                
+                                result = { success: true, earnings: item.count * item.marketPrice };
+                            }
+                        }
+                        
                         if (result.success) {
                             totalEarnings += result.earnings;
                             itemsSold += item.count;
@@ -1297,8 +1396,28 @@
                     const maxNeeded = Math.ceil((targetAmount - earned) / item.marketPrice);
                     const sellQuantity = Math.min(maxNeeded, item.count);
                     
-                    if (sellQuantity > 0 && typeof safeSellElement === 'function') {
-                        const result = await safeSellElement(item.name, sellQuantity, item.marketPrice);
+                    if (sellQuantity > 0) {
+                        let result = { success: false };
+                        if (typeof safeSellElement === 'function') {
+                            result = await safeSellElement(item.name, sellQuantity, item.marketPrice);
+                        } else {
+                            // Fallback
+                            let collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                            if (collection[item.name] && collection[item.name].count >= sellQuantity) {
+                                collection[item.name].count -= sellQuantity;
+                                if (collection[item.name].count <= 0) {
+                                    delete collection[item.name];
+                                }
+                                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                                
+                                let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                                credits += sellQuantity * item.marketPrice;
+                                localStorage.setItem('voidfarer_credits', credits.toString());
+                                
+                                result = { success: true, earnings: sellQuantity * item.marketPrice };
+                            }
+                        }
+                        
                         if (result.success) {
                             earned += result.earnings;
                             soldItems.push({ name: item.name, quantity: sellQuantity });
@@ -1331,7 +1450,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'accessing cargo hold...';
 
-                // Load all data - don't check credits, just try to load
+                // Load all data
                 await loadData();
 
                 // Hide loading
