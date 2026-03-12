@@ -203,6 +203,7 @@
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
+            font-weight: 500;
         }
         
         .return-btn:active {
@@ -431,7 +432,7 @@
             'Technetium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '🧪' }
         };
 
-        // Planet-specific resources
+        // Planet-specific resources (fallback if none provided)
         const planetResourcesMap = {
             'Verdant Prime': ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen', 'Titanium'],
             'Pyros': ['Iron', 'Gold', 'Silver', 'Uranium', 'Sulfur', 'Copper'],
@@ -446,13 +447,54 @@
         // ===== LOAD LOCATION DATA =====
         async function loadLocationData() {
             try {
-                // Load all location data
-                const planet = typeof getCurrentPlanet === 'function' ? await getCurrentPlanet() : 'Verdant Prime';
-                const star = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Sol';
-                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
-                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Nebula';
-                const type = typeof getCurrentPlanetType === 'function' ? await getCurrentPlanetType() : 'lush';
-                const resources = typeof getCurrentPlanetResources === 'function' ? await getCurrentPlanetResources() : [];
+                // Load all location data with fallbacks
+                let planet = 'Verdant Prime';
+                if (typeof getCurrentPlanet === 'function') {
+                    planet = await getCurrentPlanet();
+                } else {
+                    planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+                }
+                console.log('Surface loading planet:', planet);
+
+                let star = 'Sol';
+                if (typeof getCurrentStar === 'function') {
+                    star = await getCurrentStar();
+                } else {
+                    star = localStorage.getItem('voidfarer_current_star') || 'Sol';
+                }
+
+                let sector = 'B2';
+                if (typeof getCurrentSector === 'function') {
+                    sector = await getCurrentSector();
+                } else {
+                    sector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                }
+
+                let nebula = 'Orion Nebula';
+                if (typeof getCurrentNebula === 'function') {
+                    nebula = await getCurrentNebula();
+                } else {
+                    nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+                }
+
+                let type = 'lush';
+                if (typeof getCurrentPlanetType === 'function') {
+                    type = await getCurrentPlanetType();
+                } else {
+                    type = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                }
+
+                let resources = [];
+                if (typeof getCurrentPlanetResources === 'function') {
+                    resources = await getCurrentPlanetResources() || [];
+                } else {
+                    try {
+                        resources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || [];
+                    } catch (e) {
+                        resources = [];
+                    }
+                }
+                console.log('Loaded resources:', resources);
 
                 currentPlanet = planet || 'Verdant Prime';
                 currentStar = star || 'Sol';
@@ -463,9 +505,11 @@
                 // Determine available resources
                 if (resources && resources.length > 0) {
                     availableResources = resources;
+                    console.log('Using provided resources:', availableResources);
                 } else {
                     availableResources = planetResourcesMap[currentPlanet] || 
                         ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen'];
+                    console.log('Using fallback resources:', availableResources);
                 }
 
                 // Update UI
@@ -497,7 +541,16 @@
 
         // ===== UPDATE DISPLAY =====
         async function updateDisplay() {
-            const collection = typeof getCollection === 'function' ? await getCollection() : {};
+            let collection = {};
+            if (typeof getCollection === 'function') {
+                collection = await getCollection();
+            } else {
+                try {
+                    collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                } catch (e) {
+                    collection = {};
+                }
+            }
             const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
             document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
         }
@@ -524,6 +577,9 @@
                 // Add element to collection
                 if (typeof addElementToCollection === 'function') {
                     await addElementToCollection(elementName, 1);
+                } else {
+                    // Fallback for testing
+                    console.log('Extracted:', elementName);
                 }
                 
                 // Update mission progress
@@ -586,7 +642,17 @@
         // ===== COLONY FUNCTIONS =====
         async function toggleColony() {
             try {
-                const colonies = typeof getColonies === 'function' ? await getColonies() : [];
+                let colonies = [];
+                if (typeof getColonies === 'function') {
+                    colonies = await getColonies();
+                } else {
+                    try {
+                        colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+                    } catch (e) {
+                        colonies = [];
+                    }
+                }
+
                 const existingIndex = colonies.findIndex(c => 
                     c.planet === currentPlanet && 
                     c.star === currentStar
@@ -603,6 +669,8 @@
                         colonies.splice(existingIndex, 1);
                         if (typeof saveColonies === 'function') {
                             await saveColonies(colonies);
+                        } else {
+                            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
                         }
                         
                         colonyBtn.innerHTML = '🏭 ESTABLISH COLONY';
@@ -632,12 +700,24 @@
                         colonies.push(newColony);
                         if (typeof saveColonies === 'function') {
                             await saveColonies(colonies);
+                        } else {
+                            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
                         }
                         
                         // Bonus credits
-                        if (typeof getCredits === 'function' && typeof saveCredits === 'function') {
-                            const credits = await getCredits();
-                            await saveCredits(credits + 5000);
+                        let credits = 5000;
+                        if (typeof getCredits === 'function') {
+                            credits = await getCredits();
+                        } else {
+                            credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                        }
+                        
+                        credits += 5000;
+                        
+                        if (typeof saveCredits === 'function') {
+                            await saveCredits(credits);
+                        } else {
+                            localStorage.setItem('voidfarer_credits', credits.toString());
                         }
                         
                         colonyBtn.innerHTML = '🏭 COLONY ESTABLISHED';
@@ -659,7 +739,17 @@
         // ===== CHECK FOR EXISTING COLONY =====
         async function checkForColony() {
             try {
-                const colonies = typeof getColonies === 'function' ? await getColonies() : [];
+                let colonies = [];
+                if (typeof getColonies === 'function') {
+                    colonies = await getColonies();
+                } else {
+                    try {
+                        colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
+                    } catch (e) {
+                        colonies = [];
+                    }
+                }
+
                 const exists = colonies.some(c => 
                     c.planet === currentPlanet && 
                     c.star === currentStar
@@ -687,7 +777,7 @@
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'returning to ship...';
             setTimeout(() => {
-                window.location.href = 'ship-bridge.html';  // FIXED: Now goes to bridge, not system view
+                window.location.href = 'ship-bridge.html';
             }, 800);
         }
 
@@ -698,14 +788,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'scanning surface...';
 
-                // Check for player data
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-
-                // Load location data
+                // Load location data - this will get the planet you selected
                 await loadLocationData();
 
                 // Update display
@@ -727,9 +810,9 @@
 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
+                loadingText.textContent = 'error loading data';
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    loadingOverlay.classList.remove('active');
                 }, 2000);
             }
         }
