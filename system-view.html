@@ -206,7 +206,39 @@
             font-weight: 500;
         }
         
-        /* Planet Info Panel - Now with SET COURSE button */
+        /* Journey Total Display */
+        .journey-total {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
+            border: 2px solid #ffaa4a;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 40px 10px 40px 10px;
+            z-index: 35;
+            display: none;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            box-shadow: 0 0 20px rgba(255, 170, 74, 0.3);
+        }
+        
+        .journey-total.visible {
+            display: block;
+        }
+        
+        .journey-total-label {
+            color: #a0c0ff;
+            margin-right: 5px;
+        }
+        
+        .journey-total-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        /* Planet Info Panel */
         .planet-info {
             position: absolute;
             bottom: 30px;
@@ -220,7 +252,7 @@
             border-radius: 40px 15px 40px 15px;
             z-index: 40;
             display: none;
-            min-width: 280px;
+            min-width: 300px;
             text-align: center;
             box-shadow: 0 0 30px rgba(255, 170, 74, 0.3);
         }
@@ -299,6 +331,30 @@
             font-weight: 700;
         }
         
+        .cumulative-info {
+            background: rgba(255, 170, 74, 0.15);
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            margin: 15px 0;
+            border: 1px solid #ffaa4a;
+        }
+        
+        .cumulative-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .cumulative-label {
+            color: #a0c0ff;
+        }
+        
+        .cumulative-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .planet-info .warning-text {
             color: #ffaa4a;
             font-size: 12px;
@@ -323,9 +379,18 @@
             box-shadow: 0 0 20px #4affaa;
         }
         
+        .planet-info .set-course-btn.primary {
+            background: #ffaa4a;
+            box-shadow: 0 0 20px #ffaa4a;
+        }
+        
         .planet-info .set-course-btn:active {
             transform: scale(0.96);
             background: #6affcc;
+        }
+        
+        .planet-info .set-course-btn.primary:active {
+            background: #ffcc6a;
         }
         
         .planet-info .set-course-btn:disabled {
@@ -352,11 +417,11 @@
             background: rgba(106, 138, 192, 0.3);
         }
         
-        /* Location badge - shows current sector/region */
+        /* Location badge */
         .location-badge {
             position: absolute;
             top: 100px;
-            right: 20px;
+            left: 20px;
             background: rgba(10,10,26,0.7);
             backdrop-filter: blur(5px);
             border: 1px solid #4affaa;
@@ -465,12 +530,18 @@
             <div id="planetCount">-- planets</div>
         </div>
         
-        <!-- Location Badge - Shows current sector -->
+        <!-- Location Badge -->
         <div class="location-badge" id="locationBadge">
             <span id="currentSector">Orion Arm</span>
         </div>
         
-        <!-- Planet Info Panel with SET COURSE button -->
+        <!-- Journey Total Display (for plot mode) -->
+        <div class="journey-total" id="journeyTotal">
+            <span class="journey-total-label">Journey so far:</span>
+            <span class="journey-total-value" id="totalJourneyDistance">0.0 LY</span>
+        </div>
+        
+        <!-- Planet Info Panel -->
         <div class="planet-info" id="planetInfo">
             <h2 id="planetName"></h2>
             <p id="planetType"></p>
@@ -490,8 +561,20 @@
                     <span class="distance-value" id="descentDistance">0.5 LY</span>
                 </div>
                 <div class="distance-row total-distance">
-                    <span class="distance-label">TOTAL JOURNEY:</span>
-                    <span class="distance-value" id="totalDistance">0.0 LY</span>
+                    <span class="distance-label">THIS LEG:</span>
+                    <span class="distance-value" id="legDistance">0.0 LY</span>
+                </div>
+            </div>
+            
+            <!-- Cumulative Journey Info (for plot mode) -->
+            <div class="cumulative-info" id="cumulativeInfo">
+                <div class="cumulative-row">
+                    <span class="cumulative-label">Previous legs:</span>
+                    <span class="cumulative-value" id="previousDistance">0.0 LY</span>
+                </div>
+                <div class="cumulative-row">
+                    <span class="cumulative-label">Total journey:</span>
+                    <span class="cumulative-value" id="totalDistance">0.0 LY</span>
                 </div>
             </div>
             
@@ -505,8 +588,8 @@
             
             <p class="warning-text" id="planetWarning"></p>
             
-            <!-- ONE BUTTON - SET COURSE -->
-            <button class="set-course-btn" id="setCourseBtn" onclick="setCourseToPlanet()">🚀 SET COURSE</button>
+            <!-- Dynamic Button -->
+            <button class="set-course-btn" id="actionBtn" onclick="handlePlanetAction()">🚀 SET COURSE</button>
             <button class="close-btn" onclick="hidePlanetInfo()">CLOSE</button>
         </div>
         
@@ -535,6 +618,8 @@
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
         const locationBadge = document.getElementById('currentSector');
+        const journeyTotalEl = document.getElementById('journeyTotal');
+        const totalJourneyDistanceEl = document.getElementById('totalJourneyDistance');
 
         // ===== STATE =====
         let starData = null;
@@ -548,12 +633,42 @@
         const UNIVERSE_SEED = 42793;
         const ORBITAL_DESCENT = 0.5; // Fixed descent distance
 
+        // ===== CHECK FOR PLOT MODE =====
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPlotMode = urlParams.get('mode') === 'plot';
+        
+        // ===== PLOT MODE DATA =====
+        let plotData = {
+            fromSector: null,
+            fromRegion: null,
+            fromNebula: null,
+            fromStar: null,
+            fromPlanet: null,
+            destSector: null,
+            destRegion: null,
+            destNebula: null,
+            destNebulaType: null,
+            destNebulaDistance: 0,
+            destNebulaStars: 0,
+            sectorDistance: 0,
+            nebulaDistance: 0,
+            cumulativeDistance: 0
+        };
+
         // ===== SECTOR NAMES =====
         const sectorNames = {
             'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
             'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
             'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
             'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
+        };
+
+        // ===== SECTOR COORDINATES =====
+        const sectorCoords = {
+            'A1': { x: 0, y: 0 }, 'B1': { x: 1, y: 0 }, 'C1': { x: 2, y: 0 },
+            'A2': { x: 0, y: 1 }, 'B2': { x: 1, y: 1 }, 'C2': { x: 2, y: 1 },
+            'A3': { x: 0, y: 2 }, 'B3': { x: 1, y: 2 }, 'C3': { x: 2, y: 2 },
+            'A4': { x: 0, y: 3 }, 'B4': { x: 1, y: 3 }, 'C4': { x: 2, y: 3 }
         };
 
         // ===== HASH FUNCTION =====
@@ -638,10 +753,8 @@
             return prefix + '-' + number;
         }
 
-        // ===== CORRECTED DISTANCE CALCULATION =====
-        // Now matches warp-calculator.js and coordinates.js
-        function calculateWarpCycles(distance) {
-            // Use the authoritative formula from warp-calculator.js
+        // ===== WARP CALCULATION FUNCTIONS =====
+        function getWarpCyclesFromDistance(distance) {
             if (distance <= 1.0) return 1;
             if (distance <= 2.5) return 2;
             if (distance <= 4.5) return 3;
@@ -649,14 +762,52 @@
             return 5;
         }
 
-        function calculateFuelCost(distance) {
+        function getFuelCostFromDistance(distance) {
             return Math.floor(distance * 4) + 5;
+        }
+
+        function getSectorDistance(sector1, sector2) {
+            const s1 = sectorCoords[sector1] || { x: 1, y: 1 };
+            const s2 = sectorCoords[sector2] || { x: 1, y: 1 };
+            
+            const dx = Math.abs(s1.x - s2.x);
+            const dy = Math.abs(s1.y - s2.y);
+            const gridDistance = dx + dy;
+            
+            return gridDistance * 2.3;
+        }
+
+        // ===== LOAD PLOT DATA =====
+        function loadPlotData() {
+            plotData = {
+                fromSector: localStorage.getItem('voidfarer_plot_from_sector'),
+                fromRegion: localStorage.getItem('voidfarer_plot_from_region'),
+                fromNebula: localStorage.getItem('voidfarer_plot_from_nebula'),
+                fromStar: localStorage.getItem('voidfarer_plot_from_star'),
+                fromPlanet: localStorage.getItem('voidfarer_plot_from_planet'),
+                destSector: localStorage.getItem('voidfarer_plot_sector'),
+                destRegion: localStorage.getItem('voidfarer_plot_region'),
+                destNebula: localStorage.getItem('voidfarer_plot_nebula'),
+                destNebulaType: localStorage.getItem('voidfarer_plot_nebula_type'),
+                destNebulaDistance: parseFloat(localStorage.getItem('voidfarer_plot_nebula_distance') || '0'),
+                destNebulaStars: parseInt(localStorage.getItem('voidfarer_plot_nebula_stars') || '0'),
+                sectorDistance: parseFloat(localStorage.getItem('voidfarer_plot_sector_distance') || '0'),
+                nebulaDistance: parseFloat(localStorage.getItem('voidfarer_plot_nebula_distance') || '0'),
+                cumulativeDistance: parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0')
+            };
+            
+            // Show total journey so far
+            if (plotData.cumulativeDistance > 0) {
+                journeyTotalEl.classList.add('visible');
+                totalJourneyDistanceEl.textContent = plotData.cumulativeDistance.toFixed(1) + ' LY';
+            }
+            
+            console.log('Plot data loaded:', plotData);
         }
 
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                // Try to get from storage functions
                 if (typeof getCurrentSector === 'function') {
                     currentSector = await getCurrentSector() || 'B2';
                 } else {
@@ -669,7 +820,6 @@
                     currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
                 }
                 
-                // Update location badge
                 locationBadge.textContent = sectorNames[currentSector] || currentRegion + ' Arm';
                 
             } catch (error) {
@@ -683,15 +833,9 @@
         // ===== LOAD STAR DATA =====
         async function loadStarData() {
             try {
-                // Load star data from storage
                 currentStarName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
-                const starType = typeof getCurrentStarType === 'function' ? await getCurrentStarType() : 'Main Sequence';
-                const starIndex = typeof getCurrentStarIndex === 'function' ? await getCurrentStarIndex() : 0;
-
-                // Generate star system
                 const starSeed = UNIVERSE_SEED + (currentStarName ? hashString(currentStarName) : 0);
                 
-                // Generate star
                 const starTypeObj = getStarType(starSeed, 0);
                 starData = {
                     type: starTypeObj.type,
@@ -699,8 +843,7 @@
                     color: starTypeObj.color
                 };
                 
-                // Generate planets
-                const planetCount = Math.floor(Math.random() * 6) + 3; // 3-8 planets
+                const planetCount = Math.floor(Math.random() * 6) + 3;
                 planets = [];
                 
                 const orbitRadii = [70, 110, 150, 190, 230, 270, 310, 350];
@@ -709,10 +852,9 @@
                     const planetSeed = starSeed + i * 100;
                     const planetType = getPlanetType(planetSeed, i);
                     
-                    // Generate resources
                     const possibleResources = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 
                                               'Uranium', 'Titanium', 'Oxygen', 'Hydrogen', 'Helium', 'Copper'];
-                    const resourceCount = Math.floor(Math.random() * 3) + 2; // 2-4 resources
+                    const resourceCount = Math.floor(Math.random() * 3) + 2;
                     const resources = [];
                     
                     for (let r = 0; r < resourceCount; r++) {
@@ -722,7 +864,6 @@
                         }
                     }
                     
-                    // Random distance from current location (simulated)
                     const distanceFromCurrent = (Math.random() * 5 + 1).toFixed(1);
                     
                     planets.push({
@@ -740,18 +881,15 @@
                         orbitRadius: orbitRadii[i],
                         orbitSpeed: 0.002 - (i * 0.0002),
                         angle: Math.random() * Math.PI * 2,
-                        // CRITICAL: Store which sector this planet belongs to!
                         sector: currentSector,
                         region: currentRegion
                     });
                 }
 
-                // Update UI
                 document.getElementById('starName').textContent = currentStarName || 'Unknown Star';
                 document.getElementById('systemName').textContent = (currentStarName || 'Unknown') + ' System';
                 document.getElementById('planetCount').textContent = planets.length + ' planets';
 
-                // Set star color
                 const starEl = document.getElementById('star');
                 const color = starData?.color || '#ffd700';
                 starEl.style.background = `radial-gradient(circle at 30% 30%, #fff, ${color})`;
@@ -791,8 +929,6 @@
                 `;
                 
                 planetsContainer.appendChild(planetEl);
-                
-                // Store position for animation
                 planet.element = planetEl;
             });
         }
@@ -820,11 +956,25 @@
             
             currentPlanet = planet;
             
-            // Calculate total journey distance
-            const totalDistance = planet.distanceFromCurrent + ORBITAL_DESCENT;
-            const warpCycles = calculateWarpCycles(totalDistance);
-            const fuelCost = calculateFuelCost(totalDistance);
+            // Calculate this leg distance
+            const legDistance = planet.distanceFromCurrent + ORBITAL_DESCENT;
+            const legCycles = getWarpCyclesFromDistance(legDistance);
+            const legFuel = getFuelCostFromDistance(legDistance);
             
+            // Calculate total journey (if in plot mode)
+            let totalDistance = legDistance;
+            let totalCycles = legCycles;
+            let totalFuel = legFuel;
+            let previousDistance = 0;
+            
+            if (isPlotMode && plotData.cumulativeDistance > 0) {
+                previousDistance = plotData.cumulativeDistance;
+                totalDistance = previousDistance + legDistance;
+                totalCycles = getWarpCyclesFromDistance(totalDistance);
+                totalFuel = getFuelCostFromDistance(totalDistance);
+            }
+            
+            // Update basic planet info
             document.getElementById('planetName').textContent = planet.name;
             document.getElementById('planetType').textContent = 'Type: ' + planet.typeName;
             document.getElementById('planetTemp').textContent = 'Temperature: ' + planet.temp;
@@ -835,20 +985,38 @@
             // Update distance display
             document.getElementById('distanceFromCurrent').textContent = planet.distanceFromCurrent.toFixed(1) + ' LY';
             document.getElementById('descentDistance').textContent = ORBITAL_DESCENT.toFixed(1) + ' LY';
-            document.getElementById('totalDistance').textContent = totalDistance.toFixed(1) + ' LY';
-            document.getElementById('warpCycles').textContent = warpCycles;
-            document.getElementById('fuelCost').textContent = fuelCost;
+            document.getElementById('legDistance').textContent = legDistance.toFixed(1) + ' LY';
             
-            // Enable/disable set course button
-            const setCourseBtn = document.getElementById('setCourseBtn');
+            // Update cumulative info (for plot mode)
+            document.getElementById('previousDistance').textContent = previousDistance.toFixed(1) + ' LY';
+            document.getElementById('totalDistance').textContent = totalDistance.toFixed(1) + ' LY';
+            
+            // Update warp estimate
+            document.getElementById('warpCycles').textContent = totalCycles;
+            document.getElementById('fuelCost').textContent = totalFuel;
+            
+            // Show/hide cumulative info based on mode
+            document.getElementById('cumulativeInfo').style.display = isPlotMode ? 'block' : 'none';
+            
+            // Update action button
+            const actionBtn = document.getElementById('actionBtn');
+            
             if (!planet.landable) {
-                setCourseBtn.disabled = true;
-                setCourseBtn.textContent = '⛔ CANNOT LAND';
+                actionBtn.disabled = true;
+                actionBtn.textContent = '⛔ CANNOT LAND';
+                actionBtn.classList.remove('primary');
                 document.getElementById('planetWarning').textContent = 'Gas giants cannot be landed on';
             } else {
-                setCourseBtn.disabled = false;
-                setCourseBtn.textContent = '🚀 SET COURSE TO ' + planet.name.toUpperCase();
+                actionBtn.disabled = false;
                 document.getElementById('planetWarning').textContent = '';
+                
+                if (isPlotMode) {
+                    actionBtn.classList.add('primary');
+                    actionBtn.textContent = '🚀 COMPLETE JOURNEY TO ' + planet.name.toUpperCase();
+                } else {
+                    actionBtn.classList.remove('primary');
+                    actionBtn.textContent = '🚀 SET COURSE TO ' + planet.name.toUpperCase();
+                }
             }
             
             planetInfo.classList.add('visible');
@@ -862,39 +1030,32 @@
             currentPlanet = null;
         }
 
-        // ===== SET COURSE TO PLANET (SAVES DESTINATION LOCATION!) =====
-        async function setCourseToPlanet() {
+        // ===== HANDLE PLANET ACTION =====
+        function handlePlanetAction() {
             if (!currentPlanet) return;
             
-            if (!currentPlanet.landable) {
-                alert('Cannot land on gas giant!');
-                return;
+            if (isPlotMode) {
+                completeJourney();
+            } else {
+                setCourseToPlanet();
             }
+        }
+
+        // ===== SET COURSE TO PLANET (normal mode) =====
+        async function setCourseToPlanet() {
+            if (!currentPlanet || !currentPlanet.landable) return;
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'plotting course...';
             
             try {
-                // Calculate total journey distance
-                const totalDistance = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
-                const warpCycles = calculateWarpCycles(totalDistance);
-                const fuelCost = calculateFuelCost(totalDistance);
-                
-                // ===== CRITICAL: Save the destination sector and region! =====
-                // This is what updates the galaxy map to show your new location
-                const destSector = currentPlanet.sector;
-                const destRegion = currentPlanet.region;
-                
-                console.log('Setting course to planet in sector:', destSector, destRegion);
+                const legDistance = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
+                const warpCycles = getWarpCyclesFromDistance(legDistance);
+                const fuelCost = getFuelCostFromDistance(legDistance);
                 
                 // Save to localStorage
-                localStorage.setItem('voidfarer_current_sector', destSector);
-                localStorage.setItem('voidfarer_current_region', destRegion);
-                
-                // Also use storage function if available
-                if (typeof setCurrentSector === 'function') {
-                    await setCurrentSector(destSector, destRegion);
-                }
+                localStorage.setItem('voidfarer_current_sector', currentPlanet.sector);
+                localStorage.setItem('voidfarer_current_region', currentPlanet.region);
                 
                 // Prepare warp data
                 const warpData = {
@@ -902,29 +1063,18 @@
                     destinationType: currentPlanet.typeName,
                     startLocation: currentStarName + ' System',
                     startLocationType: 'star system',
-                    totalDistance: totalDistance,
+                    totalDistance: legDistance,
                     warpCycles: warpCycles,
                     fuelCost: fuelCost,
                     returnPage: 'surface.html'
                 };
                 
-                // Save warp data
                 localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
                 
-                // Also save planet data for surface
-                if (typeof setCurrentPlanet === 'function') {
-                    await setCurrentPlanet(
-                        currentPlanet.name,
-                        currentPlanet.type,
-                        currentPlanet.resources
-                    );
-                } else {
-                    localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
-                    localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
-                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
-                }
+                localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
+                localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
                 
-                // GO TO WARP!
                 setTimeout(() => {
                     window.location.href = 'warp.html';
                 }, 500);
@@ -936,41 +1086,110 @@
             }
         }
 
+        // ===== COMPLETE JOURNEY (plot mode) =====
+        async function completeJourney() {
+            if (!currentPlanet || !currentPlanet.landable) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'calculating total journey...';
+            
+            try {
+                // Calculate this leg
+                const legDistance = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
+                
+                // Total journey = sector + nebula + star + planet
+                const totalDistance = plotData.cumulativeDistance + legDistance;
+                const totalCycles = getWarpCyclesFromDistance(totalDistance);
+                const totalFuel = getFuelCostFromDistance(totalDistance);
+                
+                console.log('Complete journey:');
+                console.log(`- Sector: ${plotData.sectorDistance.toFixed(1)} LY`);
+                console.log(`- Nebula: ${plotData.nebulaDistance.toFixed(1)} LY`);
+                console.log(`- Star: ${legDistance.toFixed(1)} LY`);
+                console.log(`- TOTAL: ${totalDistance.toFixed(1)} LY, ${totalCycles} cycles, ${totalFuel}⭐`);
+                
+                // Prepare warp data for complete journey
+                const warpData = {
+                    destination: currentPlanet.name,
+                    destinationType: currentPlanet.typeName,
+                    startLocation: plotData.fromPlanet || 'Unknown',
+                    startLocationType: 'planet',
+                    totalDistance: totalDistance,
+                    warpCycles: totalCycles,
+                    fuelCost: totalFuel,
+                    returnPage: 'surface.html',
+                    // Store all destination info
+                    destSector: plotData.destSector,
+                    destRegion: plotData.destRegion,
+                    destNebula: plotData.destNebula,
+                    destStar: currentStarName,
+                    destPlanet: currentPlanet.name,
+                    destPlanetType: currentPlanet.type,
+                    destPlanetResources: currentPlanet.resources
+                };
+                
+                // Save and go to warp
+                localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
+                
+                // Clear plot data
+                localStorage.removeItem('voidfarer_plot_sector');
+                localStorage.removeItem('voidfarer_plot_region');
+                localStorage.removeItem('voidfarer_plot_nebula');
+                localStorage.removeItem('voidfarer_plot_nebula_distance');
+                localStorage.removeItem('voidfarer_plot_nebula_type');
+                localStorage.removeItem('voidfarer_plot_nebula_stars');
+                localStorage.removeItem('voidfarer_plot_cumulative_distance');
+                localStorage.removeItem('voidfarer_plot_from_sector');
+                localStorage.removeItem('voidfarer_plot_from_region');
+                localStorage.removeItem('voidfarer_plot_from_nebula');
+                localStorage.removeItem('voidfarer_plot_from_star');
+                localStorage.removeItem('voidfarer_plot_from_planet');
+                localStorage.removeItem('voidfarer_plot_sector_distance');
+                
+                // GO TO WARP!
+                setTimeout(() => {
+                    window.location.href = 'warp.html';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error completing journey:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to complete journey. Please try again.');
+            }
+        }
+
         // ===== GO BACK =====
         function goBack() {
-            window.location.href = 'star-cluster.html';
+            if (isPlotMode) {
+                window.location.href = 'star-cluster.html?mode=plot';
+            } else {
+                window.location.href = 'star-cluster.html';
+            }
         }
 
         // ===== INITIALIZE =====
         async function init() {
             try {
-                // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star system...';
 
-                // Check for player data
                 const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
                 }
 
-                // Load current location FIRST
                 await loadCurrentLocation();
-
-                // Load star data
                 await loadStarData();
+                
+                if (isPlotMode) {
+                    loadPlotData();
+                }
 
-                // Create orbit rings
                 createOrbitRings();
-
-                // Create planets
                 createPlanets();
-
-                // Start animation
                 animate();
 
-                // Hide loading
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
