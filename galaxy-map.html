@@ -126,7 +126,7 @@
             padding: 20px;
             border-radius: 40px 15px 40px 15px;
             z-index: 40;
-            min-width: 220px;
+            min-width: 240px;
             display: none;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
@@ -162,6 +162,36 @@
             font-weight: bold;
         }
         
+        .distance-value {
+            color: #4affaa;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .warp-info {
+            background: rgba(74, 138, 192, 0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #4a8ac0;
+        }
+        
+        .warp-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .warp-label {
+            color: #a0c0ff;
+        }
+        
+        .warp-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
         .travel-btn {
             width: 100%;
             background: #4a8ac0;
@@ -172,7 +202,7 @@
             font-size: 18px;
             font-family: 'Exo 2', sans-serif;
             cursor: pointer;
-            margin-top: 15px;
+            margin-top: 10px;
             transition: all 0.1s;
             font-weight: 600;
         }
@@ -186,6 +216,15 @@
             background: #2a4a6a;
             opacity: 0.5;
             cursor: not-allowed;
+        }
+        
+        .travel-btn.primary {
+            background: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .travel-btn.primary:active {
+            background: #ffcc6a;
         }
         
         /* Region boxes */
@@ -341,7 +380,26 @@
                 <span class="info-label">Stars:</span>
                 <span class="info-value" id="starsCount">300</span>
             </div>
+            
+            <!-- Warp Information -->
+            <div class="warp-info" id="warpInfo">
+                <div class="warp-row">
+                    <span class="warp-label">Distance:</span>
+                    <span class="warp-value" id="sectorDistance">0.0 LY</span>
+                </div>
+                <div class="warp-row">
+                    <span class="warp-label">Warp cycles:</span>
+                    <span class="warp-value" id="warpCycles">0</span>
+                </div>
+                <div class="warp-row">
+                    <span class="warp-label">Fuel cost:</span>
+                    <span class="warp-value" id="fuelCost">0⭐</span>
+                </div>
+            </div>
+            
+            <!-- Two buttons: Explore and Plot Course -->
             <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 ENTER SECTOR</button>
+            <button class="travel-btn primary" id="plotBtn" onclick="plotCourseToPlanet()">🚀 PLOT COURSE TO PLANET</button>
         </div>
         
         <canvas id="galaxyCanvas"></canvas>
@@ -421,6 +479,32 @@
             'Fringe': { left: '75%', top: '20%', width: '120px', height: '80px' }
         };
 
+        // ===== WARP CALCULATION FUNCTIONS =====
+        function getWarpCyclesFromDistance(distance) {
+            if (distance <= 1.0) return 1;
+            if (distance <= 2.5) return 2;
+            if (distance <= 4.5) return 3;
+            if (distance <= 7.0) return 4;
+            return 5;
+        }
+
+        function getFuelCostFromDistance(distance) {
+            return Math.floor(distance * 4) + 5;
+        }
+
+        function getSectorDistance(sector1, sector2) {
+            const s1 = sectorCoordinates[sector1] || { x: 1, y: 1 };
+            const s2 = sectorCoordinates[sector2] || { x: 1, y: 1 };
+            
+            // Manhattan distance
+            const dx = Math.abs(s1.x - s2.x);
+            const dy = Math.abs(s1.y - s2.y);
+            const gridDistance = dx + dy;
+            
+            // Convert to light years
+            return gridDistance * 2.3;
+        }
+
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
@@ -474,7 +558,7 @@
                 box.style.width = pos.width;
                 box.style.height = pos.height;
                 
-                // FIXED: Pass display name and sector ID
+                // Pass display name and sector ID
                 box.onclick = function() { selectRegion(data.displayName, sectorId); };
                 
                 // Highlight current sector
@@ -512,16 +596,25 @@
             
             const sectorData = sectorCoordinates[sector];
             
-            // Update panel - FIXED: use passed displayName
+            // Calculate distance and warp info
+            const distance = getSectorDistance(currentSector, sector);
+            const cycles = getWarpCyclesFromDistance(distance);
+            const fuel = getFuelCostFromDistance(distance);
+            
+            // Update panel
             document.getElementById('selectedRegionName').textContent = displayName;
             document.getElementById('sectorId').textContent = sector;
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
             
+            // Update warp info
+            document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
+            document.getElementById('warpCycles').textContent = cycles;
+            document.getElementById('fuelCost').textContent = fuel + '⭐';
+            
             // Change button based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
             if (sector === currentSector) {
-                // You're already here - allow viewing
                 travelBtn.disabled = false;
                 travelBtn.textContent = '👁️ VIEW SECTOR';
             } else {
@@ -544,7 +637,6 @@
                 loadingText.textContent = 'viewing sector...';
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
-                    // Just close the loading overlay, no navigation
                 }, 500);
                 return;
             }
@@ -553,7 +645,7 @@
             loadingText.textContent = 'entering sector...';
             
             try {
-                // Save current location for next screen - FIXED: Save both
+                // Save current location for next screen
                 if (typeof setCurrentSector === 'function') {
                     await setCurrentSector(selectedSector, selectedRegion);
                 } else {
@@ -570,6 +662,62 @@
                 console.error('Error entering sector:', error);
                 loadingOverlay.classList.remove('active');
                 alert('Failed to enter sector. Please try again.');
+            }
+        }
+
+        // ===== PLOT COURSE TO PLANET =====
+        async function plotCourseToPlanet() {
+            if (!selectedSector || !selectedRegion) {
+                alert('Please select a destination sector first');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'calculating course...';
+            
+            try {
+                // Get current location from storage
+                const currentSectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                const currentRegionName = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
+                const currentNebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Molecular Cloud';
+                const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
+                const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                
+                // Get destination (from selected sector)
+                const destSector = selectedSector;
+                const destRegion = selectedRegion;
+                
+                // Calculate sector distance for display
+                const sectorDist = getSectorDistance(currentSectorId, destSector);
+                const sectorCycles = getWarpCyclesFromDistance(sectorDist);
+                const sectorFuel = getFuelCostFromDistance(sectorDist);
+                
+                console.log(`Plotting course from ${currentRegionName} (${currentSectorId}) to ${destRegion} (${destSector})`);
+                console.log(`Sector distance: ${sectorDist.toFixed(1)} LY, ${sectorCycles} cycles, ${sectorFuel}⭐`);
+                
+                // Save all plot data
+                localStorage.setItem('voidfarer_plot_sector', destSector);
+                localStorage.setItem('voidfarer_plot_region', destRegion);
+                localStorage.setItem('voidfarer_plot_from_sector', currentSectorId);
+                localStorage.setItem('voidfarer_plot_from_region', currentRegionName);
+                localStorage.setItem('voidfarer_plot_from_nebula', currentNebula);
+                localStorage.setItem('voidfarer_plot_from_star', currentStar);
+                localStorage.setItem('voidfarer_plot_from_planet', currentPlanet);
+                
+                // Store sector distance for later calculation
+                localStorage.setItem('voidfarer_plot_sector_distance', sectorDist.toString());
+                localStorage.setItem('voidfarer_plot_sector_cycles', sectorCycles.toString());
+                localStorage.setItem('voidfarer_plot_sector_fuel', sectorFuel.toString());
+                
+                // Go to star-sectors to select destination nebula
+                setTimeout(() => {
+                    window.location.href = 'star-sectors.html?mode=plot';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error plotting course:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to plot course. Please try again.');
             }
         }
 
@@ -653,14 +801,14 @@
                     return;
                 }
                 
-                // Load current location FIRST - this gets your actual sector!
+                // Load current location FIRST
                 await loadCurrentLocation();
                 
                 // Resize canvas and draw background
                 resizeCanvas();
                 window.addEventListener('resize', resizeCanvas);
                 
-                // Create region boxes - now with current sector highlighted!
+                // Create region boxes
                 createRegionBoxes();
                 
                 // Hide loading
