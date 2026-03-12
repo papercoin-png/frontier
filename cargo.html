@@ -91,6 +91,7 @@
             font-size: 24px;
             text-shadow: 0 0 30px #6a8ac0;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -640,6 +641,7 @@
             box-shadow: 0 0 30px #3a5a8a;
             z-index: 100;
             margin-top: 20px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -872,10 +874,21 @@
                     await updateDailyPrices();
                 }
 
-                // Load all data
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
-                const collection = typeof getCollection === 'function' ? await getCollection() : {};
-                const realEstateData = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
+                // Load all data with fallbacks
+                let credits = 5000;
+                if (typeof getCredits === 'function') {
+                    credits = await getCredits();
+                }
+
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                }
+
+                let realEstateData = { properties: [] };
+                if (typeof getRealEstate === 'function') {
+                    realEstateData = await getRealEstate();
+                }
 
                 // Store in global state
                 currentCredits = credits;
@@ -894,8 +907,14 @@
                         size: 1
                     };
                     const count = data.count || 1;
-                    const marketPrice = typeof getLatestPrice === 'function' ? await getLatestPrice(name) : 100;
-                    const priceChange = typeof calculatePriceChange === 'function' ? await calculatePriceChange(name, 1) : 0;
+                    let marketPrice = 100;
+                    if (typeof getLatestPrice === 'function') {
+                        marketPrice = await getLatestPrice(name) || 100;
+                    }
+                    let priceChange = 0;
+                    if (typeof calculatePriceChange === 'function') {
+                        priceChange = await calculatePriceChange(name, 1) || 0;
+                    }
                     
                     cargoItems.push({
                         name: name,
@@ -1158,9 +1177,10 @@
             
             try {
                 const quantity = 1;
-                const result = typeof transferToProperty === 'function' ? 
-                    await transferToProperty(selectedPropertyId, currentItem.name, quantity) : 
-                    { success: false, reason: 'function not available' };
+                let result = { success: false, reason: 'function not available' };
+                if (typeof transferToProperty === 'function') {
+                    result = await transferToProperty(selectedPropertyId, currentItem.name, quantity);
+                }
                 
                 if (result.success) {
                     await loadData();
@@ -1189,9 +1209,10 @@
             loadingText.textContent = 'selling...';
             
             try {
-                const result = typeof safeSellElement === 'function' ? 
-                    await safeSellElement(itemName, quantity, item.marketPrice) : 
-                    { success: false, reason: 'function not available' };
+                let result = { success: false, reason: 'function not available' };
+                if (typeof safeSellElement === 'function') {
+                    result = await safeSellElement(itemName, quantity, item.marketPrice);
+                }
                 
                 if (result.success) {
                     if (typeof recordTrade === 'function') {
@@ -1310,14 +1331,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'accessing cargo hold...';
 
-                // Check for player data
-                const credits = typeof getCredits === 'function' ? await getCredits() : 0;
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-
-                // Load all data
+                // Load all data - don't check credits, just try to load
                 await loadData();
 
                 // Hide loading
@@ -1327,9 +1341,9 @@
 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
+                loadingText.textContent = 'error loading data';
                 setTimeout(() => {
-                    window.location.href = 'index.html';
+                    loadingOverlay.classList.remove('active');
                 }, 2000);
             }
         }
