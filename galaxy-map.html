@@ -298,7 +298,7 @@
             .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
             .region-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
         }
-
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -317,12 +317,10 @@
 <body>
     <div class="galaxy-container">
         <div class="ui-header">✦ MILKY WAY ✦</div>
-        
         <div class="current-location" id="currentLocation">
             <span class="current-dot"></span>
             <span id="currentLocationText">Loading location...</span>
         </div>
-        
         <button class="back-btn" onclick="returnToShip()">← SHIP</button>
         
         <!-- Region boxes will be dynamically created -->
@@ -352,7 +350,7 @@
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">loading galaxy...</div>
         </div>
-
+        
         <!-- Migration status (debug) -->
         <div class="migration-status" id="migrationStatus"></div>
     </div>
@@ -450,7 +448,7 @@
                 // Update display with friendly name
                 const displayName = sectorNames[currentSector] || sectorCoordinates[currentSector]?.displayName || 'Orion Arm';
                 document.getElementById('currentLocationText').textContent = displayName;
-
+                
             } catch (error) {
                 console.error('Error loading location:', error);
                 // Use defaults on error
@@ -463,11 +461,11 @@
         // ===== CREATE REGION BOXES =====
         function createRegionBoxes() {
             regionBoxes.innerHTML = '';
-
+            
             Object.entries(sectorCoordinates).forEach(([sectorId, data]) => {
                 const pos = regionPositions[data.name];
                 if (!pos) return;
-
+                
                 const box = document.createElement('div');
                 box.className = 'region-box';
                 box.id = `region-${data.name}`;
@@ -476,45 +474,46 @@
                 box.style.width = pos.width;
                 box.style.height = pos.height;
                 
-                // Use onclick directly
-                box.onclick = function() { selectRegion(data.name, sectorId); };
-
+                // FIXED: Pass both the display name AND the sector ID
+                box.onclick = function() { selectRegion(data.displayName, sectorId); };
+                
                 // Highlight current sector
                 if (sectorId === currentSector) {
                     box.style.borderColor = '#4affaa';
                     box.style.boxShadow = '0 0 30px #4affaa';
                     box.style.borderWidth = '3px';
                 }
-
+                
                 box.innerHTML = `
                     <span class="region-label">${data.displayName}</span>
                     <span class="region-count">${data.nebulae}</span>
                 `;
-
+                
                 regionBoxes.appendChild(box);
             });
         }
 
         // ===== SELECT REGION =====
-        function selectRegion(region, sector) {
+        function selectRegion(displayName, sector) {
             // Remove previous selection
             document.querySelectorAll('.region-box').forEach(box => {
                 box.classList.remove('selected');
             });
             
             // Add selection to clicked box
-            const box = document.getElementById('region-' + region);
+            const regionName = sectorCoordinates[sector]?.name;
+            const box = document.getElementById('region-' + regionName);
             if (box) {
                 box.classList.add('selected');
             }
             
-            selectedRegion = region;
+            selectedRegion = displayName;
             selectedSector = sector;
             
             const sectorData = sectorCoordinates[sector];
             
-            // Update panel
-            document.getElementById('selectedRegionName').textContent = sectorData.displayName;
+            // Update panel - now using the correct display name!
+            document.getElementById('selectedRegionName').textContent = displayName;
             document.getElementById('sectorId').textContent = sector;
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
@@ -566,7 +565,7 @@
                 setTimeout(() => {
                     window.location.href = 'star-sectors.html';
                 }, 500);
-
+                
             } catch (error) {
                 console.error('Error entering sector:', error);
                 loadingOverlay.classList.remove('active');
@@ -624,6 +623,7 @@
             for (let i = 0; i < 4; i++) {
                 const angle = (i / 4) * Math.PI * 2;
                 ctx.beginPath();
+                
                 for (let r = 0.1; r < 0.9; r += 0.1) {
                     const spiralAngle = angle + r * 10;
                     const x = centerX + Math.cos(spiralAngle) * r * canvas.width * 0.4;
@@ -645,29 +645,29 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading galaxy map...';
-
+                
                 // Check for player data
                 const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
                 }
-
+                
                 // Load current location FIRST - this gets your actual sector!
                 await loadCurrentLocation();
-
+                
                 // Resize canvas and draw background
                 resizeCanvas();
                 window.addEventListener('resize', resizeCanvas);
-
+                
                 // Create region boxes - now with current sector highlighted!
                 createRegionBoxes();
-
+                
                 // Hide loading
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
-
+                
             } catch (error) {
                 console.error('Init error:', error);
                 loadingText.textContent = 'error - redirecting...';
