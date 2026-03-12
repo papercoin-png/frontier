@@ -91,7 +91,7 @@
             border-radius: 60px 20px 60px 20px;
             padding: 15px 30px;
             color: white;
-            min-width: 280px;
+            min-width: 300px;
             z-index: 30;
             pointer-events: none;
             text-align: center;
@@ -109,7 +109,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
         }
         
         .point {
@@ -154,10 +154,49 @@
             100% { opacity: 0.5; transform: translateX(0); }
         }
         
+        /* Journey Stats Panel */
+        .journey-stats {
+            position: absolute;
+            top: max(150px, env(safe-area-inset-top) + 100px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 12px 25px;
+            color: white;
+            z-index: 30;
+            text-align: center;
+            min-width: 280px;
+        }
+        
+        .journey-stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .journey-stats-label {
+            color: #a0c0ff;
+        }
+        
+        .journey-stats-value {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .journey-stats-highlight {
+            color: #4affaa;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
         /* Distance Panel */
         .distance-panel {
             position: absolute;
-            top: max(120px, env(safe-area-inset-top) + 80px);
+            top: max(250px, env(safe-area-inset-top) + 200px);
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10,10,26,0.7);
@@ -172,7 +211,7 @@
         
         .distance-value {
             color: #4affaa;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
             font-family: 'Exo 2', sans-serif;
         }
@@ -248,6 +287,40 @@
             margin-top: 5px;
         }
         
+        /* Journey Legs Panel */
+        .legs-panel {
+            position: absolute;
+            bottom: max(250px, env(safe-area-inset-bottom) + 180px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.6);
+            backdrop-filter: blur(5px);
+            border: 1px solid #4a8ac0;
+            border-radius: 30px 10px 30px 10px;
+            padding: 10px 20px;
+            color: white;
+            z-index: 25;
+            font-size: 11px;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .leg {
+            text-align: center;
+        }
+        
+        .leg-label {
+            color: #a0c0ff;
+            font-size: 9px;
+            letter-spacing: 1px;
+        }
+        
+        .leg-value {
+            color: #ffaa4a;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
         /* Status Message */
         .status-message {
             position: absolute;
@@ -276,9 +349,11 @@
         
         @supports (padding: max(0px)) {
             .journey-panel { top: max(20px, env(safe-area-inset-top)); }
-            .distance-panel { top: max(120px, env(safe-area-inset-top) + 80px); }
+            .journey-stats { top: max(150px, env(safe-area-inset-top) + 100px); }
+            .distance-panel { top: max(250px, env(safe-area-inset-top) + 200px); }
             .stats-panel { bottom: max(150px, env(safe-area-inset-bottom) + 80px); left: max(20px, env(safe-area-inset-left)); }
             .cycle-panel { bottom: max(150px, env(safe-area-inset-bottom) + 80px); right: max(20px, env(safe-area-inset-right)); }
+            .legs-panel { bottom: max(250px, env(safe-area-inset-bottom) + 180px); }
         }
     </style>
 </head>
@@ -296,12 +371,12 @@
         <div class="warp-overlay">
             <!-- Journey Panel -->
             <div class="journey-panel">
-                <div class="journey-title">✦ WARP JOURNEY ✦</div>
+                <div class="journey-title">✦ COMPLETE JOURNEY ✦</div>
                 <div class="journey-points">
                     <div class="point start-point">
                         <span class="point-icon">🚀</span>
                         <span class="point-name" id="startName">Loading...</span>
-                        <span class="point-type" id="startType">current location</span>
+                        <span class="point-type" id="startType">origin</span>
                     </div>
                     <span class="journey-arrow">→</span>
                     <div class="point destination-point">
@@ -312,10 +387,40 @@
                 </div>
             </div>
             
-            <!-- Distance Panel -->
-            <div class="distance-panel">
-                <span class="distance-value" id="totalDistance">0.0</span>
-                <span class="distance-label"> LIGHT YEARS</span>
+            <!-- Journey Stats Panel -->
+            <div class="journey-stats" id="journeyStats">
+                <div class="journey-stats-row">
+                    <span class="journey-stats-label">Total Distance:</span>
+                    <span class="journey-stats-highlight" id="totalDistance">0.0 LY</span>
+                </div>
+                <div class="journey-stats-row">
+                    <span class="journey-stats-label">Warp Cycles:</span>
+                    <span class="journey-stats-value" id="totalCycles">0</span>
+                </div>
+                <div class="journey-stats-row">
+                    <span class="journey-stats-label">Fuel Cost:</span>
+                    <span class="journey-stats-value" id="totalFuel">0⭐</span>
+                </div>
+            </div>
+            
+            <!-- Journey Legs Panel (shows breakdown) -->
+            <div class="legs-panel" id="legsPanel">
+                <div class="leg">
+                    <div class="leg-label">SECTOR</div>
+                    <div class="leg-value" id="sectorLeg">0.0 LY</div>
+                </div>
+                <div class="leg">
+                    <div class="leg-label">NEBULA</div>
+                    <div class="leg-value" id="nebulaLeg">0.0 LY</div>
+                </div>
+                <div class="leg">
+                    <div class="leg-label">STAR</div>
+                    <div class="leg-value" id="starLeg">0.0 LY</div>
+                </div>
+                <div class="leg">
+                    <div class="leg-label">PLANET</div>
+                    <div class="leg-value" id="planetLeg">0.5 LY</div>
+                </div>
             </div>
             
             <!-- Stats Panel -->
@@ -328,13 +433,17 @@
                     <span class="stat-label">Duration:</span>
                     <span class="stat-value" id="totalTime">0</span>
                 </div>
+                <div class="stat-row">
+                    <span class="stat-label">Progress:</span>
+                    <span class="stat-value" id="progressPercent">0%</span>
+                </div>
             </div>
             
             <!-- Cycle Panel -->
             <div class="cycle-panel">
                 <div>
                     <span class="cycle-current" id="currentCycle">1</span>
-                    <span class="cycle-total">/<span id="totalCycles">1</span></span>
+                    <span class="cycle-total">/<span id="totalCyclesDisplay">1</span></span>
                 </div>
                 <div class="cycle-label">WARP CYCLES</div>
             </div>
@@ -366,15 +475,23 @@
         // ===== DOM ELEMENTS =====
         const statusMessage = document.getElementById('statusMessage');
         const currentCycleSpan = document.getElementById('currentCycle');
-        const totalCyclesSpan = document.getElementById('totalCycles');
+        const totalCyclesSpan = document.getElementById('totalCyclesDisplay');
         const startName = document.getElementById('startName');
         const startType = document.getElementById('startType');
         const destName = document.getElementById('destName');
         const destType = document.getElementById('destType');
         const destIcon = document.getElementById('destIcon');
         const totalDistanceSpan = document.getElementById('totalDistance');
+        const totalCyclesValue = document.getElementById('totalCycles');
+        const totalFuelSpan = document.getElementById('totalFuel');
         const fuelCostSpan = document.getElementById('fuelCost');
         const totalTimeSpan = document.getElementById('totalTime');
+        const progressPercent = document.getElementById('progressPercent');
+        
+        // Leg elements
+        const sectorLeg = document.getElementById('sectorLeg');
+        const nebulaLeg = document.getElementById('nebulaLeg');
+        const starLeg = document.getElementById('starLeg');
 
         // ===== WARP STATE =====
         let warpData = {
@@ -385,7 +502,15 @@
             totalDistance: 0,
             warpCycles: 1,
             fuelCost: 0,
-            returnPage: 'surface.html'
+            returnPage: 'surface.html',
+            // Complete journey data
+            destSector: null,
+            destRegion: null,
+            destNebula: null,
+            destStar: null,
+            destPlanet: null,
+            destPlanetType: null,
+            destPlanetResources: null
         };
         
         let currentCycle = 1;
@@ -440,14 +565,20 @@
                 } else {
                     // Fallback for testing
                     warpData = {
-                        destination: 'Pyros',
+                        destination: 'Pyros-3',
                         destinationType: 'volcanic planet',
-                        startLocation: 'Sol System',
-                        startLocationType: 'star system',
-                        totalDistance: 8.5,
-                        warpCycles: 12,
-                        fuelCost: 42,
-                        returnPage: 'surface.html'
+                        startLocation: 'Earth',
+                        startLocationType: 'planet',
+                        totalDistance: 16.2,
+                        warpCycles: 5,
+                        fuelCost: 69,
+                        returnPage: 'surface.html',
+                        destSector: 'C4',
+                        destRegion: 'The Fringe',
+                        destNebula: 'Tarantula Nebula',
+                        destStar: 'Eta Carinae',
+                        destPlanet: 'Pyros-3',
+                        destPlanetType: 'volcanic'
                     };
                 }
 
@@ -470,15 +601,31 @@
                     destIcon.textContent = '🪐';
                 }
                 
-                totalDistanceSpan.textContent = warpData.totalDistance.toFixed(1);
+                // Update all displays
+                totalDistanceSpan.textContent = warpData.totalDistance.toFixed(1) + ' LY';
+                totalCyclesValue.textContent = warpData.warpCycles;
                 totalCyclesSpan.textContent = warpData.warpCycles;
+                totalFuelSpan.textContent = warpData.fuelCost + '⭐';
                 fuelCostSpan.textContent = warpData.fuelCost;
                 totalTimeSpan.textContent = (warpData.warpCycles * 2) + ' sec';
+                
+                // Update leg breakdown if available
+                if (warpData.sectorDistance) {
+                    sectorLeg.textContent = warpData.sectorDistance.toFixed(1) + ' LY';
+                }
+                if (warpData.nebulaDistance) {
+                    nebulaLeg.textContent = warpData.nebulaDistance.toFixed(1) + ' LY';
+                }
+                if (warpData.starDistance) {
+                    starLeg.textContent = warpData.starDistance.toFixed(1) + ' LY';
+                }
 
                 // Use fuel if available
                 if (warpData.fuelCost > 0 && typeof useFuel === 'function') {
                     useFuel(warpData.fuelCost);
                 }
+
+                console.log('Warp data loaded:', warpData);
 
             } catch (error) {
                 console.error('Error loading warp data:', error);
@@ -852,6 +999,9 @@
             updateShipPosition(progress);
             drawStarfield(progress, speedFactor);
             drawMap(progress, speedFactor);
+            
+            // Update progress percentage
+            progressPercent.textContent = Math.round(progress * 100) + '%';
 
             // Check if warp complete
             if (elapsed >= totalDuration && !warpComplete) {
@@ -885,7 +1035,36 @@
 
         // ===== COMPLETE WARP =====
         function completeWarp() {
+            // Save all destination locations at once
+            if (warpData.destSector) {
+                localStorage.setItem('voidfarer_current_sector', warpData.destSector);
+                localStorage.setItem('voidfarer_current_region', warpData.destRegion || warpData.destSector);
+            }
+            
+            if (warpData.destNebula) {
+                localStorage.setItem('voidfarer_current_nebula', warpData.destNebula);
+                localStorage.setItem('voidfarer_current_sector_name', warpData.destNebula);
+            }
+            
+            if (warpData.destStar) {
+                localStorage.setItem('voidfarer_current_star', warpData.destStar);
+            }
+            
+            if (warpData.destPlanet) {
+                localStorage.setItem('voidfarer_current_planet', warpData.destPlanet);
+                localStorage.setItem('voidfarer_current_planet_name', warpData.destPlanet);
+                localStorage.setItem('voidfarer_current_planet_type', warpData.destPlanetType || warpData.destinationType);
+                
+                if (warpData.destPlanetResources) {
+                    localStorage.setItem('voidfarer_current_planet_resources', 
+                        JSON.stringify(warpData.destPlanetResources));
+                }
+            }
+            
+            // Clear warp data
             localStorage.removeItem('voidfarer_warp_data');
+            
+            // Navigate to destination
             window.location.href = warpData.returnPage || 'surface.html';
         }
 
@@ -893,6 +1072,11 @@
         function init() {
             try {
                 loadWarpData();
+                
+                // Set random start/dest positions for visual effect
+                startPos = { x: 0.2 + Math.random() * 0.1, y: 0.3 + Math.random() * 0.4 };
+                destPos = { x: 0.7 + Math.random() * 0.1, y: 0.3 + Math.random() * 0.4 };
+                shipPos = { ...startPos };
                 
                 drawStarfield(0, 0);
                 drawMap(0, 0);
