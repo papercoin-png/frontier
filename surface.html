@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* ... keep all existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -541,18 +542,25 @@
 
         // ===== UPDATE DISPLAY =====
         async function updateDisplay() {
-            let collection = {};
-            if (typeof getCollection === 'function') {
-                collection = await getCollection();
-            } else {
-                try {
-                    collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                } catch (e) {
-                    collection = {};
+            try {
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                } else {
+                    try {
+                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                    } catch (e) {
+                        collection = {};
+                    }
                 }
+                const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
+                document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
+                console.log('Collection updated, total items:', totalItems);
+                return collection;
+            } catch (error) {
+                console.error('Error updating display:', error);
+                return {};
             }
-            const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
-            document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
         }
 
         // ===== SHOW NOTICE =====
@@ -574,12 +582,36 @@
             };
 
             try {
-                // Add element to collection
+                console.log('Extracting:', elementName);
+                
+                // Add element to collection using the storage function
                 if (typeof addElementToCollection === 'function') {
                     await addElementToCollection(elementName, 1);
+                    console.log('Added to collection via function:', elementName);
                 } else {
-                    // Fallback for testing
-                    console.log('Extracted:', elementName);
+                    // Fallback: manually update localStorage
+                    console.log('Using localStorage fallback for extraction');
+                    let collection = {};
+                    try {
+                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
+                    } catch (e) {
+                        collection = {};
+                    }
+                    
+                    if (!collection[elementName]) {
+                        collection[elementName] = { count: 1, firstFound: new Date().toISOString() };
+                    } else {
+                        collection[elementName].count = (collection[elementName].count || 1) + 1;
+                    }
+                    
+                    localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    
+                    // Also add credits
+                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                    credits += elementData.value;
+                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    
+                    console.log('Saved to localStorage:', elementName);
                 }
                 
                 // Update mission progress
@@ -587,9 +619,14 @@
                     await updateMissionProgress(elementName, 1);
                 }
 
-                // Update display
-                await updateDisplay();
+                // Update display and get updated collection
+                const updatedCollection = await updateDisplay();
                 sessionElements++;
+
+                // Verify the element was added
+                if (updatedCollection[elementName]) {
+                    console.log(`Verification: ${elementName} count is now ${updatedCollection[elementName].count}`);
+                }
 
                 // Add to log
                 const log = document.getElementById('resourceLog');
@@ -608,8 +645,6 @@
                 if (tg?.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('light');
                 }
-
-                console.log('Extracted:', elementName);
 
             } catch (error) {
                 console.error('Extraction error:', error);
