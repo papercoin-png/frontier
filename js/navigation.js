@@ -75,19 +75,19 @@ export function getTravelTimeMsFromCycles(cycles) {
 export function calculateCompleteJourney(legs) {
     const {
         sectorDistance = 0,
-        nebulaDistance = 0,
+        starSectorDistance = 0,
         starDistance = 0,
         planetDescent = WARP_CONFIG.ORBITAL_DESCENT
     } = legs;
     
-    const totalDistance = sectorDistance + nebulaDistance + starDistance + planetDescent;
+    const totalDistance = sectorDistance + starSectorDistance + starDistance + planetDescent;
     const totalCycles = getWarpCyclesFromDistance(totalDistance);
     const totalFuel = getFuelCostFromDistance(totalDistance);
     
     return {
         // Individual legs
         sectorDistance,
-        nebulaDistance,
+        starSectorDistance,
         starDistance,
         planetDescent,
         
@@ -98,7 +98,7 @@ export function calculateCompleteJourney(legs) {
         
         // Formatted for display
         sectorDistanceFormatted: formatDistance(sectorDistance),
-        nebulaDistanceFormatted: formatDistance(nebulaDistance),
+        starSectorDistanceFormatted: formatDistance(starSectorDistance),
         starDistanceFormatted: formatDistance(starDistance),
         planetDescentFormatted: formatDistance(planetDescent),
         totalDistanceFormatted: formatDistance(totalDistance),
@@ -151,7 +151,7 @@ export function saveJourneyData(journeyData) {
         // Store all destination info for complete journey
         destSector: journeyData.destSector,
         destRegion: journeyData.destRegion,
-        destNebula: journeyData.destNebula,
+        destStarSector: journeyData.destStarSector,
         destStar: journeyData.destStar,
         destPlanet: journeyData.destPlanet,
         destPlanetType: journeyData.destPlanetType,
@@ -159,7 +159,7 @@ export function saveJourneyData(journeyData) {
         
         // Store leg distances for display
         sectorDistance: journeyData.sectorDistance || 0,
-        nebulaDistance: journeyData.nebulaDistance || 0,
+        starSectorDistance: journeyData.starSectorDistance || 0,
         starDistance: journeyData.starDistance || 0,
         planetDescent: journeyData.planetDescent || WARP_CONFIG.ORBITAL_DESCENT
     };
@@ -186,48 +186,52 @@ export function clearJourneyData() {
 // Save plot mode data when starting a journey
 export function savePlotData(plotData) {
     const {
-        fromSector, fromRegion, fromNebula, fromStar, fromPlanet,
+        fromSector, fromRegion, fromStarSector, fromStar, fromPlanet,
         destSector, destRegion,
         sectorDistance
     } = plotData;
     
     if (fromSector) localStorage.setItem('voidfarer_plot_from_sector', fromSector);
     if (fromRegion) localStorage.setItem('voidfarer_plot_from_region', fromRegion);
-    if (fromNebula) localStorage.setItem('voidfarer_plot_from_nebula', fromNebula);
+    if (fromStarSector) localStorage.setItem('voidfarer_plot_from_starSector', fromStarSector);
     if (fromStar) localStorage.setItem('voidfarer_plot_from_star', fromStar);
     if (fromPlanet) localStorage.setItem('voidfarer_plot_from_planet', fromPlanet);
     
     if (destSector) localStorage.setItem('voidfarer_plot_sector', destSector);
     if (destRegion) localStorage.setItem('voidfarer_plot_region', destRegion);
     
-    if (sectorDistance) localStorage.setItem('voidfarer_plot_sector_distance', sectorDistance.toString());
+    if (sectorDistance) {
+        localStorage.setItem('voidfarer_plot_sector_distance', sectorDistance.toString());
+        // Initialize cumulative distance with sector distance
+        localStorage.setItem('voidfarer_plot_cumulative_distance', sectorDistance.toString());
+    }
 }
 
-// Save nebula selection during plot mode
-export function savePlotNebula(nebula) {
-    localStorage.setItem('voidfarer_plot_nebula', nebula.name);
-    localStorage.setItem('voidfarer_plot_nebula_type', nebula.type);
-    localStorage.setItem('voidfarer_plot_nebula_distance', nebula.distance.toString());
-    localStorage.setItem('voidfarer_plot_nebula_stars', nebula.stars.toString());
-    if (nebula.x) localStorage.setItem('voidfarer_plot_nebula_x', nebula.x.toString());
-    if (nebula.y) localStorage.setItem('voidfarer_plot_nebula_y', nebula.y.toString());
+// Save star sector selection during plot mode
+export function savePlotStarSector(starSector) {
+    localStorage.setItem('voidfarer_plot_starSector', starSector.name);
+    localStorage.setItem('voidfarer_plot_starSector_type', starSector.type);
+    localStorage.setItem('voidfarer_plot_starSector_distance', starSector.distance.toString());
+    localStorage.setItem('voidfarer_plot_starSector_stars', starSector.stars.toString());
+    if (starSector.x) localStorage.setItem('voidfarer_plot_starSector_x', starSector.x.toString());
+    if (starSector.y) localStorage.setItem('voidfarer_plot_starSector_y', starSector.y.toString());
     
     // Calculate cumulative distance
     const sectorDist = parseFloat(localStorage.getItem('voidfarer_plot_sector_distance') || '0');
-    const cumulative = sectorDist + nebula.distance;
+    const cumulative = sectorDist + starSector.distance;
     localStorage.setItem('voidfarer_plot_cumulative_distance', cumulative.toString());
     
     return cumulative;
 }
 
 // Save star selection during plot mode
-export function savePlotStar(star, distance) {
-    localStorage.setItem('voidfarer_plot_star', star);
-    localStorage.setItem('voidfarer_plot_star_distance', distance.toString());
+export function savePlotStar(starName, starDistance) {
+    localStorage.setItem('voidfarer_plot_star', starName);
+    localStorage.setItem('voidfarer_plot_star_distance', starDistance.toString());
     
     // Calculate cumulative distance
     const cumulative = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
-    const newCumulative = cumulative + distance;
+    const newCumulative = cumulative + starDistance;
     localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
     
     return newCumulative;
@@ -238,23 +242,19 @@ export function loadPlotData() {
     return {
         fromSector: localStorage.getItem('voidfarer_plot_from_sector'),
         fromRegion: localStorage.getItem('voidfarer_plot_from_region'),
-        fromNebula: localStorage.getItem('voidfarer_plot_from_nebula'),
+        fromStarSector: localStorage.getItem('voidfarer_plot_from_starSector'),
         fromStar: localStorage.getItem('voidfarer_plot_from_star'),
         fromPlanet: localStorage.getItem('voidfarer_plot_from_planet'),
         
         destSector: localStorage.getItem('voidfarer_plot_sector'),
         destRegion: localStorage.getItem('voidfarer_plot_region'),
-        destNebula: localStorage.getItem('voidfarer_plot_nebula'),
-        destNebulaType: localStorage.getItem('voidfarer_plot_nebula_type'),
-        destNebulaDistance: parseFloat(localStorage.getItem('voidfarer_plot_nebula_distance') || '0'),
-        destNebulaStars: parseInt(localStorage.getItem('voidfarer_plot_nebula_stars') || '0'),
-        
+        destStarSector: localStorage.getItem('voidfarer_plot_starSector'),
         destStar: localStorage.getItem('voidfarer_plot_star'),
-        destStarDistance: parseFloat(localStorage.getItem('voidfarer_plot_star_distance') || '0'),
         
         sectorDistance: parseFloat(localStorage.getItem('voidfarer_plot_sector_distance') || '0'),
-        nebulaDistance: parseFloat(localStorage.getItem('voidfarer_plot_nebula_distance') || '0'),
+        starSectorDistance: parseFloat(localStorage.getItem('voidfarer_plot_starSector_distance') || '0'),
         starDistance: parseFloat(localStorage.getItem('voidfarer_plot_star_distance') || '0'),
+        
         cumulativeDistance: parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0')
     };
 }
@@ -264,17 +264,17 @@ export function clearPlotData() {
     const keys = [
         'voidfarer_plot_from_sector',
         'voidfarer_plot_from_region',
-        'voidfarer_plot_from_nebula',
+        'voidfarer_plot_from_starSector',
         'voidfarer_plot_from_star',
         'voidfarer_plot_from_planet',
         'voidfarer_plot_sector',
         'voidfarer_plot_region',
-        'voidfarer_plot_nebula',
-        'voidfarer_plot_nebula_type',
-        'voidfarer_plot_nebula_distance',
-        'voidfarer_plot_nebula_stars',
-        'voidfarer_plot_nebula_x',
-        'voidfarer_plot_nebula_y',
+        'voidfarer_plot_starSector',
+        'voidfarer_plot_starSector_type',
+        'voidfarer_plot_starSector_distance',
+        'voidfarer_plot_starSector_stars',
+        'voidfarer_plot_starSector_x',
+        'voidfarer_plot_starSector_y',
         'voidfarer_plot_star',
         'voidfarer_plot_star_distance',
         'voidfarer_plot_sector_distance',
@@ -290,7 +290,7 @@ export function saveCurrentLocation(location) {
     const {
         sector, sectorId,
         region,
-        nebula, nebulaType, nebulaStars,
+        starSector, starSectorType, starSectorStars,
         star, starType,
         planet, planetType, planetResources
     } = location;
@@ -301,15 +301,15 @@ export function saveCurrentLocation(location) {
     if (region) {
         localStorage.setItem('voidfarer_current_region', region);
     }
-    if (nebula) {
-        localStorage.setItem('voidfarer_current_nebula', nebula);
-        localStorage.setItem('voidfarer_current_sector_name', nebula);
+    if (starSector) {
+        localStorage.setItem('voidfarer_current_starSector', starSector);
+        localStorage.setItem('voidfarer_current_sector_name', starSector);
     }
-    if (nebulaType) {
-        localStorage.setItem('voidfarer_current_sector_type', nebulaType);
+    if (starSectorType) {
+        localStorage.setItem('voidfarer_current_sector_type', starSectorType);
     }
-    if (nebulaStars) {
-        localStorage.setItem('voidfarer_current_sector_stars', nebulaStars.toString());
+    if (starSectorStars) {
+        localStorage.setItem('voidfarer_current_sector_stars', starSectorStars.toString());
     }
     if (star) {
         localStorage.setItem('voidfarer_current_star', star);
@@ -334,9 +334,9 @@ export function loadCurrentLocation() {
     return {
         sector: localStorage.getItem('voidfarer_current_sector') || 'B2',
         region: localStorage.getItem('voidfarer_current_region') || 'Orion Arm',
-        nebula: localStorage.getItem('voidfarer_current_nebula') || 'Orion Molecular Cloud',
-        nebulaType: localStorage.getItem('voidfarer_current_sector_type') || 'Star-forming',
-        nebulaStars: parseInt(localStorage.getItem('voidfarer_current_sector_stars') || '85'),
+        starSector: localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud',
+        starSectorType: localStorage.getItem('voidfarer_current_sector_type') || 'Star-forming',
+        starSectorStars: parseInt(localStorage.getItem('voidfarer_current_sector_stars') || '85'),
         star: localStorage.getItem('voidfarer_current_star') || 'Sol',
         starType: localStorage.getItem('voidfarer_current_star_type') || 'Main Sequence',
         planet: localStorage.getItem('voidfarer_current_planet') || 'Earth',
@@ -468,7 +468,7 @@ export default {
     
     // Plot mode data management
     savePlotData,
-    savePlotNebula,
+    savePlotStarSector,
     savePlotStar,
     loadPlotData,
     clearPlotData,
