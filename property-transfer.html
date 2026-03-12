@@ -8,7 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=WindSong&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -86,10 +86,11 @@
         
         .loading-text {
             color: #e0f0ff;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 24px;
             text-shadow: 0 0 30px #4a9a8a;
             animation: pulse 1.5s infinite;
+            font-weight: 500;
         }
         
         @keyframes spin {
@@ -109,11 +110,12 @@
         }
         
         .transfer-title {
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             font-size: 32px;
             color: #c0e0ff;
             text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
             margin-bottom: 4px;
+            font-weight: 600;
         }
         
         .transfer-subtitle {
@@ -136,7 +138,7 @@
             color: #ffffff;
             font-size: 22px;
             font-weight: 600;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
             margin-bottom: 8px;
             text-align: center;
         }
@@ -170,6 +172,7 @@
             cursor: pointer;
             text-align: center;
             transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .direction-btn.active {
@@ -216,7 +219,7 @@
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 4px;
-            font-family: 'WindSong', cursive;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .item-quantity {
@@ -238,7 +241,7 @@
             padding: 8px;
             border-radius: 20px;
             text-align: center;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .transfer-item-btn {
@@ -251,6 +254,7 @@
             cursor: pointer;
             transition: all 0.1s;
             min-width: 70px;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .transfer-item-btn:active {
@@ -281,6 +285,7 @@
             cursor: pointer;
             text-align: center;
             transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
         }
         
         .quick-btn:active {
@@ -318,12 +323,13 @@
             border-radius: 60px 20px 60px 20px;
             font-size: 16px;
             cursor: pointer;
-            font-family: 'Libre Baskerville', serif;
+            font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
             box-shadow: 0 0 30px #2a5a5a;
             z-index: 100;
             margin-top: 10px;
+            font-weight: 500;
         }
         
         .back-button:active {
@@ -395,16 +401,9 @@
         </div>
     </div>
 
-    <script type="module">
-        // ===== IMPORTS =====
-        import { 
-            getCollection,
-            getRealEstate,
-            getPlayer,
-            transferToProperty as storageTransferToProperty,
-            transferFromProperty as storageTransferFromProperty
-        } from './js/storage.js';
-        import { isMigrationComplete } from './js/db.js';
+    <script>
+        // ===== MAKE SURE idb IS AVAILABLE =====
+        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -443,10 +442,10 @@
         };
 
         // ===== NAVIGATION =====
-        window.returnToRealEstate = function() {
+        function returnToRealEstate() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'real-estate.html';
-        };
+        }
 
         // ===== LOAD DATA =====
         async function loadData() {
@@ -457,11 +456,16 @@
                     return;
                 }
 
-                // Load all data in parallel
-                const [collection, propertyDataResult] = await Promise.all([
-                    getCollection(),
-                    getRealEstate()
-                ]);
+                // Load all data
+                let collection = {};
+                if (typeof getCollection === 'function') {
+                    collection = await getCollection();
+                }
+
+                let propertyDataResult = { properties: [] };
+                if (typeof getRealEstate === 'function') {
+                    propertyDataResult = await getRealEstate();
+                }
 
                 propertyData = propertyDataResult;
                 currentProperty = propertyData.properties?.find(p => p.id === propertyId);
@@ -488,14 +492,6 @@
 
                 // Load items
                 loadItems(collection);
-
-                // Check migration status
-                const migrated = await isMigrationComplete();
-                migrationStatus.textContent = migrated ? '✓ DB Ready' : '⚡ Loading';
-                migrationStatus.style.display = 'block';
-                setTimeout(() => {
-                    migrationStatus.style.display = 'none';
-                }, 3000);
 
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -527,12 +523,7 @@
             grid.innerHTML = '';
 
             const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
-            const targetItems = currentDirection === 'toProperty' ? propertyItems : shipItems;
             
-            const collection = currentDirection === 'toProperty' ? 
-                shipItems.reduce((acc, item) => ({ ...acc, [item.name]: item }), {}) :
-                propertyItems.reduce((acc, item) => ({ ...acc, [item.name]: item }), {});
-
             const targetUsed = currentDirection === 'toProperty' ? 
                 (currentProperty.used || 0) : 
                 shipItems.reduce((sum, item) => sum + item.count, 0);
@@ -576,7 +567,7 @@
         }
 
         // ===== SET TRANSFER DIRECTION =====
-        window.setDirection = async function(direction) {
+        async function setDirection(direction) {
             currentDirection = direction;
 
             document.getElementById('toPropertyBtn').classList.remove('active');
@@ -589,14 +580,16 @@
             }
 
             // Reload data to refresh items
-            const collection = await getCollection();
-            loadItems(collection);
+            if (typeof getCollection === 'function') {
+                const collection = await getCollection();
+                loadItems(collection);
+            }
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== TRANSFER ITEM =====
-        window.transferItem = async function(itemName) {
+        async function transferItem(itemName) {
             const safeName = itemName.replace(/\s/g, '_');
             const qtyInput = document.getElementById(`qty_${safeName}`);
             
@@ -619,31 +612,43 @@
                 let result;
                 
                 if (currentDirection === 'toProperty') {
-                    result = await storageTransferToProperty(propertyId, itemName, quantity);
+                    if (typeof transferToProperty === 'function') {
+                        result = await transferToProperty(propertyId, itemName, quantity);
+                    } else {
+                        // Fallback transfer
+                        result = { success: false, reason: 'function not available' };
+                    }
                 } else {
-                    result = await storageTransferFromProperty(propertyId, itemName, quantity);
+                    if (typeof transferFromProperty === 'function') {
+                        result = await transferFromProperty(propertyId, itemName, quantity);
+                    } else {
+                        // Fallback transfer
+                        result = { success: false, reason: 'function not available' };
+                    }
                 }
 
-                if (result.success) {
+                if (result && result.success) {
                     // Reload data
-                    const collection = await getCollection();
-                    const propertyDataResult = await getRealEstate();
-                    
-                    propertyData = propertyDataResult;
-                    currentProperty = propertyData.properties?.find(p => p.id === propertyId);
-                    
-                    if (currentProperty) {
-                        const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-                        currentProperty.used = propertyUsed;
+                    if (typeof getCollection === 'function' && typeof getRealEstate === 'function') {
+                        const collection = await getCollection();
+                        const propertyDataResult = await getRealEstate();
                         
-                        document.getElementById('propertyUsed').textContent = propertyUsed;
-                    }
+                        propertyData = propertyDataResult;
+                        currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+                        
+                        if (currentProperty) {
+                            const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                            currentProperty.used = propertyUsed;
+                            
+                            document.getElementById('propertyUsed').textContent = propertyUsed;
+                        }
 
-                    loadItems(collection);
+                        loadItems(collection);
+                    }
 
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
-                    alert('Transfer failed: ' + (result.reason || 'unknown error'));
+                    alert('Transfer failed: ' + ((result && result.reason) || 'unknown error'));
                 }
 
             } catch (error) {
@@ -652,10 +657,10 @@
             }
 
             loadingOverlay.classList.remove('active');
-        };
+        }
 
         // ===== MOVE ALL ITEMS =====
-        window.moveAll = async function() {
+        async function moveAll() {
             const sourceItems = currentDirection === 'toProperty' ? shipItems : propertyItems;
 
             if (sourceItems.length === 0) {
@@ -675,33 +680,43 @@
                     
                     let result;
                     if (currentDirection === 'toProperty') {
-                        result = await storageTransferToProperty(propertyId, item.name, quantity);
+                        if (typeof transferToProperty === 'function') {
+                            result = await transferToProperty(propertyId, item.name, quantity);
+                        } else {
+                            result = { success: false };
+                        }
                     } else {
-                        result = await storageTransferFromProperty(propertyId, item.name, quantity);
+                        if (typeof transferFromProperty === 'function') {
+                            result = await transferFromProperty(propertyId, item.name, quantity);
+                        } else {
+                            result = { success: false };
+                        }
                     }
 
-                    if (result.success) {
+                    if (result && result.success) {
                         successCount++;
                     } else {
                         failCount++;
-                        console.warn(`Failed to transfer ${item.name}:`, result.reason);
+                        console.warn(`Failed to transfer ${item.name}:`, result?.reason);
                     }
                 }
 
                 // Reload data
-                const collection = await getCollection();
-                const propertyDataResult = await getRealEstate();
+                if (typeof getCollection === 'function' && typeof getRealEstate === 'function') {
+                    const collection = await getCollection();
+                    const propertyDataResult = await getRealEstate();
 
-                propertyData = propertyDataResult;
-                currentProperty = propertyData.properties?.find(p => p.id === propertyId);
+                    propertyData = propertyDataResult;
+                    currentProperty = propertyData.properties?.find(p => p.id === propertyId);
 
-                if (currentProperty) {
-                    const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
-                    currentProperty.used = propertyUsed;
-                    document.getElementById('propertyUsed').textContent = propertyUsed;
+                    if (currentProperty) {
+                        const propertyUsed = Object.values(currentProperty.items || {}).reduce((sum, item) => sum + (item.count || 0), 0);
+                        currentProperty.used = propertyUsed;
+                        document.getElementById('propertyUsed').textContent = propertyUsed;
+                    }
+
+                    loadItems(collection);
                 }
-
-                loadItems(collection);
 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 
@@ -717,17 +732,17 @@
             }
 
             loadingOverlay.classList.remove('active');
-        };
+        }
 
         // ===== RESET QUANTITIES =====
-        window.resetQuantities = function() {
+        function resetQuantities() {
             const inputs = document.querySelectorAll('.quantity-input');
             inputs.forEach(input => {
                 input.value = '1';
             });
 
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== INITIALIZE =====
         async function init() {
@@ -735,13 +750,6 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading transfer interface...';
-
-                // Check for player data
-                const player = await getPlayer();
-                if (!player) {
-                    window.location.href = 'index.html';
-                    return;
-                }
 
                 // Check if property ID exists
                 if (!propertyId) {
@@ -770,5 +778,10 @@
         // ===== START =====
         init();
     </script>
+    
+    <!-- Load all JS files -->
+    <script src="js/storage.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/migration.js"></script>
 </body>
 </html>
