@@ -679,6 +679,14 @@
             'default': 'assets/images/planet-verdant.jpg'
         };
 
+        // ===== SECTOR NAMES =====
+        const sectorNames = {
+            'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
+            'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
+            'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
+            'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
+        };
+
         // ===== NAVIGATION =====
         function navigateTo(screen) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -725,11 +733,47 @@
                 const collection = typeof getCollection === 'function' ? await getCollection() : {};
                 const totalMass = typeof getTotalCargoMass === 'function' ? await getTotalCargoMass() : 0;
                 
-                // Load location data
-                const planet = typeof getCurrentPlanet === 'function' ? await getCurrentPlanet() : 'Verdant Prime';
-                const star = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Sol';
-                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
-                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Nebula';
+                // Load location data - CRITICAL for showing current planet!
+                let planet = 'Verdant Prime';
+                let star = 'Sol';
+                let sector = 'B2';
+                let nebula = 'Orion Nebula';
+                let planetType = 'lush';
+                
+                // Try to get from storage functions first
+                if (typeof getCurrentPlanet === 'function') {
+                    planet = await getCurrentPlanet() || 'Verdant Prime';
+                } else {
+                    planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
+                }
+                
+                if (typeof getCurrentStar === 'function') {
+                    star = await getCurrentStar() || 'Sol';
+                } else {
+                    star = localStorage.getItem('voidfarer_current_star') || 'Sol';
+                }
+                
+                if (typeof getCurrentSector === 'function') {
+                    sector = await getCurrentSector() || 'B2';
+                } else {
+                    sector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                }
+                
+                if (typeof getCurrentNebula === 'function') {
+                    nebula = await getCurrentNebula() || 'Orion Nebula';
+                } else {
+                    nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
+                }
+                
+                if (typeof getCurrentPlanetType === 'function') {
+                    planetType = await getCurrentPlanetType() || 'lush';
+                } else {
+                    planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                }
+                
+                // Log for debugging
+                console.log('Bridge loading planet:', planet);
+                console.log('Bridge loading sector:', sector);
                 
                 // Load missions
                 const missions = typeof getMissions === 'function' ? await getMissions() : [];
@@ -748,11 +792,21 @@
                 document.getElementById('creditAmount').textContent = credits.toLocaleString();
                 document.getElementById('cargoMass').textContent = totalMass.toFixed(1) + ' AMU';
                 
-                // Update location displays
+                // Update location displays - THIS IS WHAT SHOWS THE PLANET!
                 document.getElementById('currentPlanetName').textContent = planet;
                 document.getElementById('currentStar').textContent = star;
-                document.getElementById('currentSector').textContent = sector;
+                document.getElementById('currentSector').textContent = sectorNames[sector] || sector;
                 document.getElementById('currentNebula').textContent = nebula;
+                
+                // Set planet status based on type
+                const statusEl = document.getElementById('planetStatus');
+                if (planetType === 'gas') {
+                    statusEl.textContent = '● In Orbit (Gas Giant)';
+                    statusEl.style.color = '#ffaa4a';
+                } else {
+                    statusEl.textContent = '● In Orbit';
+                    statusEl.style.color = '#4affaa';
+                }
                 
                 // Update planet image
                 const planetImage = document.getElementById('currentPlanetImage');
