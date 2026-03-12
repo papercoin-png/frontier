@@ -45,7 +45,7 @@
             background: #0a2a3a;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 20px 20px 30px 20px;
+            padding: 20px 20px 100px 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
@@ -216,6 +216,13 @@
         
         .property-capacity {
             color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .property-capacity-unit {
+            color: #4affaa;
+            font-size: 11px;
+            margin-left: 2px;
         }
         
         .property-date {
@@ -326,6 +333,13 @@
         
         .market-capacity {
             color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .market-capacity-unit {
+            color: #a0d0c0;
+            font-size: 11px;
+            margin-left: 2px;
         }
         
         .market-desc {
@@ -369,32 +383,78 @@
             font-style: italic;
         }
         
-        /* Back button */
+        /* Scroll Hint */
+        .scroll-hint {
+            text-align: center;
+            color: #a0c0ff;
+            font-size: 14px;
+            margin: 20px 0 80px;
+            font-style: italic;
+            font-family: 'Exo 2', sans-serif;
+            animation: fade-in-out 2s infinite;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes fade-in-out {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        /* Enhanced Back Button - Fixed positioning */
         .back-button {
-            position: sticky;
+            position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(30, 60, 70, 0.9);
-            backdrop-filter: blur(15px);
-            border: 2px solid #6aa0a0;
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
             color: #ffffff;
-            padding: 12px 30px;
+            padding: 18px 35px;
             border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
+            font-size: 20px;
+            font-weight: 600;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
-            box-shadow: 0 0 30px #2a5a5a;
-            z-index: 100;
-            margin-top: 10px;
-            font-weight: 500;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+            pointer-events: auto;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
         }
         
         .back-button:active {
-            background: #4a9a8a;
-            transform: translateX(-50%) scale(0.98);
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
         }
 
         /* Migration status (debug) */
@@ -418,7 +478,7 @@
             <!-- Header -->
             <div class="estate-header">
                 <div class="estate-title">Real Estate</div>
-                <div class="estate-subtitle">✦ own your space ✦</div>
+                <div class="estate-subtitle">✦ mass-based storage ✦</div>
             </div>
             
             <!-- Stats Bar -->
@@ -427,7 +487,7 @@
                     <span>⭐</span> --
                 </div>
                 <div class="total-capacity" id="totalCapacity">
-                    Total: --/--
+                    Total: --/-- AMU
                 </div>
             </div>
             
@@ -443,8 +503,15 @@
                 <div class="empty-state">Loading available properties...</div>
             </div>
             
+            <!-- Scroll Hint -->
+            <div class="scroll-hint">▼ scroll down to return to Earth Hub ▼</div>
+            
             <!-- Back button -->
-            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            <button class="back-button" onclick="returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -475,35 +542,35 @@
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
 
-        // ===== PROPERTY TYPES =====
+        // ===== PROPERTY TYPES (with mass capacity) =====
         const PROPERTY_TYPES = {
             'storage_locker': {
                 name: 'Storage Locker',
-                capacity: 100,
+                capacity: 500, // 500 AMU
                 price: 10000,
                 icon: '🔐',
-                desc: 'Basic personal storage unit. Perfect for getting started.'
+                desc: 'Basic personal storage unit. Holds up to 500 AMU of materials.'
             },
             'small_warehouse': {
                 name: 'Small Warehouse',
-                capacity: 500,
+                capacity: 2000, // 2000 AMU
                 price: 50000,
                 icon: '🏢',
-                desc: 'Secure storage facility with climate control.'
+                desc: 'Secure storage facility with climate control. 2000 AMU capacity.'
             },
             'commercial_depot': {
                 name: 'Commercial Depot',
-                capacity: 2000,
+                capacity: 10000, // 10000 AMU
                 price: 200000,
                 icon: '🏭',
-                desc: 'Industrial-sized warehouse for bulk storage.'
+                desc: 'Industrial-sized warehouse for bulk storage. 10,000 AMU capacity.'
             },
             'orbital_platform': {
                 name: 'Orbital Platform',
-                capacity: 10000,
+                capacity: 50000, // 50000 AMU
                 price: 1000000,
                 icon: '🛰️',
-                desc: 'Zero-G storage in orbit. Maximum capacity.'
+                desc: 'Zero-G storage in orbit. Massive 50,000 AMU capacity.'
             }
         };
 
@@ -526,7 +593,7 @@
         // ===== LOAD DATA =====
         async function loadData() {
             try {
-                // Load all data
+                // Load all data with fallbacks
                 let credits = 5000;
                 if (typeof getCredits === 'function') {
                     credits = await getCredits();
@@ -587,7 +654,7 @@
                         <span class="property-type">${propType.icon} ${propType.name}</span>
                     </div>
                     <div class="property-details">
-                        <span>Capacity: <span class="property-capacity">${prop.used || 0}/${prop.capacity}</span></span>
+                        <span>Capacity: <span class="property-capacity">${(prop.used || 0).toFixed(1)}/${prop.capacity}</span> <span class="property-capacity-unit">AMU</span></span>
                         <span class="property-date">Purchased: ${new Date(prop.purchaseDate).toLocaleDateString()}</span>
                     </div>
                     <div class="capacity-bar-bg">
@@ -623,7 +690,7 @@
                         <span class="market-price">${prop.price.toLocaleString()}⭐</span>
                     </div>
                     <div class="market-details">
-                        <span class="market-capacity">📦 ${prop.capacity} units</span>
+                        <span class="market-capacity">📦 ${prop.capacity.toLocaleString()} <span class="market-capacity-unit">AMU</span></span>
                     </div>
                     <div class="market-desc">${prop.desc}</div>
                     <button class="purchase-btn" 
@@ -647,7 +714,7 @@
                 totalUsed += prop.used || 0;
             });
 
-            document.getElementById('totalCapacity').textContent = `Total: ${totalUsed}/${totalCapacity}`;
+            document.getElementById('totalCapacity').textContent = `Total: ${totalUsed.toFixed(1)}/${totalCapacity} AMU`;
         }
 
         // ===== PURCHASE PROPERTY =====
@@ -680,6 +747,9 @@
                     if (!spent) {
                         throw new Error('Failed to spend credits');
                     }
+                } else {
+                    // Fallback
+                    localStorage.setItem('voidfarer_credits', (credits - propType.price).toString());
                 }
 
                 // Create new property
@@ -724,8 +794,8 @@
 
         // ===== PROPERTY ACTIONS =====
         function viewProperty(propertyId) {
-            // Show property items - could be expanded later
-            alert(`View items in property ${propertyId}\n(This would show stored items)`);
+            // This would show property items - could be expanded later
+            alert(`View items in property ${propertyId}\n(This would show stored items with their masses)`);
         }
 
         function transferToProperty(propertyId) {
@@ -739,11 +809,6 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading real estate...';
-
-                // Check for player data - don't redirect, just show defaults
-                if (typeof getPlayer === 'function') {
-                    await getPlayer();
-                }
 
                 // Load data
                 await loadData();
