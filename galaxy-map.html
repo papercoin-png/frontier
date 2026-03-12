@@ -479,7 +479,7 @@
                 // Use onclick directly
                 box.onclick = function() { selectRegion(data.name, sectorId); };
 
-                // Highlight current sector - THIS IS THE KEY FIX!
+                // Highlight current sector
                 if (sectorId === currentSector) {
                     box.style.borderColor = '#4affaa';
                     box.style.boxShadow = '0 0 30px #4affaa';
@@ -519,11 +519,12 @@
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
             
-            // Enable/disable travel button based on whether it's current location
+            // Change button based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
             if (sector === currentSector) {
-                travelBtn.disabled = true;
-                travelBtn.textContent = '📍 CURRENT SECTOR';
+                // You're already here - allow viewing
+                travelBtn.disabled = false;
+                travelBtn.textContent = '👁️ VIEW SECTOR';
             } else {
                 travelBtn.disabled = false;
                 travelBtn.textContent = '🚀 ENTER SECTOR';
@@ -537,7 +538,17 @@
         // ===== TRAVEL TO SECTOR =====
         async function travelToSector() {
             if (!selectedRegion || !selectedSector) return;
-            if (selectedSector === currentSector) return;
+            
+            // If it's the current sector, just view it
+            if (selectedSector === currentSector) {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'viewing sector...';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                    // Just close the loading overlay, no navigation
+                }, 500);
+                return;
+            }
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'entering sector...';
