@@ -646,10 +646,19 @@
                         currentPlanet.type,
                         currentPlanet.resources
                     );
+                    console.log('Saved planet:', currentPlanet.name, 'Type:', currentPlanet.type);
                 } else {
+                    // Fallback to localStorage
                     localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
                     localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
                     localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
+                    console.log('Saved to localStorage:', currentPlanet.name);
+                }
+                
+                // Verify the save worked
+                if (typeof getCurrentPlanet === 'function') {
+                    const savedPlanet = await getCurrentPlanet();
+                    console.log('Verified saved planet:', savedPlanet);
                 }
                 
                 setTimeout(() => {
@@ -674,13 +683,6 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star system...';
-
-                // Check for player data
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
 
                 // Load star data
                 await loadStarData();
