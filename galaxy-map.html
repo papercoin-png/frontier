@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ... keep your existing styles ... */
         * {
             margin: 0;
             padding: 0;
@@ -147,30 +146,24 @@
             font-weight: 600;
         }
         
-        .distance-row {
+        .info-row {
             display: flex;
             justify-content: space-between;
-            margin: 10px 0;
+            margin: 8px 0;
             font-size: 14px;
         }
         
-        .distance-label {
+        .info-label {
             color: #a0c0ff;
         }
         
-        .distance-value {
-            color: #ffaa4a;
+        .info-value {
+            color: #ffd966;
             font-weight: bold;
         }
         
-        .fuel-value {
+        .stars-value {
             color: #4affaa;
-            font-weight: bold;
-        }
-        
-        .time-value {
-            color: #8a6aff;
-            font-weight: bold;
         }
         
         .travel-btn {
@@ -342,23 +335,23 @@
         <!-- Region Info Panel -->
         <div class="region-panel" id="regionPanel">
             <div class="region-name" id="selectedRegionName">Loading...</div>
-            <div class="distance-row">
-                <span class="distance-label">Distance:</span>
-                <span class="distance-value" id="regionDistance">-- LY</span>
+            <div class="info-row">
+                <span class="info-label">Sector:</span>
+                <span class="info-value" id="sectorId">---</span>
             </div>
-            <div class="distance-row">
-                <span class="distance-label">Warp Cycles:</span>
-                <span class="time-value" id="warpCycles">-- cycle</span>
+            <div class="info-row">
+                <span class="info-label">Nebulae:</span>
+                <span class="info-value" id="nebulaeCount">6</span>
             </div>
-            <div class="distance-row">
-                <span class="distance-label">Travel Time:</span>
-                <span class="time-value" id="travelTime">-- sec</span>
+            <div class="info-row">
+                <span class="info-label">Stars:</span>
+                <span class="info-value stars-value" id="starsCount">300</span>
             </div>
-            <div class="distance-row">
-                <span class="distance-label">Fuel Required:</span>
-                <span class="fuel-value" id="fuelCost">-- ⭐</span>
+            <div class="info-row">
+                <span class="info-label">Explored:</span>
+                <span class="info-value" id="exploredPercent">--%</span>
             </div>
-            <button class="travel-btn" id="travelBtn" onclick="travelToRegion()">🚀 TRAVEL</button>
+            <button class="travel-btn" id="travelBtn" onclick="travelToSector()">🚀 ENTER SECTOR</button>
         </div>
         
         <canvas id="galaxyCanvas"></canvas>
@@ -400,18 +393,18 @@
 
         // ===== SECTOR COORDINATES =====
         const sectorCoordinates = {
-            'A1': { x: 0, y: 0, name: 'Cygnus', displayName: 'Cygnus Arm', color: '#ff6a9a' },
-            'B1': { x: 1, y: 0, name: 'Perseus', displayName: 'Perseus Arm', color: '#4affaa' },
-            'C1': { x: 2, y: 0, name: 'Core', displayName: 'Galactic Core', color: '#8a8aaa' },
-            'A2': { x: 0, y: 1, name: 'Outer', displayName: 'Outer Arm', color: '#ffaa4a' },
-            'B2': { x: 1, y: 1, name: 'Orion', displayName: 'Orion Arm', color: '#8a6aff' },
-            'C2': { x: 2, y: 1, name: 'Sagittarius', displayName: 'Sagittarius Arm', color: '#c06aff' },
-            'A3': { x: 0, y: 2, name: 'Carina', displayName: 'Carina Arm', color: '#6a8aff' },
-            'B3': { x: 1, y: 2, name: 'Norma', displayName: 'Norma Arm', color: '#ff8a6a' },
-            'C3': { x: 2, y: 2, name: 'Scutum', displayName: 'Scutum Arm', color: '#6aff8a' },
-            'A4': { x: 0, y: 3, name: 'Far', displayName: 'Far Arm', color: '#ff6aff' },
-            'B4': { x: 1, y: 3, name: 'Reach', displayName: 'Outer Reach', color: '#8aff6a' },
-            'C4': { x: 2, y: 3, name: 'Fringe', displayName: 'The Fringe', color: '#ff8a8a' }
+            'A1': { x: 0, y: 0, name: 'Cygnus', displayName: 'Cygnus Arm', color: '#ff6a9a', nebulae: 6, stars: 300, explored: 23 },
+            'B1': { x: 1, y: 0, name: 'Perseus', displayName: 'Perseus Arm', color: '#4affaa', nebulae: 6, stars: 300, explored: 15 },
+            'C1': { x: 2, y: 0, name: 'Core', displayName: 'Galactic Core', color: '#8a8aaa', nebulae: 6, stars: 300, explored: 8 },
+            'A2': { x: 0, y: 1, name: 'Outer', displayName: 'Outer Arm', color: '#ffaa4a', nebulae: 6, stars: 300, explored: 31 },
+            'B2': { x: 1, y: 1, name: 'Orion', displayName: 'Orion Arm', color: '#8a6aff', nebulae: 6, stars: 300, explored: 42 },
+            'C2': { x: 2, y: 1, name: 'Sagittarius', displayName: 'Sagittarius Arm', color: '#c06aff', nebulae: 6, stars: 300, explored: 12 },
+            'A3': { x: 0, y: 2, name: 'Carina', displayName: 'Carina Arm', color: '#6a8aff', nebulae: 6, stars: 300, explored: 5 },
+            'B3': { x: 1, y: 2, name: 'Norma', displayName: 'Norma Arm', color: '#ff8a6a', nebulae: 6, stars: 300, explored: 9 },
+            'C3': { x: 2, y: 2, name: 'Scutum', displayName: 'Scutum Arm', color: '#6aff8a', nebulae: 6, stars: 300, explored: 17 },
+            'A4': { x: 0, y: 3, name: 'Far', displayName: 'Far Arm', color: '#ff6aff', nebulae: 6, stars: 300, explored: 2 },
+            'B4': { x: 1, y: 3, name: 'Reach', displayName: 'Outer Reach', color: '#8aff6a', nebulae: 6, stars: 300, explored: 1 },
+            'C4': { x: 2, y: 3, name: 'Fringe', displayName: 'The Fringe', color: '#ff8a8a', nebulae: 6, stars: 300, explored: 0 }
         };
 
         // ===== REGION BOX POSITIONS =====
@@ -475,7 +468,7 @@
 
                 box.innerHTML = `
                     <span class="region-label">${data.displayName}</span>
-                    <span class="region-count">6</span>
+                    <span class="region-count">${data.nebulae}</span>
                 `;
 
                 regionBoxes.appendChild(box);
@@ -498,30 +491,23 @@
             selectedRegion = region;
             selectedSector = sector;
             
-            // Calculate distance from current location
-            const distance = calculateSectorDistance(currentSector, sector);
+            const sectorData = sectorCoordinates[sector];
             
             // Update panel
-            document.getElementById('selectedRegionName').textContent = 
-                sectorCoordinates[sector]?.displayName || region + ' Arm';
-            document.getElementById('regionDistance').textContent = distance.toFixed(1) + ' LY';
-            
-            const cycles = calculateWarpCycles(distance);
-            const fuel = calculateFuel(distance);
-            const time = cycles * 2;
-            
-            document.getElementById('warpCycles').textContent = cycles + ' cycle' + (cycles > 1 ? 's' : '');
-            document.getElementById('travelTime').textContent = time + ' sec';
-            document.getElementById('fuelCost').innerHTML = fuel + ' ⭐';
+            document.getElementById('selectedRegionName').textContent = sectorData.displayName;
+            document.getElementById('sectorId').textContent = sector;
+            document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
+            document.getElementById('starsCount').textContent = sectorData.stars;
+            document.getElementById('exploredPercent').textContent = sectorData.explored + '%';
             
             // Enable/disable travel button based on whether it's current location
             const travelBtn = document.getElementById('travelBtn');
             if (sector === currentSector) {
                 travelBtn.disabled = true;
-                travelBtn.textContent = '📍 CURRENT LOCATION';
+                travelBtn.textContent = '📍 CURRENT SECTOR';
             } else {
                 travelBtn.disabled = false;
-                travelBtn.textContent = '🚀 TRAVEL';
+                travelBtn.textContent = '🚀 ENTER SECTOR';
             }
             
             regionPanel.classList.add('visible');
@@ -529,45 +515,16 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== DISTANCE CALCULATION =====
-        function calculateSectorDistance(sector1, sector2) {
-            const s1 = sectorCoordinates[sector1] || { x: 1, y: 1 };
-            const s2 = sectorCoordinates[sector2] || { x: 1, y: 1 };
-            
-            // Manhattan distance + some factor for "light years"
-            const gridDistance = Math.abs(s1.x - s2.x) + Math.abs(s1.y - s2.y);
-            
-            // Convert to "light years" (abstract)
-            return gridDistance * 2.5;
-        }
-
-        function calculateWarpCycles(distance) {
-            if (distance <= 2.5) return 1;
-            if (distance <= 5) return 2;
-            if (distance <= 7.5) return 3;
-            if (distance <= 10) return 4;
-            return 5;
-        }
-
-        function calculateFuel(distance) {
-            return Math.floor(distance * 4) + 5;
-        }
-
-        // ===== TRAVEL =====
-        async function travelToRegion() {
+        // ===== TRAVEL TO SECTOR (NO WARP) =====
+        async function travelToSector() {
             if (!selectedRegion || !selectedSector) return;
             if (selectedSector === currentSector) return;
             
             loadingOverlay.classList.add('active');
-            loadingText.textContent = 'calculating warp...';
+            loadingText.textContent = 'entering sector...';
             
             try {
-                // Calculate warp details
-                const distance = calculateSectorDistance(currentSector, selectedSector);
-                const cycles = calculateWarpCycles(distance);
-                const fuel = calculateFuel(distance);
-                
-                // Save destination
+                // Save destination (no warp data needed)
                 if (typeof setCurrentSector === 'function') {
                     await setCurrentSector(selectedSector, selectedRegion);
                 } else {
@@ -575,26 +532,15 @@
                     localStorage.setItem('voidfarer_current_region', selectedRegion);
                 }
                 
-                // Save warp data - FIXED: Now goes to star-sectors.html
-                if (typeof setWarpData === 'function') {
-                    setWarpData(selectedRegion, 'star-sectors.html', cycles, distance, fuel);
-                } else {
-                    localStorage.setItem('voidfarer_warp_destination', selectedRegion);
-                    localStorage.setItem('voidfarer_warp_return', 'star-sectors.html');  // FIXED HERE
-                    localStorage.setItem('voidfarer_warp_cycles', cycles);
-                    localStorage.setItem('voidfarer_warp_distance', distance);
-                    localStorage.setItem('voidfarer_warp_fuel', fuel);
-                }
-                
-                // Navigate to warp
+                // Navigate directly to star sectors
                 setTimeout(() => {
-                    window.location.href = 'warp.html';
+                    window.location.href = 'star-sectors.html';
                 }, 500);
 
             } catch (error) {
                 console.error('Error traveling:', error);
                 loadingOverlay.classList.remove('active');
-                alert('Failed to travel. Please try again.');
+                alert('Failed to enter sector. Please try again.');
             }
         }
 
@@ -707,7 +653,6 @@
     
     <!-- Load all JS files -->
     <script src="js/storage.js"></script>
-    <script src="js/warp-calculator.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
 </body>
