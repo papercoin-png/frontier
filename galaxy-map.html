@@ -71,7 +71,7 @@
             left: 20px;
             background: rgba(10,10,26,0.7);
             backdrop-filter: blur(8px);
-            border: 1px solid #ffaa4a;
+            border: 1px solid #4affaa;
             color: white;
             padding: 8px 15px;
             border-radius: 40px 10px 40px 10px;
@@ -399,6 +399,14 @@
             'C4': { x: 2, y: 3, name: 'Fringe', displayName: 'The Fringe', color: '#ff8a8a', nebulae: 6, stars: 300 }
         };
 
+        // ===== SECTOR NAMES MAPPING =====
+        const sectorNames = {
+            'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
+            'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
+            'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
+            'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
+        };
+
         // ===== REGION BOX POSITIONS =====
         const regionPositions = {
             'Cygnus': { left: '60%', top: '30%', width: '120px', height: '80px' },
@@ -418,17 +426,36 @@
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
-                const region = typeof getCurrentRegion === 'function' ? await getCurrentRegion() : 'Orion';
-
-                currentSector = sector || 'B2';
-                currentRegion = region || 'Orion';
-
-                document.getElementById('currentLocationText').textContent = 
-                    sectorCoordinates[currentSector]?.displayName || 'Orion Arm';
+                // Try to get from storage functions first
+                if (typeof getCurrentSector === 'function') {
+                    currentSector = await getCurrentSector();
+                } else {
+                    currentSector = localStorage.getItem('voidfarer_current_sector');
+                }
+                
+                if (typeof getCurrentRegion === 'function') {
+                    currentRegion = await getCurrentRegion();
+                } else {
+                    currentRegion = localStorage.getItem('voidfarer_current_region');
+                }
+                
+                // If still null, use defaults
+                if (!currentSector) currentSector = 'B2';
+                if (!currentRegion) currentRegion = 'Orion';
+                
+                // Log for debugging
+                console.log('Galaxy Map loading sector:', currentSector);
+                console.log('Galaxy Map loading region:', currentRegion);
+                
+                // Update display with friendly name
+                const displayName = sectorNames[currentSector] || sectorCoordinates[currentSector]?.displayName || 'Orion Arm';
+                document.getElementById('currentLocationText').textContent = displayName;
 
             } catch (error) {
                 console.error('Error loading location:', error);
+                // Use defaults on error
+                currentSector = 'B2';
+                currentRegion = 'Orion';
                 document.getElementById('currentLocationText').textContent = 'Orion Arm';
             }
         }
@@ -452,10 +479,11 @@
                 // Use onclick directly
                 box.onclick = function() { selectRegion(data.name, sectorId); };
 
-                // Highlight current sector
+                // Highlight current sector - THIS IS THE KEY FIX!
                 if (sectorId === currentSector) {
                     box.style.borderColor = '#4affaa';
                     box.style.boxShadow = '0 0 30px #4affaa';
+                    box.style.borderWidth = '3px';
                 }
 
                 box.innerHTML = `
@@ -506,7 +534,7 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== TRAVEL TO SECTOR (SIMPLE NAVIGATION) =====
+        // ===== TRAVEL TO SECTOR =====
         async function travelToSector() {
             if (!selectedRegion || !selectedSector) return;
             if (selectedSector === currentSector) return;
@@ -614,14 +642,14 @@
                     return;
                 }
 
-                // Load current location
+                // Load current location FIRST - this gets your actual sector!
                 await loadCurrentLocation();
 
                 // Resize canvas and draw background
                 resizeCanvas();
                 window.addEventListener('resize', resizeCanvas);
 
-                // Create region boxes
+                // Create region boxes - now with current sector highlighted!
                 createRegionBoxes();
 
                 // Hide loading
