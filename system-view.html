@@ -352,6 +352,22 @@
             background: rgba(106, 138, 192, 0.3);
         }
         
+        /* Location badge - shows current sector/region */
+        .location-badge {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(5px);
+            border: 1px solid #4affaa;
+            border-radius: 30px 8px 30px 8px;
+            padding: 6px 12px;
+            color: #4affaa;
+            font-size: 12px;
+            font-family: 'Exo 2', sans-serif;
+            z-index: 25;
+        }
+        
         /* Loading overlay */
         .loading-overlay {
             position: fixed;
@@ -449,6 +465,11 @@
             <div id="planetCount">-- planets</div>
         </div>
         
+        <!-- Location Badge - Shows current sector -->
+        <div class="location-badge" id="locationBadge">
+            <span id="currentSector">Orion Arm</span>
+        </div>
+        
         <!-- Planet Info Panel with SET COURSE button -->
         <div class="planet-info" id="planetInfo">
             <h2 id="planetName"></h2>
@@ -513,20 +534,27 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
+        const locationBadge = document.getElementById('currentSector');
 
         // ===== STATE =====
         let starData = null;
         let planets = [];
         let currentPlanet = null;
-        let currentLocation = {
-            sector: 'Orion Arm',
-            nebula: 'Orion Nebula',
-            star: 'Unknown Star'
-        };
+        let currentSector = 'B2';
+        let currentRegion = 'Orion';
+        let currentStarName = '';
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
         const ORBITAL_DESCENT = 0.5; // Fixed descent distance
+
+        // ===== SECTOR NAMES =====
+        const sectorNames = {
+            'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
+            'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
+            'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
+            'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
+        };
 
         // ===== HASH FUNCTION =====
         function hashString(str) {
@@ -624,26 +652,43 @@
             return Math.floor(distance * 4) + 5;
         }
 
+        // ===== LOAD CURRENT LOCATION =====
+        async function loadCurrentLocation() {
+            try {
+                // Try to get from storage functions
+                if (typeof getCurrentSector === 'function') {
+                    currentSector = await getCurrentSector() || 'B2';
+                } else {
+                    currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                }
+                
+                if (typeof getCurrentRegion === 'function') {
+                    currentRegion = await getCurrentRegion() || 'Orion';
+                } else {
+                    currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion';
+                }
+                
+                // Update location badge
+                locationBadge.textContent = sectorNames[currentSector] || currentRegion + ' Arm';
+                
+            } catch (error) {
+                console.error('Error loading current location:', error);
+                currentSector = 'B2';
+                currentRegion = 'Orion';
+                locationBadge.textContent = 'Orion Arm';
+            }
+        }
+
         // ===== LOAD STAR DATA =====
         async function loadStarData() {
             try {
                 // Load star data from storage
-                const starName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
+                currentStarName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
                 const starType = typeof getCurrentStarType === 'function' ? await getCurrentStarType() : 'Main Sequence';
                 const starIndex = typeof getCurrentStarIndex === 'function' ? await getCurrentStarIndex() : 0;
 
-                // Load location context
-                const sector = typeof getCurrentSector === 'function' ? await getCurrentSector() : 'B2';
-                const nebula = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Nebula';
-                
-                currentLocation = {
-                    sector: sector,
-                    nebula: nebula,
-                    star: starName
-                };
-
                 // Generate star system
-                const starSeed = UNIVERSE_SEED + (starName ? hashString(starName) : 0);
+                const starSeed = UNIVERSE_SEED + (currentStarName ? hashString(currentStarName) : 0);
                 
                 // Generate star
                 const starTypeObj = getStarType(starSeed, 0);
@@ -677,7 +722,6 @@
                     }
                     
                     // Random distance from current location (simulated)
-                    // In a real game, this would be calculated based on actual position
                     const distanceFromCurrent = (Math.random() * 5 + 1).toFixed(1);
                     
                     planets.push({
@@ -694,13 +738,16 @@
                         distanceFromCurrent: parseFloat(distanceFromCurrent),
                         orbitRadius: orbitRadii[i],
                         orbitSpeed: 0.002 - (i * 0.0002),
-                        angle: Math.random() * Math.PI * 2
+                        angle: Math.random() * Math.PI * 2,
+                        // CRITICAL: Store which sector this planet belongs to!
+                        sector: currentSector,
+                        region: currentRegion
                     });
                 }
 
                 // Update UI
-                document.getElementById('starName').textContent = starName || 'Unknown Star';
-                document.getElementById('systemName').textContent = (starName || 'Unknown') + ' System';
+                document.getElementById('starName').textContent = currentStarName || 'Unknown Star';
+                document.getElementById('systemName').textContent = (currentStarName || 'Unknown') + ' System';
                 document.getElementById('planetCount').textContent = planets.length + ' planets';
 
                 // Set star color
@@ -814,7 +861,7 @@
             currentPlanet = null;
         }
 
-        // ===== SET COURSE TO PLANET (ONE BUTTON - GO TO WARP) =====
+        // ===== SET COURSE TO PLANET (SAVES DESTINATION LOCATION!) =====
         async function setCourseToPlanet() {
             if (!currentPlanet) return;
             
@@ -832,11 +879,27 @@
                 const warpCycles = calculateWarpCycles(totalDistance);
                 const fuelCost = calculateFuelCost(totalDistance);
                 
-                // Prepare warp data - SIMPLE! Just start and destination
+                // ===== CRITICAL: Save the destination sector and region! =====
+                // This is what updates the galaxy map to show your new location
+                const destSector = currentPlanet.sector;
+                const destRegion = currentPlanet.region;
+                
+                console.log('Setting course to planet in sector:', destSector, destRegion);
+                
+                // Save to localStorage
+                localStorage.setItem('voidfarer_current_sector', destSector);
+                localStorage.setItem('voidfarer_current_region', destRegion);
+                
+                // Also use storage function if available
+                if (typeof setCurrentSector === 'function') {
+                    await setCurrentSector(destSector, destRegion);
+                }
+                
+                // Prepare warp data
                 const warpData = {
                     destination: currentPlanet.name,
                     destinationType: currentPlanet.typeName,
-                    startLocation: currentLocation.star + ' System',
+                    startLocation: currentStarName + ' System',
                     startLocationType: 'star system',
                     totalDistance: totalDistance,
                     warpCycles: warpCycles,
@@ -890,6 +953,9 @@
                     window.location.href = 'index.html';
                     return;
                 }
+
+                // Load current location FIRST
+                await loadCurrentLocation();
 
                 // Load star data
                 await loadStarData();
