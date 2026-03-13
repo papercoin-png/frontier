@@ -1,7 +1,7 @@
 // js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 
-import db from './db.js';
+import * as db from './db.js';
 
 // ===== RE-EXPORT DB FUNCTIONS =====
 // These need to be at the top so other modules can import them
@@ -17,7 +17,7 @@ export const {
     getPlayerTransactions,
     getAllProperties,
     getProperty,
-    addProperty,
+    addProperty: dbAddProperty,
     updateProperty,
     getPropertyItems,
     addItemToProperty,
@@ -1006,8 +1006,9 @@ export async function saveRealEstate(realEstateData) {
     saveTimestamp();
 }
 
+// Use the imported dbAddProperty instead of creating a new function
 export async function addProperty(propertyData) {
-    return await addProperty(propertyData);
+    return await dbAddProperty(propertyData);
 }
 
 export async function getProperty(propertyId) {
