@@ -628,22 +628,22 @@
             
             <!-- Filter Bar -->
             <div class="filter-bar">
-                <span class="filter-btn active" onclick="filterElements('all')">All</span>
-                <span class="filter-btn" onclick="filterElements('common')">Common</span>
-                <span class="filter-btn" onclick="filterElements('uncommon')">Uncommon</span>
-                <span class="filter-btn" onclick="filterElements('rare')">Rare</span>
-                <span class="filter-btn" onclick="filterElements('very-rare')">Very Rare</span>
-                <span class="filter-btn" onclick="filterElements('legendary')">Legendary</span>
+                <span class="filter-btn active" onclick="window.filterElements('all')">All</span>
+                <span class="filter-btn" onclick="window.filterElements('common')">Common</span>
+                <span class="filter-btn" onclick="window.filterElements('uncommon')">Uncommon</span>
+                <span class="filter-btn" onclick="window.filterElements('rare')">Rare</span>
+                <span class="filter-btn" onclick="window.filterElements('very-rare')">Very Rare</span>
+                <span class="filter-btn" onclick="window.filterElements('legendary')">Legendary</span>
             </div>
             
             <!-- Search Box -->
             <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search elements..." oninput="searchElements()">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search elements..." oninput="window.searchElements()">
             </div>
             
             <!-- Sort Bar -->
             <div class="sort-bar">
-                <select class="sort-select" id="sortSelect" onchange="sortElements()">
+                <select class="sort-select" id="sortSelect" onchange="window.sortElements()">
                     <option value="name">Sort by Name</option>
                     <option value="count">Sort by Quantity</option>
                     <option value="rarity">Sort by Rarity</option>
@@ -658,7 +658,7 @@
             </div>
             
             <!-- Back button -->
-            <button class="back-button" onclick="returnToBridge()">
+            <button class="back-button" onclick="window.returnToBridge()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">SHIP BRIDGE</span>
                 <span class="back-icon">🚀</span>
@@ -681,8 +681,8 @@
                 <p class="warning-text">This will start a warp journey</p>
                 
                 <div class="modal-buttons">
-                    <button class="modal-btn warp" onclick="confirmWarp()">WARP</button>
-                    <button class="modal-btn" onclick="closeWarpModal()">CANCEL</button>
+                    <button class="modal-btn warp" onclick="window.confirmWarp()">WARP</button>
+                    <button class="modal-btn" onclick="window.closeWarpModal()">CANCEL</button>
                 </div>
             </div>
         </div>
@@ -697,14 +697,14 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/migration.js"></script>
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
-    <!-- Fallback Functions -->
-    <script>
+    <!-- Fallback Functions (kept for compatibility) -->
+    <script type="module">
     (function() {
         window.getCollection = window.getCollection || function() {
             const saved = localStorage.getItem('voidfarer_collection');
@@ -728,9 +728,10 @@
     })();
     </script>
 
-    <script>
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
+
         // ===== MAIN JOURNAL SCRIPT =====
-        const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -746,6 +747,16 @@
         const loadingText = document.getElementById('loadingText');
         const elementsGrid = document.getElementById('elementsGrid');
         const warpModal = document.getElementById('warpModal');
+
+        // Make functions available globally for onclick handlers
+        window.filterElements = filterElements;
+        window.searchElements = searchElements;
+        window.sortElements = sortElements;
+        window.toggleExpand = toggleExpand;
+        window.showWarpModal = showWarpModal;
+        window.closeWarpModal = closeWarpModal;
+        window.confirmWarp = confirmWarp;
+        window.returnToBridge = returnToBridge;
 
         // ===== STATE =====
         let allElements = [];
@@ -1034,7 +1045,7 @@
                     }
                     
                     locationsHtml += `
-                        <div class="location-item" onclick="showWarpModal('${planet}', '${path}')">
+                        <div class="location-item" onclick="window.showWarpModal('${planet}', '${path}')">
                             <div class="location-path">
                                 <span class="location-sector">${path.split(' › ')[0]}</span>
                                 <span class="location-arrow">→</span>
@@ -1051,7 +1062,7 @@
                 
                 html += `
                     <div class="element-card ${rarityClass}">
-                        <div class="element-main-row" onclick="toggleExpand('${element.name}')">
+                        <div class="element-main-row" onclick="window.toggleExpand('${element.name}')">
                             <div class="element-symbol">${element.symbol}</div>
                             <div class="element-info">
                                 <div class="element-name-row">
@@ -1103,16 +1114,6 @@
                 }, 2000);
             }
         }
-
-        // Expose functions globally
-        window.filterElements = filterElements;
-        window.searchElements = searchElements;
-        window.sortElements = sortElements;
-        window.toggleExpand = toggleExpand;
-        window.showWarpModal = showWarpModal;
-        window.closeWarpModal = closeWarpModal;
-        window.confirmWarp = confirmWarp;
-        window.returnToBridge = returnToBridge;
 
         // ===== START =====
         init();
