@@ -3,6 +3,35 @@
 
 import db from './db.js';
 
+// ===== RE-EXPORT DB FUNCTIONS =====
+// These need to be at the top so other modules can import them
+export const {
+    getItem,
+    setItem,
+    getAll,
+    getAllFromIndex,
+    deleteItem,
+    clearStore,
+    countItems,
+    addTaxTransaction,
+    getPlayerTransactions,
+    getAllProperties,
+    getProperty,
+    addProperty,
+    updateProperty,
+    getPropertyItems,
+    addItemToProperty,
+    removeItemFromProperty,
+    addPriceHistory,
+    getPriceHistoryForElement,
+    addTradeHistory,
+    getTradeHistoryForElement,
+    isMigrationComplete,
+    setMigrationComplete,
+    resetAllData,
+    getDatabaseStats
+} = db;
+
 // ===== CONSTANTS =====
 export const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can carry
 
@@ -331,7 +360,7 @@ export async function initializeStorage() {
 // ===== PLAYER DATA =====
 export async function getPlayer() {
     try {
-        return await db.getItem('player', 'main');
+        return await getItem('player', 'main');
     } catch (error) {
         console.error('Error getting player:', error);
         return null;
@@ -340,7 +369,7 @@ export async function getPlayer() {
 
 export async function savePlayer(playerData) {
     try {
-        await db.setItem('player', { id: 'main', ...playerData });
+        await setItem('player', { id: 'main', ...playerData });
         saveTimestamp();
         return true;
     } catch (error) {
@@ -491,7 +520,7 @@ export async function safeSellElement(elementName, quantity, pricePerUnit) {
 
 export async function getElementCount(elementName) {
     try {
-        const element = await db.getItem('collection', elementName);
+        const element = await getItem('collection', elementName);
         return element?.count || 0;
     } catch (error) {
         console.error('Error getting element count:', error);
@@ -501,7 +530,7 @@ export async function getElementCount(elementName) {
 
 export async function getUniqueElementsCount() {
     try {
-        const elements = await db.getAll('collection');
+        const elements = await getAll('collection');
         return elements.length;
     } catch (error) {
         console.error('Error getting unique elements count:', error);
@@ -511,7 +540,7 @@ export async function getUniqueElementsCount() {
 
 export async function getTotalElementCount() {
     try {
-        const elements = await db.getAll('collection');
+        const elements = await getAll('collection');
         let total = 0;
         elements.forEach(element => {
             total += element.count || 1;
@@ -822,7 +851,7 @@ export function clearWarpData() {
 
 // ===== COLONIES =====
 export async function getColonies() {
-    return await db.getAll('colonies');
+    return await getAll('colonies');
 }
 
 export async function saveColonies(colonies) {
@@ -847,7 +876,7 @@ export async function addColony(name, planet, star, starSector, sector) {
         established: new Date().toISOString()
     };
     
-    await db.setItem('colonies', colony);
+    await setItem('colonies', colony);
     
     // Also update the full colonies list for backward compatibility
     const colonies = await getColonies();
@@ -855,13 +884,13 @@ export async function addColony(name, planet, star, starSector, sector) {
 }
 
 export async function removeColony(colonyId) {
-    await db.deleteItem('colonies', colonyId);
+    await deleteItem('colonies', colonyId);
     return await getColonies();
 }
 
 // ===== MISSIONS =====
 export async function getMissions() {
-    return await db.getAll('missions');
+    return await getAll('missions');
 }
 
 export async function saveMissions(missions) {
@@ -876,7 +905,7 @@ export async function saveMissions(missions) {
 }
 
 export async function getCompletedMissions() {
-    return await db.getAll('completedMissions');
+    return await getAll('completedMissions');
 }
 
 export async function saveCompletedMissions(missions) {
@@ -910,7 +939,7 @@ export async function updateMissionProgress(elementName, count = 1) {
 
 // ===== SCAN HISTORY =====
 export async function getScanHistory() {
-    const scans = await db.getAll('scanHistory');
+    const scans = await getAll('scanHistory');
     return scans.sort((a, b) => b.timestamp - a.timestamp);
 }
 
@@ -921,14 +950,14 @@ export async function addScan(scanData) {
         date: new Date().toISOString()
     };
     
-    await db.setItem('scanHistory', scan);
+    await setItem('scanHistory', scan);
     
     // Keep only last 10 scans by cleaning up older ones
     const allScans = await getScanHistory();
     if (allScans.length > 10) {
         const toDelete = allScans.slice(10);
         for (const scan of toDelete) {
-            await db.deleteItem('scanHistory', scan.timestamp);
+            await deleteItem('scanHistory', scan.timestamp);
         }
     }
     
@@ -942,7 +971,7 @@ export async function clearScanHistory() {
 
 // ===== REAL ESTATE =====
 export async function getRealEstate() {
-    const properties = await db.getAllProperties();
+    const properties = await getAllProperties();
     return { properties: properties };
 }
 
@@ -978,15 +1007,15 @@ export async function saveRealEstate(realEstateData) {
 }
 
 export async function addProperty(propertyData) {
-    return await db.addProperty(propertyData);
+    return await addProperty(propertyData);
 }
 
 export async function getProperty(propertyId) {
-    return await db.getProperty(propertyId);
+    return await getProperty(propertyId);
 }
 
 export async function updateProperty(propertyId, updates) {
-    return await db.updateProperty(propertyId, updates);
+    return await updateProperty(propertyId, updates);
 }
 
 export async function deleteProperty(propertyId) {
@@ -1012,7 +1041,7 @@ export async function transferToProperty(propertyId, elementName, quantity) {
         return { success: false, reason: 'insufficient_elements', available: collection[elementName]?.count || 0 };
     }
     
-    return await db.addItemToProperty(propertyId, elementName, quantity);
+    return await addItemToProperty(propertyId, elementName, quantity);
 }
 
 export async function transferFromProperty(propertyId, elementName, quantity) {
@@ -1092,7 +1121,7 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
 }
 
 export async function getTotalPropertyCapacity() {
-    const properties = await db.getAllProperties();
+    const properties = await getAllProperties();
     let totalCapacity = 0;
     let totalUsed = 0;
     
@@ -1106,14 +1135,14 @@ export async function getTotalPropertyCapacity() {
 
 // ===== TAX TRANSACTIONS =====
 export async function addTaxRecord(record) {
-    return await db.addTaxTransaction(record);
+    return await addTaxTransaction(record);
 }
 
 export async function getTaxHistory(playerId, limit = 100) {
     if (playerId) {
-        return await db.getPlayerTransactions(playerId, limit);
+        return await getPlayerTransactions(playerId, limit);
     }
-    const all = await db.getAll('taxTransactions');
+    const all = await getAll('taxTransactions');
     return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
@@ -1160,7 +1189,7 @@ export function setAmbientVolume(volume) {
 
 // ===== SHIP UPGRADES =====
 export async function getShipUpgrades() {
-    const upgrades = await db.getItem('shipUpgrades', 'current');
+    const upgrades = await getItem('shipUpgrades', 'current');
     return upgrades || {
         engine: 1,
         shields: 1,
@@ -1172,7 +1201,7 @@ export async function getShipUpgrades() {
 }
 
 export async function saveShipUpgrades(upgrades) {
-    await db.setItem('shipUpgrades', { id: 'current', ...upgrades });
+    await setItem('shipUpgrades', { id: 'current', ...upgrades });
 }
 
 export async function upgradeShip(component) {
@@ -1222,7 +1251,7 @@ export async function resetGame() {
     };
     
     // Clear all IndexedDB data
-    await db.resetAllData();
+    await resetAllData();
     
     // Clear location data from localStorage
     const locationKeys = [
@@ -1271,9 +1300,9 @@ export async function exportGameData() {
         completedMissions: await getCompletedMissions(),
         colonies: await getColonies(),
         realEstate: await getRealEstate(),
-        taxTransactions: await db.getAll('taxTransactions'),
-        dailyMetrics: await db.getAll('dailyMetrics'),
-        activeEvents: await db.getAll('activeEvents'),
+        taxTransactions: await getAll('taxTransactions'),
+        dailyMetrics: await getAll('dailyMetrics'),
+        activeEvents: await getAll('activeEvents'),
         shipUpgrades: await getShipUpgrades(),
         cargoMassLimit: CARGO_MASS_LIMIT,
         
@@ -1305,12 +1334,12 @@ export async function importGameData(jsonString) {
         const gameData = JSON.parse(jsonString);
         
         // Restore data to IndexedDB
-        if (gameData.player) await db.setItem('player', { id: 'main', ...gameData.player });
+        if (gameData.player) await setItem('player', { id: 'main', ...gameData.player });
         
         if (gameData.collection) {
             const collection = gameData.collection;
             for (const [name, data] of Object.entries(collection)) {
-                await db.setItem('collection', {
+                await setItem('collection', {
                     name: name,
                     count: data.count || 1,
                     firstFound: data.firstFound || new Date().toISOString(),
@@ -1321,13 +1350,13 @@ export async function importGameData(jsonString) {
         
         if (gameData.missions) {
             for (const mission of gameData.missions) {
-                await db.setItem('missions', mission);
+                await setItem('missions', mission);
             }
         }
         
         if (gameData.completedMissions) {
             for (const mission of gameData.completedMissions) {
-                await db.setItem('completedMissions', mission);
+                await setItem('completedMissions', mission);
             }
         }
         
@@ -1337,7 +1366,7 @@ export async function importGameData(jsonString) {
         
         if (gameData.taxTransactions) {
             for (const tx of gameData.taxTransactions) {
-                await db.setItem('taxTransactions', tx);
+                await setItem('taxTransactions', tx);
             }
         }
         
@@ -1379,46 +1408,6 @@ export async function getPlayerName() {
     const player = await getPlayer();
     return player?.name || 'Voidfarer';
 }
-
-// ===== EXPORT ALL FUNCTIONS FOR OTHER MODULES =====
-// Export db functions that other modules need
-export {
-    // Core db functions
-    getItem,
-    setItem,
-    getAll,
-    getAllFromIndex,
-    deleteItem,
-    clearStore,
-    countItems,
-    
-    // Tax functions
-    addTaxTransaction,
-    getPlayerTransactions,
-    
-    // Property functions
-    getAllProperties,
-    getProperty,
-    addProperty,
-    updateProperty,
-    getPropertyItems,
-    addItemToProperty,
-    removeItemFromProperty,
-    
-    // Market functions
-    addPriceHistory,
-    getPriceHistoryForElement,
-    addTradeHistory,
-    getTradeHistoryForElement,
-    
-    // Migration functions
-    isMigrationComplete,
-    setMigrationComplete,
-    resetAllData,
-    
-    // Stats
-    getDatabaseStats
-};
 
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
 window.getCredits = getCredits;
