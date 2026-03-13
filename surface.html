@@ -10,7 +10,418 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* ... (keep all existing styles the same) ... */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            overflow: hidden;
+            font-family: 'Libre Baskerville', serif;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .surface-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .planet-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: brightness(0.9) saturate(1.2);
+        }
+        
+        .star-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 40%, transparent 30%, rgba(0,0,0,0.3) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 10px 18px;
+            z-index: 10;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .planet-name {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .planet-name-main {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 0 10px #4affaa;
+        }
+        
+        .planet-name-type {
+            font-size: 10px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        .cargo-display {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .cargo-label {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .cargo-value {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .cargo-value span {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .top-controls {
+            position: absolute;
+            top: 90px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .extractor-status {
+            background: rgba(10, 10, 26, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 16px;
+            color: #4affaa;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        
+        .extractor-pulse {
+            width: 8px;
+            height: 8px;
+            background: #4affaa;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4affaa;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.5; transform: scale(1); }
+        }
+        
+        .return-button {
+            background: rgba(10, 10, 26, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 170, 74, 0.5);
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 16px;
+            color: white;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.1s;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+        }
+        
+        .return-button:active {
+            background: rgba(255, 170, 74, 0.3);
+            transform: scale(0.95);
+        }
+        
+        .toast-container {
+            position: absolute;
+            top: 140px;
+            right: 20px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            pointer-events: none;
+        }
+        
+        .toast {
+            background: rgba(10, 10, 26, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 16px;
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transform: translateX(120%);
+            animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards;
+            max-width: 200px;
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        .toast.success {
+            border-color: #4affaa;
+        }
+        
+        .toast.fail {
+            border-color: #ff6b6b;
+        }
+        
+        .toast-icon {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .toast-name {
+            font-weight: 500;
+        }
+        
+        .toast-name.rarity-common { color: #ffffff; }
+        .toast-name.rarity-uncommon { color: #b0ffb0; }
+        .toast-name.rarity-rare { color: #b0b0ff; }
+        .toast-name.rarity-very-rare { color: #e0b0ff; }
+        .toast-name.rarity-legendary { color: #ffd700; }
+        
+        @keyframes slideIn {
+            to { transform: translateX(0); }
+        }
+        
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+        
+        .resource-bar {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            right: 20px;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px;
+            z-index: 10;
+        }
+        
+        .resource-label {
+            color: #a0c0ff;
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        
+        .resource-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+        }
+        
+        .resource-toggle {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid;
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.1s;
+            min-width: 85px;
+            justify-content: center;
+        }
+        
+        .resource-toggle:active {
+            transform: scale(0.95);
+        }
+        
+        .resource-toggle.active {
+            background: rgba(74, 255, 170, 0.1);
+            box-shadow: 0 0 15px currentColor;
+            opacity: 1;
+        }
+        
+        .resource-toggle:not(.active) {
+            opacity: 0.4;
+            filter: grayscale(0.5);
+        }
+        
+        .resource-symbol {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .resource-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .resource-chance {
+            color: #ffd966;
+            font-size: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 4px;
+            border-radius: 20px;
+        }
+        
+        .rarity-common { 
+            border-color: #ffffff; 
+            color: #ffffff;
+        }
+        .rarity-common.active { 
+            border-color: #ffffff; 
+        }
+        
+        .rarity-uncommon { 
+            border-color: #b0ffb0; 
+            color: #b0ffb0;
+        }
+        .rarity-uncommon.active { 
+            border-color: #b0ffb0; 
+        }
+        
+        .rarity-rare { 
+            border-color: #b0b0ff; 
+            color: #b0b0ff;
+        }
+        .rarity-rare.active { 
+            border-color: #b0b0ff; 
+        }
+        
+        .rarity-very-rare { 
+            border-color: #e0b0ff; 
+            color: #e0b0ff;
+        }
+        .rarity-very-rare.active { 
+            border-color: #e0b0ff; 
+        }
+        
+        .rarity-legendary { 
+            border-color: #ffd700; 
+            color: #ffd700;
+        }
+        .rarity-legendary.active { 
+            border-color: #ffd700; 
+        }
+        
+        .active-count {
+            text-align: center;
+            margin-top: 8px;
+            color: #4affaa;
+            font-size: 12px;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -68,7 +479,7 @@
         }
 
         const CARGO_MASS_LIMIT = 5000;
-        const EXTRACTION_INTERVAL = 5000; // 5 seconds
+        const EXTRACTION_INTERVAL = 5000;
         
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -310,22 +721,6 @@
             }, 3000);
         }
 
-        // FIXED: Self-scheduling extraction instead of setInterval with async
-        async function scheduleNextExtraction() {
-            if (!isExtracting) return;
-            
-            try {
-                await attemptExtraction();
-            } catch (error) {
-                console.error('Extraction error:', error);
-            }
-            
-            // Schedule the next extraction only if still extracting
-            if (isExtracting) {
-                extractionTimer = setTimeout(scheduleNextExtraction, EXTRACTION_INTERVAL);
-            }
-        }
-
         async function attemptExtraction() {
             if (!isExtracting || isExtractionInProgress) return;
             
@@ -337,16 +732,14 @@
                 if (currentMass >= CARGO_MASS_LIMIT) {
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
-                    if (extractionTimer) {
-                        clearTimeout(extractionTimer);
-                        extractionTimer = null;
-                    }
+                    isExtractionInProgress = false;
                     return;
                 }
                 
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
+                    isExtractionInProgress = false;
                     return;
                 }
                 
@@ -373,10 +766,6 @@
                     } else {
                         isExtracting = false;
                         extractorText.textContent = 'Cargo full - extraction paused';
-                        if (extractionTimer) {
-                            clearTimeout(extractionTimer);
-                            extractionTimer = null;
-                        }
                     }
                 } else {
                     showToast(resource, false);
@@ -390,20 +779,17 @@
 
         function startExtraction() {
             if (extractionTimer) {
-                clearTimeout(extractionTimer);
-                extractionTimer = null;
+                clearInterval(extractionTimer);
             }
-            isExtracting = true;
+            extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
             extractorText.textContent = 'Auto-extractor active';
-            // Start the first extraction immediately, then schedule subsequent ones
-            scheduleNextExtraction();
         }
 
         window.returnToShip = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             if (extractionTimer) {
-                clearTimeout(extractionTimer);
+                clearInterval(extractionTimer);
                 extractionTimer = null;
             }
             
@@ -463,7 +849,7 @@
 
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) {
-                clearTimeout(extractionTimer);
+                clearInterval(extractionTimer);
             }
         });
 
