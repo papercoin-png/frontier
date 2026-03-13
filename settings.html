@@ -488,9 +488,9 @@
                     </div>
                     <div class="setting-description">the music of distant stars</div>
                     <div class="slider-container">
-                        <div class="slider-track" id="musicTrack" onclick="setMusicSlider(event)">
+                        <div class="slider-track" id="musicTrack" onclick="window.setMusicSlider(event)">
                             <div class="slider-fill" id="musicFill" style="width: 50%">
-                                <div class="slider-thumb" id="musicThumb" onmousedown="startDrag('music')" ontouchstart="startDrag('music')"></div>
+                                <div class="slider-thumb" id="musicThumb" onmousedown="window.startDrag('music')" ontouchstart="window.startDrag('music')"></div>
                             </div>
                         </div>
                         <div class="slider-labels">
@@ -511,9 +511,9 @@
                     </div>
                     <div class="setting-description">the breath of alien worlds</div>
                     <div class="slider-container">
-                        <div class="slider-track" id="ambientTrack" onclick="setAmbientSlider(event)">
+                        <div class="slider-track" id="ambientTrack" onclick="window.setAmbientSlider(event)">
                             <div class="slider-fill" id="ambientFill" style="width: 50%">
-                                <div class="slider-thumb" id="ambientThumb" onmousedown="startDrag('ambient')" ontouchstart="startDrag('ambient')"></div>
+                                <div class="slider-thumb" id="ambientThumb" onmousedown="window.startDrag('ambient')" ontouchstart="window.startDrag('ambient')"></div>
                             </div>
                         </div>
                         <div class="slider-labels">
@@ -535,8 +535,8 @@
                     </div>
                     <div class="setting-description">feel the universe respond</div>
                     <div class="toggle-container">
-                        <div class="toggle-option" onclick="setHaptic(true)">On</div>
-                        <div class="toggle-option active" onclick="setHaptic(false)">Off</div>
+                        <div class="toggle-option" onclick="window.setHaptic(true)">On</div>
+                        <div class="toggle-option active" onclick="window.setHaptic(false)">Off</div>
                     </div>
                 </div>
                 
@@ -551,8 +551,8 @@
                     </div>
                     <div class="setting-description">elements gather as you explore</div>
                     <div class="toggle-container">
-                        <div class="toggle-option" onclick="setAutoGather(true)">On</div>
-                        <div class="toggle-option active" onclick="setAutoGather(false)">Off</div>
+                        <div class="toggle-option" onclick="window.setAutoGather(true)">On</div>
+                        <div class="toggle-option active" onclick="window.setAutoGather(false)">Off</div>
                     </div>
                 </div>
                 
@@ -567,9 +567,9 @@
                     </div>
                     <div class="setting-description">how fast planets turn</div>
                     <div class="toggle-container">
-                        <div class="toggle-option active" onclick="setMotion('gentle')">Gentle</div>
-                        <div class="toggle-option" onclick="setMotion('medium')">Medium</div>
-                        <div class="toggle-option" onclick="setMotion('real')">Real</div>
+                        <div class="toggle-option active" onclick="window.setMotion('gentle')">Gentle</div>
+                        <div class="toggle-option" onclick="window.setMotion('medium')">Medium</div>
+                        <div class="toggle-option" onclick="window.setMotion('real')">Real</div>
                     </div>
                 </div>
             </div>
@@ -590,26 +590,26 @@
                 </div>
                 
                 <!-- Export/Import Buttons -->
-                <button class="data-button" onclick="exportSave()">
+                <button class="data-button" onclick="window.exportSave()">
                     <span class="data-icon">📤</span>
                     <span>Export Save Data</span>
                 </button>
                 
-                <button class="data-button" onclick="importSave()">
+                <button class="data-button" onclick="window.importSave()">
                     <span class="data-icon">📥</span>
                     <span>Import Save Data</span>
                 </button>
             </div>
             
             <!-- Reset Progress Button -->
-            <div class="reset-button" onclick="resetProgress()">
+            <div class="reset-button" onclick="window.resetProgress()">
                 <span class="reset-icon">⚠️</span>
                 <span>Reset All Progress</span>
                 <span class="reset-icon">⚠️</span>
             </div>
             
             <!-- Back Button -->
-            <button class="back-button" onclick="goBack()">← Return</button>
+            <button class="back-button" onclick="window.goBack()">← Return</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -622,9 +622,13 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
@@ -642,6 +646,18 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
+
+        // Make functions available globally for onclick handlers
+        window.startDrag = startDrag;
+        window.setMusicSlider = setMusicSlider;
+        window.setAmbientSlider = setAmbientSlider;
+        window.setHaptic = setHaptic;
+        window.setAutoGather = setAutoGather;
+        window.setMotion = setMotion;
+        window.exportSave = exportSave;
+        window.importSave = importSave;
+        window.resetProgress = resetProgress;
+        window.goBack = goBack;
 
         // ===== SLIDER HANDLING =====
         let activeSlider = null;
@@ -662,8 +678,8 @@
             
             document.getElementById('musicFill').style.width = percent + '%';
             document.getElementById('musicValue').textContent = percent + '%';
-            if (typeof setMusicVolume === 'function') {
-                setMusicVolume(percent);
+            if (typeof window.setMusicVolume === 'function') {
+                window.setMusicVolume(percent);
             } else {
                 localStorage.setItem('voidfarer_music', percent.toString());
             }
@@ -680,8 +696,8 @@
             
             document.getElementById('ambientFill').style.width = percent + '%';
             document.getElementById('ambientValue').textContent = percent + '%';
-            if (typeof setAmbientVolume === 'function') {
-                setAmbientVolume(percent);
+            if (typeof window.setAmbientVolume === 'function') {
+                window.setAmbientVolume(percent);
             } else {
                 localStorage.setItem('voidfarer_ambient', percent.toString());
             }
@@ -702,8 +718,8 @@
                 
                 document.getElementById('musicFill').style.width = percent + '%';
                 document.getElementById('musicValue').textContent = percent + '%';
-                if (typeof setMusicVolume === 'function') {
-                    setMusicVolume(percent);
+                if (typeof window.setMusicVolume === 'function') {
+                    window.setMusicVolume(percent);
                 } else {
                     localStorage.setItem('voidfarer_music', percent.toString());
                 }
@@ -716,8 +732,8 @@
                 
                 document.getElementById('ambientFill').style.width = percent + '%';
                 document.getElementById('ambientValue').textContent = percent + '%';
-                if (typeof setAmbientVolume === 'function') {
-                    setAmbientVolume(percent);
+                if (typeof window.setAmbientVolume === 'function') {
+                    window.setAmbientVolume(percent);
                 } else {
                     localStorage.setItem('voidfarer_ambient', percent.toString());
                 }
@@ -747,8 +763,8 @@
                 
                 document.getElementById('musicFill').style.width = percent + '%';
                 document.getElementById('musicValue').textContent = percent + '%';
-                if (typeof setMusicVolume === 'function') {
-                    setMusicVolume(percent);
+                if (typeof window.setMusicVolume === 'function') {
+                    window.setMusicVolume(percent);
                 } else {
                     localStorage.setItem('voidfarer_music', percent.toString());
                 }
@@ -761,8 +777,8 @@
                 
                 document.getElementById('ambientFill').style.width = percent + '%';
                 document.getElementById('ambientValue').textContent = percent + '%';
-                if (typeof setAmbientVolume === 'function') {
-                    setAmbientVolume(percent);
+                if (typeof window.setAmbientVolume === 'function') {
+                    window.setAmbientVolume(percent);
                 } else {
                     localStorage.setItem('voidfarer_ambient', percent.toString());
                 }
@@ -786,16 +802,16 @@
             if (on) {
                 options[0].classList.add('active');
                 document.getElementById('hapticValue').textContent = 'On';
-                if (typeof setHapticsEnabled === 'function') {
-                    setHapticsEnabled(true);
+                if (typeof window.setHapticsEnabled === 'function') {
+                    window.setHapticsEnabled(true);
                 } else {
                     localStorage.setItem('voidfarer_haptics', 'true');
                 }
             } else {
                 options[1].classList.add('active');
                 document.getElementById('hapticValue').textContent = 'Off';
-                if (typeof setHapticsEnabled === 'function') {
-                    setHapticsEnabled(false);
+                if (typeof window.setHapticsEnabled === 'function') {
+                    window.setHapticsEnabled(false);
                 } else {
                     localStorage.setItem('voidfarer_haptics', 'false');
                 }
@@ -812,16 +828,16 @@
             if (on) {
                 options[0].classList.add('active');
                 document.getElementById('gatherValue').textContent = 'On';
-                if (typeof setAutoGatherEnabled === 'function') {
-                    setAutoGatherEnabled(true);
+                if (typeof window.setAutoGatherEnabled === 'function') {
+                    window.setAutoGatherEnabled(true);
                 } else {
                     localStorage.setItem('voidfarer_auto_gather', 'true');
                 }
             } else {
                 options[1].classList.add('active');
                 document.getElementById('gatherValue').textContent = 'Off';
-                if (typeof setAutoGatherEnabled === 'function') {
-                    setAutoGatherEnabled(false);
+                if (typeof window.setAutoGatherEnabled === 'function') {
+                    window.setAutoGatherEnabled(false);
                 } else {
                     localStorage.setItem('voidfarer_auto_gather', 'false');
                 }
@@ -849,8 +865,8 @@
             }
             
             document.getElementById('motionValue').textContent = value;
-            if (typeof setOrbitSpeed === 'function') {
-                setOrbitSpeed(speed);
+            if (typeof window.setOrbitSpeed === 'function') {
+                window.setOrbitSpeed(speed);
             } else {
                 localStorage.setItem('voidfarer_orbit_speed', speed);
             }
@@ -866,17 +882,17 @@
                 let colonies = [];
                 let player = { ship: 'Prospector' };
 
-                if (typeof getCollection === 'function') {
-                    collection = await getCollection();
+                if (typeof window.getCollection === 'function') {
+                    collection = await window.getCollection();
                 }
-                if (typeof getCredits === 'function') {
-                    credits = await getCredits();
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
                 }
-                if (typeof getColonies === 'function') {
-                    colonies = await getColonies();
+                if (typeof window.getColonies === 'function') {
+                    colonies = await window.getColonies();
                 }
-                if (typeof getPlayer === 'function') {
-                    player = await getPlayer() || { ship: 'Prospector' };
+                if (typeof window.getPlayer === 'function') {
+                    player = await window.getPlayer() || { ship: 'Prospector' };
                 }
 
                 const elementCount = Object.keys(collection || {}).length;
@@ -904,8 +920,8 @@
             
             try {
                 let saveData = '{}';
-                if (typeof exportGameData === 'function') {
-                    saveData = await exportGameData();
+                if (typeof window.exportGameData === 'function') {
+                    saveData = await window.exportGameData();
                 } else {
                     // Fallback export
                     const data = {
@@ -953,8 +969,8 @@
                 reader.onload = async function(e) {
                     try {
                         let success = false;
-                        if (typeof importGameData === 'function') {
-                            success = await importGameData(e.target.result);
+                        if (typeof window.importGameData === 'function') {
+                            success = await window.importGameData(e.target.result);
                         } else {
                             // Fallback import
                             const data = JSON.parse(e.target.result);
@@ -997,8 +1013,8 @@
                     loadingText.textContent = 'resetting universe...';
                     
                     try {
-                        if (typeof resetGame === 'function') {
-                            await resetGame();
+                        if (typeof window.resetGame === 'function') {
+                            await window.resetGame();
                         } else {
                             // Fallback reset
                             localStorage.clear();
@@ -1134,10 +1150,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
