@@ -265,7 +265,7 @@
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
         }
-
+        
         /* Progress bar for migration */
         .migration-progress {
             width: 250px;
@@ -288,7 +288,7 @@
             font-size: 14px;
             margin-top: 10px;
         }
-
+        
         /* Error message */
         .error-message {
             color: #ff6b6b;
@@ -320,48 +320,53 @@
             
             <!-- Menu Buttons -->
             <div class="menu-buttons">
-                <!-- Single Start Button (combines New Journey and Continue) -->
-                <div class="menu-button start-button" id="startBtn">
+                <div class="menu-button start-button" onclick="startGame()">
                     <span class="button-icon">🚀</span>
-                    <span class="button-text">Start Journey</span>
+                    <span class="button-text">START JOURNEY</span>
                 </div>
                 
-                <div class="menu-button settings-button" id="settingsBtn">
+                <div class="menu-button" onclick="continueGame()">
+                    <span class="button-icon">📦</span>
+                    <span class="button-text">LOAD GAME</span>
+                </div>
+                
+                <div class="menu-button settings-button" onclick="openSettings()">
                     <span class="button-icon">⚙️</span>
-                    <span class="button-text">Settings</span>
+                    <span class="button-text">SETTINGS</span>
                 </div>
                 
-                <div class="menu-button credits-button" id="creditsBtn">
-                    <span class="button-icon">✨</span>
-                    <span class="button-text">Credits</span>
+                <div class="menu-button credits-button" onclick="openCredits()">
+                    <span class="button-icon">📜</span>
+                    <span class="button-text">CREDITS</span>
                 </div>
             </div>
             
             <!-- Tagline -->
-            <div class="tagline">find your place in the cosmos</div>
+            <div class="tagline">✦ explore • mine • trade ✦</div>
             
             <!-- Version -->
-            <div class="version">v1.0 · alone in the stars</div>
-            
-            <!-- Error Message (hidden by default) -->
-            <div class="error-message" id="errorMessage"></div>
-            
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-spinner"></div>
-                <div class="loading-text" id="loadingText">initializing...</div>
-                <div class="migration-progress" id="migrationProgress">
-                    <div class="migration-progress-fill" id="migrationProgressFill"></div>
-                </div>
-                <div class="migration-status" id="migrationStatus"></div>
+            <div class="version">v0.5.0 • deep space</div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">initializing...</div>
+            <div class="migration-progress" id="migrationProgress">
+                <div class="migration-progress-fill" id="migrationProgressFill"></div>
             </div>
+            <div class="migration-status" id="migrationStatus"></div>
+            <div class="error-message" id="errorMessage"></div>
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- Load all JS files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+    <script src="js/navigation.js"></script>
 
+    <script>
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -374,167 +379,151 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
+        const migrationProgress = document.getElementById('migrationProgress');
         const migrationProgressFill = document.getElementById('migrationProgressFill');
         const migrationStatus = document.getElementById('migrationStatus');
         const errorMessage = document.getElementById('errorMessage');
-        
-        // Menu buttons
-        const startBtn = document.getElementById('startBtn');
-        const settingsBtn = document.getElementById('settingsBtn');
-        const creditsBtn = document.getElementById('creditsBtn');
 
-        // ===== SHOW LOADING OVERLAY =====
-        function showLoading(message = 'loading...') {
-            console.log('Showing loading:', message);
-            loadingText.textContent = message;
-            loadingOverlay.classList.add('active');
-        }
-
-        // ===== HIDE LOADING OVERLAY =====
-        function hideLoading() {
-            console.log('Hiding loading');
-            loadingOverlay.classList.remove('active');
-        }
-
-        // ===== SHOW ERROR =====
-        function showError(message) {
-            console.error('Error:', message);
-            errorMessage.textContent = '⚠️ ' + message;
-            errorMessage.classList.add('visible');
-            hideLoading();
-        }
-
-        // ===== NAVIGATION =====
-        function navigateTo(screen, useWarp = false) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            if (useWarp) {
-                showLoading('warping...');
-                migrationProgressFill.style.width = '0%';
-                migrationStatus.textContent = '';
-                
-                setTimeout(() => {
-                    window.location.href = screen;
-                }, 800);
-            } else {
-                window.location.href = screen;
-            }
-        }
-
-        // ===== UNIVERSE SEED =====
-        function initializeUniverse() {
-            if (!localStorage.getItem('voidfarer_universe_seed')) {
-                // Fixed seed - everyone gets the same universe
-                localStorage.setItem('voidfarer_universe_seed', '42793');
-            }
-        }
-
-        // ===== CHECK FOR EXISTING SAVE =====
-        function hasExistingSave() {
-            return localStorage.getItem('voidfarer_player') !== null;
-        }
-
-        // ===== CREATE OR LOAD SAVE =====
-        async function startGame() {
-            showLoading('starting your journey...');
-            migrationProgressFill.style.width = '30%';
-            
+        // ===== INITIALIZE DATABASE ON LOAD =====
+        async function initializeGame() {
             try {
-                const hasSave = hasExistingSave();
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'initializing database...';
                 
-                if (!hasSave) {
-                    // First time playing - create default save
-                    migrationStatus.textContent = 'creating new save...';
-                    
-                    // Set default player
-                    localStorage.setItem('voidfarer_player', JSON.stringify({
-                        name: 'Voidfarer',
-                        ship: 'Prospector',
-                        credits: 1000,
-                        created: new Date().toISOString()
-                    }));
-                    
-                    // Initialize universe seed
-                    initializeUniverse();
-                    
-                    // Set starting location
-                    localStorage.setItem('voidfarer_current_galaxy_sector', 'B2');
-                    localStorage.setItem('voidfarer_current_nebula', 'Orion Nebula');
-                    localStorage.setItem('voidfarer_current_star', 'Sol');
-                    localStorage.setItem('voidfarer_current_planet', 'Earth');
-                    
-                    // Default missions
-                    localStorage.setItem('voidfarer_missions', JSON.stringify([
-                        { element: 'Gold', current: 0, target: 50, planet: 'Pyros', sector: 'B2', nebula: 'Orion' },
-                        { element: 'Uranium', current: 0, target: 20, planet: 'Pyros-Deep', sector: 'B2', nebula: 'Orion' },
-                        { element: 'Promethium', current: 0, target: 5, planet: 'Aether-Veil', sector: 'B2', nebula: 'Orion' }
-                    ]));
-                    
-                    localStorage.setItem('voidfarer_credits', '12450');
-                    
-                    migrationStatus.textContent = 'new save created!';
-                } else {
-                    migrationStatus.textContent = 'loading existing save...';
+                // Initialize database
+                if (typeof initializeDatabase === 'function') {
+                    await initializeDatabase();
+                    console.log('Database initialized');
                 }
                 
-                migrationProgressFill.style.width = '70%';
+                loadingText.textContent = 'loading storage...';
                 
-                // Small delay for visual feedback
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Initialize storage
+                if (typeof initializeStorage === 'function') {
+                    await initializeStorage();
+                    console.log('Storage initialized');
+                }
                 
-                migrationProgressFill.style.width = '100%';
-                migrationStatus.textContent = 'welcome back, voidfarer...';
+                // Check if migration is needed
+                if (typeof isMigrationComplete === 'function') {
+                    const migrated = await isMigrationComplete();
+                    
+                    if (!migrated && typeof migrateFromLocalStorage === 'function') {
+                        loadingText.textContent = 'migrating data...';
+                        migrationProgress.style.display = 'block';
+                        
+                        // Simulate migration progress
+                        let progress = 0;
+                        const interval = setInterval(() => {
+                            progress += 10;
+                            migrationProgressFill.style.width = progress + '%';
+                            migrationStatus.textContent = `Migrating... ${progress}%`;
+                            
+                            if (progress >= 100) {
+                                clearInterval(interval);
+                            }
+                        }, 200);
+                        
+                        await migrateFromLocalStorage();
+                        
+                        setTimeout(() => {
+                            migrationProgress.style.display = 'none';
+                            migrationStatus.textContent = '';
+                        }, 1000);
+                    }
+                }
                 
-                // Navigate to Earth Hub with warp effect
-                navigateTo('earth-hub.html', true);
+                // Hide loading after initialization
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                errorMessage.textContent = 'Failed to initialize game. Please refresh.';
+                errorMessage.classList.add('visible');
+                loadingText.textContent = 'error';
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 3000);
+            }
+        }
+
+        // ===== START GAME (New Game) =====
+        async function startGame() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'starting new game...';
+            
+            try {
+                // Check if player exists, create if not
+                if (typeof getPlayer === 'function') {
+                    const player = await getPlayer();
+                    
+                    if (!player && typeof createDefaultPlayer === 'function') {
+                        await createDefaultPlayer();
+                        console.log('Created new player');
+                    }
+                }
+                
+                // Set default location
+                if (typeof setCurrentLocation === 'function') {
+                    setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
+                }
+                
+                // Set default planet
+                if (typeof setCurrentPlanet === 'function') {
+                    setCurrentPlanet('Earth', 'lush', ['Iron', 'Carbon', 'Silicon', 'Oxygen']);
+                }
+                
+                // Navigate to ship bridge
+                setTimeout(() => {
+                    window.location.href = 'ship-bridge.html';
+                }, 500);
                 
             } catch (error) {
                 console.error('Error starting game:', error);
-                showError('Failed to start game');
+                loadingOverlay.classList.remove('active');
+                alert('Failed to start game. Please try again.');
             }
         }
 
-        // ===== BUTTON CLICK HANDLERS =====
-        startBtn.addEventListener('click', startGame);
-
-        settingsBtn.addEventListener('click', () => {
-            console.log('Settings clicked');
-            navigateTo('settings.html');
-        });
-
-        creditsBtn.addEventListener('click', () => {
-            console.log('Credits clicked');
+        // ===== CONTINUE GAME (Load existing) =====
+        async function continueGame() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('✨ VOIDFARER ✨\n\nA peaceful journey through the stars\n\nFind your place in the cosmos\n\nVersion 1.0');
-        });
-
-        // ===== PRELOAD SCREENS =====
-        function preloadScreen(url) {
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.href = url;
-            link.as = 'document';
-            document.head.appendChild(link);
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'loading game...';
+            
+            try {
+                // Just navigate to ship bridge - data will load from there
+                setTimeout(() => {
+                    window.location.href = 'ship-bridge.html';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error loading game:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to load game. Please try again.');
+            }
         }
 
-        // ===== INITIALIZE =====
-        window.addEventListener('load', async () => {
-            console.log('Index.html loaded');
-            
-            // Preload next screen for faster transition
-            preloadScreen('earth-hub.html');
-            
-            // Initialize universe seed
-            initializeUniverse();
-            
-            // Hide loading overlay initially
-            hideLoading();
-        });
+        // ===== OPEN SETTINGS =====
+        function openSettings() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            alert('Settings will be available in the next update!');
+        }
+
+        // ===== OPEN CREDITS =====
+        function openCredits() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            alert('Voidfarer\n\nCreated by: You\n\nSpecial thanks to all players!');
+        }
+
+        // ===== START INITIALIZATION =====
+        initializeGame();
     </script>
-    
-    <!-- Load JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
