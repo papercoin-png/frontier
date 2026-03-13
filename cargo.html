@@ -718,22 +718,22 @@
             
             <!-- Filter Bar -->
             <div class="filter-bar">
-                <span class="filter-btn active" onclick="filterCargo('all')">All</span>
-                <span class="filter-btn" onclick="filterCargo('common')">Common</span>
-                <span class="filter-btn" onclick="filterCargo('uncommon')">Uncommon</span>
-                <span class="filter-btn" onclick="filterCargo('rare')">Rare</span>
-                <span class="filter-btn" onclick="filterCargo('very-rare')">Very Rare</span>
-                <span class="filter-btn" onclick="filterCargo('legendary')">Legendary</span>
+                <span class="filter-btn active" onclick="window.filterCargo('all')">All</span>
+                <span class="filter-btn" onclick="window.filterCargo('common')">Common</span>
+                <span class="filter-btn" onclick="window.filterCargo('uncommon')">Uncommon</span>
+                <span class="filter-btn" onclick="window.filterCargo('rare')">Rare</span>
+                <span class="filter-btn" onclick="window.filterCargo('very-rare')">Very Rare</span>
+                <span class="filter-btn" onclick="window.filterCargo('legendary')">Legendary</span>
             </div>
             
             <!-- Search Box -->
             <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search cargo..." oninput="searchCargo()">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search cargo..." oninput="window.searchCargo()">
             </div>
             
             <!-- Sort Bar -->
             <div class="sort-bar">
-                <select class="sort-select" id="sortSelect" onchange="sortCargo()">
+                <select class="sort-select" id="sortSelect" onchange="window.sortCargo()">
                     <option value="name">Sort by Name</option>
                     <option value="count">Sort by Quantity</option>
                     <option value="mass">Sort by Mass</option>
@@ -752,7 +752,7 @@
             <div class="scroll-hint">▼ scroll down to return to Ship Bridge ▼</div>
             
             <!-- Back button - SHIP BRIDGE -->
-            <button class="back-button" onclick="returnToShipBridge()">
+            <button class="back-button" onclick="window.returnToShipBridge()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">SHIP BRIDGE</span>
                 <span class="back-icon">🚀</span>
@@ -767,9 +767,9 @@
                 <div class="modal-current" id="ejectCurrentCount">Current: 0</div>
                 
                 <div class="eject-quantity">
-                    <button class="qty-btn" id="decrementBtn" onclick="decrementQty()">−</button>
+                    <button class="qty-btn" id="decrementBtn" onclick="window.decrementQty()">−</button>
                     <input type="number" id="ejectQuantity" value="1" min="1" max="99" readonly>
-                    <button class="qty-btn" id="incrementBtn" onclick="incrementQty()">+</button>
+                    <button class="qty-btn" id="incrementBtn" onclick="window.incrementQty()">+</button>
                 </div>
                 
                 <div class="eject-mass-info">
@@ -779,8 +779,8 @@
                 <div class="warning-text" id="ejectWarning"></div>
                 
                 <div class="modal-buttons">
-                    <button class="modal-btn eject-confirm" onclick="confirmEject()">🗑️ EJECT</button>
-                    <button class="modal-btn" onclick="closeEjectModal()">CANCEL</button>
+                    <button class="modal-btn eject-confirm" onclick="window.confirmEject()">🗑️ EJECT</button>
+                    <button class="modal-btn" onclick="window.closeEjectModal()">CANCEL</button>
                 </div>
             </div>
         </div>
@@ -795,14 +795,13 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
-    <script>
-        // ===== MAIN CARGO SCRIPT =====
-        const { openDB } = idb;
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -831,6 +830,17 @@
         const ejectWarning = document.getElementById('ejectWarning');
         const decrementBtn = document.getElementById('decrementBtn');
         const incrementBtn = document.getElementById('incrementBtn');
+
+        // Make functions available globally for onclick handlers
+        window.filterCargo = filterCargo;
+        window.searchCargo = searchCargo;
+        window.sortCargo = sortCargo;
+        window.showEjectModal = showEjectModal;
+        window.closeEjectModal = closeEjectModal;
+        window.incrementQty = incrementQty;
+        window.decrementQty = decrementQty;
+        window.confirmEject = confirmEject;
+        window.returnToShipBridge = returnToShipBridge;
 
         // ===== STATE =====
         let cargoItems = [];
@@ -1195,7 +1205,7 @@
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button class="eject-btn" onclick="showEjectModal('${item.name}', ${item.count}, ${item.massPerUnit})">🗑️ EJECT</button>
+                            <button class="eject-btn" onclick="window.showEjectModal('${item.name}', ${item.count}, ${item.massPerUnit})">🗑️ EJECT</button>
                         </div>
                     </div>
                 `;
