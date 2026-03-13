@@ -626,8 +626,56 @@
         </div>
     </div>
 
+    <!-- Load all JS files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+
+    <!-- FALLBACK FUNCTIONS -->
     <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
+    (function() {
+        console.log('Surface.html initializing with fallbacks');
+        
+        // Define fallback functions
+        window.getCredits = window.getCredits || function() { 
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000; 
+        };
+
+        window.getCollection = window.getCollection || function() {
+            const saved = localStorage.getItem('voidfarer_collection');
+            return saved ? JSON.parse(saved) : {};
+        };
+
+        window.addElementToCollection = window.addElementToCollection || function(elementName, count) {
+            let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+            if (collection[elementName]) {
+                collection[elementName].count = (collection[elementName].count || 1) + count;
+            } else {
+                collection[elementName] = { count: count, firstFound: new Date().toISOString() };
+            }
+            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+            return { success: true };
+        };
+
+        window.getElementMass = window.getElementMass || function(elementName) {
+            const masses = {
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
+                'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
+                'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
+                'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
+                'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
+                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
+                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
+                'default': 100.0
+            };
+            return masses[elementName] || masses.default;
+        };
+    })();
+    </script>
+
+    <script>
+        // ===== MAIN SURFACE SCRIPT =====
         const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
@@ -645,7 +693,6 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
         const resourcesGrid = document.getElementById('resourcesGrid');
         const extractQuantity = document.getElementById('extractQuantity');
         const decrementBtn = document.getElementById('decrementBtn');
@@ -688,27 +735,6 @@
             'default': '🔹'
         };
 
-        // ===== ELEMENT MASS DATABASE =====
-        const elementMasses = {
-            'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
-            'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
-            'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
-            'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
-            'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
-            'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
-            'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
-            'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
-            'default': 100.0
-        };
-
-        // ===== GET ELEMENT MASS =====
-        function getElementMass(elementName) {
-            if (typeof window.getElementMass === 'function') {
-                return window.getElementMass(elementName);
-            }
-            return elementMasses[elementName] || elementMasses.default;
-        }
-
         // ===== GET ELEMENT ICON =====
         function getElementIcon(elementName) {
             return elementIcons[elementName] || elementIcons.default;
@@ -717,16 +743,37 @@
         // ===== LOAD PLANET DATA =====
         async function loadPlanetData() {
             try {
-                // Get planet data from localStorage
-                const planetName = localStorage.getItem('voidfarer_current_planet') || 'Earth';
-                const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                console.log('Loading planet data from localStorage:');
+                console.log('- Planet:', localStorage.getItem('voidfarer_current_planet'));
+                console.log('- Type:', localStorage.getItem('voidfarer_current_planet_type'));
+                console.log('- Resources:', localStorage.getItem('voidfarer_current_planet_resources'));
                 
-                // Get resources - either from storage or generate based on planet type
+                // Get planet data from localStorage
+                const planetName = localStorage.getItem('voidfarer_current_planet');
+                const planetType = localStorage.getItem('voidfarer_current_planet_type');
+                
+                // If no planet data exists, set Earth as default
+                if (!planetName || !planetType) {
+                    console.log('No planet data found, setting Earth as default');
+                    localStorage.setItem('voidfarer_current_planet', 'Earth');
+                    localStorage.setItem('voidfarer_current_planet_type', 'lush');
+                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
+                    
+                    // Reload data
+                    return loadPlanetData();
+                }
+                
+                // Get resources
                 let planetResources = [];
                 const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
                 
                 if (savedResources) {
-                    planetResources = JSON.parse(savedResources);
+                    try {
+                        planetResources = JSON.parse(savedResources);
+                    } catch (e) {
+                        console.error('Error parsing resources, using defaults');
+                        planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
+                    }
                 } else {
                     // Generate resources based on planet type
                     if (planetType.includes('lush')) {
@@ -762,10 +809,9 @@
                 document.getElementById('planetType').textContent = currentPlanet.typeName;
                 document.getElementById('planetIcon').textContent = currentPlanet.icon;
                 
-                // Render resources
-                renderResources();
-                
+                console.log('Planet data loaded successfully:', currentPlanet);
                 return true;
+                
             } catch (error) {
                 console.error('Error loading planet data:', error);
                 return false;
@@ -798,7 +844,7 @@
                 currentMass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
-                    const mass = getElementMass(name);
+                    const mass = window.getElementMass(name);
                     currentMass += count * mass;
                 }
                 
@@ -806,6 +852,7 @@
                 updateCargoDisplay();
                 
                 return true;
+                
             } catch (error) {
                 console.error('Error loading cargo:', error);
                 return false;
@@ -814,7 +861,6 @@
 
         // ===== UPDATE CARGO DISPLAY =====
         function updateCargoDisplay() {
-            // Update mass display
             const massPercent = (currentMass / CARGO_MASS_LIMIT) * 100;
             cargoMassDisplay.innerHTML = `Cargo: <span>${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT}</span> AMU`;
             capacityBar.style.width = Math.min(100, massPercent) + '%';
@@ -855,50 +901,28 @@
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
             
             // Auto-extract 1-3 units of random resources
-            const extractCount = Math.floor(Math.random() * 3) + 1; // 1-3 resources
+            const extractCount = Math.floor(Math.random() * 3) + 1;
             const extracted = [];
             
             for (let i = 0; i < extractCount; i++) {
-                // Pick a random resource
                 const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
                 const resource = currentPlanet.resources[randomIndex];
-                
-                // Random quantity 1-3
                 const quantity = Math.floor(Math.random() * 3) + 1;
                 
-                // Check if we have space
-                const mass = getElementMass(resource);
+                const mass = window.getElementMass(resource);
                 const totalMass = mass * quantity;
                 
                 if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
-                    // Add to collection
                     if (typeof window.addElementToCollection === 'function') {
                         await window.addElementToCollection(resource, quantity);
-                    } else {
-                        // Fallback for testing
-                        let collection = {};
-                        const saved = localStorage.getItem('voidfarer_collection');
-                        collection = saved ? JSON.parse(saved) : {};
-                        
-                        if (collection[resource]) {
-                            collection[resource].count = (collection[resource].count || 1) + quantity;
-                        } else {
-                            collection[resource] = { count: quantity, firstFound: new Date().toISOString() };
-                        }
-                        
-                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
                     }
                     
                     extracted.push({ resource, quantity, icon: getElementIcon(resource) });
-                    
-                    // Update current mass
                     currentMass += totalMass;
                 }
             }
             
             if (extracted.length > 0) {
-                // Show auto-extract log
-                autoExtracted = extracted;
                 let logHtml = '';
                 extracted.forEach(item => {
                     logHtml += `
@@ -912,10 +936,8 @@
                 autoExtractItems.innerHTML = logHtml;
                 autoExtractLog.classList.add('visible');
                 
-                // Update cargo display
                 updateCargoDisplay();
                 
-                // Show success message briefly
                 successMessage.classList.add('visible');
                 setTimeout(() => {
                     successMessage.classList.remove('visible');
@@ -927,7 +949,6 @@
         function selectResource(resource) {
             selectedResource = resource;
             
-            // Update UI
             document.querySelectorAll('.resource-card').forEach(card => {
                 card.classList.remove('selected');
                 if (card.querySelector('.resource-name').textContent === resource) {
@@ -935,12 +956,9 @@
                 }
             });
             
-            // Update mass display
-            const mass = getElementMass(resource);
+            const mass = window.getElementMass(resource);
             massPerUnitSpan.textContent = mass.toFixed(1);
             updateTotalMass();
-            
-            // Check if we can extract
             validateExtraction();
         }
 
@@ -948,8 +966,7 @@
         function updateTotalMass() {
             const qty = parseInt(extractQuantity.value);
             const mass = parseFloat(massPerUnitSpan.textContent);
-            const total = qty * mass;
-            totalMassSpan.textContent = total.toFixed(1);
+            totalMassSpan.textContent = (qty * mass).toFixed(1);
         }
 
         // ===== INCREMENT QUANTITY =====
@@ -1006,45 +1023,24 @@
             try {
                 let result;
                 
-                // Call the add function from storage.js
                 if (typeof window.addElementToCollection === 'function') {
                     result = await window.addElementToCollection(selectedResource, quantity);
                 } else {
-                    // Fallback for testing
-                    console.log(`Extracting ${quantity} of ${selectedResource}`);
-                    
-                    // Update localStorage directly for demo
-                    let collection = {};
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
-                    
-                    if (collection[selectedResource]) {
-                        collection[selectedResource].count = (collection[selectedResource].count || 1) + quantity;
-                    } else {
-                        collection[selectedResource] = { count: quantity, firstFound: new Date().toISOString() };
-                    }
-                    
-                    localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
                     result = { success: true };
                 }
                 
                 if (result && result.success) {
-                    // Show success message
                     successMessage.classList.add('visible');
                     setTimeout(() => {
                         successMessage.classList.remove('visible');
                     }, 3000);
                     
-                    // Reload cargo data to update mass
                     await loadCargoData();
-                    
-                    // Update validation
                     validateExtraction();
                     
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
-                    alert('Failed to extract resources: ' + (result?.reason || 'Unknown error'));
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                    alert('Failed to extract resources');
                 }
                 
             } catch (error) {
@@ -1067,30 +1063,23 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'scanning surface...';
                 
-                // Log what we're loading
-                console.log('Loading planet data from localStorage:');
-                console.log('Planet:', localStorage.getItem('voidfarer_current_planet'));
-                console.log('Type:', localStorage.getItem('voidfarer_current_planet_type'));
-                console.log('Resources:', localStorage.getItem('voidfarer_current_planet_resources'));
-                
-                // Load all data
+                // Load planet data
                 const planetLoaded = await loadPlanetData();
-                const cargoLoaded = await loadCargoData();
                 
                 if (!planetLoaded) {
-                    console.log('Planet data not found, setting defaults');
-                    // Set default planet data
-                    localStorage.setItem('voidfarer_current_planet', 'Earth');
-                    localStorage.setItem('voidfarer_current_planet_type', 'lush');
-                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
-                    // Reload
-                    await loadPlanetData();
+                    throw new Error('Failed to load planet data');
                 }
+                
+                // Load cargo data
+                await loadCargoData();
+                
+                // Render resources
+                renderResources();
                 
                 // Set default quantity
                 extractQuantity.value = 1;
                 if (selectedResource) {
-                    const mass = getElementMass(selectedResource);
+                    const mass = window.getElementMass(selectedResource);
                     massPerUnitSpan.textContent = mass.toFixed(1);
                     updateTotalMass();
                 }
@@ -1108,12 +1097,12 @@
                 console.error('Init error:', error);
                 loadingText.textContent = 'error loading surface';
                 
-                // Set default planet data if none exists
+                // If no planet data, set defaults and reload
                 if (!localStorage.getItem('voidfarer_current_planet')) {
                     localStorage.setItem('voidfarer_current_planet', 'Earth');
                     localStorage.setItem('voidfarer_current_planet_type', 'lush');
                     localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
-                    // Reload
+                    
                     setTimeout(() => {
                         window.location.reload();
                     }, 1000);
@@ -1128,10 +1117,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
