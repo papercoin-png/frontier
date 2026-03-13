@@ -22,7 +22,6 @@ import {
 } from './db.js';
 
 // ===== CONSTANTS =====
-// UPDATED: Increased from 1000 to 5000 for 20-minute mining experience
 export const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can carry
 
 // ===== STORAGE KEYS (kept for reference, but not used for storage) =====
@@ -260,6 +259,8 @@ function setSetting(key, value) {
 
 // ===== INITIALIZATION =====
 export async function initializeStorage() {
+    console.log('Initializing storage...');
+    
     // Set universe seed (keep in localStorage - it's tiny)
     if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED)) {
         localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, UNIVERSE_SEED.toString());
@@ -292,37 +293,55 @@ export async function initializeStorage() {
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
+    
+    console.log('Storage initialized');
 }
 
 // ===== PLAYER DATA =====
 export async function getPlayer() {
-    return await getItem('player', 'main');
+    try {
+        return await getItem('player', 'main');
+    } catch (error) {
+        console.error('Error getting player:', error);
+        return null;
+    }
 }
 
 export async function savePlayer(playerData) {
-    await setItem('player', { id: 'main', ...playerData });
-    saveTimestamp();
+    try {
+        await setItem('player', { id: 'main', ...playerData });
+        saveTimestamp();
+        return true;
+    } catch (error) {
+        console.error('Error saving player:', error);
+        return false;
+    }
 }
 
 export async function createDefaultPlayer(name = 'Voidfarer') {
-    const player = {
-        id: 'main',
-        name: name,
-        ship: 'Prospector',
-        shipLevel: 1,
-        created: new Date().toISOString(),
-        lastPlayed: new Date().toISOString(),
-        playTime: 0,
-        totalElementsCollected: 0,
-        totalCreditsEarned: 5000,
-        totalDistanceTraveled: 0,
-        totalWarps: 0,
-        credits: 5000,
-        // UPDATED: Uses the new 5000 AMU cargo limit
-        cargoMassLimit: CARGO_MASS_LIMIT
-    };
-    await savePlayer(player);
-    return player;
+    try {
+        const player = {
+            id: 'main',
+            name: name,
+            ship: 'Prospector',
+            shipLevel: 1,
+            created: new Date().toISOString(),
+            lastPlayed: new Date().toISOString(),
+            playTime: 0,
+            totalElementsCollected: 0,
+            totalCreditsEarned: 5000,
+            totalDistanceTraveled: 0,
+            totalWarps: 0,
+            credits: 5000,
+            cargoMassLimit: CARGO_MASS_LIMIT
+        };
+        await savePlayer(player);
+        console.log('Created default player');
+        return player;
+    } catch (error) {
+        console.error('Error creating default player:', error);
+        return null;
+    }
 }
 
 // ===== CARGO MASS UTILITIES =====
@@ -331,233 +350,362 @@ export function getElementMass(elementName) {
 }
 
 export async function getTotalCargoMass() {
-    const collection = await getCollection();
-    let totalMass = 0;
-    
-    for (const [name, data] of Object.entries(collection)) {
-        const count = data.count || 1;
-        const mass = getElementMass(name);
-        totalMass += count * mass;
+    try {
+        const collection = await getCollection();
+        let totalMass = 0;
+        
+        for (const [name, data] of Object.entries(collection)) {
+            const count = data.count || 1;
+            const mass = getElementMass(name);
+            totalMass += count * mass;
+        }
+        
+        return totalMass;
+    } catch (error) {
+        console.error('Error calculating total cargo mass:', error);
+        return 0;
     }
-    
-    return totalMass;
 }
 
 export async function getRemainingCargoMass() {
-    const totalMass = await getTotalCargoMass();
-    const player = await getPlayer();
-    const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
-    
-    return Math.max(0, massLimit - totalMass);
+    try {
+        const totalMass = await getTotalCargoMass();
+        const player = await getPlayer();
+        const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
+        
+        return Math.max(0, massLimit - totalMass);
+    } catch (error) {
+        console.error('Error calculating remaining cargo mass:', error);
+        return CARGO_MASS_LIMIT;
+    }
 }
 
 export async function canAddToCargo(elementName, quantity = 1) {
-    const remainingMass = await getRemainingCargoMass();
-    const elementMass = getElementMass(elementName);
-    const requiredMass = elementMass * quantity;
-    
-    return remainingMass >= requiredMass;
+    try {
+        const remainingMass = await getRemainingCargoMass();
+        const elementMass = getElementMass(elementName);
+        const requiredMass = elementMass * quantity;
+        
+        return remainingMass >= requiredMass;
+    } catch (error) {
+        console.error('Error checking cargo space:', error);
+        return false;
+    }
 }
 
 // ===== COLLECTION DATA =====
 export async function getCollection() {
-    return await getCollectionAsObject();
+    try {
+        const collection = await getCollectionAsObject();
+        console.log('getCollection returning:', collection);
+        return collection;
+    } catch (error) {
+        console.error('Error getting collection:', error);
+        return {};
+    }
 }
 
 export async function saveCollection(collection) {
-    // This is a bulk operation - convert object back to individual records
-    const elements = [];
-    for (const [name, data] of Object.entries(collection)) {
-        elements.push({
-            name: name,
-            count: data.count || 1,
-            firstFound: data.firstFound || new Date().toISOString(),
-            rarity: data.rarity || 'common',
-            value: data.value || 100,
-            mass: getElementMass(name) // Store mass for quick reference
-        });
+    try {
+        // This is a bulk operation - convert object back to individual records
+        const elements = [];
+        for (const [name, data] of Object.entries(collection)) {
+            elements.push({
+                name: name,
+                count: data.count || 1,
+                firstFound: data.firstFound || new Date().toISOString(),
+                rarity: data.rarity || 'common',
+                value: data.value || 100,
+                mass: getElementMass(name)
+            });
+        }
+        
+        // Clear and rebuild (simpler than diffing)
+        const db = await getDb();
+        const tx = db.transaction('collection', 'readwrite');
+        await tx.objectStore('collection').clear();
+        
+        for (const element of elements) {
+            await tx.objectStore('collection').put(element);
+        }
+        await tx.done;
+        
+        saveTimestamp();
+        return true;
+    } catch (error) {
+        console.error('Error saving collection:', error);
+        return false;
     }
-    
-    // Clear and rebuild (simpler than diffing)
-    const db = await getDb();
-    const tx = db.transaction('collection', 'readwrite');
-    await tx.objectStore('collection').clear();
-    
-    for (const element of elements) {
-        await tx.objectStore('collection').put(element);
-    }
-    await tx.done;
-    
-    saveTimestamp();
 }
 
 export async function addElementToCollection(elementName, count = 1) {
-    // Check if we have enough cargo space
-    const canAdd = await canAddToCargo(elementName, count);
-    if (!canAdd) {
-        const remaining = await getRemainingCargoMass();
-        const elementMass = getElementMass(elementName);
-        const maxCanAdd = Math.floor(remaining / elementMass);
+    try {
+        console.log(`Adding ${count} of ${elementName} to collection`);
         
-        return { 
-            success: false, 
-            reason: 'insufficient_cargo_space',
-            remainingMass: remaining,
-            elementMass: elementMass,
-            maxCanAdd: maxCanAdd
-        };
+        // Check if we have enough cargo space
+        const canAdd = await canAddToCargo(elementName, count);
+        if (!canAdd) {
+            const remaining = await getRemainingCargoMass();
+            const elementMass = getElementMass(elementName);
+            const maxCanAdd = Math.floor(remaining / elementMass);
+            
+            console.log('Insufficient cargo space');
+            return { 
+                success: false, 
+                reason: 'insufficient_cargo_space',
+                remainingMass: remaining,
+                elementMass: elementMass,
+                maxCanAdd: maxCanAdd
+            };
+        }
+        
+        const result = await dbAddElement(elementName, count);
+        console.log('dbAddElement result:', result);
+        
+        if (result && result.success) {
+            // Update player stats
+            const player = await getPlayer();
+            if (player) {
+                player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
+                await savePlayer(player);
+            }
+            
+            return { success: true, newCount: result.count };
+        } else {
+            return { success: false, reason: 'database_error' };
+        }
+        
+    } catch (error) {
+        console.error('Error adding element to collection:', error);
+        return { success: false, reason: 'error', error: error.message };
     }
-    
-    const result = await dbAddElement(elementName, count);
-    
-    // Update player stats
-    const player = await getPlayer();
-    if (player) {
-        player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
-        await savePlayer(player);
-    }
-    
-    return { success: true, newCount: result.count };
 }
 
 export async function removeElementFromCollection(elementName, count = 1) {
-    return await dbRemoveElement(elementName, count);
+    try {
+        console.log(`Removing ${count} of ${elementName} from collection`);
+        const result = await dbRemoveElement(elementName, count);
+        console.log('dbRemoveElement result:', result);
+        return result;
+    } catch (error) {
+        console.error('Error removing element from collection:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
 }
 
 export async function safeSellElement(elementName, quantity, pricePerUnit) {
-    const collection = await getCollection();
-    const credits = await getCredits();
-    
-    if (!collection[elementName]) {
-        return { success: false, reason: 'not_found' };
+    try {
+        const collection = await getCollection();
+        const credits = await getCredits();
+        
+        if (!collection[elementName]) {
+            return { success: false, reason: 'not_found' };
+        }
+        
+        if (collection[elementName].count < quantity) {
+            return { success: false, reason: 'insufficient', available: collection[elementName].count };
+        }
+        
+        // Remove from collection
+        const removeResult = await dbRemoveElement(elementName, quantity);
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add credits
+        const earnings = quantity * pricePerUnit;
+        const newCredits = credits + earnings;
+        await saveCredits(newCredits);
+        
+        console.log(`Sold ${quantity} of ${elementName} for ${earnings}⭐`);
+        return { 
+            success: true, 
+            earnings: earnings,
+            newCredits: newCredits
+        };
+        
+    } catch (error) {
+        console.error('Error selling element:', error);
+        return { success: false, reason: 'error', error: error.message };
     }
-    
-    if (collection[elementName].count < quantity) {
-        return { success: false, reason: 'insufficient', available: collection[elementName].count };
-    }
-    
-    // Remove from collection
-    const removeResult = await dbRemoveElement(elementName, quantity);
-    if (!removeResult.success) {
-        return removeResult;
-    }
-    
-    // Add credits
-    const earnings = quantity * pricePerUnit;
-    const newCredits = credits + earnings;
-    await saveCredits(newCredits);
-    
-    return { 
-        success: true, 
-        earnings: earnings,
-        newCredits: newCredits
-    };
 }
 
 export async function getElementCount(elementName) {
-    const element = await getItem('collection', elementName);
-    return element?.count || 0;
+    try {
+        const element = await getItem('collection', elementName);
+        return element?.count || 0;
+    } catch (error) {
+        console.error('Error getting element count:', error);
+        return 0;
+    }
 }
 
 export async function getUniqueElementsCount() {
-    const elements = await getAll('collection');
-    return elements.length;
+    try {
+        const elements = await getAll('collection');
+        return elements.length;
+    } catch (error) {
+        console.error('Error getting unique elements count:', error);
+        return 0;
+    }
 }
 
 export async function getTotalElementCount() {
-    const elements = await getAll('collection');
-    let total = 0;
-    elements.forEach(element => {
-        total += element.count || 1;
-    });
-    return total;
+    try {
+        const elements = await getAll('collection');
+        let total = 0;
+        elements.forEach(element => {
+            total += element.count || 1;
+        });
+        return total;
+    } catch (error) {
+        console.error('Error getting total element count:', error);
+        return 0;
+    }
 }
 
 // ===== CREDITS =====
 export async function getCredits() {
-    const player = await getPlayer();
-    return player?.credits || 5000;
+    try {
+        const player = await getPlayer();
+        return player?.credits || 5000;
+    } catch (error) {
+        console.error('Error getting credits:', error);
+        return 5000;
+    }
 }
 
 export async function saveCredits(credits) {
-    const player = await getPlayer();
-    if (player) {
-        player.credits = credits;
-        await savePlayer(player);
+    try {
+        const player = await getPlayer();
+        if (player) {
+            player.credits = credits;
+            await savePlayer(player);
+        }
+        saveTimestamp();
+        return true;
+    } catch (error) {
+        console.error('Error saving credits:', error);
+        return false;
     }
-    saveTimestamp();
 }
 
 export async function addCredits(amount) {
-    const current = await getCredits();
-    const newTotal = current + amount;
-    await saveCredits(newTotal);
-    
-    // Update player stats
-    const player = await getPlayer();
-    if (player) {
-        player.totalCreditsEarned = (player.totalCreditsEarned || 5000) + amount;
-        await savePlayer(player);
+    try {
+        const current = await getCredits();
+        const newTotal = current + amount;
+        await saveCredits(newTotal);
+        
+        // Update player stats
+        const player = await getPlayer();
+        if (player) {
+            player.totalCreditsEarned = (player.totalCreditsEarned || 5000) + amount;
+            await savePlayer(player);
+        }
+        
+        return newTotal;
+    } catch (error) {
+        console.error('Error adding credits:', error);
+        return 5000;
     }
-    
-    return newTotal;
 }
 
 export async function spendCredits(amount) {
-    const current = await getCredits();
-    if (current >= amount) {
-        await saveCredits(current - amount);
-        return true;
+    try {
+        const current = await getCredits();
+        if (current >= amount) {
+            await saveCredits(current - amount);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error spending credits:', error);
+        return false;
     }
-    return false;
 }
 
 // ===== SHIP FUEL (keep in localStorage for quick access) =====
 export function getShipFuel() {
-    const fuel = localStorage.getItem(STORAGE_KEYS.SHIP_FUEL);
-    return fuel ? parseInt(fuel) : 100;
+    try {
+        const fuel = localStorage.getItem(STORAGE_KEYS.SHIP_FUEL);
+        return fuel ? parseInt(fuel) : 100;
+    } catch (error) {
+        console.error('Error getting ship fuel:', error);
+        return 100;
+    }
 }
 
 export function saveShipFuel(fuel) {
-    localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
+    try {
+        localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
+    } catch (error) {
+        console.error('Error saving ship fuel:', error);
+    }
 }
 
 export function useFuel(amount) {
-    const current = getShipFuel();
-    if (current >= amount) {
-        saveShipFuel(current - amount);
-        return true;
+    try {
+        const current = getShipFuel();
+        if (current >= amount) {
+            saveShipFuel(current - amount);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error using fuel:', error);
+        return false;
     }
-    return false;
 }
 
 export function refuelShip(amount) {
-    const current = getShipFuel();
-    saveShipFuel(Math.min(100, current + amount));
+    try {
+        const current = getShipFuel();
+        saveShipFuel(Math.min(100, current + amount));
+    } catch (error) {
+        console.error('Error refueling ship:', error);
+    }
 }
 
 // ===== SHIP POWER (keep in localStorage for quick access) =====
 export function getShipPower() {
-    const power = localStorage.getItem(STORAGE_KEYS.SHIP_POWER);
-    return power ? parseInt(power) : 100;
+    try {
+        const power = localStorage.getItem(STORAGE_KEYS.SHIP_POWER);
+        return power ? parseInt(power) : 100;
+    } catch (error) {
+        console.error('Error getting ship power:', error);
+        return 100;
+    }
 }
 
 export function setShipPower(power) {
-    localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
+    try {
+        localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
+    } catch (error) {
+        console.error('Error setting ship power:', error);
+    }
 }
 
 export function usePower(amount) {
-    const current = getShipPower();
-    if (current >= amount) {
-        setShipPower(current - amount);
-        return true;
+    try {
+        const current = getShipPower();
+        if (current >= amount) {
+            setShipPower(current - amount);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error using power:', error);
+        return false;
     }
-    return false;
 }
 
 export function repairShip(amount) {
-    const current = getShipPower();
-    setShipPower(Math.min(100, current + amount));
+    try {
+        const current = getShipPower();
+        setShipPower(Math.min(100, current + amount));
+    } catch (error) {
+        console.error('Error repairing ship:', error);
+    }
 }
 
 // ===== LOCATION DATA - GALAXY LEVEL (keep in localStorage) =====
@@ -860,7 +1008,7 @@ export async function saveRealEstate(realEstateData) {
                     propertyId: property.id,
                     elementName: elementName,
                     count: itemData.count || 1,
-                    mass: getElementMass(elementName) // Store mass for property items too
+                    mass: getElementMass(elementName)
                 });
             }
         }
@@ -975,7 +1123,7 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
     }
     await collectionStore.put(collectionItem);
     
-    // Update property used space (now using mass)
+    // Update property used space
     const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
     property.used = remainingItems.reduce((sum, i) => sum + (i.count * (i.mass || getElementMass(i.elementName))), 0);
     await propertyStore.put(property);
@@ -1088,7 +1236,7 @@ export async function upgradeShip(component) {
 async function upgradeCargoHold(newLevel) {
     const player = await getPlayer();
     if (player) {
-        // Base limit 5000, increase by 1000 per level (scaled for new 5000 limit)
+        // Base limit 5000, increase by 1000 per level
         player.cargoMassLimit = CARGO_MASS_LIMIT + (newLevel - 1) * 1000;
         await savePlayer(player);
     }
@@ -1300,10 +1448,10 @@ window.setCurrentLocation = setCurrentLocation;
 window.setWarpData = setWarpData;
 window.getWarpData = getWarpData;
 window.clearWarpData = clearWarpData;
-window.getTotalCargoMass = getTotalCargoMass;  // Added for bridge display
-window.getRemainingCargoMass = getRemainingCargoMass;  // Added for bridge display
-window.refuelShip = refuelShip;  // Added for quick actions
-window.repairShip = repairShip;  // Added for quick actions
+window.getTotalCargoMass = getTotalCargoMass;
+window.getRemainingCargoMass = getRemainingCargoMass;
+window.refuelShip = refuelShip;
+window.repairShip = repairShip;
 
 // ===== INITIALIZE ON LOAD =====
 // We'll export the initialization function and let the app call it
