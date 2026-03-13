@@ -6,7 +6,6 @@ import {
     getItem,
     setItem,
     addTaxRecord as storageAddTaxRecord,
-    getTaxHistory,
     getCommunityFund,
     addToCommunityFund
 } from './storage.js';
@@ -231,6 +230,34 @@ export async function getTaxHistory(playerId, limit = 100) {
     return await storageGetTaxHistory(playerId, limit);
 }
 
+// Helper function to get tax history from storage
+async function storageGetTaxHistory(playerId, limit = 100) {
+    try {
+        const allTransactions = await getAllTaxTransactions();
+        
+        if (playerId) {
+            const playerTxs = allTransactions.filter(tx => tx.playerId === playerId);
+            return playerTxs.slice(-limit);
+        }
+        
+        return allTransactions.slice(-limit);
+    } catch (error) {
+        console.error('Error getting tax history:', error);
+        return [];
+    }
+}
+
+// Helper function to get all tax transactions
+async function getAllTaxTransactions() {
+    try {
+        const db = await getDb();
+        return await db.getAll('taxTransactions') || [];
+    } catch (error) {
+        console.error('Error getting all tax transactions:', error);
+        return [];
+    }
+}
+
 export async function addTaxRecord(record) {
     return await storageAddTaxRecord(record);
 }
@@ -401,6 +428,32 @@ export function getTaxDescription(taxType) {
     return descriptions[taxType] || 'Tax payment';
 }
 
+// Helper functions for community fund
+async function storageGetCommunityFund() {
+    return await getItem('communityFund', 'main');
+}
+
+async function storageAddToCommunityFund(amount, taxRecordId) {
+    const fund = await storageGetCommunityFund();
+    if (!fund) return false;
+    
+    fund.balance += amount;
+    fund.contributions = fund.contributions || [];
+    fund.contributions.push({
+        amount,
+        taxRecordId,
+        timestamp: Date.now()
+    });
+    
+    await setItem('communityFund', fund);
+    return true;
+}
+
+// Helper to get database instance
+async function getDb() {
+    return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
+}
+
 // ===== EXPORT =====
 export default {
     TAX_TYPES,
@@ -430,24 +483,3 @@ export default {
     formatTaxRate,
     getTaxDescription
 };
-
-// Helper imports for functions used above
-async function storageGetCommunityFund() {
-    return await getItem('communityFund', 'main');
-}
-
-async function storageAddToCommunityFund(amount, taxRecordId) {
-    const fund = await storageGetCommunityFund();
-    if (!fund) return false;
-    
-    fund.balance += amount;
-    fund.contributions = fund.contributions || [];
-    fund.contributions.push({
-        amount,
-        taxRecordId,
-        timestamp: Date.now()
-    });
-    
-    await setItem('communityFund', fund);
-    return true;
-}
