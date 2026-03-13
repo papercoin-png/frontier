@@ -583,7 +583,7 @@
             100% { opacity: 0.5; }
         }
         
-        /* Enhanced Back Button */
+        /* Enhanced Back Button - Updated to SHIP BRIDGE */
         .back-button {
             position: fixed;
             bottom: 20px;
@@ -749,13 +749,13 @@
             </div>
             
             <!-- Scroll Hint -->
-            <div class="scroll-hint">▼ scroll down to return to Earth Hub ▼</div>
+            <div class="scroll-hint">▼ scroll down to return to Ship Bridge ▼</div>
             
-            <!-- Back button -->
-            <button class="back-button" onclick="returnToEarthHub()">
+            <!-- Back button - UPDATED to SHIP BRIDGE -->
+            <button class="back-button" onclick="returnToShipBridge()">
                 <span class="back-arrow">←</span>
-                <span class="back-text">EARTH HUB</span>
-                <span class="back-icon">🌍</span>
+                <span class="back-text">SHIP BRIDGE</span>
+                <span class="back-icon">🚀</span>
             </button>
         </div>
         
@@ -878,6 +878,7 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
         const cargoGrid = document.getElementById('cargoGrid');
         
         // Eject modal elements
@@ -904,14 +905,23 @@
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
+            // Common
             'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
-            'Boron': '🧪', 'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨',
-            'Fluorine': '🧪', 'Neon': '💡', 'Sodium': '🧂', 'Magnesium': '✨',
-            'Aluminum': '🥫', 'Silicon': '💻', 'Phosphorus': '✨', 'Sulfur': '🟡',
-            'Chlorine': '🧪', 'Argon': '🎈', 'Potassium': '🍌', 'Calcium': '🥛',
-            'Iron': '⚙️', 'Nickel': '🔩', 'Copper': '🔴', 'Zinc': '⚪',
-            'Silver': '⚪', 'Gold': '🟡', 'Platinum': '⬜', 'Titanium': '🔷',
-            'Uranium': '🟣', 'Thorium': '🔮', 'Plutonium': '☢️', 'Promethium': '✨',
+            'Boron': '🧪', 'Sodium': '🧂', 'Magnesium': '✨', 'Aluminum': '🥫',
+            'Silicon': '💻', 'Potassium': '🍌', 'Calcium': '🥛',
+            
+            // Uncommon
+            'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨', 'Fluorine': '🧪',
+            'Neon': '💡', 'Phosphorus': '✨', 'Sulfur': '🟡', 'Chlorine': '🧪',
+            'Argon': '🎈', 'Iron': '⚙️', 'Nickel': '🔩', 'Lead': '🔘',
+            
+            // Rare
+            'Gold': '🟡', 'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷',
+            'Copper': '🔴', 'Zinc': '⚪', 'Tin': '🥫', 'Cobalt': '🔵',
+            'Chromium': '✨', 'Mercury': '💧', 'Uranium': '🟣', 'Thorium': '🔮',
+            'Plutonium': '☢️', 'Promethium': '✨',
+            
+            // Default
             'default': '🔹'
         };
 
@@ -927,15 +937,32 @@
         // ===== ELEMENT BASE VALUES =====
         const elementValues = {
             'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-            'Boron': 100, 'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250,
-            'Fluorine': 250, 'Neon': 250, 'Sodium': 100, 'Magnesium': 100,
-            'Aluminum': 100, 'Silicon': 100, 'Phosphorus': 250, 'Sulfur': 250,
-            'Chlorine': 250, 'Argon': 250, 'Potassium': 100, 'Calcium': 100,
-            'Iron': 250, 'Nickel': 250, 'Copper': 1000, 'Zinc': 1000,
-            'Silver': 1000, 'Gold': 1000, 'Platinum': 1000, 'Titanium': 1000,
-            'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000, 'Promethium': 25000,
+            'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
+            'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
+            'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
+            'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
+            'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
+            'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Titanium': 1000,
+            'Copper': 1000, 'Zinc': 1000, 'Tin': 1000, 'Cobalt': 1000,
+            'Chromium': 1000, 'Mercury': 1000, 'Uranium': 5000, 'Thorium': 5000,
+            'Plutonium': 5000, 'Promethium': 25000,
             'default': 100
         };
+
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            // Try the global function first (from storage.js)
+            if (typeof window.getElementMass === 'function') {
+                return window.getElementMass(elementName);
+            }
+            // Fallback
+            const masses = {
+                'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1, 'Uranium': 238.0,
+                'Promethium': 145.0, 'Iron': 55.85, 'Carbon': 12.01, 'Oxygen': 16.00,
+                'Hydrogen': 1.008, 'Helium': 4.003, 'default': 100.0
+            };
+            return masses[elementName] || masses.default;
+        }
 
         // ===== GET ELEMENT ICON =====
         function getElementIcon(elementName) {
@@ -991,7 +1018,7 @@
                 
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
-                    const massPerUnit = window.getElementMass(name);
+                    const massPerUnit = getElementMass(name);
                     const totalItemMass = count * massPerUnit;
                     const valuePerUnit = getElementValue(name);
                     const totalItemValue = count * valuePerUnit;
@@ -1207,21 +1234,41 @@
             try {
                 let result;
                 
-                // Call the remove function
+                // Call the remove function from storage.js
                 if (typeof window.removeElementFromCollection === 'function') {
                     result = await window.removeElementFromCollection(currentEjectItem, quantity);
                 } else {
-                    // Fallback
+                    // Fallback for testing
                     console.log(`Would eject ${quantity} of ${currentEjectItem}`);
+                    
+                    // Update localStorage directly for demo
+                    let collection = {};
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
+                    
+                    if (collection[currentEjectItem]) {
+                        collection[currentEjectItem].count -= quantity;
+                        if (collection[currentEjectItem].count <= 0) {
+                            delete collection[currentEjectItem];
+                        }
+                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    }
+                    
                     result = { success: true };
                 }
                 
                 if (result && result.success) {
+                    // Close modal
                     closeEjectModal();
+                    
+                    // Reload cargo data
                     await loadCargoData();
+                    
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
+                    // Show error
                     ejectWarning.textContent = result?.reason || 'Failed to eject cargo';
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                 }
                 
             } catch (error) {
@@ -1232,10 +1279,10 @@
             loadingOverlay.classList.remove('active');
         }
 
-        // ===== RETURN TO EARTH HUB =====
-        function returnToEarthHub() {
+        // ===== RETURN TO SHIP BRIDGE (UPDATED FUNCTION) =====
+        function returnToShipBridge() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'earth-hub.html';
+            window.location.href = 'ship-bridge.html';
         }
 
         // ===== INITIALIZE =====
@@ -1244,9 +1291,11 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading cargo hold...';
                 
-                await loadCargoData();
-                
-                setTimeout(() => {
+                // Wait a moment for storage to be ready
+                setTimeout(async () => {
+                    // Load cargo data
+                    await loadCargoData();
+                    
                     loadingOverlay.classList.remove('active');
                 }, 500);
                 
@@ -1259,6 +1308,7 @@
             }
         }
 
+        // ===== START =====
         init();
     </script>
 </body>
