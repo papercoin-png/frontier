@@ -576,7 +576,7 @@
 
         // ===== CALCULATE FIXED RESOURCE CHANCE =====
         function calculateResourceChance(resource) {
-            // Original working chances - DO NOT CHANGE
+            // Original working chances
             if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
                 return Math.floor(Math.random() * 20) + 80; // 80-100%
             } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
@@ -605,7 +605,14 @@
             if (typeof window.getElementMass === 'function') {
                 return window.getElementMass(elementName);
             }
-            return 100.0; // Fallback
+            // Fallback masses for common elements
+            const masses = {
+                'Iron': 55.85, 'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1,
+                'Carbon': 12.01, 'Oxygen': 16.00, 'Hydrogen': 1.008, 'Uranium': 238.0,
+                'Titanium': 47.87, 'Copper': 63.55, 'Aluminum': 26.98, 'Silicon': 28.09,
+                'default': 100.0
+            };
+            return masses[elementName] || masses.default;
         }
 
         // ===== LOAD PLANET DATA =====
@@ -726,11 +733,6 @@
                     clearInterval(extractionTimer);
                     extractionTimer = null;
                 }
-            } else if (currentMass < CARGO_MASS_LIMIT && !isExtracting && extractionTimer === null) {
-                // Restart extraction if space available
-                isExtracting = true;
-                extractorText.textContent = 'Auto-extractor active';
-                startExtraction();
             }
         }
 
@@ -834,11 +836,6 @@
                             showToast(resource, true);
                         }
                     }
-                } else {
-                    // Cargo would overflow
-                    isExtracting = false;
-                    extractorText.textContent = 'Cargo full - extraction paused';
-                    showToast(resource, false);
                 }
             } else {
                 showToast(resource, false);
@@ -877,16 +874,18 @@
             for (let i = 0; i < extractCount; i++) {
                 const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
                 const resource = currentPlanet.resources[randomIndex];
-                const quantity = Math.floor(Math.random() * 3) + 1;
+                const quantity = 1;
                 
                 const mass = getElementMass(resource);
                 const totalMass = mass * quantity;
                 
                 if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
                     if (typeof window.addElementToCollection === 'function') {
-                        await window.addElementToCollection(resource, quantity);
-                        currentMass += totalMass;
-                        showToast(resource, true);
+                        const result = await window.addElementToCollection(resource, quantity);
+                        if (result && result.success) {
+                            currentMass += totalMass;
+                            showToast(resource, true);
+                        }
                     }
                 }
             }
@@ -910,10 +909,10 @@
                 // Load cargo data
                 await loadCargoData();
                 
-                // Auto-extract on landing
+                // Auto-extract on landing FIRST
                 await performAutoExtract();
                 
-                // Start extraction timer
+                // THEN start extraction timer
                 startExtraction();
                 
                 setTimeout(() => {
