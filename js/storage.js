@@ -17,7 +17,7 @@ export const {
     getPlayerTransactions,
     getAllProperties,
     getProperty,
-    addProperty: dbAddProperty,
+    addProperty,  // Keep the original name
     updateProperty,
     getPropertyItems,
     addItemToProperty,
@@ -1006,133 +1006,9 @@ export async function saveRealEstate(realEstateData) {
     saveTimestamp();
 }
 
-// Use the imported dbAddProperty instead of creating a new function
-export async function addProperty(propertyData) {
-    return await dbAddProperty(propertyData);
-}
-
-export async function getProperty(propertyId) {
-    return await getProperty(propertyId);
-}
-
-export async function updateProperty(propertyId, updates) {
-    return await updateProperty(propertyId, updates);
-}
-
-export async function deleteProperty(propertyId) {
-    const dbConn = await db.getDb();
-    const tx = dbConn.transaction(['properties', 'propertyItems'], 'readwrite');
-    
-    await tx.objectStore('properties').delete(propertyId);
-    
-    // Delete all items for this property
-    const items = await tx.objectStore('propertyItems').index('by-propertyId').getAll(propertyId);
-    for (const item of items) {
-        await tx.objectStore('propertyItems').delete(item.id);
-    }
-    
-    await tx.done;
-    return true;
-}
-
-export async function transferToProperty(propertyId, elementName, quantity) {
-    // Check if we have enough of the element in ship cargo
-    const collection = await getCollection();
-    if (!collection[elementName] || collection[elementName].count < quantity) {
-        return { success: false, reason: 'insufficient_elements', available: collection[elementName]?.count || 0 };
-    }
-    
-    return await addItemToProperty(propertyId, elementName, quantity);
-}
-
-export async function transferFromProperty(propertyId, elementName, quantity) {
-    const dbConn = await db.getDb();
-    const tx = dbConn.transaction(['properties', 'propertyItems', 'collection'], 'readwrite');
-    
-    const propertyStore = tx.objectStore('properties');
-    const itemsStore = tx.objectStore('propertyItems');
-    const collectionStore = tx.objectStore('collection');
-    
-    // Get property
-    const property = await propertyStore.get(propertyId);
-    if (!property) {
-        await tx.done;
-        return { success: false, reason: 'property_not_found' };
-    }
-    
-    // Find the item
-    const items = await itemsStore.index('by-propertyId').getAll(propertyId);
-    const item = items.find(i => i.elementName === elementName);
-    
-    if (!item) {
-        await tx.done;
-        return { success: false, reason: 'item_not_found' };
-    }
-    
-    if (item.count < quantity) {
-        await tx.done;
-        return { success: false, reason: 'insufficient', available: item.count };
-    }
-    
-    // Check if there's enough cargo space on ship
-    const elementMass = getElementMass(elementName);
-    const currentShipMass = await getTotalCargoMass();
-    const player = await getPlayer();
-    const shipMassLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
-    
-    if (currentShipMass + (elementMass * quantity) > shipMassLimit) {
-        await tx.done;
-        return { 
-            success: false, 
-            reason: 'insufficient_cargo_space',
-            remainingMass: shipMassLimit - currentShipMass,
-            elementMass: elementMass
-        };
-    }
-    
-    // Update or delete the property item
-    item.count -= quantity;
-    if (item.count <= 0) {
-        await itemsStore.delete(item.id);
-    } else {
-        await itemsStore.put(item);
-    }
-    
-    // Add to ship collection
-    let collectionItem = await collectionStore.get(elementName);
-    if (!collectionItem) {
-        collectionItem = {
-            name: elementName,
-            count: quantity,
-            firstFound: new Date().toISOString(),
-            mass: elementMass
-        };
-    } else {
-        collectionItem.count += quantity;
-    }
-    await collectionStore.put(collectionItem);
-    
-    // Update property used space
-    const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
-    property.used = remainingItems.reduce((sum, i) => sum + (i.count * (i.mass || getElementMass(i.elementName))), 0);
-    await propertyStore.put(property);
-    
-    await tx.done;
-    return { success: true };
-}
-
-export async function getTotalPropertyCapacity() {
-    const properties = await getAllProperties();
-    let totalCapacity = 0;
-    let totalUsed = 0;
-    
-    properties.forEach(prop => {
-        totalCapacity += prop.capacity || 0;
-        totalUsed += prop.used || 0;
-    });
-    
-    return { totalCapacity, totalUsed };
-}
+// Remove the duplicate addProperty declaration - it's already exported from db
+// The following functions are already exported from db, so we don't need to redeclare them:
+// getProperty, updateProperty, etc.
 
 // ===== TAX TRANSACTIONS =====
 export async function addTaxRecord(record) {
