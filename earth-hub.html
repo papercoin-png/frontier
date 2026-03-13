@@ -330,7 +330,7 @@
             transform: rotate(90deg);
         }
         
-        /* Expanded Items - REDESIGNED for better fit */
+        /* Expanded Items */
         .group-items {
             display: none;
             padding: 10px;
@@ -753,7 +753,7 @@
             </div>
             
             <!-- Economic Alert Banner (dynamic) -->
-            <div class="alert-banner" id="alertBanner" style="display: none;" onclick="navigateTo('economy-dashboard.html')">
+            <div class="alert-banner" id="alertBanner" style="display: none;" onclick="window.navigateTo('economy-dashboard.html')">
                 <div class="alert-icon">📈</div>
                 <div class="alert-content">
                     <div class="alert-title" id="alertTitle">Economic Alert</div>
@@ -780,10 +780,10 @@
                 
                 <!-- Quick Sell Bar -->
                 <div class="quick-sell">
-                    <button class="quick-sell-btn" id="quickSell100" onclick="quickSell(100)">100⭐</button>
-                    <button class="quick-sell-btn" id="quickSell500" onclick="quickSell(500)">500⭐</button>
-                    <button class="quick-sell-btn" id="quickSell1000" onclick="quickSell(1000)">1000⭐</button>
-                    <button class="quick-sell-btn" id="quickSellAll" onclick="quickSell('all')">ALL</button>
+                    <button class="quick-sell-btn" id="quickSell100" onclick="window.quickSell(100)">100⭐</button>
+                    <button class="quick-sell-btn" id="quickSell500" onclick="window.quickSell(500)">500⭐</button>
+                    <button class="quick-sell-btn" id="quickSell1000" onclick="window.quickSell(1000)">1000⭐</button>
+                    <button class="quick-sell-btn" id="quickSellAll" onclick="window.quickSell('all')">ALL</button>
                 </div>
                 
                 <!-- Total Value Row -->
@@ -794,7 +794,7 @@
             </div>
             
             <!-- Tax Banner -->
-            <div class="tax-banner" onclick="navigateTo('tax-center.html')">
+            <div class="tax-banner" onclick="window.navigateTo('tax-center.html')">
                 <div class="tax-icon">💰</div>
                 <div class="tax-content">
                     <div class="tax-title">Tax Center</div>
@@ -822,7 +822,7 @@
                 
                 <!-- Chart Controls -->
                 <div class="chart-controls">
-                    <select id="chartElement" class="chart-select" onchange="updatePriceChart()">
+                    <select id="chartElement" class="chart-select" onchange="window.updatePriceChart()">
                         <option value="Gold">Gold</option>
                         <option value="Silver">Silver</option>
                         <option value="Platinum">Platinum</option>
@@ -830,7 +830,7 @@
                         <option value="Promethium">Promethium</option>
                     </select>
                     
-                    <select id="chartPeriod" class="chart-select" onchange="updatePriceChart()">
+                    <select id="chartPeriod" class="chart-select" onchange="window.updatePriceChart()">
                         <option value="7">7 Days</option>
                         <option value="30">30 Days</option>
                         <option value="90">90 Days</option>
@@ -840,25 +840,25 @@
             
             <!-- HUB CARDS GRID -->
             <div class="hub-grid">
-                <div class="hub-card" onclick="navigateTo('ship-bridge.html')">
+                <div class="hub-card" onclick="window.navigateTo('ship-bridge.html')">
                     <div class="hub-icon">🚀</div>
                     <div class="hub-label">Ship Bridge</div>
                     <div class="hub-desc">Return to your ship</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('cargo.html')">
+                <div class="hub-card" onclick="window.navigateTo('cargo.html')">
                     <div class="hub-icon">📦</div>
                     <div class="hub-label">Cargo Hold</div>
                     <div class="hub-desc">Manage inventory</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('real-estate.html')">
+                <div class="hub-card" onclick="window.navigateTo('real-estate.html')">
                     <div class="hub-icon">🏢</div>
                     <div class="hub-label">Real Estate</div>
                     <div class="hub-desc">Buy & manage storage</div>
                 </div>
                 
-                <div class="hub-card" onclick="navigateTo('economy-dashboard.html')">
+                <div class="hub-card" onclick="window.navigateTo('economy-dashboard.html')">
                     <div class="hub-icon">📊</div>
                     <div class="hub-label">Economy</div>
                     <div class="hub-desc">Galactic economic stats</div>
@@ -866,7 +866,7 @@
             </div>
             
             <!-- Back button to main menu -->
-            <button class="back-button" onclick="returnToMenu()">← MAIN MENU</button>
+            <button class="back-button" onclick="window.returnToMenu()">← MAIN MENU</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -879,9 +879,17 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/market-dynamics.js"></script>
+    <script type="module" src="js/economic-events.js"></script>
+    <script type="module" src="js/tax-system.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
+        import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -898,11 +906,19 @@
         const migrationStatus = document.getElementById('migrationStatus');
 
         // ===== STATE =====
-        // Start with Common group expanded so sell buttons are visible immediately
         let expandedGroup = 'common';
         let priceChart = null;
         let currentCollection = {};
         let currentCredits = 0;
+
+        // Make functions available globally for onclick handlers
+        window.navigateTo = navigateTo;
+        window.returnToMenu = returnToMenu;
+        window.updatePriceChart = updatePriceChart;
+        window.quickSell = quickSell;
+        window.sellItem = sellItem;
+        window.sellGroup = sellGroup;
+        window.toggleGroup = toggleGroup;
 
         // ===== NAVIGATION FUNCTIONS =====
         function navigateTo(screen) {
@@ -925,8 +941,8 @@
                 loadingText.textContent = 'loading market data...';
                 
                 // Update daily prices if needed
-                if (typeof updateDailyPrices === 'function') {
-                    await updateDailyPrices();
+                if (typeof window.updateDailyPrices === 'function') {
+                    await window.updateDailyPrices();
                 }
 
                 // Load all data with fallbacks
@@ -966,13 +982,13 @@
                 }
 
                 let events = [];
-                if (typeof getActiveEvents === 'function') {
-                    events = await getActiveEvents();
+                if (typeof window.getActiveEvents === 'function') {
+                    events = await window.getActiveEvents();
                 }
 
                 let rates = { transaction: 0.02 };
-                if (typeof getCurrentRates === 'function') {
-                    rates = await getCurrentRates();
+                if (typeof window.getCurrentRates === 'function') {
+                    rates = await window.getCurrentRates();
                 }
 
                 loadingText.textContent = 'updating displays...';
@@ -1101,7 +1117,7 @@
             return groups;
         }
 
-        // ===== RENDER MARKET (REDESIGNED for better fit) =====
+        // ===== RENDER MARKET =====
         function renderMarket(collection) {
             const groups = groupElements(collection);
             const container = document.getElementById('marketGroups');
@@ -1147,7 +1163,7 @@
                 
                 groupDiv.appendChild(header);
                 
-                // Group Items (expanded) - NEW TWO-ROW LAYOUT
+                // Group Items
                 const itemsDiv = document.createElement('div');
                 itemsDiv.className = `group-items ${expandedGroup === rarity ? 'show' : ''}`;
                 
@@ -1169,9 +1185,9 @@
                             </div>
                         </div>
                         <div class="item-actions-row">
-                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, ${element.marketPrice}, event)">1</button>
-                            ${halfQuantity > 0 ? `<button class="sell-btn small" onclick="sellItem('${element.name}', ${halfQuantity}, ${element.marketPrice}, event)">½</button>` : ''}
-                            <button class="sell-btn small sell-all" onclick="sellItem('${element.name}', ${element.count}, ${element.marketPrice}, event)">ALL</button>
+                            <button class="sell-btn small" onclick="window.sellItem('${element.name}', 1, ${element.marketPrice}, event)">1</button>
+                            ${halfQuantity > 0 ? `<button class="sell-btn small" onclick="window.sellItem('${element.name}', ${halfQuantity}, ${element.marketPrice}, event)">½</button>` : ''}
+                            <button class="sell-btn small sell-all" onclick="window.sellItem('${element.name}', ${element.count}, ${element.marketPrice}, event)">ALL</button>
                         </div>
                     `;
                     itemsDiv.appendChild(itemRow);
@@ -1184,9 +1200,9 @@
                 const hasItems = group.totalCount > 0;
                 
                 actionsDiv.innerHTML = `
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 1, event)" ${!hasItems ? 'disabled' : ''}>SELL 1</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'half', event)" ${!hasItems ? 'disabled' : ''}>SELL HALF</button>
-                    <button class="group-action-btn" onclick="sellGroup('${rarity}', 'all', event)" ${!hasItems ? 'disabled' : ''}>SELL ALL</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 1, event)" ${!hasItems ? 'disabled' : ''}>SELL 1</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 'half', event)" ${!hasItems ? 'disabled' : ''}>SELL HALF</button>
+                    <button class="group-action-btn" onclick="window.sellGroup('${rarity}', 'all', event)" ${!hasItems ? 'disabled' : ''}>SELL ALL</button>
                 `;
                 itemsDiv.appendChild(actionsDiv);
                 
@@ -1394,8 +1410,8 @@
             const days = parseInt(document.getElementById('chartPeriod').value);
             
             let history = [];
-            if (typeof getPriceHistory === 'function') {
-                history = await getPriceHistory(element) || [];
+            if (typeof window.getPriceHistory === 'function') {
+                history = await window.getPriceHistory(element) || [];
             }
             
             const recentHistory = history.slice(-days);
@@ -1505,12 +1521,12 @@
 
                 // Set up periodic refresh
                 setInterval(async () => {
-                    if (typeof getActiveEvents === 'function') {
-                        const events = await getActiveEvents();
+                    if (typeof window.getActiveEvents === 'function') {
+                        const events = await window.getActiveEvents();
                         updateEventAlerts(events);
                     }
-                    if (typeof checkAndExpireEvents === 'function') {
-                        await checkAndExpireEvents();
+                    if (typeof window.checkAndExpireEvents === 'function') {
+                        await window.checkAndExpireEvents();
                     }
                 }, 60000);
 
@@ -1526,13 +1542,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/market-dynamics.js"></script>
-    <script src="js/economic-events.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
