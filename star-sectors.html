@@ -469,7 +469,7 @@
             <span class="journey-total-value" id="totalJourneyDistance">0.0 LY</span>
         </div>
         
-        <button class="back-btn" onclick="returnToGalaxy()">← GALAXY</button>
+        <button class="back-btn" onclick="window.returnToGalaxy()">← GALAXY</button>
         
         <!-- Star Sector markers will be added here -->
         <div id="sectorMarkers"></div>
@@ -500,7 +500,7 @@
             </div>
             
             <!-- Dynamic button based on mode -->
-            <button class="action-btn" id="actionBtn" onclick="handleSectorAction()">🚀 EXPLORE</button>
+            <button class="action-btn" id="actionBtn" onclick="window.handleSectorAction()">🚀 EXPLORE</button>
         </div>
         
         <canvas id="sectorCanvas"></canvas>
@@ -514,9 +514,14 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -535,6 +540,10 @@
         const markersContainer = document.getElementById('sectorMarkers');
         const journeyTotalEl = document.getElementById('journeyTotal');
         const totalJourneyDistanceEl = document.getElementById('totalJourneyDistance');
+
+        // Make functions available globally for onclick handlers
+        window.returnToGalaxy = returnToGalaxy;
+        window.handleSectorAction = handleSectorAction;
 
         // ===== STATE =====
         let currentRegion = 'Orion Arm';
@@ -711,12 +720,12 @@
                 const sectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 
                 // Also try storage functions if available
-                if (typeof getCurrentSector === 'function') {
-                    const storedSector = await getCurrentSector();
+                if (typeof window.getCurrentSector === 'function') {
+                    const storedSector = await window.getCurrentSector();
                     if (storedSector) currentSectorId = storedSector;
                 }
-                if (typeof getCurrentRegion === 'function') {
-                    const storedRegion = await getCurrentRegion();
+                if (typeof window.getCurrentRegion === 'function') {
+                    const storedRegion = await window.getCurrentRegion();
                     if (storedRegion) currentRegion = storedRegion;
                 }
                 
@@ -835,8 +844,8 @@
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
                 
                 // Save destination
-                if (typeof setCurrentNebula === 'function') {
-                    await setCurrentNebula(
+                if (typeof window.setCurrentNebula === 'function') {
+                    await window.setCurrentNebula(
                         selectedStarSector.name,
                         selectedStarSector.type,
                         selectedStarSector.stars,
@@ -853,7 +862,7 @@
                 
                 // Navigate to star cluster
                 setTimeout(() => {
-                    window.location.href = 'star-cluster.html';
+                    window.location.href = 'cluster-view.html';
                 }, 500);
 
             } catch (error) {
@@ -885,8 +894,8 @@
                 });
                 
                 // Save star sector data using navigation.js if available
-                if (typeof savePlotNebula === 'function') {
-                    savePlotNebula(selectedStarSector);
+                if (typeof window.savePlotNebula === 'function') {
+                    window.savePlotNebula(selectedStarSector);
                 } else {
                     // Fallback to direct localStorage
                     localStorage.setItem('voidfarer_plot_nebula', selectedStarSector.name);
@@ -900,7 +909,7 @@
                 
                 // Navigate to star cluster in plot mode
                 setTimeout(() => {
-                    window.location.href = 'star-cluster.html?mode=plot';
+                    window.location.href = 'cluster-view.html?mode=plot';
                 }, 500);
                 
             } catch (error) {
@@ -912,11 +921,7 @@
 
         // ===== RETURN TO GALAXY =====
         function returnToGalaxy() {
-            if (isPlotMode) {
-                window.location.href = 'galaxy-map.html';
-            } else {
-                window.location.href = 'galaxy-map.html';
-            }
+            window.location.href = 'galaxy-map.html';
         }
 
         // ===== CREATE STAR SECTOR MARKERS =====
@@ -999,7 +1004,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star sectors...';
 
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -1027,11 +1032,5 @@
 
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
