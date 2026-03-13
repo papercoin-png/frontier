@@ -255,109 +255,142 @@ export async function countItems(storeName) {
 
 // Get collection as object (matches your existing format)
 export async function getCollectionAsObject() {
-  const elements = await getAll('collection');
-  const collection = {};
-  elements.forEach(element => {
-    collection[element.name] = {
-      count: element.count || 1,
-      firstFound: element.firstFound
-    };
-  });
-  return collection;
+  try {
+    const elements = await getAll('collection');
+    const collection = {};
+    
+    elements.forEach(element => {
+      collection[element.name] = {
+        count: element.count || 1,
+        firstFound: element.firstFound || new Date().toISOString()
+      };
+    });
+    
+    console.log('getCollectionAsObject returning:', collection);
+    return collection;
+    
+  } catch (error) {
+    console.error('Error in getCollectionAsObject:', error);
+    return {};
+  }
 }
 
 // Add element to collection
 export async function addElementToCollection(elementName, count = 1, elementData = {}) {
-  const db = await getDb();
-  const tx = db.transaction('collection', 'readwrite');
-  const store = tx.objectStore('collection');
-  
-  let element = await store.get(elementName);
-  
-  if (!element) {
-    element = {
-      name: elementName,
-      count: count,
-      firstFound: new Date().toISOString(),
-      rarity: elementData.rarity || 'common',
-      value: elementData.value || 100
-    };
-  } else {
-    element.count = (element.count || 1) + count;
+  try {
+    const db = await getDb();
+    const tx = db.transaction('collection', 'readwrite');
+    const store = tx.objectStore('collection');
+    
+    let element = await store.get(elementName);
+    
+    if (!element) {
+      element = {
+        name: elementName,
+        count: count,
+        firstFound: new Date().toISOString(),
+        rarity: elementData.rarity || 'common',
+        value: elementData.value || 100
+      };
+    } else {
+      element.count = (element.count || 1) + count;
+    }
+    
+    await store.put(element);
+    await tx.done;
+    
+    console.log(`Added ${count} of ${elementName} to collection, new count: ${element.count}`);
+    return { success: true, count: element.count };
+    
+  } catch (error) {
+    console.error('Error in addElementToCollection:', error);
+    return { success: false, error: error.message };
   }
-  
-  await store.put(element);
-  await tx.done;
-  
-  return { success: true, count: element.count };
 }
 
 // Remove element from collection
 export async function removeElementFromCollection(elementName, count = 1) {
-  const db = await getDb();
-  const tx = db.transaction('collection', 'readwrite');
-  const store = tx.objectStore('collection');
-  
-  const element = await store.get(elementName);
-  if (!element) {
+  try {
+    const db = await getDb();
+    const tx = db.transaction('collection', 'readwrite');
+    const store = tx.objectStore('collection');
+    
+    const element = await store.get(elementName);
+    if (!element) {
+      await tx.done;
+      return { success: false, reason: 'not_found' };
+    }
+    
+    if (element.count < count) {
+      await tx.done;
+      return { success: false, reason: 'insufficient', available: element.count };
+    }
+    
+    element.count -= count;
+    
+    if (element.count <= 0) {
+      await store.delete(elementName);
+    } else {
+      await store.put(element);
+    }
+    
     await tx.done;
-    return { success: false, reason: 'not_found' };
+    console.log(`Removed ${count} of ${elementName}, new count: ${element.count || 0}`);
+    return { success: true, newCount: element.count || 0 };
+    
+  } catch (error) {
+    console.error('Error in removeElementFromCollection:', error);
+    return { success: false, error: error.message };
   }
-  
-  if (element.count < count) {
-    await tx.done;
-    return { success: false, reason: 'insufficient', available: element.count };
-  }
-  
-  element.count -= count;
-  
-  if (element.count <= 0) {
-    await store.delete(elementName);
-  } else {
-    await store.put(element);
-  }
-  
-  await tx.done;
-  return { success: true, newCount: element.count || 0 };
 }
 
 // ===== TAX TRANSACTION HELPERS =====
 
 // Add a tax transaction
 export async function addTaxTransaction(transaction) {
-  const db = await getDb();
-  
-  // Ensure transaction has all required fields
-  const newTx = {
-    id: transaction.id || 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    playerId: transaction.playerId,
-    playerName: transaction.playerName,
-    taxType: transaction.taxType,
-    amount: transaction.amount,
-    baseAmount: transaction.baseAmount,
-    rate: transaction.rate,
-    description: transaction.description,
-    status: transaction.status || 'completed',
-    reference: transaction.reference || null,
-    timestamp: Date.now(),
-    date: new Date().toISOString(),
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-    day: new Date().getDate(),
-    quarter: Math.floor(new Date().getMonth() / 3) + 1
-  };
-  
-  await setItem('taxTransactions', newTx);
-  
-  return newTx;
+  try {
+    const db = await getDb();
+    
+    // Ensure transaction has all required fields
+    const newTx = {
+      id: transaction.id || 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      playerId: transaction.playerId,
+      playerName: transaction.playerName,
+      taxType: transaction.taxType,
+      amount: transaction.amount,
+      baseAmount: transaction.baseAmount,
+      rate: transaction.rate,
+      description: transaction.description,
+      status: transaction.status || 'completed',
+      reference: transaction.reference || null,
+      timestamp: Date.now(),
+      date: new Date().toISOString(),
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+      day: new Date().getDate(),
+      quarter: Math.floor(new Date().getMonth() / 3) + 1
+    };
+    
+    await setItem('taxTransactions', newTx);
+    return newTx;
+    
+  } catch (error) {
+    console.error('Error in addTaxTransaction:', error);
+    return null;
+  }
 }
 
 // Get transactions for a player
 export async function getPlayerTransactions(playerId, limit = 100) {
-  const transactions = await getAllFromIndex('taxTransactions', 'by-playerId', playerId);
-  return transactions
-    .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, limit);
+  try {
+    const transactions = await getAllFromIndex('taxTransactions', 'by-playerId', playerId);
+    return transactions
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+  } catch (error) {
+    console.error('Error in getPlayerTransactions:', error);
+    return [];
+  }
 }
 
 // ===== PROPERTY HELPERS =====
@@ -374,28 +407,40 @@ export async function getProperty(propertyId) {
 
 // Add a property
 export async function addProperty(propertyData) {
-  const newProperty = {
-    id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    name: propertyData.name,
-    type: propertyData.type,
-    capacity: propertyData.capacity,
-    used: 0,
-    purchaseDate: new Date().toISOString(),
-    cost: propertyData.cost
-  };
-  
-  await setItem('properties', newProperty);
-  return newProperty;
+  try {
+    const newProperty = {
+      id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      name: propertyData.name,
+      type: propertyData.type,
+      capacity: propertyData.capacity,
+      used: 0,
+      purchaseDate: new Date().toISOString(),
+      cost: propertyData.cost
+    };
+    
+    await setItem('properties', newProperty);
+    return newProperty;
+    
+  } catch (error) {
+    console.error('Error in addProperty:', error);
+    return null;
+  }
 }
 
 // Update property
 export async function updateProperty(propertyId, updates) {
-  const property = await getProperty(propertyId);
-  if (!property) return null;
-  
-  const updatedProperty = { ...property, ...updates };
-  await setItem('properties', updatedProperty);
-  return updatedProperty;
+  try {
+    const property = await getProperty(propertyId);
+    if (!property) return null;
+    
+    const updatedProperty = { ...property, ...updates };
+    await setItem('properties', updatedProperty);
+    return updatedProperty;
+    
+  } catch (error) {
+    console.error('Error in updateProperty:', error);
+    return null;
+  }
 }
 
 // Get items for a property
@@ -405,164 +450,197 @@ export async function getPropertyItems(propertyId) {
 
 // Add item to property
 export async function addItemToProperty(propertyId, elementName, quantity) {
-  const db = await getDb();
-  const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
-  
-  const propertyStore = tx.objectStore('properties');
-  const itemsStore = tx.objectStore('propertyItems');
-  
-  // Check property capacity
-  const property = await propertyStore.get(propertyId);
-  if (!property) {
+  try {
+    const db = await getDb();
+    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+    
+    const propertyStore = tx.objectStore('properties');
+    const itemsStore = tx.objectStore('propertyItems');
+    
+    // Check property capacity
+    const property = await propertyStore.get(propertyId);
+    if (!property) {
+      await tx.done;
+      return { success: false, reason: 'property_not_found' };
+    }
+    
+    const currentItems = await itemsStore.index('by-propertyId').getAll(propertyId);
+    const currentUsed = currentItems.reduce((sum, item) => sum + (item.count || 0), 0);
+    
+    if (currentUsed + quantity > property.capacity) {
+      await tx.done;
+      return { success: false, reason: 'insufficient_space' };
+    }
+    
+    // Check if item already exists
+    const existingItems = currentItems.filter(item => item.elementName === elementName);
+    
+    if (existingItems.length > 0) {
+      // Update existing item
+      const item = existingItems[0];
+      item.count += quantity;
+      await itemsStore.put(item);
+    } else {
+      // Create new item
+      const newItem = {
+        id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        propertyId: propertyId,
+        elementName: elementName,
+        count: quantity
+      };
+      await itemsStore.put(newItem);
+    }
+    
+    // Update property used space
+    property.used = currentUsed + quantity;
+    await propertyStore.put(property);
+    
     await tx.done;
-    return { success: false, reason: 'property_not_found' };
+    return { success: true };
+    
+  } catch (error) {
+    console.error('Error in addItemToProperty:', error);
+    return { success: false, error: error.message };
   }
-  
-  const currentItems = await itemsStore.index('by-propertyId').getAll(propertyId);
-  const currentUsed = currentItems.reduce((sum, item) => sum + (item.count || 0), 0);
-  
-  if (currentUsed + quantity > property.capacity) {
-    await tx.done;
-    return { success: false, reason: 'insufficient_space' };
-  }
-  
-  // Check if item already exists
-  const existingItems = currentItems.filter(item => item.elementName === elementName);
-  
-  if (existingItems.length > 0) {
-    // Update existing item
-    const item = existingItems[0];
-    item.count += quantity;
-    await itemsStore.put(item);
-  } else {
-    // Create new item
-    const newItem = {
-      id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      propertyId: propertyId,
-      elementName: elementName,
-      count: quantity
-    };
-    await itemsStore.put(newItem);
-  }
-  
-  // Update property used space
-  property.used = currentUsed + quantity;
-  await propertyStore.put(property);
-  
-  await tx.done;
-  return { success: true };
 }
 
 // Remove item from property
 export async function removeItemFromProperty(propertyId, elementName, quantity) {
-  const db = await getDb();
-  const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
-  
-  const propertyStore = tx.objectStore('properties');
-  const itemsStore = tx.objectStore('propertyItems');
-  
-  // Get property
-  const property = await propertyStore.get(propertyId);
-  if (!property) {
+  try {
+    const db = await getDb();
+    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+    
+    const propertyStore = tx.objectStore('properties');
+    const itemsStore = tx.objectStore('propertyItems');
+    
+    // Get property
+    const property = await propertyStore.get(propertyId);
+    if (!property) {
+      await tx.done;
+      return { success: false, reason: 'property_not_found' };
+    }
+    
+    // Find the item
+    const items = await itemsStore.index('by-propertyId').getAll(propertyId);
+    const item = items.find(i => i.elementName === elementName);
+    
+    if (!item) {
+      await tx.done;
+      return { success: false, reason: 'item_not_found' };
+    }
+    
+    if (item.count < quantity) {
+      await tx.done;
+      return { success: false, reason: 'insufficient', available: item.count };
+    }
+    
+    // Update or delete the item
+    item.count -= quantity;
+    if (item.count <= 0) {
+      await itemsStore.delete(item.id);
+    } else {
+      await itemsStore.put(item);
+    }
+    
+    // Update property used space
+    const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
+    property.used = remainingItems.reduce((sum, i) => sum + (i.count || 0), 0);
+    await propertyStore.put(property);
+    
     await tx.done;
-    return { success: false, reason: 'property_not_found' };
+    return { success: true, newCount: item.count || 0 };
+    
+  } catch (error) {
+    console.error('Error in removeItemFromProperty:', error);
+    return { success: false, error: error.message };
   }
-  
-  // Find the item
-  const items = await itemsStore.index('by-propertyId').getAll(propertyId);
-  const item = items.find(i => i.elementName === elementName);
-  
-  if (!item) {
-    await tx.done;
-    return { success: false, reason: 'item_not_found' };
-  }
-  
-  if (item.count < quantity) {
-    await tx.done;
-    return { success: false, reason: 'insufficient', available: item.count };
-  }
-  
-  // Update or delete the item
-  item.count -= quantity;
-  if (item.count <= 0) {
-    await itemsStore.delete(item.id);
-  } else {
-    await itemsStore.put(item);
-  }
-  
-  // Update property used space
-  const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
-  property.used = remainingItems.reduce((sum, i) => sum + (i.count || 0), 0);
-  await propertyStore.put(property);
-  
-  await tx.done;
-  return { success: true, newCount: item.count || 0 };
 }
 
 // ===== MIGRATION HELPERS =====
 
 // Check if migration has been performed
 export async function isMigrationComplete() {
-  const flag = await getItem('migration', 'localStorage');
-  return flag ? flag.complete : false;
+  try {
+    const flag = await getItem('migration', 'localStorage');
+    return flag ? flag.complete : false;
+  } catch (error) {
+    console.error('Error in isMigrationComplete:', error);
+    return false;
+  }
 }
 
 // Mark migration as complete
 export async function setMigrationComplete() {
-  await setItem('migration', {
-    id: 'localStorage',
-    complete: true,
-    timestamp: Date.now(),
-    date: new Date().toISOString()
-  });
+  try {
+    await setItem('migration', {
+      id: 'localStorage',
+      complete: true,
+      timestamp: Date.now(),
+      date: new Date().toISOString()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error in setMigrationComplete:', error);
+    return false;
+  }
 }
 
 // ===== UTILITY FUNCTIONS =====
 
 // Clear all game data (for reset)
 export async function resetAllData() {
-  const stores = [
-    'player', 'collection', 'missions', 'completedMissions',
-    'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
-    'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
-    'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
-    'bookmarks', 'shipUpgrades', 'settings'
-  ];
-  
-  const db = await getDb();
-  const tx = db.transaction(stores, 'readwrite');
-  
-  for (const store of stores) {
-    await tx.objectStore(store).clear();
+  try {
+    const stores = [
+      'player', 'collection', 'missions', 'completedMissions',
+      'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
+      'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
+      'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
+      'bookmarks', 'shipUpgrades', 'settings'
+    ];
+    
+    const db = await getDb();
+    const tx = db.transaction(stores, 'readwrite');
+    
+    for (const store of stores) {
+      await tx.objectStore(store).clear();
+    }
+    
+    await tx.done;
+    
+    // Clear migration flag too
+    await deleteItem('migration', 'localStorage');
+    
+    return true;
+  } catch (error) {
+    console.error('Error in resetAllData:', error);
+    return false;
   }
-  
-  await tx.done;
-  
-  // Clear migration flag too
-  await deleteItem('migration', 'localStorage');
-  
-  return true;
 }
 
 // Get database stats (for debugging)
 export async function getDatabaseStats() {
-  const stores = [
-    'player', 'collection', 'missions', 'completedMissions',
-    'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
-    'activeEvents', 'colonies'
-  ];
-  
-  const stats = {};
-  const db = await getDb();
-  
-  for (const store of stores) {
-    if (db.objectStoreNames.contains(store)) {
-      const count = await db.count(store);
-      stats[store] = count;
+  try {
+    const stores = [
+      'player', 'collection', 'missions', 'completedMissions',
+      'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
+      'activeEvents', 'colonies'
+    ];
+    
+    const stats = {};
+    const db = await getDb();
+    
+    for (const store of stores) {
+      if (db.objectStoreNames.contains(store)) {
+        const count = await db.count(store);
+        stats[store] = count;
+      }
     }
+    
+    return stats;
+  } catch (error) {
+    console.error('Error in getDatabaseStats:', error);
+    return {};
   }
-  
-  return stats;
 }
 
 // ===== INITIALIZATION =====
@@ -579,7 +657,6 @@ export async function initializeDatabase() {
 }
 
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
-// This is critical for storage.js and other files to work
 window.idb = idb;
 window.getDb = getDb;
 
