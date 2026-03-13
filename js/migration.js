@@ -1,17 +1,7 @@
 // js/migration.js - One-time migration from localStorage to IndexedDB
 // Run this once when the game loads to transfer existing player data
 
-import { 
-  setItem, 
-  setItems, 
-  isMigrationComplete, 
-  setMigrationComplete,
-  addElementToCollection,
-  addTaxTransaction,
-  addProperty,
-  clearStore,
-  getItem
-} from './db.js';
+import db from './db.js';
 
 // ===== MIGRATION STATUS =====
 let migrationInProgress = false;
@@ -48,7 +38,7 @@ async function migratePlayer() {
     const player = safeJSONParse(playerData);
     if (player) {
       // Ensure player has an ID for the object store
-      await setItem('player', { 
+      await db.setItem('player', { 
         id: 'main', 
         ...player,
         migratedAt: new Date().toISOString()
@@ -58,7 +48,7 @@ async function migratePlayer() {
     }
   } else {
     // Create default player if none exists
-    await setItem('player', {
+    await db.setItem('player', {
       id: 'main',
       name: 'Voidfarer',
       ship: 'Prospector',
@@ -98,7 +88,7 @@ async function migrateCollection() {
         count_value = elementInfo;
       }
       
-      await addElementToCollection(elementName, count_value, {
+      await db.addElementToCollection(elementName, count_value, {
         firstFound: firstFound || new Date().toISOString()
       });
       count++;
@@ -123,7 +113,7 @@ async function migrateMissions() {
       if (!mission.id) {
         mission.id = 'mission_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await setItem('missions', mission);
+      await db.setItem('missions', mission);
     }
     
     logMigration(`Migrated ${missions.length} active missions`);
@@ -144,7 +134,7 @@ async function migrateCompletedMissions() {
       if (!mission.id) {
         mission.id = 'mission_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await setItem('completedMissions', mission);
+      await db.setItem('completedMissions', mission);
     }
     
     logMigration(`Migrated ${missions.length} completed missions`);
@@ -163,12 +153,12 @@ async function migrateRealEstate() {
     
     for (const property of realEstate.properties || []) {
       // Save property to properties store
-      await setItem('properties', property);
+      await db.setItem('properties', property);
       
       // Save property items if they exist
       if (property.items) {
         for (const [elementName, itemData] of Object.entries(property.items)) {
-          await setItem('propertyItems', {
+          await db.setItem('propertyItems', {
             id: `item_${property.id}_${elementName}`,
             propertyId: property.id,
             elementName: elementName,
@@ -197,7 +187,7 @@ async function migrateTaxTransactions() {
     let count = 0;
     
     for (const tx of transactions) {
-      await addTaxTransaction(tx);
+      await db.addTaxTransaction(tx);
       count++;
     }
     
@@ -216,7 +206,7 @@ async function migrateDailyMetrics() {
     const metrics = safeJSONParse(metricsData, []);
     
     for (const metric of metrics) {
-      await setItem('dailyMetrics', metric);
+      await db.setItem('dailyMetrics', metric);
     }
     
     logMigration(`Migrated ${metrics.length} daily metrics`);
@@ -234,7 +224,7 @@ async function migrateHourlySnapshots() {
     const snapshots = safeJSONParse(snapshotsData, []);
     
     for (const snapshot of snapshots) {
-      await setItem('hourlySnapshots', snapshot);
+      await db.setItem('hourlySnapshots', snapshot);
     }
     
     logMigration(`Migrated ${snapshots.length} hourly snapshots`);
@@ -251,7 +241,7 @@ async function migrateTaxRates() {
   if (ratesData) {
     const rates = safeJSONParse(ratesData);
     if (rates) {
-      await setItem('taxRates', { id: 'current', ...rates });
+      await db.setItem('taxRates', { id: 'current', ...rates });
       logMigration('Tax rates migrated');
       return true;
     }
@@ -267,7 +257,7 @@ async function migrateCommunityFund() {
   if (fundData) {
     const fund = safeJSONParse(fundData);
     if (fund) {
-      await setItem('communityFund', { id: 'main', ...fund });
+      await db.setItem('communityFund', { id: 'main', ...fund });
       logMigration('Community fund migrated');
       return true;
     }
@@ -284,7 +274,7 @@ async function migrateActiveEvents() {
     const events = safeJSONParse(eventsData, []);
     
     for (const event of events) {
-      await setItem('activeEvents', event);
+      await db.setItem('activeEvents', event);
     }
     
     logMigration(`Migrated ${events.length} active events`);
@@ -302,7 +292,7 @@ async function migrateEventHistory() {
     const history = safeJSONParse(historyData, []);
     
     for (const entry of history) {
-      await setItem('eventHistory', entry);
+      await db.setItem('eventHistory', entry);
     }
     
     logMigration(`Migrated ${history.length} event history entries`);
@@ -323,7 +313,7 @@ async function migrateColonies() {
       if (!colony.id) {
         colony.id = 'colony_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await setItem('colonies', colony);
+      await db.setItem('colonies', colony);
     }
     
     logMigration(`Migrated ${colonies.length} colonies`);
@@ -344,7 +334,7 @@ async function migrateDiscoveredLocations() {
       if (!location.id) {
         location.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await setItem('discoveredLocations', location);
+      await db.setItem('discoveredLocations', location);
     }
     
     logMigration(`Migrated ${locations.length} discovered locations`);
@@ -364,7 +354,7 @@ async function migrateScanHistory() {
     for (const scan of scans) {
       // Use timestamp as key if available
       const key = scan.timestamp || Date.now();
-      await setItem('scanHistory', { timestamp: key, ...scan });
+      await db.setItem('scanHistory', { timestamp: key, ...scan });
     }
     
     logMigration(`Migrated ${scans.length} scan history entries`);
@@ -385,7 +375,7 @@ async function migrateBookmarks() {
       if (!bookmark.id) {
         bookmark.id = 'bookmark_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await setItem('bookmarks', bookmark);
+      await db.setItem('bookmarks', bookmark);
     }
     
     logMigration(`Migrated ${bookmarks.length} bookmarks`);
@@ -402,13 +392,13 @@ async function migrateShipUpgrades() {
   if (upgradesData) {
     const upgrades = safeJSONParse(upgradesData);
     if (upgrades) {
-      await setItem('shipUpgrades', { id: 'current', ...upgrades });
+      await db.setItem('shipUpgrades', { id: 'current', ...upgrades });
       logMigration('Ship upgrades migrated');
       return true;
     }
   } else {
     // Create default upgrades
-    await setItem('shipUpgrades', {
+    await db.setItem('shipUpgrades', {
       id: 'current',
       engine: 1,
       shields: 1,
@@ -439,7 +429,7 @@ async function migrateSettings() {
   for (const key of settingsKeys) {
     const value = localStorage.getItem(key);
     if (value !== null) {
-      await setItem('settings', { key: key, value: value });
+      await db.setItem('settings', { key: key, value: value });
       migratedCount++;
     }
   }
@@ -456,13 +446,13 @@ async function migrateCredits() {
   if (credits) {
     // Credits are stored in the player object, but also need to be accessible
     // We'll store them in player and also as a separate setting for convenience
-    const player = await getItem('player', 'main');
+    const player = await db.getItem('player', 'main');
     if (player) {
       player.credits = parseInt(credits) || 5000;
-      await setItem('player', player);
+      await db.setItem('player', player);
     }
     
-    await setItem('settings', { key: 'credits', value: credits });
+    await db.setItem('settings', { key: 'credits', value: credits });
     logMigration(`Credits: ${credits}⭐`);
     return true;
   }
@@ -475,7 +465,7 @@ async function migrateShipFuel() {
   
   const fuel = localStorage.getItem('voidfarer_ship_fuel');
   if (fuel) {
-    await setItem('settings', { key: 'ship_fuel', value: fuel });
+    await db.setItem('settings', { key: 'ship_fuel', value: fuel });
     logMigration(`Ship fuel: ${fuel}%`);
     return true;
   }
@@ -488,7 +478,7 @@ async function migrateShipPower() {
   
   const power = localStorage.getItem('voidfarer_ship_power');
   if (power) {
-    await setItem('settings', { key: 'ship_power', value: power });
+    await db.setItem('settings', { key: 'ship_power', value: power });
     logMigration(`Ship power: ${power}%`);
     return true;
   }
@@ -525,7 +515,7 @@ async function migrateCurrentLocation() {
   }
   
   if (Object.keys(locationData).length > 0) {
-    await setItem('settings', { key: 'current_location', value: JSON.stringify(locationData) });
+    await db.setItem('settings', { key: 'current_location', value: JSON.stringify(locationData) });
     logMigration('Current location migrated');
     return true;
   }
@@ -541,7 +531,7 @@ export async function migrateFromLocalStorage(showProgress = true) {
   }
   
   // Check if migration already completed
-  const completed = await isMigrationComplete();
+  const completed = await db.isMigrationComplete();
   if (completed) {
     logMigration('Migration already completed previously', 'info');
     return { success: true, reason: 'ALREADY_COMPLETED' };
@@ -603,7 +593,7 @@ export async function migrateFromLocalStorage(showProgress = true) {
     results.location = await migrateCurrentLocation();
     
     // Mark migration as complete
-    await setMigrationComplete();
+    await db.setMigrationComplete();
     
     // Log summary
     logMigration('✅ Migration completed successfully!');
@@ -663,7 +653,7 @@ export async function rollbackMigration() {
     ];
     
     for (const store of stores) {
-      await clearStore(store);
+      await db.clearStore(store);
     }
     
     logMigration('✅ Rollback complete. localStorage data remains intact.');
