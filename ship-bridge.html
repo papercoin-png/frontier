@@ -404,11 +404,6 @@
             transform: scale(0.96);
         }
         
-        /* Back button (hidden on bridge) */
-        .back-button {
-            display: none;
-        }
-        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -443,7 +438,7 @@
                     <span>⭐</span> --
                 </div>
                 <div class="location" id="locationDisplay">
-                    <span id="currentPlanet">Earth</span>
+                    <span id="currentPlanet">Loading...</span>
                 </div>
             </div>
             
@@ -452,7 +447,7 @@
                 <div class="window-view">
                     <img src="assets/images/earth-view.jpg" class="planet-image" id="planetImage" alt="Planet view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
                     <div class="window-overlay"></div>
-                    <div class="window-label" id="planetLabel">Earth • home</div>
+                    <div class="window-label" id="planetLabel">Loading...</div>
                 </div>
             </div>
             
@@ -554,7 +549,6 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
 
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
@@ -621,10 +615,29 @@
 
         // ===== LOAD CURRENT LOCATION =====
         function loadCurrentLocation() {
-            // Get current planet
-            const planet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
-            const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-            const planetImage = localStorage.getItem('voidfarer_current_planet_image') || 'earth-view.jpg';
+            // Get current planet - if none exists, set Earth as default
+            let planet = localStorage.getItem('voidfarer_current_planet');
+            let planetType = localStorage.getItem('voidfarer_current_planet_type');
+            let planetImage = localStorage.getItem('voidfarer_current_planet_image');
+            
+            if (!planet) {
+                console.log('No planet data found, initializing with Earth');
+                planet = 'Earth';
+                planetType = 'lush';
+                planetImage = 'earth-view.jpg';
+                
+                // Save default planet data
+                localStorage.setItem('voidfarer_current_planet', planet);
+                localStorage.setItem('voidfarer_current_planet_type', planetType);
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
+                localStorage.setItem('voidfarer_current_planet_image', planetImage);
+                
+                // Also set location data
+                localStorage.setItem('voidfarer_current_sector', 'B2');
+                localStorage.setItem('voidfarer_current_region', 'Orion Arm');
+                localStorage.setItem('voidfarer_current_starSector', 'Orion Molecular Cloud');
+                localStorage.setItem('voidfarer_current_star', 'Sol');
+            }
             
             // Update display
             document.getElementById('currentPlanet').textContent = planet;
@@ -636,40 +649,43 @@
             imgElement.onerror = function() {
                 this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
             };
+            
+            console.log('Current planet loaded:', planet);
         }
 
-        // ===== GO TO SURFACE (with fallback) =====
+        // ===== GO TO SURFACE (with guaranteed planet data) =====
         function goToSurface() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            // Make sure we have planet data before going
-            const currentPlanet = localStorage.getItem('voidfarer_current_planet');
-            const currentPlanetType = localStorage.getItem('voidfarer_current_planet_type');
+            // Ensure planet data exists before navigating
+            let currentPlanet = localStorage.getItem('voidfarer_current_planet');
+            let currentPlanetType = localStorage.getItem('voidfarer_current_planet_type');
+            let currentPlanetResources = localStorage.getItem('voidfarer_current_planet_resources');
             
-            if (!currentPlanet) {
-                // If no planet data, set default (Earth)
-                console.log('No planet data found, setting default Earth');
-                setCurrentPlanet('Earth', 'lush', ['Iron', 'Carbon', 'Silicon', 'Oxygen']);
+            // If any planet data is missing, set Earth as default
+            if (!currentPlanet || !currentPlanetType || !currentPlanetResources) {
+                console.log('Missing planet data, setting default Earth before navigation');
+                
+                localStorage.setItem('voidfarer_current_planet', 'Earth');
+                localStorage.setItem('voidfarer_current_planet_type', 'lush');
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
+                localStorage.setItem('voidfarer_current_planet_image', 'earth-view.jpg');
+                
+                // Also ensure location data exists
+                if (!localStorage.getItem('voidfarer_current_sector')) {
+                    localStorage.setItem('voidfarer_current_sector', 'B2');
+                    localStorage.setItem('voidfarer_current_region', 'Orion Arm');
+                    localStorage.setItem('voidfarer_current_starSector', 'Orion Molecular Cloud');
+                    localStorage.setItem('voidfarer_current_star', 'Sol');
+                }
             }
             
+            // Double-check data was saved
+            console.log('Navigating to surface with planet:', localStorage.getItem('voidfarer_current_planet'));
+            console.log('Planet type:', localStorage.getItem('voidfarer_current_planet_type'));
+            console.log('Resources:', localStorage.getItem('voidfarer_current_planet_resources'));
+            
             window.location.href = 'surface.html';
-        }
-
-        // ===== SET CURRENT PLANET (helper) =====
-        function setCurrentPlanet(name, type, resources) {
-            localStorage.setItem('voidfarer_current_planet', name);
-            localStorage.setItem('voidfarer_current_planet_type', type);
-            localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(resources));
-            
-            // Set appropriate image based on planet type
-            let image = 'earth-view.jpg';
-            if (type.includes('scorched') || type.includes('volcanic')) image = 'pyros-surface.jpg';
-            else if (type.includes('frozen') || type.includes('ice')) image = 'glacier-surface.jpg';
-            else if (type.includes('lush')) image = 'verdant-surface.jpg';
-            else if (type.includes('barren')) image = 'barren-surface.jpg';
-            else if (type.includes('gas')) image = 'gas-surface.jpg';
-            
-            localStorage.setItem('voidfarer_current_planet_image', image);
         }
 
         // ===== WARP HOME =====
@@ -688,7 +704,6 @@
                 const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
                 
                 // Calculate distance to Earth (simplified for demo)
-                // In real game, this would use navigation.js
                 let totalDistance = 0;
                 
                 if (currentSector !== 'B2') {
