@@ -4,7 +4,6 @@
 import * as db from './db.js';
 
 // ===== RE-EXPORT DB FUNCTIONS =====
-// These need to be at the top so other modules can import them
 export const {
     getItem,
     setItem,
@@ -30,7 +29,9 @@ export const {
     setMigrationComplete,
     resetAllData,
     getDatabaseStats,
-    getCurrentRates  // Add this export
+    getCurrentRates,
+    getCommunityFund,
+    addToCommunityFund  // Add this export
 } = db;
 
 // ===== CONSTANTS =====
