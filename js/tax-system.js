@@ -4,7 +4,7 @@ import {
     getItem,
     setItem,
     addTaxRecord as storageAddTaxRecord,
-    getCommunityFund,  // Make sure this is imported correctly
+    getCommunityFund,  // This import is correct
     addToCommunityFund
 } from './storage.js';
 
@@ -345,7 +345,7 @@ export async function payTax(playerId, playerName, taxType, baseAmount, descript
 }
 
 // ===== COMMUNITY FUND =====
-// Only ONE declaration of getCommunityFund - remove the duplicate
+// ONLY ONE declaration - using the imported function
 export async function getCommunityFund() {
     return await storageGetCommunityFund();
 }
@@ -392,26 +392,6 @@ export async function getCommunityFundSummary() {
     };
 }
 
-// ===== TAX RATE FORMATTING =====
-export function formatTaxRate(rate, type) {
-    if (type === TAX_TYPES.REGISTRATION) {
-        return rate + '⭐';
-    }
-    return (rate * 100).toFixed(1) + '%';
-}
-
-export function getTaxDescription(taxType) {
-    const descriptions = {
-        [TAX_TYPES.TRANSACTION]: 'Transaction tax on sales',
-        [TAX_TYPES.PROPERTY]: 'Monthly property tax',
-        [TAX_TYPES.INCOME]: 'Progressive income tax',
-        [TAX_TYPES.LUXURY]: 'Wealth tax on high net worth',
-        [TAX_TYPES.ESTATE]: 'Estate tax on transfers',
-        [TAX_TYPES.REGISTRATION]: 'One-time professional registration'
-    };
-    return descriptions[taxType] || 'Tax payment';
-}
-
 // Helper functions for community fund
 async function storageGetCommunityFund() {
     return await getItem('communityFund', 'main');
@@ -436,6 +416,26 @@ async function storageAddToCommunityFund(amount, taxRecordId) {
 // Helper to get database instance
 async function getDb() {
     return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
+}
+
+// ===== TAX RATE FORMATTING =====
+export function formatTaxRate(rate, type) {
+    if (type === TAX_TYPES.REGISTRATION) {
+        return rate + '⭐';
+    }
+    return (rate * 100).toFixed(1) + '%';
+}
+
+export function getTaxDescription(taxType) {
+    const descriptions = {
+        [TAX_TYPES.TRANSACTION]: 'Transaction tax on sales',
+        [TAX_TYPES.PROPERTY]: 'Monthly property tax',
+        [TAX_TYPES.INCOME]: 'Progressive income tax',
+        [TAX_TYPES.LUXURY]: 'Wealth tax on high net worth',
+        [TAX_TYPES.ESTATE]: 'Estate tax on transfers',
+        [TAX_TYPES.REGISTRATION]: 'One-time professional registration'
+    };
+    return descriptions[taxType] || 'Tax payment';
 }
 
 // ===== EXPORT =====
