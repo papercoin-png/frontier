@@ -278,16 +278,6 @@ export async function canAddToCargo(elementName, quantity = 1) {
     }
 }
 
-// ===== HELPER: Settings storage (keep in localStorage for simplicity) =====
-function getSetting(key, defaultValue) {
-    const value = localStorage.getItem(key);
-    return value !== null ? value : defaultValue;
-}
-
-function setSetting(key, value) {
-    localStorage.setItem(key, value.toString());
-}
-
 // ===== INITIALIZATION =====
 export async function initializeStorage() {
     console.log('Initializing storage...');
