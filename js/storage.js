@@ -1380,6 +1380,46 @@ export async function getPlayerName() {
     return player?.name || 'Voidfarer';
 }
 
+// ===== EXPORT ALL FUNCTIONS FOR OTHER MODULES =====
+// Export db functions that other modules need
+export {
+    // Core db functions
+    getItem,
+    setItem,
+    getAll,
+    getAllFromIndex,
+    deleteItem,
+    clearStore,
+    countItems,
+    
+    // Tax functions
+    addTaxTransaction,
+    getPlayerTransactions,
+    
+    // Property functions
+    getAllProperties,
+    getProperty,
+    addProperty,
+    updateProperty,
+    getPropertyItems,
+    addItemToProperty,
+    removeItemFromProperty,
+    
+    // Market functions
+    addPriceHistory,
+    getPriceHistoryForElement,
+    addTradeHistory,
+    getTradeHistoryForElement,
+    
+    // Migration functions
+    isMigrationComplete,
+    setMigrationComplete,
+    resetAllData,
+    
+    // Stats
+    getDatabaseStats
+};
+
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
 window.getCredits = getCredits;
 window.getCollection = getCollection;
