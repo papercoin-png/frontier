@@ -29,7 +29,8 @@ export const {
     isMigrationComplete,
     setMigrationComplete,
     resetAllData,
-    getDatabaseStats
+    getDatabaseStats,
+    getCurrentRates  // Add this export
 } = db;
 
 // ===== CONSTANTS =====
@@ -504,13 +505,14 @@ export function getWarpData() {
 }
 
 export function clearWarpData() {
-    Object.values([
+    const keys = [
         STORAGE_KEYS.WARP_DESTINATION,
         STORAGE_KEYS.WARP_RETURN,
         STORAGE_KEYS.WARP_CYCLES,
         STORAGE_KEYS.WARP_DISTANCE,
         STORAGE_KEYS.WARP_FUEL
-    ]).forEach(key => localStorage.removeItem(key));
+    ];
+    keys.forEach(key => localStorage.removeItem(key));
 }
 
 // ===== COLONIES =====
@@ -656,15 +658,24 @@ export async function resetGame() {
     await resetAllData();
     
     const locationKeys = [
-        STORAGE_KEYS.CURRENT_SECTOR, STORAGE_KEYS.CURRENT_REGION,
-        STORAGE_KEYS.CURRENT_STAR_SECTOR, STORAGE_KEYS.CURRENT_SECTOR_NAME,
-        STORAGE_KEYS.CURRENT_SECTOR_TYPE, STORAGE_KEYS.CURRENT_SECTOR_STARS,
-        STORAGE_KEYS.CURRENT_SECTOR_X, STORAGE_KEYS.CURRENT_SECTOR_Y,
-        STORAGE_KEYS.CURRENT_STAR, STORAGE_KEYS.CURRENT_STAR_TYPE,
-        STORAGE_KEYS.CURRENT_STAR_INDEX, STORAGE_KEYS.CURRENT_STAR_X,
-        STORAGE_KEYS.CURRENT_STAR_Y, STORAGE_KEYS.CURRENT_STAR_PLANETS,
-        STORAGE_KEYS.CURRENT_PLANET, STORAGE_KEYS.CURRENT_PLANET_TYPE,
-        STORAGE_KEYS.CURRENT_PLANET_RESOURCES, STORAGE_KEYS.CURRENT_PLANET_IMAGE
+        STORAGE_KEYS.CURRENT_SECTOR,
+        STORAGE_KEYS.CURRENT_REGION,
+        STORAGE_KEYS.CURRENT_STAR_SECTOR,
+        STORAGE_KEYS.CURRENT_SECTOR_NAME,
+        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
+        STORAGE_KEYS.CURRENT_SECTOR_STARS,
+        STORAGE_KEYS.CURRENT_SECTOR_X,
+        STORAGE_KEYS.CURRENT_SECTOR_Y,
+        STORAGE_KEYS.CURRENT_STAR,
+        STORAGE_KEYS.CURRENT_STAR_TYPE,
+        STORAGE_KEYS.CURRENT_STAR_INDEX,
+        STORAGE_KEYS.CURRENT_STAR_X,
+        STORAGE_KEYS.CURRENT_STAR_Y,
+        STORAGE_KEYS.CURRENT_STAR_PLANETS,
+        STORAGE_KEYS.CURRENT_PLANET,
+        STORAGE_KEYS.CURRENT_PLANET_TYPE,
+        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
+        STORAGE_KEYS.CURRENT_PLANET_IMAGE
     ];
     locationKeys.forEach(key => localStorage.removeItem(key));
     
