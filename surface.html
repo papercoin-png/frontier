@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Voidfarer - Planetary Surface</title>
+    <title>Voidfarer - Planetary Surface (DEBUG)</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
@@ -422,6 +422,24 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Debug overlay - temporary */
+        .debug-overlay {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+            max-width: 200px;
+            max-height: 100px;
+            overflow: auto;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -463,6 +481,13 @@
                 <div class="loading-spinner"></div>
                 <div class="loading-text" id="loadingText">landing on surface...</div>
             </div>
+
+            <!-- Debug overlay -->
+            <div class="debug-overlay" id="debugOverlay">
+                <div>⏱️ Timer: <span id="debugTimer">inactive</span></div>
+                <div>📦 Mass: <span id="debugMass">0</span></div>
+                <div>🔍 Last: <span id="debugLast">-</span></div>
+            </div>
         </div>
     </div>
 
@@ -491,6 +516,11 @@
         const activeCount = document.getElementById('activeCount');
         const toastContainer = document.getElementById('toastContainer');
         const extractorText = document.getElementById('extractorText');
+        
+        // Debug elements
+        const debugTimer = document.getElementById('debugTimer');
+        const debugMass = document.getElementById('debugMass');
+        const debugLast = document.getElementById('debugLast');
 
         let currentPlanet = {
             name: 'Earth',
@@ -503,6 +533,7 @@
         let resourceChances = {};
         let isExtracting = true;
         let extractionTimer = null;
+        let extractionCount = 0;
         
         // Cache for cargo mass
         let cachedCargoMass = 0;
@@ -586,6 +617,7 @@
             }
             
             try {
+                console.log('📊 Fetching fresh cargo mass from database...');
                 const collection = await window.getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
@@ -593,9 +625,10 @@
                 }
                 cachedCargoMass = mass;
                 lastMassUpdate = now;
+                debugMass.textContent = mass.toFixed(0);
                 return mass;
             } catch (error) {
-                console.error('Error getting cargo mass:', error);
+                console.error('❌ Error getting cargo mass:', error);
                 return cachedCargoMass || 0;
             }
         }
@@ -607,6 +640,7 @@
         }
 
         async function loadPlanetData() {
+            console.log('🌍 Loading planet data...');
             try {
                 const planetNameStr = localStorage.getItem('voidfarer_current_planet') || 'Earth';
                 const planetTypeStr = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
@@ -617,7 +651,9 @@
                 if (savedResources) {
                     try {
                         planetResources = JSON.parse(savedResources);
+                        console.log('📋 Loaded resources from localStorage:', planetResources);
                     } catch (e) {
+                        console.error('❌ Error parsing resources:', e);
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
                     }
                 } else {
@@ -632,6 +668,7 @@
                     } else {
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
                     }
+                    console.log('📋 Generated resources:', planetResources);
                 }
                 
                 let imageFile = 'earth-view.jpg';
@@ -668,10 +705,11 @@
                 renderResourceToggles();
                 await updateCargoDisplay();
                 
+                console.log('✅ Planet data loaded successfully');
                 return true;
                 
             } catch (error) {
-                console.error('Error loading planet data:', error);
+                console.error('❌ Error loading planet data:', error);
                 return false;
             }
         }
@@ -706,6 +744,7 @@
             resourceStates[resource] = !resourceStates[resource];
             renderResourceToggles();
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            console.log(`🔄 Toggled ${resource}: ${resourceStates[resource] ? 'ON' : 'OFF'}`);
         };
 
         function updateActiveCount() {
@@ -732,107 +771,132 @@
             }, 3000);
         }
 
-        // FIXED: Working extraction function
+        // DEBUG: Heavy logging extraction function
         async function attemptExtraction() {
-            if (!isExtracting) return;
+            extractionCount++;
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`\n========== EXTRACTION ATTEMPT #${extractionCount} @ ${timestamp} ==========`);
+            
+            debugTimer.textContent = `active (#${extractionCount})`;
+            
+            if (!isExtracting) {
+                console.log('⛔ isExtracting is false, skipping');
+                debugLast.textContent = 'skipped (isExtracting=false)';
+                return;
+            }
             
             try {
-                // Get current cargo mass
+                console.log('📦 Getting current cargo mass...');
                 const currentMass = await getCurrentCargoMass();
+                console.log(`📊 Current cargo mass: ${currentMass} / ${CARGO_MASS_LIMIT} AMU`);
+                debugMass.textContent = currentMass.toFixed(0);
                 
-                // Check if cargo is full
                 if (currentMass >= CARGO_MASS_LIMIT) {
+                    console.log('⚠️ Cargo is full! Stopping extraction.');
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
+                    debugLast.textContent = 'cargo full';
                     if (extractionTimer) {
                         clearInterval(extractionTimer);
                         extractionTimer = null;
+                        debugTimer.textContent = 'stopped (full)';
                     }
                     return;
                 }
                 
-                // Get active resources
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
+                console.log(`🎯 Active resources (${activeResources.length}):`, activeResources);
+                
                 if (activeResources.length === 0) {
+                    console.log('⚠️ No active resources selected');
                     extractorText.textContent = 'No resources selected';
+                    debugLast.textContent = 'no active resources';
                     return;
-                } else {
-                    extractorText.textContent = 'Auto-extractor active';
                 }
                 
-                // Pick a random resource
+                extractorText.textContent = 'Auto-extractor active';
+                
                 const randomIndex = Math.floor(Math.random() * activeResources.length);
                 const resource = activeResources[randomIndex];
+                console.log(`🎲 Selected resource: ${resource} (index ${randomIndex})`);
                 
-                // Get the chance for this resource
-                const chance = resourceChances[resource] || 70;
-                
-                // Determine quantity - players ALWAYS get at least 1
-                let quantity = 1;
-                
-                // Roll for bonus quantity
-                const roll = Math.random() * 100;
-                
-                if (roll < chance) {
-                    // Success! Determine bonus based on how good the roll was
-                    if (roll < chance * 0.2) { // Top 20% of successful rolls
-                        quantity = 4;
-                    } else if (roll < chance * 0.5) { // Next 30%
-                        quantity = 3;
-                    } else if (roll < chance * 0.8) { // Next 30%
-                        quantity = 2;
-                    } else {
-                        quantity = 1;
-                    }
-                } else {
-                    quantity = 1;
-                }
-                
-                // Calculate mass
+                // Force quantity to 1 for debugging
+                const quantity = 1;
                 const massPerUnit = getElementMass(resource);
                 const totalMass = massPerUnit * quantity;
                 
-                // Check if we have enough space
+                console.log(`⚖️ Mass per unit: ${massPerUnit} AMU, total: ${totalMass} AMU`);
+                console.log(`📦 Space check: ${currentMass} + ${totalMass} = ${currentMass + totalMass} <= ${CARGO_MASS_LIMIT}? ${currentMass + totalMass <= CARGO_MASS_LIMIT ? 'YES' : 'NO'}`);
+                
                 if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
-                    // Add to collection
-                    const result = await window.addElementToCollection(resource, quantity);
+                    console.log(`📞 Calling window.addElementToCollection('${resource}', ${quantity})...`);
                     
-                    if (result && result.success) {
-                        // Update cache
+                    // Log the function to make sure it exists
+                    console.log('📞 addElementToCollection type:', typeof window.addElementToCollection);
+                    
+                    const result = await window.addElementToCollection(resource, quantity);
+                    console.log('📨 Result from addElementToCollection:', result);
+                    
+                    if (result && result.success === true) {
+                        console.log('✅✅✅ EXTRACTION SUCCESSFUL!');
                         cachedCargoMass = currentMass + totalMass;
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
-                        
-                        // Show success toast
                         showToast(resource, quantity);
+                        debugLast.textContent = `SUCCESS: ${resource}`;
                     } else {
-                        console.error('Extraction failed:', result);
+                        console.error('❌❌❌ EXTRACTION FAILED:', result);
+                        debugLast.textContent = `FAILED: ${resource}`;
+                        
+                        // Show failure toast for debugging
+                        const symbol = getElementSymbol(resource);
+                        const rarityClass = getRarityClass(resource);
+                        const toast = document.createElement('div');
+                        toast.className = 'toast fail';
+                        toast.innerHTML = `
+                            <span class="toast-icon">${symbol}</span>
+                            <span class="toast-name ${rarityClass}">FAILED</span>
+                        `;
+                        toastContainer.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
                     }
+                } else {
+                    console.log('⚠️ Not enough cargo space');
+                    debugLast.textContent = 'insufficient space';
                 }
+                
             } catch (error) {
-                console.error('Extraction error:', error);
+                console.error('❌❌❌ CRITICAL ERROR in attemptExtraction:', error);
+                console.error('Error stack:', error.stack);
+                debugLast.textContent = 'ERROR';
             }
+            
+            console.log(`========== EXTRACTION ATTEMPT #${extractionCount} COMPLETE ==========\n`);
         }
 
-        // FIXED: Proper interval handling for async function
         function startExtraction() {
+            console.log('🚀 Starting extraction timer...');
             if (extractionTimer) {
+                console.log('⏹️ Clearing existing timer');
                 clearInterval(extractionTimer);
             }
             isExtracting = true;
             extractorText.textContent = 'Auto-extractor active';
+            debugTimer.textContent = 'running';
             
-            // Use setInterval with an async wrapper to properly handle the promise
             extractionTimer = setInterval(() => {
                 if (isExtracting) {
                     attemptExtraction().catch(error => {
-                        console.error('Extraction interval error:', error);
+                        console.error('❌ Interval error:', error);
                     });
                 }
             }, EXTRACTION_INTERVAL);
+            
+            console.log(`✅ Extraction timer set for ${EXTRACTION_INTERVAL/1000} second intervals`);
         }
 
         window.returnToShip = function() {
+            console.log('👋 Returning to ship...');
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             if (extractionTimer) {
@@ -844,9 +908,11 @@
         };
 
         async function performAutoExtract() {
+            console.log('🎁 Performing initial auto-extract...');
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
             
             const extractCount = Math.floor(Math.random() * 3) + 1;
+            console.log(`📦 Initial extract count: ${extractCount}`);
             
             for (let i = 0; i < extractCount; i++) {
                 const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
@@ -854,6 +920,7 @@
                 const mass = getElementMass(resource);
                 
                 const currentMass = await getCurrentCargoMass();
+                console.log(`🎁 Initial extract ${i+1}: trying ${resource}`);
                 
                 if (currentMass + mass <= CARGO_MASS_LIMIT) {
                     const result = await window.addElementToCollection(resource, 1);
@@ -861,15 +928,21 @@
                         cachedCargoMass = currentMass + mass;
                         await updateCargoDisplay();
                         showToast(resource, 1);
+                        console.log(`✅ Initial extract success: ${resource}`);
+                    } else {
+                        console.log(`❌ Initial extract failed: ${resource}`);
                     }
                 }
             }
         }
 
         async function init() {
+            console.log('🔧 INITIALIZING SURFACE');
             try {
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'landing on surface...';
+                
+                console.log('📡 Checking window.addElementToCollection:', typeof window.addElementToCollection);
                 
                 const planetLoaded = await loadPlanetData();
                 
@@ -877,6 +950,7 @@
                     throw new Error('Failed to load planet data');
                 }
                 
+                console.log('✅ Planet data loaded, starting extraction...');
                 startExtraction();
                 
                 setTimeout(() => {
@@ -885,7 +959,7 @@
                 }, 500);
                 
             } catch (error) {
-                console.error('Init error:', error);
+                console.error('❌ Init error:', error);
                 loadingText.textContent = 'error landing';
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -899,6 +973,10 @@
             }
         });
 
+        // Log initial state
+        console.log('📱 Surface page loaded');
+        console.log('⏱️ EXTRACTION_INTERVAL:', EXTRACTION_INTERVAL);
+        
         init();
     </script>
 </body>
