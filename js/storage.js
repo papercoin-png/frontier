@@ -40,8 +40,8 @@ export const STORAGE_KEYS = {
     CURRENT_SECTOR: 'voidfarer_current_sector',
     CURRENT_REGION: 'voidfarer_current_region',
     
-    // Location data - Nebula/Sector level
-    CURRENT_NEBULA: 'voidfarer_current_nebula',
+    // Location data - Star Sector level
+    CURRENT_STAR_SECTOR: 'voidfarer_current_starSector',
     CURRENT_SECTOR_NAME: 'voidfarer_current_sector_name',
     CURRENT_SECTOR_TYPE: 'voidfarer_current_sector_type',
     CURRENT_SECTOR_STARS: 'voidfarer_current_sector_stars',
@@ -563,7 +563,7 @@ export function getCurrentSector() {
 }
 
 export function getCurrentRegion() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_REGION) || 'Orion';
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_REGION) || 'Orion Arm';
 }
 
 export function setCurrentSector(sector, region) {
@@ -571,9 +571,9 @@ export function setCurrentSector(sector, region) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_REGION, region);
 }
 
-// ===== LOCATION DATA - NEBULA/SECTOR LEVEL (keep in localStorage) =====
-export function getCurrentNebula() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_NEBULA) || 'Orion Molecular Cloud';
+// ===== LOCATION DATA - STAR SECTOR LEVEL (keep in localStorage) =====
+export function getCurrentStarSector() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_SECTOR) || 'Orion Molecular Cloud';
 }
 
 export function getCurrentSectorName() {
@@ -595,8 +595,8 @@ export function getCurrentSectorCoords() {
     return { x, y };
 }
 
-export function setCurrentNebula(name, type, stars, x, y) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_NEBULA, name);
+export function setCurrentStarSector(name, type, stars, x, y) {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_SECTOR, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_NAME, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_STARS, stars.toString());
@@ -640,7 +640,7 @@ export function setCurrentStar(name, type, index, planets, x, y) {
 
 // ===== LOCATION DATA - PLANET LEVEL (keep in localStorage) =====
 export function getCurrentPlanet() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Verdant Prime';
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
 }
 
 export function getCurrentPlanetType() {
@@ -659,13 +659,13 @@ export function setCurrentPlanet(name, type, resources) {
 }
 
 // ===== SET CURRENT LOCATION (ALL LEVELS) =====
-export function setCurrentLocation(region, sector, nebula, nebulaType, nebulaStars, nebulaX, nebulaY) {
+export function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
     // Galaxy level
     setCurrentSector(sector, region);
     
-    // Nebula level
-    if (nebula) {
-        setCurrentNebula(nebula, nebulaType || 'Unknown', nebulaStars || 50, nebulaX || 30, nebulaY || 40);
+    // Star sector level
+    if (starSector) {
+        setCurrentStarSector(starSector, starSectorType || 'Unknown', starSectorStars || 50, starSectorX || 30, starSectorY || 40);
     }
 }
 
@@ -712,13 +712,13 @@ export async function saveColonies(colonies) {
     await tx.done;
 }
 
-export async function addColony(name, planet, star, nebula, sector) {
+export async function addColony(name, planet, star, starSector, sector) {
     const colony = {
         id: 'colony_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         name: name,
         planet: planet,
         star: star,
-        nebula: nebula,
+        starSector: starSector,
         sector: sector,
         established: new Date().toISOString()
     };
@@ -1104,7 +1104,7 @@ export async function resetGame() {
     const locationKeys = [
         STORAGE_KEYS.CURRENT_SECTOR,
         STORAGE_KEYS.CURRENT_REGION,
-        STORAGE_KEYS.CURRENT_NEBULA,
+        STORAGE_KEYS.CURRENT_STAR_SECTOR,
         STORAGE_KEYS.CURRENT_SECTOR_NAME,
         STORAGE_KEYS.CURRENT_SECTOR_TYPE,
         STORAGE_KEYS.CURRENT_SECTOR_STARS,
@@ -1162,7 +1162,7 @@ export async function exportGameData() {
         location: {
             sector: getCurrentSector(),
             region: getCurrentRegion(),
-            nebula: getCurrentNebula(),
+            starSector: getCurrentStarSector(),
             star: getCurrentStar(),
             planet: getCurrentPlanet()
         }
@@ -1226,7 +1226,7 @@ export async function importGameData(jsonString) {
         // Restore location
         if (gameData.location) {
             setCurrentSector(gameData.location.sector, gameData.location.region);
-            setCurrentNebula(gameData.location.nebula, 'Unknown', 50, 30, 40);
+            setCurrentStarSector(gameData.location.starSector, 'Unknown', 50, 30, 40);
             setCurrentStar(gameData.location.star, 'Unknown', 0, '3-7');
             setCurrentPlanet(gameData.location.planet, 'lush', []);
         }
@@ -1253,7 +1253,29 @@ export async function getPlayerName() {
     return player?.name || 'Voidfarer';
 }
 
-// ===== INITIALIZE ON LOAD (but don't await - let app handle it) =====
+// ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
+// This is CRITICAL for cargo.html and other HTML files to work
+window.getCredits = getCredits;
+window.getCollection = getCollection;
+window.removeElementFromCollection = removeElementFromCollection;
+window.getElementMass = getElementMass;
+window.getPlayer = getPlayer;
+window.savePlayer = savePlayer;
+window.addCredits = addCredits;
+window.spendCredits = spendCredits;
+window.getShipFuel = getShipFuel;
+window.getShipPower = getShipPower;
+window.getCurrentSector = getCurrentSector;
+window.getCurrentRegion = getCurrentRegion;
+window.getCurrentStarSector = getCurrentStarSector;
+window.getCurrentStar = getCurrentStar;
+window.getCurrentPlanet = getCurrentPlanet;
+window.setCurrentLocation = setCurrentLocation;
+window.setWarpData = setWarpData;
+window.getWarpData = getWarpData;
+window.clearWarpData = clearWarpData;
+
+// ===== INITIALIZE ON LOAD =====
 // We'll export the initialization function and let the app call it
 
 // Need to import getDb for some functions
