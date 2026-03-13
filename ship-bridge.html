@@ -426,7 +426,7 @@
             <div class="bridge-header">
                 <div class="bridge-title">Ship Bridge</div>
                 <div class="bridge-subtitle">✦ command center ✦</div>
-                <button class="home-btn" onclick="warpHome()">
+                <button class="home-btn" onclick="window.warpHome()">
                     <span class="home-icon">🏠</span>
                     <span>HOME</span>
                 </button>
@@ -451,24 +451,24 @@
                 </div>
             </div>
             
-            <!-- Action Grid - UPDATED: Ship Status changed to Journal -->
+            <!-- Action Grid -->
             <div class="action-grid">
-                <div class="action-card" onclick="goToSurface()">
+                <div class="action-card" onclick="window.goToSurface()">
                     <div class="action-icon">🪐</div>
                     <div class="action-label">SURFACE</div>
                     <div class="action-desc">Extract resources</div>
                 </div>
-                <div class="action-card" onclick="goToCargo()">
+                <div class="action-card" onclick="window.goToCargo()">
                     <div class="action-icon">📦</div>
                     <div class="action-label">CARGO</div>
                     <div class="action-desc">Manage inventory</div>
                 </div>
-                <div class="action-card" onclick="goToGalaxyMap()">
+                <div class="action-card" onclick="window.goToGalaxyMap()">
                     <div class="action-icon">🌌</div>
                     <div class="action-label">GALAXY MAP</div>
                     <div class="action-desc">Plot long courses</div>
                 </div>
-                <div class="action-card" onclick="goToJournal()">
+                <div class="action-card" onclick="window.goToJournal()">
                     <div class="action-icon">📖</div>
                     <div class="action-label">JOURNAL</div>
                     <div class="action-desc">Discovered elements</div>
@@ -514,8 +514,8 @@
                 
                 <!-- Quick Actions -->
                 <div class="quick-actions">
-                    <button class="quick-btn" onclick="quickRefuel()">⛽ REFUEL</button>
-                    <button class="quick-btn" onclick="quickRepair()">🔧 REPAIR</button>
+                    <button class="quick-btn" onclick="window.quickRefuel()">⛽ REFUEL</button>
+                    <button class="quick-btn" onclick="window.quickRepair()">🔧 REPAIR</button>
                 </div>
             </div>
             
@@ -530,9 +530,14 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -549,6 +554,15 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
+
+        // Make functions available globally for onclick handlers
+        window.goToSurface = goToSurface;
+        window.goToCargo = goToCargo;
+        window.goToGalaxyMap = goToGalaxyMap;
+        window.goToJournal = goToJournal;
+        window.warpHome = warpHome;
+        window.quickRefuel = quickRefuel;
+        window.quickRepair = quickRepair;
 
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
@@ -680,11 +694,6 @@
                 }
             }
             
-            // Double-check data was saved
-            console.log('Navigating to surface with planet:', localStorage.getItem('voidfarer_current_planet'));
-            console.log('Planet type:', localStorage.getItem('voidfarer_current_planet_type'));
-            console.log('Resources:', localStorage.getItem('voidfarer_current_planet_resources'));
-            
             window.location.href = 'surface.html';
         }
 
@@ -769,7 +778,6 @@
             window.location.href = 'galaxy-map.html';
         }
 
-        // NEW: Go to Journal (replaces Ship Status)
         function goToJournal() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'journal.html';
@@ -896,11 +904,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
