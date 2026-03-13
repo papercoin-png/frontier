@@ -735,7 +735,7 @@
                 }
             }
             
-            // RESTART EXTRACTION IF SPACE AVAILABLE - THIS IS THE FIX
+            // RESTART EXTRACTION IF SPACE AVAILABLE
             if (currentMass < CARGO_MASS_LIMIT && !isExtracting && extractionTimer === null) {
                 isExtracting = true;
                 startExtraction();
@@ -806,10 +806,7 @@
 
         // ===== ATTEMPT EXTRACTION =====
         async function attemptExtraction() {
-            if (!isExtracting) {
-                console.log('Extraction skipped: isExtracting = false');
-                return;
-            }
+            if (!isExtracting) return;
             if (currentMass >= CARGO_MASS_LIMIT) {
                 isExtracting = false;
                 extractorText.textContent = 'Cargo full - extraction paused';
@@ -831,8 +828,6 @@
             const chance = resourceChances[resource] || 70;
             const success = Math.random() * 100 < chance;
             
-            console.log(`Extracting ${resource}: chance=${chance}%, success=${success}`);
-            
             if (success) {
                 const mass = getElementMass(resource);
                 
@@ -846,9 +841,6 @@
                             currentMass += mass;
                             updateCargoDisplay();
                             showToast(resource, true);
-                            console.log(`Successfully added ${resource}`);
-                        } else {
-                            console.log('Failed to add to database:', result);
                         }
                     }
                 }
@@ -864,7 +856,6 @@
             }
             extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
             extractorText.textContent = 'Auto-extractor active';
-            console.log('Extraction timer started');
         }
 
         // ===== RETURN TO SHIP =====
@@ -925,14 +916,14 @@
                 // Load cargo data
                 await loadCargoData();
                 
-                // Auto-extract on landing
-                await performAutoExtract();
-                
-                // Start extraction timer
+                // Start extraction timer FIRST
                 startExtraction();
                 
+                // Hide loading overlay and THEN auto-extract
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
+                    // Auto-extract after loading screen is gone
+                    performAutoExtract();
                 }, 500);
                 
             } catch (error) {
