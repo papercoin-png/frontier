@@ -1,1 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Star Cluster</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            overflow: auto;
+            font-family: 'Libre Baskerville', serif;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .cluster-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .ui-header {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background: rgba(10,10,26,0.9);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            text-align: center;
+            border-bottom: 2px solid #6a8ac0;
+        }
+        
+        .ui-header h1 {
+            color: white;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 20px #8a6aff;
+            font-weight: 600;
+        }
+        
+        .current-location {
+            position: sticky;
+            top: 70px;
+            z-index: 25;
+            margin: 10px 15px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .current-dot {
+            width: 12px;
+            height: 12px;
+            background: #4affaa;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #4affaa;
+        }
+        
+        .journey-info {
+            position: sticky;
+            top: 130px;
+            z-index: 25;
+            margin: 10px 15px;
+            background: rgba(10,10,26,0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+        }
+        
+        .journey-distance {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .journey-total {
+            position: sticky;
+            top: 170px;
+            z-index: 25;
+            margin: 10px 15px;
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: none;
+            justify-content: space-between;
+            color: white;
+        }
+        
+        .journey-total.visible {
+            display: flex;
+        }
+        
+        .journey-total-label {
+            color: #a0c0ff;
+        }
+        
+        .journey-total-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        .back-btn {
+            position: fixed;
+            bottom: 30px;
+            left: 20px;
+            background: rgba(10,10,26,0.9);
+            backdrop-filter: blur(8px);
+            border: 2px solid #6a8ac0;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 40px 15px 40px 15px;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 40;
+            min-width: 120px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 500;
+        }
+        
+        .back-btn:active {
+            background: rgba(106, 138, 192, 0.3);
+            transform: scale(0.96);
+        }
+        
+        /* Star Grid */
+        .stars-grid {
+            padding: 20px 15px 100px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .star-card {
+            background: rgba(30, 45, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+        }
+        
+        .star-card:active {
+            background: rgba(60, 90, 140, 0.8);
+            transform: scale(0.98);
+        }
+        
+        .star-card.current {
+            border-color: #4affaa;
+            box-shadow: 0 0 30px rgba(74, 255, 170, 0.3);
+        }
+        
+        .star-icon {
+            font-size: 48px;
+            min-width: 70px;
+            text-align: center;
+            filter: drop-shadow(0 0 15px currentColor);
+        }
+        
+        .star-info {
+            flex: 1;
+        }
+        
+        .star-name {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 5px;
+        }
+        
+        .star-type {
+            color: #a0c0ff;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .star-details {
+            display: flex;
+            gap: 20px;
+            color: #ffd966;
+            font-size: 14px;
+        }
+        
+        .distance-badge {
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: #ffaa4a;
+            color: black;
+            padding: 5px 15px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: bold;
+            border: 2px solid white;
+        }
+        
+        /* Info panel for selected star */
+        .star-info-panel {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.95);
+            backdrop-filter: blur(15px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            z-index: 50;
+            display: none;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 0 30px #ffaa4a;
+        }
+        
+        .star-info-panel.visible {
+            display: block;
+        }
+        
+        .star-info-name {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            color: #ffffff;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .star-info-type {
+            color: #a0c0ff;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .star-info-planets {
+            color: #ffd966;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .star-info-distance {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        
+        .distance-value {
+            color: #4affaa;
+            font-weight: 700;
+            font-size: 20px;
+        }
+        
+        .cumulative-info {
+            background: rgba(255, 170, 74, 0.15);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ffaa4a;
+            display: none;
+        }
+        
+        .cumulative-info.visible {
+            display: block;
+        }
+        
+        .cumulative-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .cumulative-label {
+            color: #a0c0ff;
+        }
+        
+        .cumulative-value {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        .star-info-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .star-info-btn {
+            flex: 1;
+            background: #4a8ac0;
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+        }
+        
+        .star-info-btn:active {
+            background: #6aa0e0;
+            transform: scale(0.96);
+        }
+        
+        .star-info-btn.primary {
+            background: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .star-info-btn.primary:active {
+            background: #ffcc6a;
+        }
+        
+        .star-info-btn.secondary {
+            background: transparent;
+            border: 1px solid #6a8ac0;
+        }
+        
+        .star-info-btn.secondary:active {
+            background: rgba(106, 138, 192, 0.3);
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #8a6aff;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: white;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 20px #8a6aff;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="cluster-view">
+        <div class="ui-header">
+            <h1 id="clusterTitle">Loading Star Cluster...</h1>
+        </div>
+        
+        <div class="current-location" id="currentLocation">
+            <span class="current-dot"></span>
+            <span id="currentLocationText">Loading current star...</span>
+        </div>
+        
+        <div class="journey-info" id="journeyInfo">
+            <span>Journey so far:</span>
+            <span class="journey-distance" id="journeyDistance">0.0 LY</span>
+        </div>
+        
+        <div class="journey-total" id="journeyTotal">
+            <span class="journey-total-label">Total with star leg:</span>
+            <span class="journey-total-value" id="totalJourneyDistance">0.0 LY</span>
+        </div>
+        
+        <div class="stars-grid" id="starsGrid">
+            <div style="color: white; text-align: center; padding: 50px;">Loading stars...</div>
+        </div>
+        
+        <button class="back-btn" onclick="window.returnToSectors()">← STAR SECTORS</button>
+        
+        <!-- Star Info Panel -->
+        <div class="star-info-panel" id="starInfoPanel">
+            <div class="star-info-name" id="starInfoName">Star Name</div>
+            <div class="star-info-type" id="starInfoType">Star Type</div>
+            <div class="star-info-planets" id="starInfoPlanets">0 planets</div>
+            <div class="star-info-distance">
+                <div>Distance from current:</div>
+                <span class="distance-value" id="starDistance">0.0</span> LY
+            </div>
+            
+            <!-- Cumulative info (shown only in plot mode) -->
+            <div class="cumulative-info" id="cumulativeInfo">
+                <div class="cumulative-row">
+                    <span class="cumulative-label">Previous legs:</span>
+                    <span class="cumulative-value" id="previousDistance">0.0 LY</span>
+                </div>
+                <div class="cumulative-row">
+                    <span class="cumulative-label">After this leg:</span>
+                    <span class="cumulative-value" id="afterThisLeg">0.0 LY</span>
+                </div>
+            </div>
+            
+            <div class="star-info-buttons">
+                <button class="star-info-btn" id="actionBtn" onclick="window.handleStarAction()">🚀 VIEW SYSTEM</button>
+                <button class="star-info-btn secondary" onclick="window.hideStarInfo()">CLOSE</button>
+            </div>
+        </div>
+        
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">entering system...</div>
+        </div>
+
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
+    </div>
+
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const migrationStatus = document.getElementById('migrationStatus');
+        const starsGrid = document.getElementById('starsGrid');
+        const starInfoPanel = document.getElementById('starInfoPanel');
+        const journeyDistanceSpan = document.getElementById('journeyDistance');
+        const journeyTotalEl = document.getElementById('journeyTotal');
+        const totalJourneyDistanceEl = document.getElementById('totalJourneyDistance');
+        const cumulativeInfoEl = document.getElementById('cumulativeInfo');
+        const previousDistanceEl = document.getElementById('previousDistance');
+        const afterThisLegEl = document.getElementById('afterThisLeg');
+
+        // Make functions available globally for onclick handlers
+        window.returnToSectors = returnToSectors;
+        window.handleStarAction = handleStarAction;
+        window.hideStarInfo = hideStarInfo;
+
+        // ===== CONSTANTS =====
+        const UNIVERSE_SEED = 42793;
+
+        // ===== STATE =====
+        let stars = [];
+        let currentStarName = '';
+        let clusterName = 'Unknown Cluster';
+        let starCount = 50;
+        let selectedStar = null;
+        let journeyDistance = 0;
+        let cumulativeBefore = 0;
+        
+        // ===== CHECK FOR PLOT MODE =====
+        const urlParams = new URLSearchParams(window.location.search);
+        const isPlotMode = urlParams.get('mode') === 'plot';
+
+        // ===== HASH FUNCTION =====
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
+        // ===== SEEDED RANDOM =====
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+
+        function seededRandomRange(seed, index, min, max) {
+            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+        }
+
+        function seededRandomChoice(seed, index, array) {
+            const choice = Math.floor(seededRandom(seed, index) * array.length);
+            return array[choice];
+        }
+
+        // ===== STAR TYPES =====
+        const starTypes = [
+            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8, icon: '🟡' },
+            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5, icon: '🔴' },
+            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12, icon: '🔵' },
+            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0, icon: '💫' },
+            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0, icon: '⚫' }
+        ];
+
+        function getStarType(seed, index) {
+            const rand = seededRandom(seed, index);
+            let cumulative = 0;
+            
+            for (const type of starTypes) {
+                cumulative += type.prob;
+                if (rand < cumulative) {
+                    return { ...type };
+                }
+            }
+            return { ...starTypes[0] };
+        }
+
+        // ===== NAME GENERATION =====
+        const namePrefixes = [
+            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
+            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
+            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
+        ];
+
+        const nameSuffixes = [
+            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
+            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
+            'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
+        ];
+
+        function generateStarName(seed, index) {
+            const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
+            const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
+            return prefix + ' ' + suffix;
+        }
+
+        // ===== WARP CALCULATION FUNCTIONS =====
+        function getWarpCyclesFromDistance(distance) {
+            if (distance <= 1.0) return 1;
+            if (distance <= 2.5) return 2;
+            if (distance <= 4.5) return 3;
+            if (distance <= 7.0) return 4;
+            return 5;
+        }
+
+        function getFuelCostFromDistance(distance) {
+            return Math.floor(distance * 4) + 5;
+        }
+
+        // ===== LOAD JOURNEY DISTANCE =====
+        function loadJourneyDistance() {
+            const saved = localStorage.getItem('voidfarer_journey_distance');
+            journeyDistance = saved ? parseFloat(saved) : 0;
+            journeyDistanceSpan.textContent = journeyDistance.toFixed(1) + ' LY';
+        }
+
+        // ===== LOAD CUMULATIVE DISTANCE (for plot mode) =====
+        function loadCumulativeDistance() {
+            cumulativeBefore = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
+            
+            if (isPlotMode && cumulativeBefore > 0) {
+                journeyTotalEl.classList.add('visible');
+                totalJourneyDistanceEl.textContent = cumulativeBefore.toFixed(1) + ' LY';
+            }
+        }
+
+        // ===== GENERATE STAR DISTANCE =====
+        function generateStarDistance(index, isCurrent) {
+            if (isCurrent) return 0;
+            
+            const baseDistance = 0.5 + (index / starCount) * 3.0;
+            const seed = UNIVERSE_SEED + index * 100;
+            const randomFactor = seededRandom(seed, 0) * 0.5;
+            
+            return parseFloat((baseDistance + randomFactor).toFixed(1));
+        }
+
+        // ===== LOAD CLUSTER DATA =====
+        async function loadClusterData() {
+            try {
+                // Load data from storage
+                const star = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : '';
+                const starSector = typeof window.getCurrentNebula === 'function' ? await window.getCurrentNebula() : 'Orion Molecular Cloud';
+                const count = typeof window.getCurrentSectorStars === 'function' ? await window.getCurrentSectorStars() : 85;
+
+                currentStarName = star || '';
+                clusterName = starSector || 'Orion Molecular Cloud';
+                starCount = count || 85;
+
+                // Update UI
+                document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
+                document.getElementById('currentLocationText').textContent = 
+                    currentStarName || 'No star selected';
+
+                // Load journey distance
+                loadJourneyDistance();
+                
+                // Load cumulative distance for plot mode
+                if (isPlotMode) {
+                    loadCumulativeDistance();
+                }
+
+                return true;
+
+            } catch (error) {
+                console.error('Error loading cluster data:', error);
+                clusterName = 'Orion Molecular Cloud';
+                document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
+                return false;
+            }
+        }
+
+        // ===== GENERATE STARS =====
+        function generateStars() {
+            stars = [];
+            
+            const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 100000;
+            
+            for (let i = 0; i < starCount; i++) {
+                const starSeed = clusterSeed + i * 1000;
+                const starType = getStarType(starSeed, i);
+                
+                let planetCount = 0;
+                if (starType.maxPlanets > 0) {
+                    planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
+                }
+                
+                const isCurrent = (starType.name === currentStarName);
+                const distance = generateStarDistance(i, isCurrent);
+                
+                stars.push({
+                    index: i,
+                    name: generateStarName(starSeed, i + 20),
+                    type: starType.name,
+                    typeKey: starType.type,
+                    icon: starType.icon,
+                    color: starType.color,
+                    planets: planetCount,
+                    distance: distance,
+                    isCurrent: isCurrent
+                });
+            }
+
+            // Sort stars: Current star first, then by distance
+            stars.sort((a, b) => {
+                if (a.isCurrent) return -1;
+                if (b.isCurrent) return 1;
+                return a.distance - b.distance;
+            });
+        }
+
+        // ===== SHOW STAR INFO =====
+        function showStarInfo(star) {
+            selectedStar = star;
+            
+            document.getElementById('starInfoName').textContent = star.name;
+            document.getElementById('starInfoType').textContent = star.type;
+            document.getElementById('starInfoPlanets').textContent = star.planets + ' planets';
+            document.getElementById('starDistance').textContent = star.distance.toFixed(1);
+            
+            // Update cumulative info for plot mode
+            if (isPlotMode) {
+                const afterThisLeg = cumulativeBefore + star.distance;
+                previousDistanceEl.textContent = cumulativeBefore.toFixed(1) + ' LY';
+                afterThisLegEl.textContent = afterThisLeg.toFixed(1) + ' LY';
+                cumulativeInfoEl.classList.add('visible');
+            } else {
+                cumulativeInfoEl.classList.remove('visible');
+            }
+            
+            // Update action button based on mode
+            const actionBtn = document.getElementById('actionBtn');
+            
+            if (isPlotMode) {
+                actionBtn.classList.add('primary');
+                actionBtn.textContent = '⭐ SELECT THIS STAR';
+            } else {
+                actionBtn.classList.remove('primary');
+                actionBtn.textContent = '🚀 VIEW SYSTEM';
+            }
+            
+            starInfoPanel.classList.add('visible');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== HIDE STAR INFO =====
+        function hideStarInfo() {
+            starInfoPanel.classList.remove('visible');
+            selectedStar = null;
+        }
+
+        // ===== HANDLE STAR ACTION =====
+        function handleStarAction() {
+            if (!selectedStar) return;
+            
+            if (isPlotMode) {
+                selectStarForJourney();
+            } else {
+                viewSystem();
+            }
+        }
+
+        // ===== VIEW SYSTEM (normal mode) =====
+        async function viewSystem() {
+            if (!selectedStar) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'entering system...';
+            
+            try {
+                // Add this star's distance to journey total
+                const newTotal = journeyDistance + selectedStar.distance;
+                localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
+                
+                // Save star data
+                if (typeof window.setCurrentStar === 'function') {
+                    await window.setCurrentStar(
+                        selectedStar.name,
+                        selectedStar.type,
+                        selectedStar.index,
+                        selectedStar.planets + ' planets'
+                    );
+                } else {
+                    localStorage.setItem('voidfarer_current_star', selectedStar.name);
+                    localStorage.setItem('voidfarer_current_star_type', selectedStar.type);
+                    localStorage.setItem('voidfarer_current_star_index', selectedStar.index.toString());
+                }
+                
+                // Navigate to system view
+                setTimeout(() => {
+                    window.location.href = 'system-view.html';
+                }, 500);
+
+            } catch (error) {
+                console.error('Error entering system:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to enter system. Please try again.');
+            }
+        }
+
+        // ===== SELECT STAR FOR JOURNEY (plot mode) =====
+        async function selectStarForJourney() {
+            if (!selectedStar) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'adding star leg...';
+            
+            try {
+                // Get current cumulative distance
+                const currentCumulative = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
+                
+                // Calculate new cumulative
+                const newCumulative = currentCumulative + selectedStar.distance;
+                
+                console.log('Star leg:', {
+                    star: selectedStar.name,
+                    distance: selectedStar.distance,
+                    previousCumulative: currentCumulative,
+                    newCumulative: newCumulative
+                });
+                
+                // Save star data using navigation.js if available
+                if (typeof window.savePlotStar === 'function') {
+                    window.savePlotStar(selectedStar.name, selectedStar.distance);
+                } else {
+                    // Fallback to direct localStorage
+                    localStorage.setItem('voidfarer_plot_star', selectedStar.name);
+                    localStorage.setItem('voidfarer_plot_star_distance', selectedStar.distance.toString());
+                    
+                    // CRITICAL: Update cumulative distance
+                    localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
+                }
+                
+                // Navigate to system view in plot mode
+                setTimeout(() => {
+                    window.location.href = 'system-view.html?mode=plot';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error selecting star:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to select star. Please try again.');
+            }
+        }
+
+        // ===== RENDER STARS =====
+        function renderStars() {
+            starsGrid.innerHTML = '';
+
+            if (stars.length === 0) {
+                starsGrid.innerHTML = '<div style="color: white; text-align: center; padding: 50px;">No stars found in this cluster</div>';
+                return;
+            }
+
+            stars.forEach((star) => {
+                const card = document.createElement('div');
+                card.className = 'star-card';
+                if (star.isCurrent) {
+                    card.classList.add('current');
+                }
+                card.onclick = function() { showStarInfo(star); };
+                
+                let distanceDisplay = '';
+                if (star.isCurrent) {
+                    distanceDisplay = `<div class="distance-badge" style="background:#4affaa; color:black;">📍 CURRENT</div>`;
+                } else {
+                    distanceDisplay = `<div class="distance-badge">${star.distance.toFixed(1)} LY</div>`;
+                }
+                
+                card.innerHTML = `
+                    ${distanceDisplay}
+                    <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
+                    <div class="star-info">
+                        <div class="star-name" style="color: ${star.color}">${star.name}</div>
+                        <div class="star-type">${star.type}</div>
+                        <div class="star-details">⏺️ ${star.planets} planets</div>
+                    </div>
+                `;
+                
+                starsGrid.appendChild(card);
+            });
+        }
+
+        // ===== RETURN TO STAR SECTORS =====
+        function returnToSectors() {
+            if (isPlotMode) {
+                window.location.href = 'star-sectors.html?mode=plot';
+            } else {
+                window.location.href = 'star-sectors.html';
+            }
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading star cluster...';
+
+                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
+                if (!credits) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                await loadClusterData();
+                generateStars();
+                renderStars();
+
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error - redirecting...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
