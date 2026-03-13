@@ -700,7 +700,6 @@
                 let collection = {};
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
-                    console.log('Current collection in cargo:', collection);
                 }
                 
                 // Calculate total mass
@@ -736,7 +735,7 @@
                 }
             }
             
-            // Restart extraction if space available
+            // RESTART EXTRACTION IF SPACE AVAILABLE - THIS IS THE FIX
             if (currentMass < CARGO_MASS_LIMIT && !isExtracting && extractionTimer === null) {
                 isExtracting = true;
                 startExtraction();
@@ -807,7 +806,10 @@
 
         // ===== ATTEMPT EXTRACTION =====
         async function attemptExtraction() {
-            if (!isExtracting) return;
+            if (!isExtracting) {
+                console.log('Extraction skipped: isExtracting = false');
+                return;
+            }
             if (currentMass >= CARGO_MASS_LIMIT) {
                 isExtracting = false;
                 extractorText.textContent = 'Cargo full - extraction paused';
@@ -829,6 +831,8 @@
             const chance = resourceChances[resource] || 70;
             const success = Math.random() * 100 < chance;
             
+            console.log(`Extracting ${resource}: chance=${chance}%, success=${success}`);
+            
             if (success) {
                 const mass = getElementMass(resource);
                 
@@ -837,18 +841,15 @@
                     // Add to collection
                     if (typeof window.addElementToCollection === 'function') {
                         const result = await window.addElementToCollection(resource, 1);
-                        console.log('Add result:', result);
                         
                         if (result && result.success) {
                             currentMass += mass;
                             updateCargoDisplay();
                             showToast(resource, true);
+                            console.log(`Successfully added ${resource}`);
                         } else {
-                            console.error('Failed to add element to database:', result);
-                            showToast(resource, false);
+                            console.log('Failed to add to database:', result);
                         }
-                    } else {
-                        console.error('addElementToCollection function not found');
                     }
                 }
             } else {
@@ -863,6 +864,7 @@
             }
             extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
             extractorText.textContent = 'Auto-extractor active';
+            console.log('Extraction timer started');
         }
 
         // ===== RETURN TO SHIP =====
@@ -896,7 +898,6 @@
                 if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
                     if (typeof window.addElementToCollection === 'function') {
                         const result = await window.addElementToCollection(resource, quantity);
-                        console.log('Auto-extract result:', result);
                         if (result && result.success) {
                             currentMass += totalMass;
                             showToast(resource, true);
