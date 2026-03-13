@@ -1272,7 +1272,7 @@ export async function getPlayerName() {
 }
 
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
-// This is CRITICAL for surface.html, cargo.html and other HTML files to work
+// This is CRITICAL for earth-hub.html, surface.html, cargo.html and other HTML files to work
 window.getCredits = getCredits;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
@@ -1282,6 +1282,7 @@ window.getPlayer = getPlayer;
 window.savePlayer = savePlayer;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
+window.safeSellElement = safeSellElement;  // ← ADDED THIS LINE FOR EARTH HUB SELLING
 window.getShipFuel = getShipFuel;
 window.getShipPower = getShipPower;
 window.getCurrentSector = getCurrentSector;
