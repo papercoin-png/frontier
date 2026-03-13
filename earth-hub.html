@@ -392,20 +392,25 @@
         .item-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
         }
         
         .sell-btn {
             background: rgba(74, 154, 138, 0.3);
             border: 1px solid #4a9a8a;
             color: #ffffff;
-            padding: 6px 12px;
+            padding: 6px 8px;
             border-radius: 30px 8px 30px 8px;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             transition: all 0.1s;
-            min-width: 50px;
+            min-width: 35px;
             text-align: center;
+            font-weight: 600;
+        }
+        
+        .sell-btn:hover {
+            background: rgba(74, 154, 138, 0.5);
         }
         
         .sell-btn:active {
@@ -413,10 +418,15 @@
             transform: scale(0.95);
         }
         
-        .sell-btn.small {
-            padding: 4px 8px;
-            font-size: 11px;
-            min-width: 40px;
+        .sell-btn.sell-all {
+            background: rgba(255, 170, 74, 0.3);
+            border-color: #ffaa4a;
+            color: #ffd966;
+        }
+        
+        .sell-btn.sell-all:active {
+            background: #ffaa4a;
+            color: #0a0a1a;
         }
         
         /* Group Actions */
@@ -738,7 +748,7 @@
             </div>
             
             <!-- Market Hint -->
-            <div class="market-hint">▼ Tap on any group to expand/collapse ▼</div>
+            <div class="market-hint">▼ Click on any group to expand/collapse ▼</div>
             
             <!-- MARKET CARD -->
             <div class="market-card">
@@ -1128,6 +1138,8 @@
                 itemsDiv.className = `group-items ${expandedGroup === rarity ? 'show' : ''}`;
                 
                 group.elements.forEach(element => {
+                    const halfQuantity = Math.floor(element.count / 2);
+                    
                     const itemRow = document.createElement('div');
                     itemRow.className = 'item-row';
                     
@@ -1141,7 +1153,9 @@
                             <span class="item-current-price">${element.marketPrice}⭐</span>
                         </div>
                         <div class="item-actions">
-                            <button class="sell-btn small" onclick="sellItem('${element.name}', 1, ${element.marketPrice}, event)">SELL</button>
+                            <button class="sell-btn" onclick="sellItem('${element.name}', 1, ${element.marketPrice}, event)">1</button>
+                            ${halfQuantity > 0 ? `<button class="sell-btn" onclick="sellItem('${element.name}', ${halfQuantity}, ${element.marketPrice}, event)">½</button>` : ''}
+                            <button class="sell-btn sell-all" onclick="sellItem('${element.name}', ${element.count}, ${element.marketPrice}, event)">ALL</button>
                         </div>
                     `;
                     itemsDiv.appendChild(itemRow);
@@ -1188,6 +1202,11 @@
         // ===== SELL ITEM =====
         async function sellItem(elementName, quantity, price, event) {
             if (event) event.stopPropagation();
+            
+            if (quantity <= 0) {
+                alert('No items to sell');
+                return;
+            }
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'selling...';
