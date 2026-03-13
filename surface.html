@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Voidfarer - Surface</title>
+    <title>Voidfarer - Planetary Surface</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <!-- Add idb library for IndexedDB -->
@@ -42,268 +42,15 @@
             position: relative;
             width: 100%;
             height: 100%;
-            overflow: hidden;
             background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 30px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
         
-        /* Planet surface background */
-        .surface-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            opacity: 0.7;
-        }
-        
-        /* Dark overlay for mood */
-        .atmosphere {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at center, transparent 30%, rgba(10, 20, 30, 0.7) 100%);
-            z-index: 2;
-            pointer-events: none;
-        }
-        
-        /* Planet name overlay */
-        .planet-name {
-            position: absolute;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ffffff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 28px;
-            text-shadow: 0 0 20px #000, 0 0 40px #4a8ac0;
-            background: rgba(0,0,0,0.4);
-            padding: 8px 30px;
-            border-radius: 60px 15px 60px 15px;
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            z-index: 10;
-            font-weight: 600;
-        }
-        
-        /* Location Info */
-        .location-info {
-            position: absolute;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #a0c0ff;
-            font-size: 12px;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(5px);
-            padding: 4px 16px;
-            border-radius: 40px 10px 40px 10px;
-            border: 1px solid #8ac0d0;
-            z-index: 10;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        /* Cargo Mass Indicator */
-        .cargo-mass {
-            position: absolute;
-            top: 160px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(10, 20, 30, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid #4affaa;
-            color: #e0f0f0;
-            padding: 6px 20px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            z-index: 15;
-            font-family: 'Exo 2', sans-serif;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        .cargo-mass.warning {
-            border-color: #ffaa4a;
-            color: #ffaa4a;
-        }
-        
-        .cargo-mass.critical {
-            border-color: #ff6b6b;
-            color: #ff6b6b;
-        }
-        
-        .cargo-mass-value {
-            font-weight: 600;
-            color: #4affaa;
-        }
-        
-        .cargo-mass.warning .cargo-mass-value {
-            color: #ffaa4a;
-        }
-        
-        .cargo-mass.critical .cargo-mass-value {
-            color: #ff6b6b;
-        }
-        
-        /* Auto-extractor notice */
-        .auto-notice {
-            position: absolute;
-            top: 220px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(10, 20, 30, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 8px 20px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            z-index: 15;
-            opacity: 0;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-            pointer-events: none;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .auto-notice.show {
-            opacity: 1;
-            animation: notice-pulse 2s ease-in-out;
-        }
-        
-        @keyframes notice-pulse {
-            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        }
-        
-        /* Resource log */
-        .resource-log {
-            position: absolute;
-            bottom: 150px;
-            left: 20px;
-            z-index: 20;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            background: rgba(10,10,26,0.5);
-            backdrop-filter: blur(5px);
-            padding: 15px;
-            border-radius: 30px 10px 30px 10px;
-            border: 1px solid #8ac0d0;
-            min-width: 180px;
-            max-width: 220px;
-        }
-        
-        .log-entry {
-            margin-bottom: 5px;
-            padding: 3px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 13px;
-        }
-        
-        .log-entry:last-child {
-            border-bottom: none;
-        }
-        
-        /* Collection counter */
-        .collection {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            z-index: 20;
-            font-size: 24px;
-            font-family: 'Exo 2', sans-serif;
-            color: #e0f0f0;
-            text-shadow: 0 0 20px #8aa0aa;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            padding: 10px 20px;
-            border-radius: 60px 15px 60px 15px;
-            border: 2px solid #8ac0d0;
-            min-width: 100px;
-            text-align: center;
-            font-weight: 600;
-        }
-        
-        /* Return button */
-        .return-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8aa0aa;
-            color: #e0f0f0;
-            padding: 12px 24px;
-            border-radius: 60px 15px 60px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            font-weight: 500;
-        }
-        
-        .return-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
-        }
-        
-        /* Resource indicator */
-        .resource-indicator {
-            position: absolute;
-            top: 280px;
-            right: 20px;
-            z-index: 15;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            border: 1px solid #8ac0d0;
-            border-radius: 40px 10px 40px 10px;
-            padding: 10px 15px;
-            color: #ffffff;
-            font-size: 12px;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .planet-resources {
-            color: #ffd966;
-            font-weight: 600;
-            margin-top: 5px;
-        }
-        
-        /* Colony button */
-        .colony-btn {
-            position: absolute;
-            top: 30px;
-            right: 20px;
-            z-index: 20;
-            background: rgba(10, 20, 30, 0.6);
-            backdrop-filter: blur(5px);
-            border: 2px solid #8ac0d0;
-            color: #e0f0f0;
-            padding: 8px 16px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 14px;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .colony-btn:active {
-            background: rgba(138, 160, 170, 0.3);
-            transform: scale(0.97);
-        }
-        
-        .colony-btn.established {
-            background: rgba(74, 154, 106, 0.5);
-            border-color: #4affaa;
-        }
-        
-        /* Loading overlay */
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -315,28 +62,34 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
             flex-direction: column;
             gap: 20px;
         }
         
         .loading-overlay.active {
             display: flex;
+            opacity: 1;
+            pointer-events: all;
         }
         
         .loading-spinner {
             width: 50px;
             height: 50px;
-            border: 4px solid #8ac0d0;
+            border: 4px solid #6a8ac0;
             border-top: 4px solid transparent;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
         
         .loading-text {
-            color: #ffffff;
+            color: #e0f0ff;
             font-family: 'Exo 2', sans-serif;
             font-size: 24px;
-            text-shadow: 0 0 15px #8ac0d0;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
             font-weight: 500;
         }
         
@@ -345,13 +98,447 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Element colors */
-        .text-common { color: #ffffff; }
-        .text-uncommon { color: #b0ffb0; }
-        .text-rare { color: #b0b0ff; }
-        .text-very-rare { color: #e0b0ff; }
-        .text-legendary { color: #ffd700; }
-
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .surface-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .surface-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .surface-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Planet Info Card */
+        .planet-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .planet-icon {
+            font-size: 48px;
+            min-width: 60px;
+            text-align: center;
+            filter: drop-shadow(0 0 15px #6a8ac0);
+        }
+        
+        .planet-info {
+            flex: 1;
+        }
+        
+        .planet-name {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 4px;
+        }
+        
+        .planet-type {
+            color: #a0c0ff;
+            font-size: 14px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .cargo-mass {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .cargo-mass span {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        /* Extraction Section */
+        .extraction-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-family: 'Exo 2', sans-serif;
+            border-bottom: 1px solid #6a8ac0;
+            padding-bottom: 8px;
+        }
+        
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .resource-card {
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #4a8ac0;
+            border-radius: 30% 10% 30% 10%;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .resource-card:active {
+            background: rgba(74, 138, 192, 0.3);
+            transform: scale(0.97);
+        }
+        
+        .resource-card.selected {
+            border-color: #ffaa4a;
+            box-shadow: 0 0 20px #ffaa4a;
+        }
+        
+        .resource-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 10px #4a8ac0);
+        }
+        
+        .resource-name {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .resource-chance {
+            color: #ffd966;
+            font-size: 12px;
+        }
+        
+        .extraction-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .qty-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(74, 138, 192, 0.3);
+            border: 2px solid #6a8ac0;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-btn:active {
+            background: #6a8ac0;
+            transform: scale(0.9);
+        }
+        
+        .qty-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #extractQuantity {
+            width: 80px;
+            height: 60px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #6a8ac0;
+            border-radius: 30px 8px 30px 8px;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .extract-info {
+            text-align: center;
+            margin: 15px 0;
+            font-size: 14px;
+            color: #a0c0ff;
+        }
+        
+        .extract-mass {
+            color: #4affaa;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .extract-btn {
+            width: 100%;
+            background: #4affaa;
+            border: none;
+            color: #0a0a1a;
+            padding: 18px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 22px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 30px #4affaa;
+        }
+        
+        .extract-btn:active {
+            transform: scale(0.97);
+            background: #6affcc;
+        }
+        
+        .extract-btn:disabled {
+            background: #2a4a6a;
+            color: #a0c0ff;
+            box-shadow: none;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Cargo Summary */
+        .cargo-summary {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .cargo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        
+        .cargo-header h3 {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .cargo-toggle {
+            color: #ffaa4a;
+            font-size: 14px;
+        }
+        
+        .cargo-items {
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .cargo-items.expanded {
+            display: block;
+        }
+        
+        .cargo-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(74, 138, 192, 0.3);
+        }
+        
+        .cargo-item:last-child {
+            border-bottom: none;
+        }
+        
+        .cargo-item-name {
+            color: #ffffff;
+            font-size: 14px;
+        }
+        
+        .cargo-item-qty {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .cargo-item-mass {
+            color: #4affaa;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+        
+        .empty-cargo {
+            color: #a0c0ff;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        /* Success Message */
+        .success-message {
+            background: rgba(74, 255, 170, 0.2);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px;
+            margin: 10px 0;
+            text-align: center;
+            color: #4affaa;
+            font-weight: 600;
+            display: none;
+        }
+        
+        .success-message.visible {
+            display: block;
+        }
+        
+        /* Capacity Bar */
+        .capacity-bar-container {
+            margin: 10px 0;
+        }
+        
+        .capacity-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #a0c0ff;
+            margin-bottom: 4px;
+        }
+        
+        .capacity-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .capacity-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
+            transition: width 0.3s;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 16px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 260px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin-top: 20px;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        /* Mass warning */
+        .mass-warning {
+            color: #ff6b6b;
+            font-size: 12px;
+            margin-top: 5px;
+            text-align: center;
+            display: none;
+        }
+        
+        .mass-warning.visible {
+            display: block;
+        }
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -369,54 +556,99 @@
 </head>
 <body>
     <div class="phone-frame">
-        <div class="surface-view">
-            <!-- Planet surface background -->
-            <img src="assets/images/surface-bg.jpg" class="surface-bg" id="surfaceBg" alt="Surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
-            
-            <!-- Atmosphere overlay -->
-            <div class="atmosphere"></div>
-            
-            <!-- Planet name -->
-            <div class="planet-name" id="planetName">Loading...</div>
-            
-            <!-- Location Info -->
-            <div class="location-info" id="locationInfo">Loading location...</div>
-            
-            <!-- Cargo Mass Indicator -->
-            <div class="cargo-mass" id="cargoMass">
-                <span>📦 Cargo:</span>
-                <span class="cargo-mass-value" id="cargoMassValue">0/1000 AMU</span>
+        <div class="surface-view" id="surfaceView">
+            <!-- Header -->
+            <div class="surface-header">
+                <div class="surface-title">Surface</div>
+                <div class="surface-subtitle">✦ extract resources ✦</div>
             </div>
             
-            <!-- Colony Button -->
-            <button class="colony-btn" id="colonyBtn" onclick="toggleColony()">🏭 ESTABLISH COLONY</button>
-            
-            <!-- Auto notice -->
-            <div class="auto-notice" id="autoNotice">⚙️ Auto-extractor active</div>
-            
-            <!-- Resource indicator -->
-            <div class="resource-indicator">
-                <div>📦 This planet:</div>
-                <div class="planet-resources" id="planetResources">Loading...</div>
+            <!-- Planet Info Card -->
+            <div class="planet-card">
+                <div class="planet-icon" id="planetIcon">🌍</div>
+                <div class="planet-info">
+                    <div class="planet-name" id="planetName">Loading...</div>
+                    <div class="planet-type" id="planetType">Loading...</div>
+                </div>
             </div>
             
-            <!-- Resource log -->
-            <div class="resource-log" id="resourceLog">
-                <div class="log-entry" style="color:#aaa;">⚙️ Ready to extract...</div>
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="cargo-mass" id="cargoMassDisplay">
+                    Cargo: <span>--/--</span> AMU
+                </div>
             </div>
             
-            <!-- Collection counter -->
-            <div class="collection" id="collectionCount">✨ 0</div>
+            <!-- Extraction Section -->
+            <div class="extraction-section">
+                <div class="section-title">⚡ Available Resources</div>
+                
+                <div class="resources-grid" id="resourcesGrid">
+                    <!-- Filled by JavaScript -->
+                    <div style="color: #a0c0ff; text-align: center; grid-column: span 2; padding: 20px;">Loading resources...</div>
+                </div>
+                
+                <div class="extraction-controls">
+                    <button class="qty-btn" id="decrementBtn" onclick="decrementQty()">−</button>
+                    <input type="number" id="extractQuantity" value="1" min="1" max="10" readonly>
+                    <button class="qty-btn" id="incrementBtn" onclick="incrementQty()">+</button>
+                </div>
+                
+                <div class="extract-info">
+                    <span>Mass per unit: <span class="extract-mass" id="massPerUnit">0</span> AMU</span>
+                    <span style="margin-left: 15px;">Total: <span class="extract-mass" id="totalMass">0</span> AMU</span>
+                </div>
+                
+                <div class="capacity-bar-container">
+                    <div class="capacity-labels">
+                        <span>Cargo Capacity</span>
+                        <span id="capacityText">0/1000 AMU</span>
+                    </div>
+                    <div class="capacity-bar-bg">
+                        <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="mass-warning" id="massWarning">
+                    ⚠️ Not enough cargo space
+                </div>
+                
+                <button class="extract-btn" id="extractBtn" onclick="extractResource()">⛏️ EXTRACT</button>
+            </div>
             
-            <!-- Return button -->
-            <button class="return-btn" onclick="returnToShip()">← RETURN TO SHIP</button>
+            <!-- Success Message -->
+            <div class="success-message" id="successMessage">
+                ✨ Resources added to cargo!
+            </div>
+            
+            <!-- Cargo Summary -->
+            <div class="cargo-summary">
+                <div class="cargo-header" onclick="toggleCargo()">
+                    <h3>📦 Current Cargo</h3>
+                    <span class="cargo-toggle" id="cargoToggle">▼</span>
+                </div>
+                <div class="cargo-items" id="cargoItems">
+                    <!-- Filled by JavaScript -->
+                    <div class="empty-cargo">No cargo yet. Extract some resources!</div>
+                </div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToShip()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">RETURN TO SHIP</span>
+                <span class="back-icon">🚀</span>
+            </button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text" id="loadingText">scanning surface...</div>
+                <div class="loading-text" id="loadingText">extracting...</div>
             </div>
-
+            
             <!-- Migration status (debug) -->
             <div class="migration-status" id="migrationStatus"></div>
         </div>
@@ -431,6 +663,8 @@
         if (tg) {
             tg.ready();
             tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
         }
 
         // ===== CONSTANTS =====
@@ -440,559 +674,388 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
-        const autoNotice = document.getElementById('autoNotice');
+        const resourcesGrid = document.getElementById('resourcesGrid');
+        const extractQuantity = document.getElementById('extractQuantity');
+        const decrementBtn = document.getElementById('decrementBtn');
+        const incrementBtn = document.getElementById('incrementBtn');
+        const massPerUnitSpan = document.getElementById('massPerUnit');
+        const totalMassSpan = document.getElementById('totalMass');
+        const extractBtn = document.getElementById('extractBtn');
+        const successMessage = document.getElementById('successMessage');
+        const cargoItems = document.getElementById('cargoItems');
+        const cargoToggle = document.getElementById('cargoToggle');
+        const capacityBar = document.getElementById('capacityBar');
+        const capacityText = document.getElementById('capacityText');
+        const massWarning = document.getElementById('massWarning');
 
         // ===== STATE =====
-        let gatherInterval = null;
-        let sessionElements = 0;
-        let currentPlanet = 'Verdant Prime';
-        let currentStar = 'Sol';
-        let currentSector = 'B2';
-        let currentNebula = 'Orion Nebula';
-        let planetType = 'lush';
-        let availableResources = [];
-        let currentCargoMass = 0;
+        let currentPlanet = {
+            name: 'Unknown',
+            type: 'unknown',
+            typeName: 'Unknown',
+            icon: '🌍',
+            resources: []
+        };
+        
+        let selectedResource = null;
+        let cargoData = [];
+        let currentCredits = 5000;
+        let currentMass = 0;
+        let cargoExpanded = false;
 
-        // ===== ELEMENT DATABASE WITH MASS =====
-        const elementDatabase = {
-            // Common
-            'Hydrogen': { value: 100, rarity: 'common', color: '#ffffff', icon: '💧', mass: 1.008 },
-            'Helium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🎈', mass: 4.003 },
-            'Lithium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🔋', mass: 6.94 },
-            'Beryllium': { value: 100, rarity: 'common', color: '#ffffff', icon: '💎', mass: 9.012 },
-            'Boron': { value: 100, rarity: 'common', color: '#ffffff', icon: '🧪', mass: 10.81 },
-            'Sodium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🧂', mass: 22.99 },
-            'Magnesium': { value: 100, rarity: 'common', color: '#ffffff', icon: '✨', mass: 24.31 },
-            'Aluminum': { value: 100, rarity: 'common', color: '#ffffff', icon: '🥫', mass: 26.98 },
-            'Silicon': { value: 100, rarity: 'common', color: '#ffffff', icon: '💻', mass: 28.09 },
-            'Potassium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🍌', mass: 39.10 },
-            'Calcium': { value: 100, rarity: 'common', color: '#ffffff', icon: '🥛', mass: 40.08 },
-            
-            // Uncommon
-            'Carbon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '⚫', mass: 12.01 },
-            'Nitrogen': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🌬️', mass: 14.01 },
-            'Oxygen': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '💨', mass: 16.00 },
-            'Fluorine': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🧪', mass: 19.00 },
-            'Neon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '💡', mass: 20.18 },
-            'Phosphorus': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '✨', mass: 30.97 },
-            'Sulfur': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🟡', mass: 32.06 },
-            'Chlorine': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🧪', mass: 35.45 },
-            'Argon': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🎈', mass: 39.95 },
-            'Iron': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '⚙️', mass: 55.85 },
-            'Nickel': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🔩', mass: 58.69 },
-            'Lead': { value: 250, rarity: 'uncommon', color: '#b0ffb0', icon: '🔘', mass: 207.2 },
-            
-            // Rare
-            'Gold': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🟡', mass: 197.0 },
-            'Silver': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⚪', mass: 107.9 },
-            'Platinum': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⬜', mass: 195.1 },
-            'Titanium': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔷', mass: 47.87 },
-            'Copper': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔴', mass: 63.55 },
-            'Zinc': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '⚪', mass: 65.38 },
-            'Tin': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🥫', mass: 118.7 },
-            'Cobalt': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '🔵', mass: 58.93 },
-            'Chromium': { value: 1000, rarity: 'rare', color: '#b0b0ff', icon: '✨', mass: 52.00 },
-            
-            // Very Rare
-            'Uranium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🟣', mass: 238.0 },
-            'Thorium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '🔮', mass: 232.0 },
-            'Plutonium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '☢️', mass: 244.0 },
-            'Radium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '💀', mass: 226.0 },
-            'Polonium': { value: 5000, rarity: 'very-rare', color: '#e0b0ff', icon: '💀', mass: 209.0 },
-            
-            // Legendary
-            'Promethium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '✨', mass: 145.0 },
-            'Technetium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '🧪', mass: 98.0 },
-            'Astatine': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '☣️', mass: 210.0 },
-            'Francium': { value: 25000, rarity: 'legendary', color: '#ffd700', icon: '💥', mass: 223.0 }
+        // ===== ELEMENT ICONS =====
+        const elementIcons = {
+            'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
+            'Boron': '🧪', 'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨',
+            'Fluorine': '🧪', 'Neon': '💡', 'Sodium': '🧂', 'Magnesium': '✨',
+            'Aluminum': '🥫', 'Silicon': '💻', 'Phosphorus': '✨', 'Sulfur': '🟡',
+            'Chlorine': '🧪', 'Argon': '🎈', 'Potassium': '🍌', 'Calcium': '🥛',
+            'Iron': '⚙️', 'Nickel': '🔩', 'Copper': '🔴', 'Zinc': '⚪',
+            'Silver': '⚪', 'Gold': '🟡', 'Platinum': '⬜', 'Titanium': '🔷',
+            'Uranium': '🟣', 'Thorium': '🔮', 'Plutonium': '☢️', 'Promethium': '✨',
+            'default': '🔹'
         };
 
-        // Planet-specific resources
-        const planetResourcesMap = {
-            'Verdant Prime': ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen', 'Titanium'],
-            'Pyros': ['Iron', 'Gold', 'Silver', 'Uranium', 'Sulfur', 'Copper'],
-            'Pyros-Deep': ['Uranium', 'Plutonium', 'Thorium', 'Gold'],
-            'Glacier-7': ['Hydrogen', 'Helium', 'Ice', 'Methane', 'Nitrogen'],
-            'Aether': ['Hydrogen', 'Helium', 'Methane', 'Promethium'],
-            'Aether-Veil': ['Promethium', 'Technetium', 'Helium'],
-            'Europa': ['Uranium', 'Ice', 'Hydrogen'],
-            'Titanis': ['Promethium', 'Titanium', 'Iron']
+        // ===== ELEMENT MASS DATABASE =====
+        const elementMasses = {
+            'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+            'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
+            'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
+            'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
+            'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
+            'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
+            'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
+            'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
+            'default': 100.0
         };
 
         // ===== GET ELEMENT MASS =====
         function getElementMass(elementName) {
-            return elementDatabase[elementName]?.mass || 100.0;
-        }
-
-        // ===== UPDATE CARGO MASS DISPLAY =====
-        async function updateCargoMass() {
-            try {
-                let totalMass = 0;
-                if (typeof getTotalCargoMass === 'function') {
-                    totalMass = await getTotalCargoMass();
-                } else {
-                    // Fallback calculation
-                    let collection = {};
-                    if (typeof getCollection === 'function') {
-                        collection = await getCollection();
-                    } else {
-                        try {
-                            collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                        } catch (e) {
-                            collection = {};
-                        }
-                    }
-                    
-                    for (const [name, data] of Object.entries(collection)) {
-                        const count = data.count || 1;
-                        const mass = getElementMass(name);
-                        totalMass += count * mass;
-                    }
-                }
-                
-                currentCargoMass = totalMass;
-                const percentFull = (totalMass / CARGO_MASS_LIMIT) * 100;
-                
-                const cargoElement = document.getElementById('cargoMass');
-                const cargoValue = document.getElementById('cargoMassValue');
-                
-                cargoValue.textContent = `${totalMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
-                
-                // Update warning classes
-                cargoElement.classList.remove('warning', 'critical');
-                if (percentFull > 90) {
-                    cargoElement.classList.add('critical');
-                } else if (percentFull > 75) {
-                    cargoElement.classList.add('warning');
-                }
-                
-                return totalMass;
-            } catch (error) {
-                console.error('Error updating cargo mass:', error);
-                return 0;
+            if (typeof window.getElementMass === 'function') {
+                return window.getElementMass(elementName);
             }
+            return elementMasses[elementName] || elementMasses.default;
         }
 
-        // ===== CHECK IF CAN ADD TO CARGO =====
-        async function canAddToCargo(elementName, quantity = 1) {
-            const currentMass = await updateCargoMass();
-            const elementMass = getElementMass(elementName);
-            const requiredMass = elementMass * quantity;
-            
-            return (currentMass + requiredMass) <= CARGO_MASS_LIMIT;
-        }
-
-        // ===== LOAD LOCATION DATA =====
-        async function loadLocationData() {
+        // ===== LOAD PLANET DATA =====
+        async function loadPlanetData() {
             try {
-                // Load all location data with fallbacks
-                let planet = 'Verdant Prime';
-                if (typeof getCurrentPlanet === 'function') {
-                    planet = await getCurrentPlanet();
-                } else {
-                    planet = localStorage.getItem('voidfarer_current_planet') || 'Verdant Prime';
-                }
-
-                let star = 'Sol';
-                if (typeof getCurrentStar === 'function') {
-                    star = await getCurrentStar();
-                } else {
-                    star = localStorage.getItem('voidfarer_current_star') || 'Sol';
-                }
-
-                let sector = 'B2';
-                if (typeof getCurrentSector === 'function') {
-                    sector = await getCurrentSector();
-                } else {
-                    sector = localStorage.getItem('voidfarer_current_sector') || 'B2';
-                }
-
-                let nebula = 'Orion Nebula';
-                if (typeof getCurrentNebula === 'function') {
-                    nebula = await getCurrentNebula();
-                } else {
-                    nebula = localStorage.getItem('voidfarer_current_nebula') || 'Orion Nebula';
-                }
-
-                let type = 'lush';
-                if (typeof getCurrentPlanetType === 'function') {
-                    type = await getCurrentPlanetType();
-                } else {
-                    type = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-                }
-
-                let resources = [];
-                if (typeof getCurrentPlanetResources === 'function') {
-                    resources = await getCurrentPlanetResources() || [];
-                } else {
-                    try {
-                        resources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources')) || [];
-                    } catch (e) {
-                        resources = [];
-                    }
-                }
-
-                currentPlanet = planet || 'Verdant Prime';
-                currentStar = star || 'Sol';
-                currentSector = sector || 'B2';
-                currentNebula = nebula || 'Orion Nebula';
-                planetType = type || 'lush';
-
-                // Determine available resources
-                if (resources && resources.length > 0) {
-                    availableResources = resources;
-                } else {
-                    availableResources = planetResourcesMap[currentPlanet] || 
-                        ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen'];
-                }
-
-                // Update UI
-                document.getElementById('planetName').textContent = currentPlanet;
-                document.getElementById('locationInfo').textContent = 
-                    `${currentStar} • ${currentNebula} • Sector ${currentSector}`;
-                document.getElementById('planetResources').textContent = 
-                    availableResources.slice(0, 5).join(', ');
+                // Get planet data from localStorage
+                const planetName = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources') || '["Iron", "Carbon", "Silicon"]');
                 
-                // Set background based on planet type
-                const filters = {
-                    'scorched': 'hue-rotate(20deg) saturate(1.3)',
-                    'lush': 'hue-rotate(0deg) saturate(1.1)',
-                    'frozen': 'hue-rotate(180deg) brightness(1.1)',
-                    'barren': 'grayscale(0.5) brightness(0.9)',
-                    'gas': 'hue-rotate(280deg) saturate(1.2)'
+                // Set planet icon based on type
+                let icon = '🌍';
+                if (planetType.includes('scorched') || planetType.includes('volcanic')) icon = '🌋';
+                else if (planetType.includes('frozen') || planetType.includes('ice')) icon = '❄️';
+                else if (planetType.includes('gas')) icon = '🌪️';
+                else if (planetType.includes('barren')) icon = '🪨';
+                else if (planetType.includes('lush')) icon = '🌱';
+                
+                currentPlanet = {
+                    name: planetName,
+                    type: planetType,
+                    typeName: planetType.charAt(0).toUpperCase() + planetType.slice(1),
+                    icon: icon,
+                    resources: planetResources
                 };
-                document.getElementById('surfaceBg').style.filter = filters[planetType] || 'none';
-
+                
+                document.getElementById('planetName').textContent = currentPlanet.name;
+                document.getElementById('planetType').textContent = currentPlanet.typeName;
+                document.getElementById('planetIcon').textContent = currentPlanet.icon;
+                
+                // Render resources
+                renderResources();
+                
             } catch (error) {
-                console.error('Error loading location:', error);
-                // Use defaults
-                currentPlanet = 'Verdant Prime';
-                availableResources = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Oxygen'];
-                document.getElementById('planetName').textContent = currentPlanet;
-                document.getElementById('planetResources').textContent = 'Carbon, Iron, Silicon, Gold, Oxygen';
+                console.error('Error loading planet data:', error);
             }
         }
 
-        // ===== UPDATE DISPLAY =====
-        async function updateDisplay() {
+        // ===== LOAD CARGO DATA =====
+        async function loadCargoData() {
             try {
-                let collection = {};
-                if (typeof getCollection === 'function') {
-                    collection = await getCollection();
+                // Get credits
+                if (typeof window.getCredits === 'function') {
+                    currentCredits = await window.getCredits();
                 } else {
-                    try {
-                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                    } catch (e) {
-                        collection = {};
-                    }
+                    currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
-                const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
-                document.getElementById('collectionCount').textContent = `✨ ${totalItems}`;
                 
-                await updateCargoMass();
+                // Get collection
+                let collection = {};
+                if (typeof window.getCollection === 'function') {
+                    collection = await window.getCollection();
+                } else {
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
+                }
                 
-                return collection;
+                // Update credits display
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${currentCredits.toLocaleString()}`;
+                
+                // Convert collection to array for display
+                cargoData = [];
+                let totalMass = 0;
+                
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = data.count || 1;
+                    const mass = getElementMass(name);
+                    const totalItemMass = count * mass;
+                    totalMass += totalItemMass;
+                    
+                    cargoData.push({
+                        name: name,
+                        count: count,
+                        mass: mass,
+                        totalMass: totalItemMass
+                    });
+                }
+                
+                currentMass = totalMass;
+                
+                // Update cargo display
+                updateCargoDisplay();
+                
             } catch (error) {
-                console.error('Error updating display:', error);
-                return {};
+                console.error('Error loading cargo:', error);
             }
         }
 
-        // ===== SHOW NOTICE =====
-        function showNotice(message, isWarning = false) {
-            autoNotice.textContent = message;
-            if (isWarning) {
-                autoNotice.style.color = '#ffaa4a';
-            } else {
-                autoNotice.style.color = '#e0f0f0';
+        // ===== UPDATE CARGO DISPLAY =====
+        function updateCargoDisplay() {
+            // Update mass display
+            const massPercent = (currentMass / CARGO_MASS_LIMIT) * 100;
+            document.getElementById('cargoMassDisplay').innerHTML = `Cargo: <span>${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT}</span> AMU`;
+            capacityBar.style.width = Math.min(100, massPercent) + '%';
+            capacityText.textContent = `${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
+            
+            // Render cargo items
+            if (cargoData.length === 0) {
+                cargoItems.innerHTML = '<div class="empty-cargo">No cargo yet. Extract some resources!</div>';
+                return;
             }
-            autoNotice.classList.add('show');
-            setTimeout(() => autoNotice.classList.remove('show'), 2000);
+            
+            let html = '';
+            cargoData.sort((a, b) => b.totalMass - a.totalMass).forEach(item => {
+                html += `
+                    <div class="cargo-item">
+                        <span class="cargo-item-name">${item.name}</span>
+                        <span>
+                            <span class="cargo-item-qty">${item.count}x</span>
+                            <span class="cargo-item-mass">(${item.totalMass.toFixed(1)} AMU)</span>
+                        </span>
+                    </div>
+                `;
+            });
+            
+            cargoItems.innerHTML = html;
+        }
+
+        // ===== RENDER RESOURCES =====
+        function renderResources() {
+            if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
+                resourcesGrid.innerHTML = '<div style="color: #a0c0ff; text-align: center; grid-column: span 2; padding: 20px;">No resources found on this planet</div>';
+                return;
+            }
+            
+            let html = '';
+            currentPlanet.resources.forEach(resource => {
+                const chance = Math.floor(Math.random() * 30) + 70; // 70-100% for demo
+                const icon = elementIcons[resource] || '🔹';
+                
+                html += `
+                    <div class="resource-card" onclick="selectResource('${resource}')">
+                        <div class="resource-icon">${icon}</div>
+                        <div class="resource-name">${resource}</div>
+                        <div class="resource-chance">${chance}% chance</div>
+                    </div>
+                `;
+            });
+            
+            resourcesGrid.innerHTML = html;
+            
+            // Select first resource by default
+            if (currentPlanet.resources.length > 0 && !selectedResource) {
+                selectResource(currentPlanet.resources[0]);
+            }
+        }
+
+        // ===== SELECT RESOURCE =====
+        function selectResource(resource) {
+            selectedResource = resource;
+            
+            // Update UI
+            document.querySelectorAll('.resource-card').forEach(card => {
+                card.classList.remove('selected');
+                if (card.querySelector('.resource-name').textContent === resource) {
+                    card.classList.add('selected');
+                }
+            });
+            
+            // Update mass display
+            const mass = getElementMass(resource);
+            massPerUnitSpan.textContent = mass.toFixed(1);
+            updateTotalMass();
+            
+            // Check if we can extract
+            validateExtraction();
+        }
+
+        // ===== UPDATE TOTAL MASS =====
+        function updateTotalMass() {
+            const qty = parseInt(extractQuantity.value);
+            const mass = parseFloat(massPerUnitSpan.textContent);
+            const total = qty * mass;
+            totalMassSpan.textContent = total.toFixed(1);
+        }
+
+        // ===== INCREMENT QUANTITY =====
+        function incrementQty() {
+            let current = parseInt(extractQuantity.value);
+            if (current < 10) {
+                current++;
+                extractQuantity.value = current;
+                updateTotalMass();
+                validateExtraction();
+            }
+        }
+
+        // ===== DECREMENT QUANTITY =====
+        function decrementQty() {
+            let current = parseInt(extractQuantity.value);
+            if (current > 1) {
+                current--;
+                extractQuantity.value = current;
+                updateTotalMass();
+                validateExtraction();
+            }
+        }
+
+        // ===== VALIDATE EXTRACTION =====
+        function validateExtraction() {
+            if (!selectedResource) {
+                extractBtn.disabled = true;
+                return;
+            }
+            
+            const qty = parseInt(extractQuantity.value);
+            const mass = parseFloat(massPerUnitSpan.textContent);
+            const totalMass = qty * mass;
+            
+            if (currentMass + totalMass > CARGO_MASS_LIMIT) {
+                extractBtn.disabled = true;
+                massWarning.classList.add('visible');
+            } else {
+                extractBtn.disabled = false;
+                massWarning.classList.remove('visible');
+            }
         }
 
         // ===== EXTRACT RESOURCE =====
         async function extractResource() {
-            // Pick random resource from available
-            const elementName = availableResources[Math.floor(Math.random() * availableResources.length)];
-            const elementData = elementDatabase[elementName] || { 
-                value: 100, 
-                rarity: 'common', 
-                color: '#ffffff',
-                icon: '🔹',
-                mass: 100.0
-            };
-
+            if (!selectedResource || extractBtn.disabled) return;
+            
+            const quantity = parseInt(extractQuantity.value);
+            const mass = parseFloat(massPerUnitSpan.textContent);
+            const totalMass = quantity * mass;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'extracting resources...';
+            
             try {
-                // Check if we have enough cargo space
-                const canAdd = await canAddToCargo(elementName, 1);
+                let result;
                 
-                if (!canAdd) {
-                    showNotice('⚠️ Cargo full! Cannot extract', true);
-                    if (tg?.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred('error');
-                    }
-                    return;
-                }
-
-                // Add element to collection
-                if (typeof addElementToCollection === 'function') {
-                    const result = await addElementToCollection(elementName, 1);
-                    if (!result.success) {
-                        if (result.reason === 'insufficient_cargo_space') {
-                            showNotice('⚠️ Cargo full! Cannot extract', true);
-                            return;
-                        }
-                    }
+                // Call the add function from storage.js
+                if (typeof window.addElementToCollection === 'function') {
+                    result = await window.addElementToCollection(selectedResource, quantity);
                 } else {
-                    // Fallback: manually update localStorage
-                    let collection = {};
-                    try {
-                        collection = JSON.parse(localStorage.getItem('voidfarer_collection')) || {};
-                    } catch (e) {
-                        collection = {};
-                    }
+                    // Fallback for testing
+                    console.log(`Would extract ${quantity} of ${selectedResource}`);
                     
-                    if (!collection[elementName]) {
-                        collection[elementName] = { count: 1, firstFound: new Date().toISOString() };
+                    // Update localStorage directly for demo
+                    let collection = {};
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
+                    
+                    if (collection[selectedResource]) {
+                        collection[selectedResource].count = (collection[selectedResource].count || 1) + quantity;
                     } else {
-                        collection[elementName].count = (collection[elementName].count || 1) + 1;
+                        collection[selectedResource] = { count: quantity, firstFound: new Date().toISOString() };
                     }
                     
                     localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    result = { success: true };
+                }
+                
+                if (result && result.success) {
+                    // Show success message
+                    successMessage.classList.add('visible');
+                    setTimeout(() => {
+                        successMessage.classList.remove('visible');
+                    }, 3000);
                     
-                    // Add credits
-                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                    credits += elementData.value;
-                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    // Reload cargo data
+                    await loadCargoData();
+                    
+                    // Update validation
+                    validateExtraction();
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Failed to extract resources: ' + (result?.reason || 'Unknown error'));
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                 }
                 
-                // Update mission progress
-                if (typeof updateMissionProgress === 'function') {
-                    await updateMissionProgress(elementName, 1);
-                }
-
-                // Update display
-                await updateDisplay();
-                sessionElements++;
-
-                // Add to log
-                const log = document.getElementById('resourceLog');
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                entry.style.color = elementData.color;
-                entry.innerHTML = `✨ +1 ${elementName} (${elementData.value}⭐) • ⚖️ ${elementData.mass.toFixed(1)} AMU`;
-                
-                log.insertBefore(entry, log.firstChild);
-                while (log.children.length > 5) {
-                    log.removeChild(log.lastChild);
-                }
-
-                showNotice(`Found ${elementName}`);
-
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.impactOccurred('light');
-                }
-
             } catch (error) {
                 console.error('Extraction error:', error);
-                showNotice('⚠️ Extraction failed', true);
+                alert('Error extracting resources');
             }
+            
+            loadingOverlay.classList.remove('active');
         }
 
-        // ===== AUTO-EXTRACT =====
-        function startAutoExtract() {
-            if (gatherInterval) clearInterval(gatherInterval);
-            
-            const autoGather = localStorage.getItem('voidfarer_auto_gather') !== 'false';
-            
-            if (!autoGather) {
-                showNotice('⚠️ Auto-extractor disabled', true);
-                return;
-            }
-
-            showNotice('⚙️ Auto-extractor active');
-            
-            // Extract every 4 seconds
-            gatherInterval = setInterval(() => {
-                extractResource();
-            }, 4000);
-            
-            // Do first extraction immediately
-            setTimeout(() => extractResource(), 1000);
-        }
-
-        // ===== COLONY FUNCTIONS =====
-        async function toggleColony() {
-            try {
-                let colonies = [];
-                if (typeof getColonies === 'function') {
-                    colonies = await getColonies();
-                } else {
-                    try {
-                        colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
-                    } catch (e) {
-                        colonies = [];
-                    }
-                }
-
-                const existingIndex = colonies.findIndex(c => 
-                    c.planet === currentPlanet && 
-                    c.star === currentStar
-                );
-                
-                const colonyBtn = document.getElementById('colonyBtn');
-                
-                if (existingIndex >= 0) {
-                    // Remove colony
-                    if (confirm('Abandon this colony?')) {
-                        loadingOverlay.classList.add('active');
-                        loadingText.textContent = 'abandoning colony...';
-                        
-                        colonies.splice(existingIndex, 1);
-                        if (typeof saveColonies === 'function') {
-                            await saveColonies(colonies);
-                        } else {
-                            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
-                        }
-                        
-                        colonyBtn.innerHTML = '🏭 ESTABLISH COLONY';
-                        colonyBtn.classList.remove('established');
-                        
-                        showNotice('Colony abandoned');
-                        
-                        loadingOverlay.classList.remove('active');
-                    }
-                } else {
-                    // Establish colony
-                    const name = prompt('Name your colony:', currentPlanet + ' Outpost');
-                    if (name) {
-                        loadingOverlay.classList.add('active');
-                        loadingText.textContent = 'establishing colony...';
-                        
-                        const newColony = {
-                            id: 'colony_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-                            name: name,
-                            planet: currentPlanet,
-                            star: currentStar,
-                            nebula: currentNebula,
-                            sector: currentSector,
-                            established: new Date().toISOString()
-                        };
-                        
-                        colonies.push(newColony);
-                        if (typeof saveColonies === 'function') {
-                            await saveColonies(colonies);
-                        } else {
-                            localStorage.setItem('voidfarer_colonies', JSON.stringify(colonies));
-                        }
-                        
-                        // Bonus credits
-                        let credits = 5000;
-                        if (typeof getCredits === 'function') {
-                            credits = await getCredits();
-                        } else {
-                            credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                        }
-                        
-                        credits += 5000;
-                        
-                        if (typeof saveCredits === 'function') {
-                            await saveCredits(credits);
-                        } else {
-                            localStorage.setItem('voidfarer_credits', credits.toString());
-                        }
-                        
-                        colonyBtn.innerHTML = '🏭 COLONY ESTABLISHED';
-                        colonyBtn.classList.add('established');
-                        
-                        await updateDisplay();
-                        showNotice('Colony established! +5000⭐');
-                        
-                        loadingOverlay.classList.remove('active');
-                    }
-                }
-            } catch (error) {
-                console.error('Colony error:', error);
-                loadingOverlay.classList.remove('active');
-                showNotice('⚠️ Colony operation failed', true);
-            }
-        }
-
-        // ===== CHECK FOR EXISTING COLONY =====
-        async function checkForColony() {
-            try {
-                let colonies = [];
-                if (typeof getColonies === 'function') {
-                    colonies = await getColonies();
-                } else {
-                    try {
-                        colonies = JSON.parse(localStorage.getItem('voidfarer_colonies')) || [];
-                    } catch (e) {
-                        colonies = [];
-                    }
-                }
-
-                const exists = colonies.some(c => 
-                    c.planet === currentPlanet && 
-                    c.star === currentStar
-                );
-                
-                const btn = document.getElementById('colonyBtn');
-                if (exists) {
-                    btn.innerHTML = '🏭 COLONY ESTABLISHED';
-                    btn.classList.add('established');
-                } else {
-                    btn.innerHTML = '🏭 ESTABLISH COLONY';
-                    btn.classList.remove('established');
-                }
-            } catch (error) {
-                console.error('Error checking colony:', error);
-            }
+        // ===== TOGGLE CARGO =====
+        function toggleCargo() {
+            cargoExpanded = !cargoExpanded;
+            cargoItems.classList.toggle('expanded', cargoExpanded);
+            cargoToggle.textContent = cargoExpanded ? '▲' : '▼';
         }
 
         // ===== RETURN TO SHIP =====
         function returnToShip() {
-            if (gatherInterval) {
-                clearInterval(gatherInterval);
-            }
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'returning to ship...';
-            setTimeout(() => {
-                window.location.href = 'ship-bridge.html';
-            }, 800);
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
         }
 
         // ===== INITIALIZE =====
         async function init() {
             try {
-                // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'scanning surface...';
-
-                // Load location data
-                await loadLocationData();
-
-                // Update display (includes cargo mass)
-                await updateDisplay();
-
-                // Check for existing colony
-                await checkForColony();
-
-                // Clear log
-                document.getElementById('resourceLog').innerHTML = '<div class="log-entry" style="color:#aaa;">⚙️ Ready</div>';
                 
-                sessionElements = 0;
-
-                // Hide loading
-                loadingOverlay.classList.remove('active');
-
-                // Start auto-extract
-                setTimeout(startAutoExtract, 1000);
-
+                // Load all data
+                await loadPlanetData();
+                await loadCargoData();
+                
+                // Set default quantity
+                extractQuantity.value = 1;
+                if (selectedResource) {
+                    const mass = getElementMass(selectedResource);
+                    massPerUnitSpan.textContent = mass.toFixed(1);
+                    updateTotalMass();
+                }
+                
+                validateExtraction();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error loading data';
+                loadingText.textContent = 'error loading surface';
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 2000);
@@ -1001,16 +1064,10 @@
 
         // ===== START =====
         init();
-
-        // ===== CLEANUP =====
-        window.addEventListener('beforeunload', () => {
-            if (gatherInterval) clearInterval(gatherInterval);
-        });
     </script>
     
     <!-- Load all JS files -->
     <script src="js/storage.js"></script>
-    <script src="js/missions.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
 </body>
