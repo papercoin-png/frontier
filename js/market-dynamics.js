@@ -712,6 +712,22 @@ export async function getMarketStats() {
     return stats;
 }
 
+// Helper function for delete operations (used locally)
+async function deleteItem(storeName, key) {
+    try {
+        const db = await getDb();
+        return await db.delete(storeName, key);
+    } catch (error) {
+        console.error(`Error deleting item from ${storeName}:`, error);
+        return false;
+    }
+}
+
+// Helper to get database instance
+async function getDb() {
+    return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
+}
+
 // ===== EXPORT =====
 export default {
     BASE_PRICES,
@@ -742,6 +758,3 @@ export default {
     checkPriceAlerts,
     getMarketStats
 };
-
-// Need to import deleteItem for cleanup
-import { deleteItem } from './storage.js';
