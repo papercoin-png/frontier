@@ -507,7 +507,7 @@
             <div class="scroll-hint">▼ scroll down to return to Earth Hub ▼</div>
             
             <!-- Back button -->
-            <button class="back-button" onclick="returnToEarthHub()">
+            <button class="back-button" onclick="window.returnToEarthHub()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">EARTH HUB</span>
                 <span class="back-icon">🌍</span>
@@ -524,9 +524,13 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -541,6 +545,12 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
+
+        // Make functions available globally for onclick handlers
+        window.returnToEarthHub = returnToEarthHub;
+        window.purchaseProperty = purchaseProperty;
+        window.viewProperty = viewProperty;
+        window.transferToProperty = transferToProperty;
 
         // ===== PROPERTY TYPES (with mass capacity) =====
         const PROPERTY_TYPES = {
@@ -595,18 +605,18 @@
             try {
                 // Load all data with fallbacks
                 let credits = 5000;
-                if (typeof getCredits === 'function') {
-                    credits = await getCredits();
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
                 }
 
                 let propertyData = { properties: [] };
-                if (typeof getRealEstate === 'function') {
-                    propertyData = await getRealEstate();
+                if (typeof window.getRealEstate === 'function') {
+                    propertyData = await window.getRealEstate();
                 }
 
                 let player = null;
-                if (typeof getPlayer === 'function') {
-                    player = await getPlayer();
+                if (typeof window.getPlayer === 'function') {
+                    player = await window.getPlayer();
                 }
 
                 // Update header
@@ -661,8 +671,8 @@
                         <div class="capacity-bar-fill" style="width: ${usedPercent}%"></div>
                     </div>
                     <div class="property-actions">
-                        <button class="property-btn" onclick="viewProperty('${prop.id}')">VIEW ITEMS</button>
-                        <button class="property-btn primary" onclick="transferToProperty('${prop.id}')">TRANSFER</button>
+                        <button class="property-btn" onclick="window.viewProperty('${prop.id}')">VIEW ITEMS</button>
+                        <button class="property-btn primary" onclick="window.transferToProperty('${prop.id}')">TRANSFER</button>
                     </div>
                 `;
 
@@ -694,7 +704,7 @@
                     </div>
                     <div class="market-desc">${prop.desc}</div>
                     <button class="purchase-btn" 
-                        onclick="purchaseProperty('${type}')" 
+                        onclick="window.purchaseProperty('${type}')" 
                         ${alreadyOwned || credits < prop.price ? 'disabled' : ''}>
                         ${alreadyOwned ? '✓ OWNED' : 'PURCHASE'}
                     </button>
@@ -722,14 +732,14 @@
             const propType = PROPERTY_TYPES[type];
             if (!propType) return;
 
-            let credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+            let credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
 
             if (credits < propType.price) {
                 alert('Not enough credits!');
                 return;
             }
 
-            let propertyData = typeof getRealEstate === 'function' ? await getRealEstate() : { properties: [] };
+            let propertyData = typeof window.getRealEstate === 'function' ? await window.getRealEstate() : { properties: [] };
 
             // Check if already own this type
             if (propertyData.properties?.some(p => p.type === type)) {
@@ -742,8 +752,8 @@
 
             try {
                 // Spend credits
-                if (typeof spendCredits === 'function') {
-                    const spent = await spendCredits(propType.price);
+                if (typeof window.spendCredits === 'function') {
+                    const spent = await window.spendCredits(propType.price);
                     if (!spent) {
                         throw new Error('Failed to spend credits');
                     }
@@ -771,8 +781,8 @@
                 propertyData.properties.push(newProp);
                 
                 // Save to storage
-                if (typeof saveRealEstate === 'function') {
-                    await saveRealEstate(propertyData);
+                if (typeof window.saveRealEstate === 'function') {
+                    await window.saveRealEstate(propertyData);
                 } else {
                     // Fallback save
                     localStorage.setItem('voidfarer_real_estate', JSON.stringify(propertyData));
@@ -800,7 +810,7 @@
 
         function transferToProperty(propertyId) {
             // Navigate to transfer page
-            navigateTo(`property-transfer.html?property=${propertyId}`);
+            navigateTo(`transfer.html?property=${propertyId}`);
         }
 
         // ===== INITIALIZE =====
@@ -830,10 +840,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
