@@ -1,5 +1,5 @@
 // js/db.js - IndexedDB service for Voidfarer
-// Using idb library for simpler Promise-based API
+// Using idb library for simpler Promise-based API with proper error handling
 
 const DB_NAME = 'VoidfarerDB';
 const DB_VERSION = 1;
@@ -51,7 +51,6 @@ function getDb() {
           store.createIndex('by-name', 'name');
         }
         
-        // Property items stored separately for better performance
         if (!db.objectStoreNames.contains('propertyItems')) {
           const store = db.createObjectStore('propertyItems', { keyPath: 'id' });
           store.createIndex('by-propertyId', 'propertyId');
@@ -80,12 +79,10 @@ function getDb() {
         }
         
         if (!db.objectStoreNames.contains('taxRates')) {
-          // Single record store for tax rates
           db.createObjectStore('taxRates', { keyPath: 'id' });
         }
         
         if (!db.objectStoreNames.contains('communityFund')) {
-          // Single record store for community fund
           db.createObjectStore('communityFund', { keyPath: 'id' });
         }
         
@@ -132,13 +129,28 @@ function getDb() {
         
         // ===== SHIP STORES =====
         if (!db.objectStoreNames.contains('shipUpgrades')) {
-          // Single record store for ship upgrades
           db.createObjectStore('shipUpgrades', { keyPath: 'id' });
         }
         
-        // ===== SETTINGS STORES (can stay in localStorage, but optional) =====
+        // ===== SETTINGS STORES =====
         if (!db.objectStoreNames.contains('settings')) {
           const store = db.createObjectStore('settings', { keyPath: 'key' });
+        }
+        
+        // ===== PRICE HISTORY STORE (for market dynamics) =====
+        if (!db.objectStoreNames.contains('priceHistory')) {
+          const store = db.createObjectStore('priceHistory', { keyPath: 'id' });
+          store.createIndex('by-element', 'elementName');
+          store.createIndex('by-date', 'date');
+          store.createIndex('by-timestamp', 'timestamp');
+        }
+        
+        // ===== TRADE HISTORY STORE =====
+        if (!db.objectStoreNames.contains('tradeHistory')) {
+          const store = db.createObjectStore('tradeHistory', { keyPath: 'id' });
+          store.createIndex('by-element', 'elementName');
+          store.createIndex('by-date', 'date');
+          store.createIndex('by-timestamp', 'timestamp');
         }
         
         // ===== MIGRATION FLAG =====
@@ -266,7 +278,6 @@ export async function getCollectionAsObject() {
       };
     });
     
-    console.log('getCollectionAsObject returning:', collection);
     return collection;
     
   } catch (error) {
@@ -275,11 +286,12 @@ export async function getCollectionAsObject() {
   }
 }
 
-// Add element to collection
+// Add element to collection - RETURNS ACTUAL NEW COUNT
 export async function addElementToCollection(elementName, count = 1, elementData = {}) {
+  let tx;
   try {
     const db = await getDb();
-    const tx = db.transaction('collection', 'readwrite');
+    tx = db.transaction('collection', 'readwrite');
     const store = tx.objectStore('collection');
     
     let element = await store.get(elementName);
@@ -299,20 +311,22 @@ export async function addElementToCollection(elementName, count = 1, elementData
     await store.put(element);
     await tx.done;
     
-    console.log(`Added ${count} of ${elementName} to collection, new count: ${element.count}`);
+    // Return the actual new count
     return { success: true, count: element.count };
     
   } catch (error) {
     console.error('Error in addElementToCollection:', error);
+    if (tx) await tx.abort();
     return { success: false, error: error.message };
   }
 }
 
 // Remove element from collection
 export async function removeElementFromCollection(elementName, count = 1) {
+  let tx;
   try {
     const db = await getDb();
-    const tx = db.transaction('collection', 'readwrite');
+    tx = db.transaction('collection', 'readwrite');
     const store = tx.objectStore('collection');
     
     const element = await store.get(elementName);
@@ -330,16 +344,17 @@ export async function removeElementFromCollection(elementName, count = 1) {
     
     if (element.count <= 0) {
       await store.delete(elementName);
+      await tx.done;
+      return { success: true, newCount: 0 };
     } else {
       await store.put(element);
+      await tx.done;
+      return { success: true, newCount: element.count };
     }
-    
-    await tx.done;
-    console.log(`Removed ${count} of ${elementName}, new count: ${element.count || 0}`);
-    return { success: true, newCount: element.count || 0 };
     
   } catch (error) {
     console.error('Error in removeElementFromCollection:', error);
+    if (tx) await tx.abort();
     return { success: false, error: error.message };
   }
 }
@@ -351,7 +366,6 @@ export async function addTaxTransaction(transaction) {
   try {
     const db = await getDb();
     
-    // Ensure transaction has all required fields
     const newTx = {
       id: transaction.id || 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       playerId: transaction.playerId,
@@ -450,14 +464,14 @@ export async function getPropertyItems(propertyId) {
 
 // Add item to property
 export async function addItemToProperty(propertyId, elementName, quantity) {
+  let tx;
   try {
     const db = await getDb();
-    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+    tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
     
     const propertyStore = tx.objectStore('properties');
     const itemsStore = tx.objectStore('propertyItems');
     
-    // Check property capacity
     const property = await propertyStore.get(propertyId);
     if (!property) {
       await tx.done;
@@ -472,16 +486,13 @@ export async function addItemToProperty(propertyId, elementName, quantity) {
       return { success: false, reason: 'insufficient_space' };
     }
     
-    // Check if item already exists
     const existingItems = currentItems.filter(item => item.elementName === elementName);
     
     if (existingItems.length > 0) {
-      // Update existing item
       const item = existingItems[0];
       item.count += quantity;
       await itemsStore.put(item);
     } else {
-      // Create new item
       const newItem = {
         id: 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         propertyId: propertyId,
@@ -491,7 +502,6 @@ export async function addItemToProperty(propertyId, elementName, quantity) {
       await itemsStore.put(newItem);
     }
     
-    // Update property used space
     property.used = currentUsed + quantity;
     await propertyStore.put(property);
     
@@ -500,27 +510,27 @@ export async function addItemToProperty(propertyId, elementName, quantity) {
     
   } catch (error) {
     console.error('Error in addItemToProperty:', error);
+    if (tx) await tx.abort();
     return { success: false, error: error.message };
   }
 }
 
 // Remove item from property
 export async function removeItemFromProperty(propertyId, elementName, quantity) {
+  let tx;
   try {
     const db = await getDb();
-    const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+    tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
     
     const propertyStore = tx.objectStore('properties');
     const itemsStore = tx.objectStore('propertyItems');
     
-    // Get property
     const property = await propertyStore.get(propertyId);
     if (!property) {
       await tx.done;
       return { success: false, reason: 'property_not_found' };
     }
     
-    // Find the item
     const items = await itemsStore.index('by-propertyId').getAll(propertyId);
     const item = items.find(i => i.elementName === elementName);
     
@@ -534,7 +544,6 @@ export async function removeItemFromProperty(propertyId, elementName, quantity) 
       return { success: false, reason: 'insufficient', available: item.count };
     }
     
-    // Update or delete the item
     item.count -= quantity;
     if (item.count <= 0) {
       await itemsStore.delete(item.id);
@@ -542,7 +551,6 @@ export async function removeItemFromProperty(propertyId, elementName, quantity) 
       await itemsStore.put(item);
     }
     
-    // Update property used space
     const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
     property.used = remainingItems.reduce((sum, i) => sum + (i.count || 0), 0);
     await propertyStore.put(property);
@@ -552,7 +560,60 @@ export async function removeItemFromProperty(propertyId, elementName, quantity) 
     
   } catch (error) {
     console.error('Error in removeItemFromProperty:', error);
+    if (tx) await tx.abort();
     return { success: false, error: error.message };
+  }
+}
+
+// ===== PRICE HISTORY HELPERS =====
+export async function addPriceHistory(elementName, price, date) {
+  try {
+    const entry = {
+      id: `price_${elementName}_${date}`,
+      elementName: elementName,
+      date: date,
+      price: price,
+      timestamp: Date.now()
+    };
+    
+    await setItem('priceHistory', entry);
+    return entry;
+  } catch (error) {
+    console.error('Error adding price history:', error);
+    return null;
+  }
+}
+
+export async function getPriceHistoryForElement(elementName) {
+  try {
+    const db = await getDb();
+    const entries = await db.getAllFromIndex('priceHistory', 'by-element', elementName);
+    return entries.sort((a, b) => a.date.localeCompare(b.date));
+  } catch (error) {
+    console.error('Error getting price history:', error);
+    return [];
+  }
+}
+
+// ===== TRADE HISTORY HELPERS =====
+export async function addTradeHistory(trade) {
+  try {
+    await setItem('tradeHistory', trade);
+    return trade;
+  } catch (error) {
+    console.error('Error adding trade history:', error);
+    return null;
+  }
+}
+
+export async function getTradeHistoryForElement(elementName) {
+  try {
+    const db = await getDb();
+    const entries = await db.getAllFromIndex('tradeHistory', 'by-element', elementName);
+    return entries.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (error) {
+    console.error('Error getting trade history:', error);
+    return [];
   }
 }
 
@@ -595,19 +656,20 @@ export async function resetAllData() {
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
       'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
       'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
-      'bookmarks', 'shipUpgrades', 'settings'
+      'bookmarks', 'shipUpgrades', 'settings', 'priceHistory', 'tradeHistory'
     ];
     
     const db = await getDb();
     const tx = db.transaction(stores, 'readwrite');
     
     for (const store of stores) {
-      await tx.objectStore(store).clear();
+      if (db.objectStoreNames.contains(store)) {
+        await tx.objectStore(store).clear();
+      }
     }
     
     await tx.done;
     
-    // Clear migration flag too
     await deleteItem('migration', 'localStorage');
     
     return true;
@@ -623,7 +685,7 @@ export async function getDatabaseStats() {
     const stores = [
       'player', 'collection', 'missions', 'completedMissions',
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
-      'activeEvents', 'colonies'
+      'activeEvents', 'colonies', 'priceHistory', 'tradeHistory'
     ];
     
     const stats = {};
@@ -644,7 +706,6 @@ export async function getDatabaseStats() {
 }
 
 // ===== INITIALIZATION =====
-// Call this when your app starts
 export async function initializeDatabase() {
   try {
     await getDb();
@@ -693,6 +754,12 @@ export default {
   getPropertyItems,
   addItemToProperty,
   removeItemFromProperty,
+  
+  // Market
+  addPriceHistory,
+  getPriceHistoryForElement,
+  addTradeHistory,
+  getTradeHistoryForElement,
   
   // Migration
   isMigrationComplete,
