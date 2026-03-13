@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* Keep all existing styles exactly as they were */
         * {
             margin: 0;
             padding: 0;
@@ -545,17 +546,16 @@
         };
 
         function calculateResourceChance(resource) {
-            // These are now used for QUANTITY bonuses, not success/failure
             if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
-                return 90; // Very common - high chance of bonus
+                return 90;
             } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
-                return 70; // Rare - good chance of bonus
+                return 70;
             } else if (['Uranium', 'Thorium'].includes(resource)) {
-                return 50; // Very rare - medium chance of bonus
+                return 50;
             } else if (['Promethium'].includes(resource)) {
-                return 30; // Legendary - low chance of bonus
+                return 30;
             }
-            return 80; // Default
+            return 80;
         }
 
         function getRarityClass(resource) {
@@ -733,13 +733,16 @@
             }, 3000);
         }
 
-        // FIXED: Players ALWAYS get elements on every extraction
-        function attemptExtraction() {
+        // FIXED: Working extraction function
+        async function attemptExtraction() {
             if (!isExtracting) return;
             
             try {
-                // Check cargo space
-                if (cachedCargoMass >= CARGO_MASS_LIMIT) {
+                // Get current cargo mass
+                const currentMass = await getCurrentCargoMass();
+                
+                // Check if cargo is full
+                if (currentMass >= CARGO_MASS_LIMIT) {
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
                     if (extractionTimer) {
@@ -749,6 +752,7 @@
                     return;
                 }
                 
+                // Get active resources
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
@@ -761,7 +765,7 @@
                 const randomIndex = Math.floor(Math.random() * activeResources.length);
                 const resource = activeResources[randomIndex];
                 
-                // Get the chance for this resource (used for bonus quantity)
+                // Get the chance for this resource
                 const chance = resourceChances[resource] || 70;
                 
                 // Determine quantity - players ALWAYS get at least 1
@@ -773,73 +777,38 @@
                 if (roll < chance) {
                     // Success! Determine bonus based on how good the roll was
                     if (roll < chance * 0.2) { // Top 20% of successful rolls
-                        quantity = 4; // Mega bonus!
+                        quantity = 4;
                     } else if (roll < chance * 0.5) { // Next 30%
-                        quantity = 3; // Big bonus!
+                        quantity = 3;
                     } else if (roll < chance * 0.8) { // Next 30%
-                        quantity = 2; // Small bonus!
+                        quantity = 2;
                     } else {
-                        quantity = 1; // No bonus, but still got 1
+                        quantity = 1;
                     }
                 } else {
-                    // Even on "failure", players get 1
                     quantity = 1;
                 }
                 
-                // Cap quantity based on available space
+                // Calculate mass
                 const massPerUnit = getElementMass(resource);
-                const maxPossible = Math.floor((CARGO_MASS_LIMIT - cachedCargoMass) / massPerUnit);
-                if (quantity > maxPossible) {
-                    quantity = maxPossible;
-                }
+                const totalMass = massPerUnit * quantity;
                 
-                if (quantity <= 0) {
-                    // No space for even 1 unit
-                    isExtracting = false;
-                    extractorText.textContent = 'Cargo full - extraction paused';
-                    if (extractionTimer) {
-                        clearInterval(extractionTimer);
-                        extractionTimer = null;
+                // Check if we have enough space
+                if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
+                    // Add to collection
+                    const result = await window.addElementToCollection(resource, quantity);
+                    
+                    if (result && result.success) {
+                        // Update cache
+                        cachedCargoMass = currentMass + totalMass;
+                        lastMassUpdate = Date.now();
+                        await updateCargoDisplay();
+                        
+                        // Show success toast
+                        showToast(resource, quantity);
+                    } else {
+                        console.error('Extraction failed:', result);
                     }
-                    return;
-                }
-                
-                console.log(`Extracting ${resource}: chance=${chance}%, roll=${roll.toFixed(1)}%, quantity=${quantity}`);
-                
-                const mass = massPerUnit * quantity;
-                
-                // Add to collection
-                if (typeof window.addElementToCollection === 'function') {
-                    (async () => {
-                        try {
-                            const result = await window.addElementToCollection(resource, quantity);
-                            
-                            if (result && result.success) {
-                                // Update cache
-                                cachedCargoMass += mass;
-                                lastMassUpdate = Date.now();
-                                await updateCargoDisplay();
-                                
-                                // Show success toast
-                                showToast(resource, quantity);
-                                
-                                console.log(`✅ Added ${quantity}x ${resource}`);
-                            } else {
-                                console.error('Database error:', result);
-                                // Fallback - show red toast
-                                const toast = document.createElement('div');
-                                toast.className = 'toast fail';
-                                toast.innerHTML = `
-                                    <span class="toast-icon">⚠️</span>
-                                    <span class="toast-name">Extraction failed</span>
-                                `;
-                                toastContainer.appendChild(toast);
-                                setTimeout(() => toast.remove(), 3000);
-                            }
-                        } catch (error) {
-                            console.error('Extraction error:', error);
-                        }
-                    })();
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
@@ -876,16 +845,14 @@
                 const resource = currentPlanet.resources[randomIndex];
                 const mass = getElementMass(resource);
                 
-                await updateCargoDisplay();
+                const currentMass = await getCurrentCargoMass();
                 
-                if (cachedCargoMass + mass <= CARGO_MASS_LIMIT) {
-                    if (typeof window.addElementToCollection === 'function') {
-                        const result = await window.addElementToCollection(resource, 1);
-                        if (result && result.success) {
-                            cachedCargoMass += mass;
-                            await updateCargoDisplay();
-                            showToast(resource, 1);
-                        }
+                if (currentMass + mass <= CARGO_MASS_LIMIT) {
+                    const result = await window.addElementToCollection(resource, 1);
+                    if (result && result.success) {
+                        cachedCargoMass = currentMass + mass;
+                        await updateCargoDisplay();
+                        showToast(resource, 1);
                     }
                 }
             }
