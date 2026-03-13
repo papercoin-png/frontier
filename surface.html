@@ -6,7 +6,6 @@
     <title>Voidfarer - Planetary Surface</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -46,7 +45,6 @@
             background: #000;
         }
         
-        /* Fullscreen Planet Image */
         .planet-canvas {
             position: absolute;
             top: 0;
@@ -58,7 +56,6 @@
             filter: brightness(0.9) saturate(1.2);
         }
         
-        /* Dynamic starfield overlay */
         .star-overlay {
             position: absolute;
             top: 0;
@@ -70,7 +67,6 @@
             z-index: 2;
         }
         
-        /* Top Status Bar - Glass morphism */
         .status-bar {
             position: absolute;
             top: 20px;
@@ -81,7 +77,6 @@
             align-items: center;
             background: rgba(10, 10, 26, 0.4);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(74, 255, 170, 0.3);
             border-radius: 60px 20px 60px 20px;
             padding: 10px 18px;
@@ -132,7 +127,6 @@
             font-size: 12px;
         }
         
-        /* Top Controls Row - Extractor and Return Button */
         .top-controls {
             position: absolute;
             top: 90px;
@@ -145,7 +139,6 @@
             pointer-events: none;
         }
         
-        /* Auto-Extractor Status */
         .extractor-status {
             background: rgba(10, 10, 26, 0.3);
             backdrop-filter: blur(5px);
@@ -177,7 +170,6 @@
             100% { opacity: 0.5; transform: scale(1); }
         }
         
-        /* Return to Ship Button - Clear Text */
         .return-button {
             background: rgba(10, 10, 26, 0.3);
             backdrop-filter: blur(5px);
@@ -199,7 +191,6 @@
             transform: scale(0.95);
         }
         
-        /* Toast Notifications - Float over landscape */
         .toast-container {
             position: absolute;
             top: 140px;
@@ -261,7 +252,6 @@
             to { opacity: 0; }
         }
         
-        /* Resource Toggles - Bottom bar */
         .resource-bar {
             position: absolute;
             bottom: 120px;
@@ -269,7 +259,6 @@
             right: 20px;
             background: rgba(10, 10, 26, 0.4);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(74, 255, 170, 0.3);
             border-radius: 60px 20px 60px 20px;
             padding: 12px;
@@ -315,7 +304,6 @@
             opacity: 1;
         }
         
-        /* Dim inactive toggles */
         .resource-toggle:not(.active) {
             opacity: 0.4;
             filter: grayscale(0.5);
@@ -340,7 +328,6 @@
             border-radius: 20px;
         }
         
-        /* Rarity Colors */
         .rarity-common { 
             border-color: #ffffff; 
             color: #ffffff;
@@ -389,7 +376,6 @@
             font-family: 'Exo 2', sans-serif;
         }
         
-        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -441,11 +427,9 @@
 <body>
     <div class="phone-frame">
         <div class="surface-view" id="surfaceView">
-            <!-- Fullscreen Planet Image -->
             <img src="assets/images/earth-view.jpg" class="planet-canvas" id="planetImage" alt="Planet surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
             <div class="star-overlay"></div>
             
-            <!-- Top Status Bar -->
             <div class="status-bar">
                 <div class="planet-name">
                     <span class="planet-name-main" id="planetName">Loading...</span>
@@ -457,7 +441,6 @@
                 </div>
             </div>
             
-            <!-- Top Controls Row - Extractor and Return Button -->
             <div class="top-controls">
                 <div class="extractor-status" id="extractorStatus">
                     <span class="extractor-pulse"></span>
@@ -468,19 +451,14 @@
                 </div>
             </div>
             
-            <!-- Toast Notifications Container -->
             <div class="toast-container" id="toastContainer"></div>
             
-            <!-- Resource Toggles Bar -->
             <div class="resource-bar">
                 <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
-                <div class="resource-grid" id="resourceGrid">
-                    <!-- Filled by JavaScript -->
-                </div>
+                <div class="resource-grid" id="resourceGrid"></div>
                 <div class="active-count" id="activeCount">Extracting: 0 resources</div>
             </div>
             
-            <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
                 <div class="loading-text" id="loadingText">landing on surface...</div>
@@ -488,28 +466,21 @@
         </div>
     </div>
 
-    <!-- Load all JS files -->
     <script src="js/db.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 
     <script>
-        // ===== MAIN SURFACE SCRIPT =====
         const { openDB } = idb;
-
-        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
 
-        // ===== CONSTANTS =====
         const CARGO_MASS_LIMIT = 5000;
-        const EXTRACTION_INTERVAL = 5000; // 5 seconds
-        const SYNC_INTERVAL = 10000; // 10 seconds
-
-        // ===== DOM ELEMENTS =====
+        const EXTRACTION_INTERVAL = 5000;
+        
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const planetImage = document.getElementById('planetImage');
@@ -521,7 +492,6 @@
         const toastContainer = document.getElementById('toastContainer');
         const extractorText = document.getElementById('extractorText');
 
-        // ===== STATE =====
         let currentPlanet = {
             name: 'Earth',
             type: 'lush',
@@ -529,18 +499,12 @@
             resources: []
         };
         
-        // Resource states: all active by default
         let resourceStates = {};
-        
-        // Store fixed chances for each resource (calculated once at load)
         let resourceChances = {};
-        
-        let currentMass = 0;
-        let extractionTimer = null;
-        let syncTimer = null;
         let isExtracting = true;
-
-        // ===== ELEMENT DATA =====
+        let extractionTimer = null;
+        let isExtractionInProgress = false;
+        
         const elementData = {
             'Hydrogen': { symbol: 'H', rarity: 'common' },
             'Helium': { symbol: 'He', rarity: 'common' },
@@ -576,38 +540,32 @@
             'Promethium': { symbol: 'Pm', rarity: 'legendary' }
         };
 
-        // ===== CALCULATE FIXED RESOURCE CHANCE =====
         function calculateResourceChance(resource) {
-            // Original working chances
             if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
-                return Math.floor(Math.random() * 20) + 80; // 80-100%
+                return Math.floor(Math.random() * 20) + 80;
             } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
-                return Math.floor(Math.random() * 30) + 50; // 50-80%
+                return Math.floor(Math.random() * 30) + 50;
             } else if (['Uranium', 'Thorium'].includes(resource)) {
-                return Math.floor(Math.random() * 30) + 20; // 20-50%
+                return Math.floor(Math.random() * 30) + 20;
             } else if (['Promethium'].includes(resource)) {
-                return Math.floor(Math.random() * 15) + 5; // 5-20%
+                return Math.floor(Math.random() * 15) + 5;
             }
-            return 70; // Default
+            return 70;
         }
 
-        // ===== GET RARITY CLASS =====
         function getRarityClass(resource) {
             const rarity = elementData[resource]?.rarity || 'common';
             return `rarity-${rarity}`;
         }
 
-        // ===== GET ELEMENT SYMBOL =====
         function getElementSymbol(resource) {
             return elementData[resource]?.symbol || resource.substring(0, 2);
         }
 
-        // ===== GET ELEMENT MASS =====
         function getElementMass(elementName) {
             if (typeof window.getElementMass === 'function') {
                 return window.getElementMass(elementName);
             }
-            // Fallback masses for common elements
             const masses = {
                 'Iron': 55.85, 'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1,
                 'Carbon': 12.01, 'Oxygen': 16.00, 'Hydrogen': 1.008, 'Uranium': 238.0,
@@ -617,14 +575,31 @@
             return masses[elementName] || masses.default;
         }
 
-        // ===== LOAD PLANET DATA =====
+        async function getCurrentCargoMass() {
+            try {
+                const collection = await window.getCollection();
+                let mass = 0;
+                for (const [name, data] of Object.entries(collection)) {
+                    mass += (data.count || 1) * getElementMass(name);
+                }
+                return mass;
+            } catch (error) {
+                console.error('Error getting cargo mass:', error);
+                return 0;
+            }
+        }
+
+        async function updateCargoDisplay() {
+            const mass = await getCurrentCargoMass();
+            cargoMass.innerHTML = `<span>${Math.round(mass)}</span>/5000 AMU`;
+            return mass;
+        }
+
         async function loadPlanetData() {
             try {
-                // Get planet data from localStorage
                 const planetNameStr = localStorage.getItem('voidfarer_current_planet') || 'Earth';
                 const planetTypeStr = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
                 
-                // Get resources
                 let planetResources = [];
                 const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
                 
@@ -635,7 +610,6 @@
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
                     }
                 } else {
-                    // Generate resources based on planet type
                     if (planetTypeStr.includes('lush')) {
                         planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen'];
                     } else if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
@@ -649,7 +623,6 @@
                     }
                 }
                 
-                // Set planet icon based on type
                 let imageFile = 'earth-view.jpg';
                 if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
                     imageFile = 'pyros-surface.jpg';
@@ -661,7 +634,6 @@
                     imageFile = 'barren-surface.jpg';
                 }
                 
-                // Update planet image
                 planetImage.src = 'assets/images/' + imageFile;
                 planetImage.onerror = function() {
                     this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
@@ -677,15 +649,13 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
-                // Initialize all resources as active by default
-                // AND calculate fixed chances for each resource
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
                     resourceChances[resource] = calculateResourceChance(resource);
                 });
                 
-                // Render resource toggles
                 renderResourceToggles();
+                await updateCargoDisplay();
                 
                 return true;
                 
@@ -695,72 +665,6 @@
             }
         }
 
-        // ===== LOAD CARGO DATA =====
-        async function loadCargoData() {
-            try {
-                // Get collection
-                let collection = {};
-                if (typeof window.getCollection === 'function') {
-                    collection = await window.getCollection();
-                }
-                
-                // Calculate total mass
-                currentMass = 0;
-                for (const [name, data] of Object.entries(collection)) {
-                    const count = data.count || 1;
-                    const mass = getElementMass(name);
-                    currentMass += count * mass;
-                }
-                
-                // Update cargo display
-                updateCargoDisplay();
-                
-                return true;
-                
-            } catch (error) {
-                console.error('Error loading cargo:', error);
-                return false;
-            }
-        }
-
-        // ===== UPDATE CARGO DISPLAY =====
-        function updateCargoDisplay() {
-            cargoMass.innerHTML = `<span>${currentMass.toFixed(0)}</span>/5000 AMU`;
-            
-            // Stop extraction if cargo is full
-            if (currentMass >= CARGO_MASS_LIMIT && isExtracting) {
-                isExtracting = false;
-                extractorText.textContent = 'Cargo full - extraction paused';
-                if (extractionTimer) {
-                    clearInterval(extractionTimer);
-                    extractionTimer = null;
-                }
-            }
-            
-            // RESTART EXTRACTION IF SPACE AVAILABLE
-            if (currentMass < CARGO_MASS_LIMIT && !isExtracting && extractionTimer === null) {
-                isExtracting = true;
-                startExtraction();
-                extractorText.textContent = 'Auto-extractor active';
-            }
-        }
-
-        // ===== SYNC CARGO MASS WITH DATABASE =====
-        async function syncCargoMass() {
-            try {
-                const collection = await window.getCollection();
-                let newMass = 0;
-                for (const [name, data] of Object.entries(collection)) {
-                    newMass += (data.count || 1) * getElementMass(name);
-                }
-                currentMass = newMass;
-                updateCargoDisplay();
-            } catch (error) {
-                console.error('Error syncing cargo mass:', error);
-            }
-        }
-
-        // ===== RENDER RESOURCE TOGGLES =====
         function renderResourceToggles() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
                 resourceGrid.innerHTML = '<div style="color: #a0c0ff; padding: 20px;">No resources found</div>';
@@ -787,20 +691,17 @@
             updateActiveCount();
         }
 
-        // ===== TOGGLE RESOURCE =====
         window.toggleResource = function(resource) {
             resourceStates[resource] = !resourceStates[resource];
             renderResourceToggles();
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         };
 
-        // ===== UPDATE ACTIVE COUNT =====
         function updateActiveCount() {
             const activeResources = Object.values(resourceStates).filter(v => v).length;
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        // ===== SHOW TOAST NOTIFICATION =====
         function showToast(resource, success) {
             const symbol = getElementSymbol(resource);
             const rarityClass = getRarityClass(resource);
@@ -813,7 +714,6 @@
             
             toastContainer.appendChild(toast);
             
-            // Remove after animation
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
@@ -821,54 +721,62 @@
             }, 3000);
         }
 
-        // ===== ATTEMPT EXTRACTION =====
         async function attemptExtraction() {
-            if (!isExtracting) return;
-            if (currentMass >= CARGO_MASS_LIMIT) {
-                isExtracting = false;
-                extractorText.textContent = 'Cargo full - extraction paused';
-                return;
-            }
+            if (!isExtracting || isExtractionInProgress) return;
             
-            // Get active resources
-            const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
-            if (activeResources.length === 0) {
-                extractorText.textContent = 'No resources selected';
-                return;
-            }
+            isExtractionInProgress = true;
             
-            // Pick a random active resource
-            const randomIndex = Math.floor(Math.random() * activeResources.length);
-            const resource = activeResources[randomIndex];
-            
-            // Use fixed chance from resourceChances object
-            const chance = resourceChances[resource] || 70;
-            const success = Math.random() * 100 < chance;
-            
-            if (success) {
-                const mass = getElementMass(resource);
+            try {
+                const currentMass = await updateCargoDisplay();
                 
-                // Check if we have space
-                if (currentMass + mass <= CARGO_MASS_LIMIT) {
-                    // Add to collection
-                    if (typeof window.addElementToCollection === 'function') {
-                        const result = await window.addElementToCollection(resource, 1);
-                        
-                        if (result && result.success) {
-                            currentMass += mass;
-                            updateCargoDisplay();
-                            showToast(resource, true);
-                        } else {
-                            showToast(resource, false);
-                        }
-                    }
+                if (currentMass >= CARGO_MASS_LIMIT) {
+                    isExtracting = false;
+                    extractorText.textContent = 'Cargo full - extraction paused';
+                    isExtractionInProgress = false;
+                    return;
                 }
-            } else {
-                showToast(resource, false);
+                
+                const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
+                if (activeResources.length === 0) {
+                    extractorText.textContent = 'No resources selected';
+                    isExtractionInProgress = false;
+                    return;
+                }
+                
+                const randomIndex = Math.floor(Math.random() * activeResources.length);
+                const resource = activeResources[randomIndex];
+                const chance = resourceChances[resource] || 70;
+                const success = Math.random() * 100 < chance;
+                
+                if (success) {
+                    const mass = getElementMass(resource);
+                    
+                    if (currentMass + mass <= CARGO_MASS_LIMIT) {
+                        if (typeof window.addElementToCollection === 'function') {
+                            const result = await window.addElementToCollection(resource, 1);
+                            
+                            if (result && result.success) {
+                                await updateCargoDisplay();
+                                showToast(resource, true);
+                                extractorText.textContent = 'Auto-extractor active';
+                            } else {
+                                showToast(resource, false);
+                            }
+                        }
+                    } else {
+                        isExtracting = false;
+                        extractorText.textContent = 'Cargo full - extraction paused';
+                    }
+                } else {
+                    showToast(resource, false);
+                }
+            } catch (error) {
+                console.error('Extraction error:', error);
+            } finally {
+                isExtractionInProgress = false;
             }
         }
 
-        // ===== START EXTRACTION TIMER =====
         function startExtraction() {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
@@ -877,80 +785,56 @@
             extractorText.textContent = 'Auto-extractor active';
         }
 
-        // ===== RETURN TO SHIP =====
         window.returnToShip = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            // Stop extraction timer
             if (extractionTimer) {
                 clearInterval(extractionTimer);
                 extractionTimer = null;
             }
             
-            // Stop sync timer
-            if (syncTimer) {
-                clearInterval(syncTimer);
-                syncTimer = null;
-            }
-            
             window.location.href = 'ship-bridge.html';
         };
 
-        // ===== AUTO-EXTRACT ON LANDING =====
         async function performAutoExtract() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
             
-            // Auto-extract 1-3 units of random resources
             const extractCount = Math.floor(Math.random() * 3) + 1;
             
             for (let i = 0; i < extractCount; i++) {
                 const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
                 const resource = currentPlanet.resources[randomIndex];
-                const quantity = 1;
-                
                 const mass = getElementMass(resource);
-                const totalMass = mass * quantity;
                 
-                if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
+                const currentMass = await updateCargoDisplay();
+                
+                if (currentMass + mass <= CARGO_MASS_LIMIT) {
                     if (typeof window.addElementToCollection === 'function') {
-                        const result = await window.addElementToCollection(resource, quantity);
+                        const result = await window.addElementToCollection(resource, 1);
                         if (result && result.success) {
-                            currentMass += totalMass;
+                            await updateCargoDisplay();
                             showToast(resource, true);
                         }
                     }
                 }
             }
-            
-            updateCargoDisplay();
         }
 
-        // ===== INITIALIZE =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'landing on surface...';
                 
-                // Load planet data
                 const planetLoaded = await loadPlanetData();
                 
                 if (!planetLoaded) {
                     throw new Error('Failed to load planet data');
                 }
                 
-                // Load cargo data
-                await loadCargoData();
-                
-                // Start extraction timer FIRST
                 startExtraction();
                 
-                // Start sync timer to check for cargo changes
-                syncTimer = setInterval(syncCargoMass, SYNC_INTERVAL);
-                
-                // Hide loading overlay and THEN auto-extract
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
-                    // Auto-extract after loading screen is gone
                     performAutoExtract();
                 }, 500);
                 
@@ -963,17 +847,12 @@
             }
         }
 
-        // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
             }
-            if (syncTimer) {
-                clearInterval(syncTimer);
-            }
         });
 
-        // ===== START =====
         init();
     </script>
 </body>
