@@ -507,6 +507,7 @@
         // ===== CONSTANTS =====
         const CARGO_MASS_LIMIT = 5000;
         const EXTRACTION_INTERVAL = 5000; // 5 seconds
+        const SYNC_INTERVAL = 10000; // 10 seconds
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -536,6 +537,7 @@
         
         let currentMass = 0;
         let extractionTimer = null;
+        let syncTimer = null;
         let isExtracting = true;
 
         // ===== ELEMENT DATA =====
@@ -743,6 +745,21 @@
             }
         }
 
+        // ===== SYNC CARGO MASS WITH DATABASE =====
+        async function syncCargoMass() {
+            try {
+                const collection = await window.getCollection();
+                let newMass = 0;
+                for (const [name, data] of Object.entries(collection)) {
+                    newMass += (data.count || 1) * getElementMass(name);
+                }
+                currentMass = newMass;
+                updateCargoDisplay();
+            } catch (error) {
+                console.error('Error syncing cargo mass:', error);
+            }
+        }
+
         // ===== RENDER RESOURCE TOGGLES =====
         function renderResourceToggles() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
@@ -841,6 +858,8 @@
                             currentMass += mass;
                             updateCargoDisplay();
                             showToast(resource, true);
+                        } else {
+                            showToast(resource, false);
                         }
                     }
                 }
@@ -866,6 +885,12 @@
             if (extractionTimer) {
                 clearInterval(extractionTimer);
                 extractionTimer = null;
+            }
+            
+            // Stop sync timer
+            if (syncTimer) {
+                clearInterval(syncTimer);
+                syncTimer = null;
             }
             
             window.location.href = 'ship-bridge.html';
@@ -919,6 +944,9 @@
                 // Start extraction timer FIRST
                 startExtraction();
                 
+                // Start sync timer to check for cargo changes
+                syncTimer = setInterval(syncCargoMass, SYNC_INTERVAL);
+                
                 // Hide loading overlay and THEN auto-extract
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -939,6 +967,9 @@
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
+            }
+            if (syncTimer) {
+                clearInterval(syncTimer);
             }
         });
 
