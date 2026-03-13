@@ -217,6 +217,22 @@
             font-size: 12px;
         }
         
+        /* Market Hint */
+        .market-hint {
+            text-align: center;
+            color: #a0d0c0;
+            font-size: 12px;
+            margin-bottom: 10px;
+            font-style: italic;
+            animation: fade-in-out 2s infinite;
+        }
+        
+        @keyframes fade-in-out {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
         /* ===== MARKET CARD ===== */
         .market-card {
             background: rgba(30, 60, 70, 0.6);
@@ -721,6 +737,9 @@
                 </div>
             </div>
             
+            <!-- Market Hint -->
+            <div class="market-hint">▼ Tap on any group to expand/collapse ▼</div>
+            
             <!-- MARKET CARD -->
             <div class="market-card">
                 <div class="market-header">
@@ -855,7 +874,8 @@
         const migrationStatus = document.getElementById('migrationStatus');
 
         // ===== STATE =====
-        let expandedGroup = null;
+        // Start with Common group expanded so sell buttons are visible immediately
+        let expandedGroup = 'common';
         let priceChart = null;
         let currentCollection = {};
         let currentCredits = 0;
@@ -887,33 +907,38 @@
 
                 // Load all data with fallbacks
                 let credits = 5000;
-                if (typeof getCredits === 'function') {
-                    credits = await getCredits();
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
+                } else {
+                    credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
 
                 let collection = {};
-                if (typeof getCollection === 'function') {
-                    collection = await getCollection();
+                if (typeof window.getCollection === 'function') {
+                    collection = await window.getCollection();
+                } else {
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
                 }
 
                 let planet = 'Earth';
-                if (typeof getCurrentPlanet === 'function') {
-                    planet = await getCurrentPlanet();
+                if (typeof window.getCurrentPlanet === 'function') {
+                    planet = await window.getCurrentPlanet();
                 }
 
                 let star = 'Sol';
-                if (typeof getCurrentStar === 'function') {
-                    star = await getCurrentStar();
+                if (typeof window.getCurrentStar === 'function') {
+                    star = await window.getCurrentStar();
                 }
 
                 let sector = 'B2';
-                if (typeof getCurrentSector === 'function') {
-                    sector = await getCurrentSector();
+                if (typeof window.getCurrentSector === 'function') {
+                    sector = await window.getCurrentSector();
                 }
 
-                let nebula = 'Orion Nebula';
-                if (typeof getCurrentNebula === 'function') {
-                    nebula = await getCurrentNebula();
+                let starSector = 'Orion Nebula';
+                if (typeof window.getCurrentStarSector === 'function') {
+                    starSector = await window.getCurrentStarSector();
                 }
 
                 let events = [];
@@ -934,7 +959,7 @@
 
                 // Update UI
                 updateHeader(credits, collection);
-                updateLocation(planet, star, sector, nebula);
+                updateLocation(planet, star, sector, starSector);
                 renderMarket(collection);
                 updateTaxSummary(rates);
                 updateEventAlerts(events);
@@ -955,7 +980,7 @@
         }
 
         // ===== UPDATE LOCATION =====
-        function updateLocation(planet, star, sector, nebula) {
+        function updateLocation(planet, star, sector, starSector) {
             document.getElementById('locationText').textContent = `📍 ${planet || 'Earth'} • ${star || 'Sol'}`;
             document.getElementById('sectorText').textContent = `Sector ${sector || 'B2'}`;
         }
@@ -1001,16 +1026,29 @@
             };
             
             const elementDatabase = {
-                'Carbon': { icon: '⚫', rarity: 'common', value: 100 },
-                'Silicon': { icon: '💎', rarity: 'common', value: 100 },
                 'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
                 'Helium': { icon: '🎈', rarity: 'common', value: 100 },
-                'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
+                'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
+                'Beryllium': { icon: '💎', rarity: 'common', value: 100 },
+                'Boron': { icon: '🧪', rarity: 'common', value: 100 },
+                'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
+                'Magnesium': { icon: '✨', rarity: 'common', value: 100 },
+                'Aluminum': { icon: '🥫', rarity: 'common', value: 100 },
+                'Silicon': { icon: '💻', rarity: 'common', value: 100 },
+                'Potassium': { icon: '🍌', rarity: 'common', value: 100 },
+                'Calcium': { icon: '🥛', rarity: 'common', value: 100 },
+                'Carbon': { icon: '⚫', rarity: 'uncommon', value: 250 },
+                'Nitrogen': { icon: '🌬️', rarity: 'uncommon', value: 250 },
                 'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
+                'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
+                'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
                 'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
                 'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
                 'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
+                'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
+                'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
                 'Uranium': { icon: '🟣', rarity: 'very-rare', value: 5000 },
+                'Thorium': { icon: '🔮', rarity: 'very-rare', value: 5000 },
                 'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 }
             };
             
@@ -1021,7 +1059,7 @@
                     value: 100 
                 };
                 const count = collection[elementName].count || 1;
-                const marketPrice = typeof getLatestPrice === 'function' ? getLatestPrice(elementName) : elementData.value;
+                const marketPrice = elementData.value;
                 
                 if (groups[elementData.rarity]) {
                     groups[elementData.rarity].elements.push({
@@ -1046,7 +1084,7 @@
             container.innerHTML = '';
             
             let totalMarketValue = 0;
-            const rarityOrder = ['legendary', 'very-rare', 'rare', 'uncommon', 'common'];
+            const rarityOrder = ['common', 'uncommon', 'rare', 'very-rare', 'legendary'];
             
             rarityOrder.forEach(rarity => {
                 const group = groups[rarity];
@@ -1155,20 +1193,36 @@
             loadingText.textContent = 'selling...';
             
             try {
-                if (typeof safeSellElement === 'function') {
-                    const result = await safeSellElement(elementName, quantity, price);
-                    
-                    if (result.success) {
-                        if (typeof recordTrade === 'function') {
-                            await recordTrade(elementName, quantity, price);
-                        }
-                        await loadAllData();
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    } else {
-                        alert('Sale failed: ' + (result.reason || 'unknown error'));
-                    }
+                let result;
+                
+                if (typeof window.safeSellElement === 'function') {
+                    result = await window.safeSellElement(elementName, quantity, price);
                 } else {
-                    alert('Sale function not available');
+                    // Fallback for testing
+                    console.log(`Selling ${quantity} of ${elementName} for ${price}⭐ each`);
+                    
+                    // Update localStorage directly
+                    let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+                    if (collection[elementName]) {
+                        collection[elementName].count -= quantity;
+                        if (collection[elementName].count <= 0) {
+                            delete collection[elementName];
+                        }
+                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    }
+                    
+                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                    credits += quantity * price;
+                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    
+                    result = { success: true, earnings: quantity * price };
+                }
+                
+                if (result && result.success) {
+                    await loadAllData();
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Sale failed: ' + (result?.reason || 'unknown error'));
                 }
             } catch (error) {
                 console.error('Sell error:', error);
@@ -1207,13 +1261,15 @@
                         sellQuantity = Math.min(quantity, element.count);
                     }
                     
-                    if (sellQuantity > 0 && typeof safeSellElement === 'function') {
-                        const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
-                        if (result.success) {
-                            totalEarnings += result.earnings;
-                            if (typeof recordTrade === 'function') {
-                                await recordTrade(element.name, sellQuantity, element.marketPrice);
+                    if (sellQuantity > 0) {
+                        if (typeof window.safeSellElement === 'function') {
+                            const result = await window.safeSellElement(element.name, sellQuantity, element.marketPrice);
+                            if (result.success) {
+                                totalEarnings += result.earnings;
                             }
+                        } else {
+                            // Fallback
+                            totalEarnings += sellQuantity * element.marketPrice;
                         }
                     }
                 }
@@ -1260,27 +1316,21 @@
                     if (remaining <= 0) break;
                     
                     if (amount === 'all') {
-                        if (typeof safeSellElement === 'function') {
-                            const result = await safeSellElement(element.name, element.count, element.marketPrice);
+                        if (typeof window.safeSellElement === 'function') {
+                            const result = await window.safeSellElement(element.name, element.count, element.marketPrice);
                             if (result.success) {
                                 totalEarned += result.earnings;
-                                if (typeof recordTrade === 'function') {
-                                    await recordTrade(element.name, element.count, element.marketPrice);
-                                }
                             }
                         }
                     } else {
                         const maxCanSell = Math.floor(remaining / element.marketPrice);
                         const sellQuantity = Math.min(maxCanSell, element.count);
                         
-                        if (sellQuantity > 0 && typeof safeSellElement === 'function') {
-                            const result = await safeSellElement(element.name, sellQuantity, element.marketPrice);
+                        if (sellQuantity > 0 && typeof window.safeSellElement === 'function') {
+                            const result = await window.safeSellElement(element.name, sellQuantity, element.marketPrice);
                             if (result.success) {
                                 totalEarned += result.earnings;
                                 remaining -= result.earnings;
-                                if (typeof recordTrade === 'function') {
-                                    await recordTrade(element.name, sellQuantity, element.marketPrice);
-                                }
                             }
                         }
                     }
