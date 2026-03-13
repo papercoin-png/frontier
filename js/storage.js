@@ -1,5 +1,5 @@
 // js/storage.js - Save/load player progress for Voidfarer
-// Now using IndexedDB via db.js for unlimited storage with mass-based cargo
+// Using IndexedDB via db.js for unlimited storage with mass-based cargo
 
 import { 
   getItem,
@@ -26,79 +26,52 @@ export const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can 
 
 // ===== STORAGE KEYS (kept for reference, but not used for storage) =====
 export const STORAGE_KEYS = {
-    // Player data
     PLAYER: 'voidfarer_player',
     COLLECTION: 'voidfarer_collection',
     MISSIONS: 'voidfarer_missions',
     COMPLETED_MISSIONS: 'voidfarer_completed_missions',
     CREDITS: 'voidfarer_credits',
-    
-    // Universe data
     UNIVERSE_SEED: 'voidfarer_universe_seed',
-    
-    // Location data - Galaxy level
     CURRENT_SECTOR: 'voidfarer_current_sector',
     CURRENT_REGION: 'voidfarer_current_region',
-    
-    // Location data - Star Sector level
     CURRENT_STAR_SECTOR: 'voidfarer_current_starSector',
     CURRENT_SECTOR_NAME: 'voidfarer_current_sector_name',
     CURRENT_SECTOR_TYPE: 'voidfarer_current_sector_type',
     CURRENT_SECTOR_STARS: 'voidfarer_current_sector_stars',
     CURRENT_SECTOR_X: 'voidfarer_current_sector_x',
     CURRENT_SECTOR_Y: 'voidfarer_current_sector_y',
-    
-    // Location data - Star level
     CURRENT_STAR: 'voidfarer_current_star',
     CURRENT_STAR_TYPE: 'voidfarer_current_star_type',
     CURRENT_STAR_INDEX: 'voidfarer_current_star_index',
     CURRENT_STAR_X: 'voidfarer_current_star_x',
     CURRENT_STAR_Y: 'voidfarer_current_star_y',
     CURRENT_STAR_PLANETS: 'voidfarer_current_star_planets',
-    
-    // Location data - Planet level
     CURRENT_PLANET: 'voidfarer_current_planet',
     CURRENT_PLANET_TYPE: 'voidfarer_current_planet_type',
     CURRENT_PLANET_RESOURCES: 'voidfarer_current_planet_resources',
     CURRENT_PLANET_IMAGE: 'voidfarer_current_planet_image',
-    
-    // Warp data
     WARP_DESTINATION: 'voidfarer_warp_destination',
     WARP_RETURN: 'voidfarer_warp_return',
     WARP_CYCLES: 'voidfarer_warp_cycles',
     WARP_DISTANCE: 'voidfarer_warp_distance',
     WARP_FUEL: 'voidfarer_warp_fuel',
-    
-    // Colonies
     COLONIES: 'voidfarer_colonies',
-    
-    // Discoveries
     DISCOVERED_LOCATIONS: 'voidfarer_discovered_locations',
     BOOKMARKS: 'voidfarer_bookmarks',
     RECENT_LOCATIONS: 'voidfarer_recent_locations',
     SCAN_HISTORY: 'voidfarer_scan_history',
-    
-    // Ship data
     SHIP_POWER: 'voidfarer_ship_power',
     SHIP_UPGRADES: 'voidfarer_ship_upgrades',
     SHIP_FUEL: 'voidfarer_ship_fuel',
-    
-    // Settings
     SETTINGS_HAPTICS: 'voidfarer_haptics',
     SETTINGS_AUTO_GATHER: 'voidfarer_auto_gather',
     SETTINGS_ORBIT_SPEED: 'voidfarer_orbit_speed',
     SETTINGS_MUSIC: 'voidfarer_music',
     SETTINGS_AMBIENT: 'voidfarer_ambient',
-    
-    // Stats
     PLAYER_STATS: 'voidfarer_player_stats',
     ACHIEVEMENTS: 'voidfarer_achievements',
     LAST_SAVE: 'voidfarer_last_save',
-    
-    // Real Estate
     REAL_ESTATE: 'voidfarer_real_estate',
-    
-    // Economic Data
     TOTAL_MONEY_SUPPLY: 'voidfarer_total_money_supply',
     DAILY_METRICS: 'voidfarer_daily_metrics',
     HOURLY_SNAPSHOTS: 'voidfarer_hourly_snapshots',
@@ -112,8 +85,7 @@ export const STORAGE_KEYS = {
 // ===== UNIVERSE CONSTANTS =====
 export const UNIVERSE_SEED = 42793;
 
-// ===== ELEMENT MASS DATABASE =====
-// Atomic masses for calculating cargo capacity
+// ===== ELEMENT MASS DATABASE - SINGLE SOURCE OF TRUTH =====
 export const ELEMENT_MASS = {
     // Common
     'Hydrogen': 1.008,
@@ -247,32 +219,69 @@ export const ELEMENT_MASS = {
 // Default mass for unknown elements
 const DEFAULT_MASS = 100.0;
 
-// ===== HELPER: Settings storage (keep in localStorage for simplicity) =====
-function getSetting(key, defaultValue) {
-    const value = localStorage.getItem(key);
-    return value !== null ? value : defaultValue;
+// ===== ELEMENT MASS ACCESSOR - SINGLE FUNCTION =====
+export function getElementMass(elementName) {
+    return ELEMENT_MASS[elementName] || DEFAULT_MASS;
 }
 
-function setSetting(key, value) {
-    localStorage.setItem(key, value.toString());
+// ===== CARGO MASS UTILITIES =====
+export async function getTotalCargoMass() {
+    try {
+        const collection = await getCollection();
+        let totalMass = 0;
+        
+        for (const [name, data] of Object.entries(collection)) {
+            const count = data.count || 1;
+            const mass = getElementMass(name);
+            totalMass += count * mass;
+        }
+        
+        return totalMass;
+    } catch (error) {
+        console.error('Error calculating total cargo mass:', error);
+        return 0;
+    }
+}
+
+export async function getRemainingCargoMass() {
+    try {
+        const totalMass = await getTotalCargoMass();
+        const player = await getPlayer();
+        const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
+        
+        return Math.max(0, massLimit - totalMass);
+    } catch (error) {
+        console.error('Error calculating remaining cargo mass:', error);
+        return CARGO_MASS_LIMIT;
+    }
+}
+
+export async function canAddToCargo(elementName, quantity = 1) {
+    try {
+        const remainingMass = await getRemainingCargoMass();
+        const elementMass = getElementMass(elementName);
+        const requiredMass = elementMass * quantity;
+        
+        return remainingMass >= requiredMass;
+    } catch (error) {
+        console.error('Error checking cargo space:', error);
+        return false;
+    }
 }
 
 // ===== INITIALIZATION =====
 export async function initializeStorage() {
     console.log('Initializing storage...');
     
-    // Set universe seed (keep in localStorage - it's tiny)
     if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED)) {
         localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, UNIVERSE_SEED.toString());
     }
     
-    // Create default player if none exists in IndexedDB
     const player = await getPlayer();
     if (!player) {
         await createDefaultPlayer();
     }
     
-    // Initialize default settings in localStorage if needed
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS)) {
         localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, 'true');
     }
@@ -289,7 +298,6 @@ export async function initializeStorage() {
         localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
     }
     
-    // Initialize default location if none exists
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
@@ -344,60 +352,10 @@ export async function createDefaultPlayer(name = 'Voidfarer') {
     }
 }
 
-// ===== CARGO MASS UTILITIES =====
-export function getElementMass(elementName) {
-    return ELEMENT_MASS[elementName] || DEFAULT_MASS;
-}
-
-export async function getTotalCargoMass() {
-    try {
-        const collection = await getCollection();
-        let totalMass = 0;
-        
-        for (const [name, data] of Object.entries(collection)) {
-            const count = data.count || 1;
-            const mass = getElementMass(name);
-            totalMass += count * mass;
-        }
-        
-        return totalMass;
-    } catch (error) {
-        console.error('Error calculating total cargo mass:', error);
-        return 0;
-    }
-}
-
-export async function getRemainingCargoMass() {
-    try {
-        const totalMass = await getTotalCargoMass();
-        const player = await getPlayer();
-        const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
-        
-        return Math.max(0, massLimit - totalMass);
-    } catch (error) {
-        console.error('Error calculating remaining cargo mass:', error);
-        return CARGO_MASS_LIMIT;
-    }
-}
-
-export async function canAddToCargo(elementName, quantity = 1) {
-    try {
-        const remainingMass = await getRemainingCargoMass();
-        const elementMass = getElementMass(elementName);
-        const requiredMass = elementMass * quantity;
-        
-        return remainingMass >= requiredMass;
-    } catch (error) {
-        console.error('Error checking cargo space:', error);
-        return false;
-    }
-}
-
 // ===== COLLECTION DATA =====
 export async function getCollection() {
     try {
         const collection = await getCollectionAsObject();
-        console.log('getCollection returning:', collection);
         return collection;
     } catch (error) {
         console.error('Error getting collection:', error);
@@ -407,7 +365,6 @@ export async function getCollection() {
 
 export async function saveCollection(collection) {
     try {
-        // This is a bulk operation - convert object back to individual records
         const elements = [];
         for (const [name, data] of Object.entries(collection)) {
             elements.push({
@@ -420,7 +377,6 @@ export async function saveCollection(collection) {
             });
         }
         
-        // Clear and rebuild (simpler than diffing)
         const db = await getDb();
         const tx = db.transaction('collection', 'readwrite');
         await tx.objectStore('collection').clear();
@@ -438,22 +394,18 @@ export async function saveCollection(collection) {
     }
 }
 
-// FIXED: Removed cargo space check since surface.html already handles it
 export async function addElementToCollection(elementName, count = 1) {
     try {
-        console.log(`Adding ${count} of ${elementName} to collection`);
-        
         const result = await dbAddElement(elementName, count);
-        console.log('dbAddElement result:', result);
         
         if (result && result.success) {
-            // Update player stats
             const player = await getPlayer();
             if (player) {
                 player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
                 await savePlayer(player);
             }
             
+            // Return the actual new count from the database
             return { success: true, newCount: result.count };
         } else {
             return { success: false, reason: 'database_error' };
@@ -467,9 +419,7 @@ export async function addElementToCollection(elementName, count = 1) {
 
 export async function removeElementFromCollection(elementName, count = 1) {
     try {
-        console.log(`Removing ${count} of ${elementName} from collection`);
         const result = await dbRemoveElement(elementName, count);
-        console.log('dbRemoveElement result:', result);
         return result;
     } catch (error) {
         console.error('Error removing element from collection:', error);
@@ -490,18 +440,15 @@ export async function safeSellElement(elementName, quantity, pricePerUnit) {
             return { success: false, reason: 'insufficient', available: collection[elementName].count };
         }
         
-        // Remove from collection
         const removeResult = await dbRemoveElement(elementName, quantity);
         if (!removeResult.success) {
             return removeResult;
         }
         
-        // Add credits
         const earnings = quantity * pricePerUnit;
         const newCredits = credits + earnings;
         await saveCredits(newCredits);
         
-        console.log(`Sold ${quantity} of ${elementName} for ${earnings}⭐`);
         return { 
             success: true, 
             earnings: earnings,
@@ -580,7 +527,6 @@ export async function addCredits(amount) {
         const newTotal = current + amount;
         await saveCredits(newTotal);
         
-        // Update player stats
         const player = await getPlayer();
         if (player) {
             player.totalCreditsEarned = (player.totalCreditsEarned || 5000) + amount;
@@ -692,7 +638,7 @@ export function repairShip(amount) {
     }
 }
 
-// ===== LOCATION DATA - GALAXY LEVEL (keep in localStorage) =====
+// ===== LOCATION DATA - GALAXY LEVEL =====
 export function getCurrentSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR) || 'B2';
 }
@@ -706,7 +652,7 @@ export function setCurrentSector(sector, region) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_REGION, region);
 }
 
-// ===== LOCATION DATA - STAR SECTOR LEVEL (keep in localStorage) =====
+// ===== LOCATION DATA - STAR SECTOR LEVEL =====
 export function getCurrentStarSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_SECTOR) || 'Orion Molecular Cloud';
 }
@@ -739,7 +685,7 @@ export function setCurrentStarSector(name, type, stars, x, y) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_Y, y.toString());
 }
 
-// ===== LOCATION DATA - STAR LEVEL (keep in localStorage) =====
+// ===== LOCATION DATA - STAR LEVEL =====
 export function getCurrentStar() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || 'Sol';
 }
@@ -773,7 +719,7 @@ export function setCurrentStar(name, type, index, planets, x, y) {
     if (y) localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_Y, y.toString());
 }
 
-// ===== LOCATION DATA - PLANET LEVEL (keep in localStorage) =====
+// ===== LOCATION DATA - PLANET LEVEL =====
 export function getCurrentPlanet() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
 }
@@ -796,7 +742,6 @@ export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
     
-    // Set appropriate image based on planet type
     let image = 'earth-view.jpg';
     if (type.includes('scorched') || type.includes('volcanic')) image = 'pyros-surface.jpg';
     else if (type.includes('frozen') || type.includes('ice')) image = 'glacier-surface.jpg';
@@ -807,18 +752,15 @@ export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE, image);
 }
 
-// ===== SET CURRENT LOCATION (ALL LEVELS) =====
 export function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
-    // Galaxy level
     setCurrentSector(sector, region);
     
-    // Star sector level
     if (starSector) {
         setCurrentStarSector(starSector, starSectorType || 'Unknown', starSectorStars || 50, starSectorX || 30, starSectorY || 40);
     }
 }
 
-// ===== WARP DATA (keep in localStorage) =====
+// ===== WARP DATA =====
 export function setWarpData(destination, returnPage, cycles, distance, fuel) {
     localStorage.setItem(STORAGE_KEYS.WARP_DESTINATION, destination);
     localStorage.setItem(STORAGE_KEYS.WARP_RETURN, returnPage);
@@ -874,7 +816,6 @@ export async function addColony(name, planet, star, starSector, sector) {
     
     await setItem('colonies', colony);
     
-    // Also update the full colonies list for backward compatibility
     const colonies = await getColonies();
     return colonies;
 }
@@ -948,7 +889,6 @@ export async function addScan(scanData) {
     
     await setItem('scanHistory', scan);
     
-    // Keep only last 10 scans by cleaning up older ones
     const allScans = await getScanHistory();
     if (allScans.length > 10) {
         const toDelete = allScans.slice(10);
@@ -972,19 +912,15 @@ export async function getRealEstate() {
 }
 
 export async function saveRealEstate(realEstateData) {
-    // This is a bulk operation
     const db = await getDb();
     const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
     
-    // Clear existing properties
     await tx.objectStore('properties').clear();
     await tx.objectStore('propertyItems').clear();
     
-    // Save all properties
     for (const property of realEstateData.properties || []) {
         await tx.objectStore('properties').put(property);
         
-        // Save property items
         if (property.items) {
             for (const [elementName, itemData] of Object.entries(property.items)) {
                 await tx.objectStore('propertyItems').put({
@@ -1020,7 +956,6 @@ export async function deleteProperty(propertyId) {
     
     await tx.objectStore('properties').delete(propertyId);
     
-    // Delete all items for this property
     const items = await tx.objectStore('propertyItems').index('by-propertyId').getAll(propertyId);
     for (const item of items) {
         await tx.objectStore('propertyItems').delete(item.id);
@@ -1031,7 +966,6 @@ export async function deleteProperty(propertyId) {
 }
 
 export async function transferToProperty(propertyId, elementName, quantity) {
-    // Check if we have enough of the element in ship cargo
     const collection = await getCollection();
     if (!collection[elementName] || collection[elementName].count < quantity) {
         return { success: false, reason: 'insufficient_elements', available: collection[elementName]?.count || 0 };
@@ -1048,14 +982,12 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
     const itemsStore = tx.objectStore('propertyItems');
     const collectionStore = tx.objectStore('collection');
     
-    // Get property
     const property = await propertyStore.get(propertyId);
     if (!property) {
         await tx.done;
         return { success: false, reason: 'property_not_found' };
     }
     
-    // Find the item
     const items = await itemsStore.index('by-propertyId').getAll(propertyId);
     const item = items.find(i => i.elementName === elementName);
     
@@ -1069,7 +1001,6 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
         return { success: false, reason: 'insufficient', available: item.count };
     }
     
-    // Check if there's enough cargo space on ship
     const elementMass = getElementMass(elementName);
     const currentShipMass = await getTotalCargoMass();
     const player = await getPlayer();
@@ -1085,7 +1016,6 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
         };
     }
     
-    // Update or delete the property item
     item.count -= quantity;
     if (item.count <= 0) {
         await itemsStore.delete(item.id);
@@ -1093,7 +1023,6 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
         await itemsStore.put(item);
     }
     
-    // Add to ship collection
     let collectionItem = await collectionStore.get(elementName);
     if (!collectionItem) {
         collectionItem = {
@@ -1107,7 +1036,6 @@ export async function transferFromProperty(propertyId, elementName, quantity) {
     }
     await collectionStore.put(collectionItem);
     
-    // Update property used space
     const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
     property.used = remainingItems.reduce((sum, i) => sum + (i.count * (i.mass || getElementMass(i.elementName))), 0);
     await propertyStore.put(property);
@@ -1142,7 +1070,7 @@ export async function getTaxHistory(playerId, limit = 100) {
     return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
-// ===== SETTINGS (keep in localStorage) =====
+// ===== SETTINGS =====
 export function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
 }
@@ -1206,7 +1134,6 @@ export async function upgradeShip(component) {
         upgrades[component]++;
         await saveShipUpgrades(upgrades);
         
-        // If upgrading cargo hold, increase mass limit
         if (component === 'cargoHold') {
             await upgradeCargoHold(upgrades[component]);
         }
@@ -1216,11 +1143,9 @@ export async function upgradeShip(component) {
     return false;
 }
 
-// Special function for cargo hold upgrades to increase mass limit
 async function upgradeCargoHold(newLevel) {
     const player = await getPlayer();
     if (player) {
-        // Base limit 5000, increase by 1000 per level
         player.cargoMassLimit = CARGO_MASS_LIMIT + (newLevel - 1) * 1000;
         await savePlayer(player);
     }
@@ -1237,7 +1162,6 @@ export function getLastSaveTime() {
 
 // ===== RESET GAME =====
 export async function resetGame() {
-    // Keep settings
     const settings = {
         haptics: getHapticsEnabled(),
         autoGather: getAutoGatherEnabled(),
@@ -1246,10 +1170,8 @@ export async function resetGame() {
         ambient: getAmbientVolume()
     };
     
-    // Clear all IndexedDB data
     await dbResetAll();
     
-    // Clear location data from localStorage
     const locationKeys = [
         STORAGE_KEYS.CURRENT_SECTOR,
         STORAGE_KEYS.CURRENT_REGION,
@@ -1273,14 +1195,12 @@ export async function resetGame() {
     
     locationKeys.forEach(key => localStorage.removeItem(key));
     
-    // Restore settings
     setHapticsEnabled(settings.haptics);
     setAutoGatherEnabled(settings.autoGather);
     setOrbitSpeed(settings.orbitSpeed);
     setMusicVolume(settings.music);
     setAmbientVolume(settings.ambient);
     
-    // Re-initialize
     await initializeStorage();
 }
 
@@ -1302,7 +1222,6 @@ export async function exportGameData() {
         shipUpgrades: await getShipUpgrades(),
         cargoMassLimit: CARGO_MASS_LIMIT,
         
-        // Include localStorage settings
         settings: {
             haptics: getHapticsEnabled(),
             autoGather: getAutoGatherEnabled(),
@@ -1311,7 +1230,6 @@ export async function exportGameData() {
             ambient: getAmbientVolume()
         },
         
-        // Include current location
         location: {
             sector: getCurrentSector(),
             region: getCurrentRegion(),
@@ -1329,7 +1247,6 @@ export async function importGameData(jsonString) {
     try {
         const gameData = JSON.parse(jsonString);
         
-        // Restore data to IndexedDB
         if (gameData.player) await setItem('player', { id: 'main', ...gameData.player });
         
         if (gameData.collection) {
@@ -1366,7 +1283,6 @@ export async function importGameData(jsonString) {
             }
         }
         
-        // Restore settings
         if (gameData.settings) {
             setHapticsEnabled(gameData.settings.haptics);
             setAutoGatherEnabled(gameData.settings.autoGather);
@@ -1375,7 +1291,6 @@ export async function importGameData(jsonString) {
             setAmbientVolume(gameData.settings.ambient);
         }
         
-        // Restore location
         if (gameData.location) {
             setCurrentSector(gameData.location.sector, gameData.location.region);
             setCurrentStarSector(gameData.location.starSector, 'Unknown', 50, 30, 40);
@@ -1405,7 +1320,7 @@ export async function getPlayerName() {
     return player?.name || 'Voidfarer';
 }
 
-// ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
+// ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
 window.getCredits = getCredits;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
@@ -1436,8 +1351,4 @@ window.getRemainingCargoMass = getRemainingCargoMass;
 window.refuelShip = refuelShip;
 window.repairShip = repairShip;
 
-// ===== INITIALIZE ON LOAD =====
-// We'll export the initialization function and let the app call it
-
-// Need to import getDb for some functions
 import { getDb } from './db.js';
