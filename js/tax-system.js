@@ -4,8 +4,8 @@ import {
     getItem,
     setItem,
     addTaxRecord as storageAddTaxRecord,
-    getCommunityFund as storageGetCommunityFund,  // Rename the import
-    addToCommunityFund as storageAddToCommunityFund  // Rename this too
+    getCommunityFund,  // Keep this import
+    addToCommunityFund  // Keep this import
 } from './storage.js';
 
 // ===== TAX TYPES =====
@@ -334,7 +334,7 @@ export async function payTax(playerId, playerName, taxType, baseAmount, descript
         description
     });
     
-    await storageAddToCommunityFund(amount, record.id);
+    await addToCommunityFund(taxAmount, record.id);
     
     return {
         paid: taxAmount,
@@ -345,17 +345,12 @@ export async function payTax(playerId, playerName, taxType, baseAmount, descript
 }
 
 // ===== COMMUNITY FUND =====
-// Use the imported functions directly
-export async function getCommunityFund() {
-    return await storageGetCommunityFund();
-}
-
-export async function addToCommunityFund(amount, taxRecordId) {
-    return await storageAddToCommunityFund(amount, taxRecordId);
-}
+// Use the imported functions directly - NO REDECLARATION
+// The functions getCommunityFund and addToCommunityFund are already imported from storage.js
+// So we don't need to redeclare them here
 
 export async function allocateFromCommunityFund(amount, purpose, description) {
-    const fund = await storageGetCommunityFund();
+    const fund = await getCommunityFund();  // Use imported function
     if (!fund || fund.balance < amount) return false;
     
     fund.balance -= amount;
@@ -372,7 +367,7 @@ export async function allocateFromCommunityFund(amount, purpose, description) {
 }
 
 export async function getCommunityFundSummary() {
-    const fund = await storageGetCommunityFund();
+    const fund = await getCommunityFund();  // Use imported function
     if (!fund) return null;
     
     const now = Date.now();
@@ -439,8 +434,8 @@ export default {
     getTaxHistory,
     getPlayerTaxSummary,
     payTax,
-    getCommunityFund,
-    addToCommunityFund,
+    getCommunityFund,  // Export the imported function
+    addToCommunityFund,  // Export the imported function
     allocateFromCommunityFund,
     getCommunityFundSummary,
     formatTaxRate,
