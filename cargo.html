@@ -682,7 +682,7 @@
                     <span>⭐</span> --
                 </div>
                 <div class="cargo-capacity" id="cargoCapacityDisplay">
-                    Mass: --/1000 AMU
+                    Mass: --/5000 AMU
                 </div>
             </div>
             
@@ -690,7 +690,7 @@
             <div class="capacity-card">
                 <div class="capacity-header">
                     <span class="capacity-label">Mass Capacity</span>
-                    <span class="capacity-numbers" id="capacityText">-- / 1000 AMU</span>
+                    <span class="capacity-numbers" id="capacityText">-- / 5000 AMU</span>
                 </div>
                 <div class="capacity-bar-bg">
                     <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
@@ -751,7 +751,7 @@
             <!-- Scroll Hint -->
             <div class="scroll-hint">▼ scroll down to return to Ship Bridge ▼</div>
             
-            <!-- Back button - UPDATED to SHIP BRIDGE -->
+            <!-- Back button - SHIP BRIDGE -->
             <button class="back-button" onclick="returnToShipBridge()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">SHIP BRIDGE</span>
@@ -800,65 +800,6 @@
     <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 
-    <!-- FALLBACK FUNCTIONS - Ensure cargo displays even if storage.js doesn't expose functions -->
-    <script>
-    (function() {
-        console.log('Cargo.html initializing with fallbacks');
-        
-        // Define fallback functions that read directly from localStorage
-        window.getCredits = window.getCredits || function() { 
-            console.log('Using fallback getCredits');
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000; 
-        };
-
-        window.getCollection = window.getCollection || function() {
-            console.log('Using fallback getCollection');
-            const saved = localStorage.getItem('voidfarer_collection');
-            try {
-                return saved ? JSON.parse(saved) : {};
-            } catch (e) {
-                console.error('Error parsing collection', e);
-                return {};
-            }
-        };
-
-        window.removeElementFromCollection = window.removeElementFromCollection || function(elementName, count) {
-            console.log('Using fallback removeElementFromCollection', elementName, count);
-            try {
-                let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
-                if (collection[elementName]) {
-                    collection[elementName].count -= count;
-                    if (collection[elementName].count <= 0) {
-                        delete collection[elementName];
-                    }
-                    localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                }
-                return { success: true };
-            } catch (e) {
-                console.error('Error removing element', e);
-                return { success: false, reason: 'error' };
-            }
-        };
-
-        window.getElementMass = window.getElementMass || function(elementName) {
-            const masses = {
-                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
-                'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
-                'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
-                'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
-                'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
-                'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
-                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
-                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
-                'default': 100.0
-            };
-            return masses[elementName] || masses.default;
-        };
-        
-        console.log('Fallback functions installed');
-    })();
-    </script>
-
     <script>
         // ===== MAIN CARGO SCRIPT =====
         const { openDB } = idb;
@@ -873,7 +814,7 @@
         }
 
         // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 1000;
+        const CARGO_MASS_LIMIT = 5000; // Match storage.js
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -951,7 +892,7 @@
 
         // ===== GET ELEMENT MASS =====
         function getElementMass(elementName) {
-            // Try the global function first (from storage.js)
+            // Use the global function from storage.js
             if (typeof window.getElementMass === 'function') {
                 return window.getElementMass(elementName);
             }
@@ -993,8 +934,6 @@
                 if (typeof window.getCredits === 'function') {
                     credits = await window.getCredits();
                     console.log('Got credits:', credits);
-                } else {
-                    credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
                 
                 // Get collection
@@ -1002,9 +941,6 @@
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
                     console.log('Got collection:', collection);
-                } else {
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
                 }
                 
                 // Update credits display
@@ -1237,24 +1173,6 @@
                 // Call the remove function from storage.js
                 if (typeof window.removeElementFromCollection === 'function') {
                     result = await window.removeElementFromCollection(currentEjectItem, quantity);
-                } else {
-                    // Fallback for testing
-                    console.log(`Would eject ${quantity} of ${currentEjectItem}`);
-                    
-                    // Update localStorage directly for demo
-                    let collection = {};
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
-                    
-                    if (collection[currentEjectItem]) {
-                        collection[currentEjectItem].count -= quantity;
-                        if (collection[currentEjectItem].count <= 0) {
-                            delete collection[currentEjectItem];
-                        }
-                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                    }
-                    
-                    result = { success: true };
                 }
                 
                 if (result && result.success) {
@@ -1279,7 +1197,7 @@
             loadingOverlay.classList.remove('active');
         }
 
-        // ===== RETURN TO SHIP BRIDGE (UPDATED FUNCTION) =====
+        // ===== RETURN TO SHIP BRIDGE =====
         function returnToShipBridge() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
@@ -1291,11 +1209,10 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading cargo hold...';
                 
-                // Wait a moment for storage to be ready
-                setTimeout(async () => {
-                    // Load cargo data
-                    await loadCargoData();
-                    
+                // Load cargo data
+                await loadCargoData();
+                
+                setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
                 
