@@ -8,8 +8,7 @@ import {
     getAll,
     getAllFromIndex,
     deleteItem,
-    getCurrentRates,
-    addToAdjustmentLog
+    getCurrentRates
 } from './storage.js';
 
 // ===== EVENT TYPES =====
@@ -1071,6 +1070,34 @@ export async function runDailyEventMaintenance() {
     };
 }
 
+// Helper function to add to adjustment log
+function addToAdjustmentLog(entry) {
+    try {
+        const log = localStorage.getItem('voidfarer_adjustment_log');
+        const allLogs = log ? JSON.parse(log) : [];
+        
+        allLogs.push({
+            ...entry,
+            timestamp: entry.timestamp || Date.now(),
+            date: new Date().toISOString()
+        });
+        
+        // Keep only last 1000 entries
+        if (allLogs.length > 1000) {
+            allLogs.shift();
+        }
+        
+        localStorage.setItem('voidfarer_adjustment_log', JSON.stringify(allLogs));
+    } catch (error) {
+        console.error('Error adding to adjustment log:', error);
+    }
+}
+
+// Helper to get database instance
+async function getDb() {
+    return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
+}
+
 // ===== EXPORT =====
 export default {
     EVENT_TYPES,
@@ -1094,6 +1121,3 @@ export default {
     saveEventSettings,
     runDailyEventMaintenance
 };
-
-// Need to import getDb for some functions
-import { getDb } from './db.js';
