@@ -598,11 +598,11 @@
                 <div class="history-list" id="historyList">
                     <div style="color: #a0c0ff; text-align: center; padding: 20px;">Loading history...</div>
                 </div>
-                <button class="view-all-btn" onclick="viewAllHistory()">VIEW ALL HISTORY</button>
+                <button class="view-all-btn" onclick="window.viewAllHistory()">VIEW ALL HISTORY</button>
             </div>
             
             <!-- Back Button -->
-            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            <button class="back-button" onclick="window.returnToEarthHub()">← EARTH HUB</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -615,9 +615,16 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/tax-system.js"></script>
+    <script type="module" src="js/tax-history.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
+        import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -632,6 +639,10 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
+
+        // Make functions available globally for onclick handlers
+        window.returnToEarthHub = returnToEarthHub;
+        window.viewAllHistory = viewAllHistory;
 
         // ===== STATE =====
         let taxChart = null;
@@ -655,26 +666,26 @@
 
                 // Get player data
                 let playerName = 'Voidfarer';
-                if (typeof getPlayer === 'function') {
-                    const player = await getPlayer();
+                if (typeof window.getPlayer === 'function') {
+                    const player = await window.getPlayer();
                     playerName = player?.name || 'Voidfarer';
                 }
                 document.getElementById('playerName').textContent = playerName;
 
                 // Load tax data
                 let history = [];
-                if (typeof getTaxHistory === 'function') {
-                    history = await getTaxHistory(PLAYER_ID, 100) || [];
+                if (typeof window.getTaxHistory === 'function') {
+                    history = await window.getTaxHistory(PLAYER_ID, 100) || [];
                 }
 
                 let rates = { transaction: 0.02, property: 0.005, income: 0.08, luxury: 0.03, estate: 0.10, registration: 5000 };
-                if (typeof getCurrentRates === 'function') {
-                    rates = await getCurrentRates() || rates;
+                if (typeof window.getCurrentRates === 'function') {
+                    rates = await window.getCurrentRates() || rates;
                 }
 
                 let exemptions = { transaction: 0, property: 0, income: 0, luxury: false };
-                if (typeof getTaxExemptions === 'function') {
-                    exemptions = await getTaxExemptions(PLAYER_ID) || exemptions;
+                if (typeof window.getTaxExemptions === 'function') {
+                    exemptions = await window.getTaxExemptions(PLAYER_ID) || exemptions;
                 }
 
                 // Calculate totals
@@ -1056,12 +1067,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/tax-history.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
