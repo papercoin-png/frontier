@@ -503,7 +503,6 @@
         let resourceChances = {};
         let isExtracting = true;
         let extractionTimer = null;
-        let isExtractionInProgress = false;
         
         const elementData = {
             'Hydrogen': { symbol: 'H', rarity: 'common' },
@@ -721,10 +720,9 @@
             }, 3000);
         }
 
+        // FIXED: Use setInterval but with a flag to prevent overlap
         async function attemptExtraction() {
-            if (!isExtracting || isExtractionInProgress) return;
-            
-            isExtractionInProgress = true;
+            if (!isExtracting) return;
             
             try {
                 const currentMass = await updateCargoDisplay();
@@ -732,15 +730,19 @@
                 if (currentMass >= CARGO_MASS_LIMIT) {
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
-                    isExtractionInProgress = false;
+                    if (extractionTimer) {
+                        clearInterval(extractionTimer);
+                        extractionTimer = null;
+                    }
                     return;
                 }
                 
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
-                    isExtractionInProgress = false;
                     return;
+                } else {
+                    extractorText.textContent = 'Auto-extractor active';
                 }
                 
                 const randomIndex = Math.floor(Math.random() * activeResources.length);
@@ -758,22 +760,16 @@
                             if (result && result.success) {
                                 await updateCargoDisplay();
                                 showToast(resource, true);
-                                extractorText.textContent = 'Auto-extractor active';
                             } else {
                                 showToast(resource, false);
                             }
                         }
-                    } else {
-                        isExtracting = false;
-                        extractorText.textContent = 'Cargo full - extraction paused';
                     }
                 } else {
                     showToast(resource, false);
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
-            } finally {
-                isExtractionInProgress = false;
             }
         }
 
@@ -781,8 +777,9 @@
             if (extractionTimer) {
                 clearInterval(extractionTimer);
             }
-            extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
+            isExtracting = true;
             extractorText.textContent = 'Auto-extractor active';
+            extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
         }
 
         window.returnToShip = function() {
