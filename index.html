@@ -477,12 +477,12 @@
         </div>
     </div>
 
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
-    <script>
+    <script type="module">
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -497,6 +497,14 @@
         const creditsModal = document.getElementById('creditsModal');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Make functions available globally for onclick handlers
+        window.startGame = startGame;
+        window.openSettings = openSettings;
+        window.closeSettings = closeSettings;
+        window.openCredits = openCredits;
+        window.closeCredits = closeCredits;
+        window.resetGame = resetGame;
+
         // ===== INITIALIZE DATABASE ON LOAD =====
         async function initializeGame() {
             try {
@@ -504,14 +512,14 @@
                 loadingText.textContent = 'initializing...';
                 
                 // Initialize database
-                if (typeof initializeDatabase === 'function') {
-                    await initializeDatabase();
+                if (typeof window.initializeDatabase === 'function') {
+                    await window.initializeDatabase();
                     console.log('Database initialized');
                 }
                 
                 // Initialize storage
-                if (typeof initializeStorage === 'function') {
-                    await initializeStorage();
+                if (typeof window.initializeStorage === 'function') {
+                    await window.initializeStorage();
                     console.log('Storage initialized');
                 }
                 
@@ -540,23 +548,23 @@
             
             try {
                 // Check if player exists, create if not
-                if (typeof getPlayer === 'function') {
-                    const player = await getPlayer();
+                if (typeof window.getPlayer === 'function') {
+                    const player = await window.getPlayer();
                     
-                    if (!player && typeof createDefaultPlayer === 'function') {
-                        await createDefaultPlayer();
+                    if (!player && typeof window.createDefaultPlayer === 'function') {
+                        await window.createDefaultPlayer();
                         console.log('Created new player');
                     }
                 }
                 
                 // Set default location
-                if (typeof setCurrentLocation === 'function') {
-                    setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
+                if (typeof window.setCurrentLocation === 'function') {
+                    window.setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
                 }
                 
                 // Set default planet
-                if (typeof setCurrentPlanet === 'function') {
-                    setCurrentPlanet('Earth', 'lush', ['Iron', 'Carbon', 'Silicon', 'Oxygen']);
+                if (typeof window.setCurrentPlanet === 'function') {
+                    window.setCurrentPlanet('Earth', 'lush', ['Iron', 'Carbon', 'Silicon', 'Oxygen']);
                 }
                 
                 // Navigate to ship bridge
@@ -604,18 +612,18 @@
             
             try {
                 // Reset all data
-                if (typeof resetAllData === 'function') {
-                    await resetAllData();
+                if (typeof window.resetAllData === 'function') {
+                    await window.resetAllData();
                     console.log('All data reset');
                 }
                 
                 // Re-initialize with fresh data
-                if (typeof initializeDatabase === 'function') {
-                    await initializeDatabase();
+                if (typeof window.initializeDatabase === 'function') {
+                    await window.initializeDatabase();
                 }
                 
-                if (typeof initializeStorage === 'function') {
-                    await initializeStorage();
+                if (typeof window.initializeStorage === 'function') {
+                    await window.initializeStorage();
                 }
                 
                 setTimeout(() => {
