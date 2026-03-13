@@ -199,6 +199,59 @@
             font-weight: 600;
         }
         
+        /* Auto-Extract Log */
+        .auto-extract-log {
+            background: rgba(74, 255, 170, 0.1);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .auto-extract-log.visible {
+            display: block;
+        }
+        
+        .log-title {
+            color: #4affaa;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-family: 'Exo 2', sans-serif;
+            text-align: center;
+        }
+        
+        .log-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .log-item {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 8px 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .log-item-icon {
+            font-size: 18px;
+        }
+        
+        .log-item-name {
+            color: #ffffff;
+        }
+        
+        .log-item-qty {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
         /* Extraction Section */
         .extraction-section {
             background: rgba(30, 45, 70, 0.6);
@@ -355,81 +408,6 @@
             cursor: not-allowed;
         }
         
-        /* Cargo Summary */
-        .cargo-summary {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 16px;
-            margin-bottom: 20px;
-        }
-        
-        .cargo-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            cursor: pointer;
-        }
-        
-        .cargo-header h3 {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .cargo-toggle {
-            color: #ffaa4a;
-            font-size: 14px;
-        }
-        
-        .cargo-items {
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        
-        .cargo-items.expanded {
-            display: block;
-        }
-        
-        .cargo-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(74, 138, 192, 0.3);
-        }
-        
-        .cargo-item:last-child {
-            border-bottom: none;
-        }
-        
-        .cargo-item-name {
-            color: #ffffff;
-            font-size: 14px;
-        }
-        
-        .cargo-item-qty {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        .cargo-item-mass {
-            color: #4affaa;
-            font-size: 12px;
-            margin-left: 5px;
-        }
-        
-        .empty-cargo {
-            color: #a0c0ff;
-            text-align: center;
-            padding: 20px;
-            font-style: italic;
-        }
-        
         /* Success Message */
         .success-message {
             background: rgba(74, 255, 170, 0.2);
@@ -473,6 +451,19 @@
             width: 0%;
             background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
             transition: width 0.3s;
+        }
+        
+        /* Mass warning */
+        .mass-warning {
+            color: #ff6b6b;
+            font-size: 12px;
+            margin-top: 5px;
+            text-align: center;
+            display: none;
+        }
+        
+        .mass-warning.visible {
+            display: block;
         }
         
         /* Back button */
@@ -526,19 +517,6 @@
             filter: drop-shadow(0 0 5px #ffaa4a);
         }
         
-        /* Mass warning */
-        .mass-warning {
-            color: #ff6b6b;
-            font-size: 12px;
-            margin-top: 5px;
-            text-align: center;
-            display: none;
-        }
-        
-        .mass-warning.visible {
-            display: block;
-        }
-        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -580,6 +558,12 @@
                 <div class="cargo-mass" id="cargoMassDisplay">
                     Cargo: <span>--/--</span> AMU
                 </div>
+            </div>
+            
+            <!-- Auto-Extract Log -->
+            <div class="auto-extract-log" id="autoExtractLog">
+                <div class="log-title">✨ Auto-extracted on landing</div>
+                <div class="log-items" id="autoExtractItems"></div>
             </div>
             
             <!-- Extraction Section -->
@@ -624,18 +608,6 @@
                 ✨ Resources added to cargo!
             </div>
             
-            <!-- Cargo Summary -->
-            <div class="cargo-summary">
-                <div class="cargo-header" onclick="toggleCargo()">
-                    <h3>📦 Current Cargo</h3>
-                    <span class="cargo-toggle" id="cargoToggle">▼</span>
-                </div>
-                <div class="cargo-items" id="cargoItems">
-                    <!-- Filled by JavaScript -->
-                    <div class="empty-cargo">No cargo yet. Extract some resources!</div>
-                </div>
-            </div>
-            
             <!-- Back button -->
             <button class="back-button" onclick="returnToShip()">
                 <span class="back-arrow">←</span>
@@ -668,7 +640,7 @@
         }
 
         // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+        const CARGO_MASS_LIMIT = 1000;
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -682,11 +654,11 @@
         const totalMassSpan = document.getElementById('totalMass');
         const extractBtn = document.getElementById('extractBtn');
         const successMessage = document.getElementById('successMessage');
-        const cargoItems = document.getElementById('cargoItems');
-        const cargoToggle = document.getElementById('cargoToggle');
         const capacityBar = document.getElementById('capacityBar');
         const capacityText = document.getElementById('capacityText');
         const massWarning = document.getElementById('massWarning');
+        const autoExtractLog = document.getElementById('autoExtractLog');
+        const autoExtractItems = document.getElementById('autoExtractItems');
 
         // ===== STATE =====
         let currentPlanet = {
@@ -698,10 +670,9 @@
         };
         
         let selectedResource = null;
-        let cargoData = [];
         let currentCredits = 5000;
         let currentMass = 0;
-        let cargoExpanded = false;
+        let autoExtracted = [];
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
@@ -737,13 +708,38 @@
             return elementMasses[elementName] || elementMasses.default;
         }
 
+        // ===== GET ELEMENT ICON =====
+        function getElementIcon(elementName) {
+            return elementIcons[elementName] || elementIcons.default;
+        }
+
         // ===== LOAD PLANET DATA =====
         async function loadPlanetData() {
             try {
                 // Get planet data from localStorage
                 const planetName = localStorage.getItem('voidfarer_current_planet') || 'Earth';
                 const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
-                const planetResources = JSON.parse(localStorage.getItem('voidfarer_current_planet_resources') || '["Iron", "Carbon", "Silicon"]');
+                
+                // Get resources - either from storage or generate based on planet type
+                let planetResources = [];
+                const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
+                
+                if (savedResources) {
+                    planetResources = JSON.parse(savedResources);
+                } else {
+                    // Generate resources based on planet type
+                    if (planetType.includes('lush')) {
+                        planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen'];
+                    } else if (planetType.includes('scorched') || planetType.includes('volcanic')) {
+                        planetResources = ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium'];
+                    } else if (planetType.includes('frozen') || planetType.includes('ice')) {
+                        planetResources = ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice'];
+                    } else if (planetType.includes('barren')) {
+                        planetResources = ['Iron', 'Silicon', 'Aluminum', 'Titanium'];
+                    } else {
+                        planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
+                    }
+                }
                 
                 // Set planet icon based on type
                 let icon = '🌍';
@@ -795,25 +791,13 @@
                 // Update credits display
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${currentCredits.toLocaleString()}`;
                 
-                // Convert collection to array for display
-                cargoData = [];
-                let totalMass = 0;
-                
+                // Calculate total mass
+                currentMass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
                     const mass = getElementMass(name);
-                    const totalItemMass = count * mass;
-                    totalMass += totalItemMass;
-                    
-                    cargoData.push({
-                        name: name,
-                        count: count,
-                        mass: mass,
-                        totalMass: totalItemMass
-                    });
+                    currentMass += count * mass;
                 }
-                
-                currentMass = totalMass;
                 
                 // Update cargo display
                 updateCargoDisplay();
@@ -830,27 +814,6 @@
             document.getElementById('cargoMassDisplay').innerHTML = `Cargo: <span>${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT}</span> AMU`;
             capacityBar.style.width = Math.min(100, massPercent) + '%';
             capacityText.textContent = `${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
-            
-            // Render cargo items
-            if (cargoData.length === 0) {
-                cargoItems.innerHTML = '<div class="empty-cargo">No cargo yet. Extract some resources!</div>';
-                return;
-            }
-            
-            let html = '';
-            cargoData.sort((a, b) => b.totalMass - a.totalMass).forEach(item => {
-                html += `
-                    <div class="cargo-item">
-                        <span class="cargo-item-name">${item.name}</span>
-                        <span>
-                            <span class="cargo-item-qty">${item.count}x</span>
-                            <span class="cargo-item-mass">(${item.totalMass.toFixed(1)} AMU)</span>
-                        </span>
-                    </div>
-                `;
-            });
-            
-            cargoItems.innerHTML = html;
         }
 
         // ===== RENDER RESOURCES =====
@@ -863,7 +826,7 @@
             let html = '';
             currentPlanet.resources.forEach(resource => {
                 const chance = Math.floor(Math.random() * 30) + 70; // 70-100% for demo
-                const icon = elementIcons[resource] || '🔹';
+                const icon = getElementIcon(resource);
                 
                 html += `
                     <div class="resource-card" onclick="selectResource('${resource}')">
@@ -879,6 +842,79 @@
             // Select first resource by default
             if (currentPlanet.resources.length > 0 && !selectedResource) {
                 selectResource(currentPlanet.resources[0]);
+            }
+        }
+
+        // ===== PERFORM AUTO-EXTRACT ON LANDING =====
+        async function performAutoExtract() {
+            if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
+            
+            // Auto-extract 1-3 units of random resources
+            const extractCount = Math.floor(Math.random() * 3) + 1; // 1-3 resources
+            const extracted = [];
+            
+            for (let i = 0; i < extractCount; i++) {
+                // Pick a random resource
+                const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
+                const resource = currentPlanet.resources[randomIndex];
+                
+                // Random quantity 1-3
+                const quantity = Math.floor(Math.random() * 3) + 1;
+                
+                // Check if we have space
+                const mass = getElementMass(resource);
+                const totalMass = mass * quantity;
+                
+                if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
+                    // Add to collection
+                    if (typeof window.addElementToCollection === 'function') {
+                        await window.addElementToCollection(resource, quantity);
+                    } else {
+                        // Fallback for testing
+                        let collection = {};
+                        const saved = localStorage.getItem('voidfarer_collection');
+                        collection = saved ? JSON.parse(saved) : {};
+                        
+                        if (collection[resource]) {
+                            collection[resource].count = (collection[resource].count || 1) + quantity;
+                        } else {
+                            collection[resource] = { count: quantity, firstFound: new Date().toISOString() };
+                        }
+                        
+                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    }
+                    
+                    extracted.push({ resource, quantity, icon: getElementIcon(resource) });
+                    
+                    // Update current mass
+                    currentMass += totalMass;
+                }
+            }
+            
+            if (extracted.length > 0) {
+                // Show auto-extract log
+                autoExtracted = extracted;
+                let logHtml = '';
+                extracted.forEach(item => {
+                    logHtml += `
+                        <div class="log-item">
+                            <span class="log-item-icon">${item.icon}</span>
+                            <span class="log-item-name">${item.resource}</span>
+                            <span class="log-item-qty">+${item.quantity}</span>
+                        </div>
+                    `;
+                });
+                autoExtractItems.innerHTML = logHtml;
+                autoExtractLog.classList.add('visible');
+                
+                // Update cargo display
+                updateCargoDisplay();
+                
+                // Show success message briefly
+                successMessage.classList.add('visible');
+                setTimeout(() => {
+                    successMessage.classList.remove('visible');
+                }, 3000);
             }
         }
 
@@ -958,8 +994,6 @@
             if (!selectedResource || extractBtn.disabled) return;
             
             const quantity = parseInt(extractQuantity.value);
-            const mass = parseFloat(massPerUnitSpan.textContent);
-            const totalMass = quantity * mass;
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'extracting resources...';
@@ -972,7 +1006,7 @@
                     result = await window.addElementToCollection(selectedResource, quantity);
                 } else {
                     // Fallback for testing
-                    console.log(`Would extract ${quantity} of ${selectedResource}`);
+                    console.log(`Extracting ${quantity} of ${selectedResource}`);
                     
                     // Update localStorage directly for demo
                     let collection = {};
@@ -996,7 +1030,7 @@
                         successMessage.classList.remove('visible');
                     }, 3000);
                     
-                    // Reload cargo data
+                    // Reload cargo data to update mass
                     await loadCargoData();
                     
                     // Update validation
@@ -1014,13 +1048,6 @@
             }
             
             loadingOverlay.classList.remove('active');
-        }
-
-        // ===== TOGGLE CARGO =====
-        function toggleCargo() {
-            cargoExpanded = !cargoExpanded;
-            cargoItems.classList.toggle('expanded', cargoExpanded);
-            cargoToggle.textContent = cargoExpanded ? '▲' : '▼';
         }
 
         // ===== RETURN TO SHIP =====
@@ -1049,6 +1076,9 @@
                 
                 validateExtraction();
                 
+                // Auto-extract on landing
+                await performAutoExtract();
+                
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
@@ -1067,8 +1097,8 @@
     </script>
     
     <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
     <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 </body>
 </html>
