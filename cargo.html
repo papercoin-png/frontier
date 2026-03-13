@@ -927,9 +927,10 @@
             'default': 100
         };
 
-        // ===== GET ELEMENT MASS (from storage.js if available) =====
+        // ===== GET ELEMENT MASS =====
         function getElementMass(elementName) {
-            if (typeof getElementMass === 'function') {
+            // Try the global function first (from storage.js)
+            if (typeof window.getElementMass === 'function') {
                 return window.getElementMass(elementName);
             }
             // Fallback
@@ -966,16 +967,16 @@
             try {
                 // Get credits
                 let credits = 5000;
-                if (typeof getCredits === 'function') {
-                    credits = await getCredits();
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
                 } else {
                     credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
                 
                 // Get collection
                 let collection = {};
-                if (typeof getCollection === 'function') {
-                    collection = await getCollection();
+                if (typeof window.getCollection === 'function') {
+                    collection = await window.getCollection();
                 } else {
                     const saved = localStorage.getItem('voidfarer_collection');
                     collection = saved ? JSON.parse(saved) : {};
@@ -1203,9 +1204,9 @@
             try {
                 let result;
                 
-                // Call the remove function from storage.js
-                if (typeof removeElementFromCollection === 'function') {
-                    result = await removeElementFromCollection(currentEjectItem, quantity);
+                // Call the remove function from storage.js (now exposed globally)
+                if (typeof window.removeElementFromCollection === 'function') {
+                    result = await window.removeElementFromCollection(currentEjectItem, quantity);
                 } else {
                     // Fallback for testing
                     console.log(`Would eject ${quantity} of ${currentEjectItem}`);
