@@ -60,6 +60,7 @@ export const STORAGE_KEYS = {
     CURRENT_PLANET: 'voidfarer_current_planet',
     CURRENT_PLANET_TYPE: 'voidfarer_current_planet_type',
     CURRENT_PLANET_RESOURCES: 'voidfarer_current_planet_resources',
+    CURRENT_PLANET_IMAGE: 'voidfarer_current_planet_image',
     
     // Warp data
     WARP_DESTINATION: 'voidfarer_warp_destination',
@@ -288,7 +289,7 @@ export async function initializeStorage() {
     
     // Initialize default location if none exists
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
-        setCurrentLocation('Orion', 'B2', 'Orion Molecular Cloud');
+        setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
 }
 
@@ -606,16 +607,16 @@ export function setCurrentStarSector(name, type, stars, x, y) {
 
 // ===== LOCATION DATA - STAR LEVEL (keep in localStorage) =====
 export function getCurrentStar() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || '';
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || 'Sol';
 }
 
 export function getCurrentStarType() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_TYPE) || '';
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_TYPE) || 'Main Sequence';
 }
 
 export function getCurrentStarIndex() {
     const index = localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_INDEX);
-    return index ? parseInt(index) : -1;
+    return index ? parseInt(index) : 0;
 }
 
 export function getCurrentStarCoords() {
@@ -626,7 +627,7 @@ export function getCurrentStarCoords() {
 
 export function getCurrentStarPlanets() {
     const planets = localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_PLANETS);
-    return planets || '3-7';
+    return planets || '5 planets';
 }
 
 export function setCurrentStar(name, type, index, planets, x, y) {
@@ -649,13 +650,27 @@ export function getCurrentPlanetType() {
 
 export function getCurrentPlanetResources() {
     const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
-    return resources ? JSON.parse(resources) : ['Carbon', 'Iron', 'Silicon'];
+    return resources ? JSON.parse(resources) : ['Iron', 'Carbon', 'Silicon'];
+}
+
+export function getCurrentPlanetImage() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE) || 'earth-view.jpg';
 }
 
 export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
+    
+    // Set appropriate image based on planet type
+    let image = 'earth-view.jpg';
+    if (type.includes('scorched') || type.includes('volcanic')) image = 'pyros-surface.jpg';
+    else if (type.includes('frozen') || type.includes('ice')) image = 'glacier-surface.jpg';
+    else if (type.includes('lush')) image = 'verdant-surface.jpg';
+    else if (type.includes('barren')) image = 'barren-surface.jpg';
+    else if (type.includes('gas')) image = 'gas-surface.jpg';
+    
+    localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE, image);
 }
 
 // ===== SET CURRENT LOCATION (ALL LEVELS) =====
@@ -1113,9 +1128,13 @@ export async function resetGame() {
         STORAGE_KEYS.CURRENT_STAR,
         STORAGE_KEYS.CURRENT_STAR_TYPE,
         STORAGE_KEYS.CURRENT_STAR_INDEX,
+        STORAGE_KEYS.CURRENT_STAR_X,
+        STORAGE_KEYS.CURRENT_STAR_Y,
+        STORAGE_KEYS.CURRENT_STAR_PLANETS,
         STORAGE_KEYS.CURRENT_PLANET,
         STORAGE_KEYS.CURRENT_PLANET_TYPE,
-        STORAGE_KEYS.CURRENT_PLANET_RESOURCES
+        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
+        STORAGE_KEYS.CURRENT_PLANET_IMAGE
     ];
     
     locationKeys.forEach(key => localStorage.removeItem(key));
@@ -1134,7 +1153,7 @@ export async function resetGame() {
 // ===== EXPORT / UTILITY =====
 export async function exportGameData() {
     const gameData = {
-        version: '2.0', // Updated version for mass-based cargo
+        version: '2.0',
         exportDate: new Date().toISOString(),
         universeSeed: UNIVERSE_SEED,
         player: await getPlayer(),
@@ -1164,7 +1183,8 @@ export async function exportGameData() {
             region: getCurrentRegion(),
             starSector: getCurrentStarSector(),
             star: getCurrentStar(),
-            planet: getCurrentPlanet()
+            planet: getCurrentPlanet(),
+            planetImage: getCurrentPlanetImage()
         }
     };
     
@@ -1174,8 +1194,6 @@ export async function exportGameData() {
 export async function importGameData(jsonString) {
     try {
         const gameData = JSON.parse(jsonString);
-        
-        // Validate version/universe seed?
         
         // Restore data to IndexedDB
         if (gameData.player) await setItem('player', { id: 'main', ...gameData.player });
@@ -1227,8 +1245,8 @@ export async function importGameData(jsonString) {
         if (gameData.location) {
             setCurrentSector(gameData.location.sector, gameData.location.region);
             setCurrentStarSector(gameData.location.starSector, 'Unknown', 50, 30, 40);
-            setCurrentStar(gameData.location.star, 'Unknown', 0, '3-7');
-            setCurrentPlanet(gameData.location.planet, 'lush', []);
+            setCurrentStar(gameData.location.star, 'Unknown', 0, '5 planets');
+            setCurrentPlanet(gameData.location.planet, 'lush', ['Iron', 'Carbon', 'Silicon']);
         }
         
         return true;
@@ -1254,9 +1272,10 @@ export async function getPlayerName() {
 }
 
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
-// This is CRITICAL for cargo.html and other HTML files to work
+// This is CRITICAL for surface.html, cargo.html and other HTML files to work
 window.getCredits = getCredits;
 window.getCollection = getCollection;
+window.addElementToCollection = addElementToCollection;
 window.removeElementFromCollection = removeElementFromCollection;
 window.getElementMass = getElementMass;
 window.getPlayer = getPlayer;
@@ -1270,6 +1289,10 @@ window.getCurrentRegion = getCurrentRegion;
 window.getCurrentStarSector = getCurrentStarSector;
 window.getCurrentStar = getCurrentStar;
 window.getCurrentPlanet = getCurrentPlanet;
+window.getCurrentPlanetType = getCurrentPlanetType;
+window.getCurrentPlanetResources = getCurrentPlanetResources;
+window.getCurrentPlanetImage = getCurrentPlanetImage;
+window.setCurrentPlanet = setCurrentPlanet;
 window.setCurrentLocation = setCurrentLocation;
 window.setWarpData = setWarpData;
 window.getWarpData = getWarpData;
