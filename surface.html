@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* Keep all existing styles exactly as they were */
         * {
             margin: 0;
             padding: 0;
@@ -815,13 +814,22 @@
             }
         }
 
+        // FIXED: Proper interval handling for async function
         function startExtraction() {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
             }
             isExtracting = true;
             extractorText.textContent = 'Auto-extractor active';
-            extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
+            
+            // Use setInterval with an async wrapper to properly handle the promise
+            extractionTimer = setInterval(() => {
+                if (isExtracting) {
+                    attemptExtraction().catch(error => {
+                        console.error('Extraction interval error:', error);
+                    });
+                }
+            }, EXTRACTION_INTERVAL);
         }
 
         window.returnToShip = function() {
