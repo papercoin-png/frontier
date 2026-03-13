@@ -453,7 +453,7 @@
                 </div>
                 <div class="cargo-display">
                     <span class="cargo-label">CARGO</span>
-                    <span class="cargo-value" id="cargoMass"><span>0</span>/1000 AMU</span>
+                    <span class="cargo-value" id="cargoMass"><span>0</span>/5000 AMU</span>
                 </div>
             </div>
             
@@ -493,46 +493,6 @@
     <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 
-    <!-- Fallback Functions -->
-    <script>
-    (function() {
-        window.getCredits = window.getCredits || function() { 
-            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000; 
-        };
-
-        window.getCollection = window.getCollection || function() {
-            const saved = localStorage.getItem('voidfarer_collection');
-            return saved ? JSON.parse(saved) : {};
-        };
-
-        window.addElementToCollection = window.addElementToCollection || function(elementName, count) {
-            let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
-            if (collection[elementName]) {
-                collection[elementName].count = (collection[elementName].count || 1) + count;
-            } else {
-                collection[elementName] = { count: count, firstFound: new Date().toISOString() };
-            }
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-            return { success: true };
-        };
-
-        window.getElementMass = window.getElementMass || function(elementName) {
-            const masses = {
-                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
-                'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
-                'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
-                'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
-                'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
-                'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
-                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
-                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
-                'default': 100.0
-            };
-            return masses[elementName] || masses.default;
-        };
-    })();
-    </script>
-
     <script>
         // ===== MAIN SURFACE SCRIPT =====
         const { openDB } = idb;
@@ -545,8 +505,8 @@
         }
 
         // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 5000; // UPDATED: Increased from 1000 to 5000 for 20-minute mining
-        const EXTRACTION_INTERVAL = 5000; // 5 seconds (unchanged)
+        const CARGO_MASS_LIMIT = 5000;
+        const EXTRACTION_INTERVAL = 5000; // 5 seconds
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -614,38 +574,25 @@
             'Promethium': { symbol: 'Pm', rarity: 'legendary' }
         };
 
-        // ===== CALCULATE FIXED RESOURCE CHANCE - UPDATED WITH LOWER PERCENTAGES =====
+        // ===== CALCULATE FIXED RESOURCE CHANCE =====
         function calculateResourceChance(resource) {
-            // Lower chances for more realistic 20-minute mining experience
+            // Lower chances for realistic 20-minute mining
             if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
-                return Math.floor(Math.random() * 20) + 40; // 40-60% (was 80-100%)
+                return Math.floor(Math.random() * 20) + 40; // 40-60%
             } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
-                return Math.floor(Math.random() * 15) + 10; // 10-25% (was 50-80%)
+                return Math.floor(Math.random() * 15) + 10; // 10-25%
             } else if (['Uranium', 'Thorium'].includes(resource)) {
-                return Math.floor(Math.random() * 7) + 3; // 3-10% (was 20-50%)
+                return Math.floor(Math.random() * 7) + 3; // 3-10%
             } else if (['Promethium'].includes(resource)) {
-                return Math.floor(Math.random() * 2) + 1; // 1-3% (was 5-20%)
+                return Math.floor(Math.random() * 2) + 1; // 1-3%
             }
-            return 50; // Default for uncommon (was 70)
+            return 50; // Default for uncommon
         }
 
         // ===== GET RARITY CLASS =====
         function getRarityClass(resource) {
             const rarity = elementData[resource]?.rarity || 'common';
             return `rarity-${rarity}`;
-        }
-
-        // ===== GET RARITY COLOR (for toasts) =====
-        function getRarityColor(resource) {
-            const rarity = elementData[resource]?.rarity || 'common';
-            switch(rarity) {
-                case 'common': return '#ffffff';
-                case 'uncommon': return '#b0ffb0';
-                case 'rare': return '#b0b0ff';
-                case 'very-rare': return '#e0b0ff';
-                case 'legendary': return '#ffd700';
-                default: return '#ffffff';
-            }
         }
 
         // ===== GET ELEMENT SYMBOL =====
@@ -738,9 +685,7 @@
                 let collection = {};
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
-                } else {
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
+                    console.log('Current collection:', collection);
                 }
                 
                 // Calculate total mass
@@ -764,8 +709,7 @@
 
         // ===== UPDATE CARGO DISPLAY =====
         function updateCargoDisplay() {
-            const massPercent = (currentMass / CARGO_MASS_LIMIT) * 100;
-            cargoMass.innerHTML = `<span>${currentMass.toFixed(0)}</span>/${CARGO_MASS_LIMIT} AMU`;
+            cargoMass.innerHTML = `<span>${currentMass.toFixed(0)}</span>/5000 AMU`;
             
             // Stop extraction if cargo is full
             if (currentMass >= CARGO_MASS_LIMIT && isExtracting) {
@@ -793,7 +737,7 @@
             let html = '';
             currentPlanet.resources.forEach(resource => {
                 const symbol = getElementSymbol(resource);
-                const chance = resourceChances[resource] || 50; // Use fixed chance
+                const chance = resourceChances[resource] || 50;
                 const isActive = resourceStates[resource];
                 const rarityClass = getRarityClass(resource);
                 
@@ -864,7 +808,7 @@
             const randomIndex = Math.floor(Math.random() * activeResources.length);
             const resource = activeResources[randomIndex];
             
-            // Use fixed chance from resourceChances object (now lower for realism)
+            // Use fixed chance from resourceChances object
             const chance = resourceChances[resource] || 50;
             const success = Math.random() * 100 < chance;
             
@@ -873,14 +817,24 @@
                 
                 // Check if we have space
                 if (currentMass + mass <= CARGO_MASS_LIMIT) {
-                    // Add to collection
+                    // Add to collection with error checking
                     if (typeof window.addElementToCollection === 'function') {
-                        await window.addElementToCollection(resource, 1);
+                        console.log(`Attempting to add 1 ${resource} to collection`);
+                        const result = await window.addElementToCollection(resource, 1);
+                        console.log('Add result:', result);
+                        
+                        if (result && result.success) {
+                            currentMass += mass;
+                            updateCargoDisplay();
+                            showToast(resource, true);
+                        } else {
+                            console.error('Failed to add element:', result);
+                            showToast(resource, false);
+                        }
+                    } else {
+                        console.error('addElementToCollection function not found');
+                        showToast(resource, false);
                     }
-                    
-                    currentMass += mass;
-                    updateCargoDisplay();
-                    showToast(resource, true);
                 } else {
                     // Cargo would overflow
                     isExtracting = false;
