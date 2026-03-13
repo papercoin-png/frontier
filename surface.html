@@ -20,11 +20,11 @@
         
         body {
             background: #0a0a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            overflow: hidden;
             font-family: 'Libre Baskerville', serif;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
         
         .phone-frame {
@@ -42,12 +42,286 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: #0a1a2a;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 20px 20px 30px 20px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        /* Fullscreen Planet Image */
+        .planet-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: brightness(0.9) saturate(1.2);
+        }
+        
+        /* Dynamic starfield overlay */
+        .star-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 40%, transparent 30%, rgba(0,0,0,0.3) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        /* Top Status Bar - Glass morphism */
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 10px 18px;
+            z-index: 10;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .planet-name {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .planet-name-main {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 0 10px #4affaa;
+        }
+        
+        .planet-name-type {
+            font-size: 10px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        .cargo-display {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .cargo-label {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .cargo-value {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .cargo-value span {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        /* Auto-Extractor Status - Subtle center top */
+        .extractor-status {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 26, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 16px;
+            z-index: 10;
+            color: #4affaa;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        
+        .extractor-pulse {
+            width: 8px;
+            height: 8px;
+            background: #4affaa;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4affaa;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.5; transform: scale(1); }
+        }
+        
+        /* Toast Notifications - Float over landscape */
+        .toast-container {
+            position: absolute;
+            top: 140px;
+            right: 20px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            pointer-events: none;
+        }
+        
+        .toast {
+            background: rgba(10, 10, 26, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 16px;
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transform: translateX(120%);
+            animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards;
+            max-width: 200px;
+            box-shadow: 0 0 20px rgba(74, 255, 170, 0.3);
+        }
+        
+        .toast.success {
+            border-color: #4affaa;
+        }
+        
+        .toast.fail {
+            border-color: #ff6b6b;
+        }
+        
+        .toast-icon {
+            font-size: 18px;
+        }
+        
+        @keyframes slideIn {
+            to { transform: translateX(0); }
+        }
+        
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+        
+        /* Resource Toggles - Bottom bar */
+        .resource-bar {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            right: 20px;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 15px;
+            z-index: 10;
+        }
+        
+        .resource-label {
+            color: #a0c0ff;
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .resource-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .resource-toggle {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.1s;
+            min-width: 70px;
+            justify-content: center;
+        }
+        
+        .resource-toggle.active {
+            border-color: #4affaa;
+            background: rgba(74, 255, 170, 0.1);
+            box-shadow: 0 0 15px rgba(74, 255, 170, 0.3);
+        }
+        
+        .resource-toggle:active {
+            transform: scale(0.95);
+        }
+        
+        .resource-icon {
+            font-size: 18px;
+        }
+        
+        .resource-name {
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .resource-chance {
+            color: #ffd966;
+            font-size: 11px;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 20px;
+        }
+        
+        .active-count {
+            text-align: center;
+            margin-top: 10px;
+            color: #4affaa;
+            font-size: 12px;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        /* Back button - subtle */
+        .back-button {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 26, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 170, 74, 0.5);
+            color: #ffffff;
+            padding: 8px 24px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+            z-index: 15;
+            width: fit-content;
+            letter-spacing: 1px;
+        }
+        
+        .back-button:active {
+            background: rgba(255, 170, 74, 0.3);
+            transform: translateX(-50%) scale(0.96);
         }
         
         /* Loading Overlay */
@@ -97,532 +371,53 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-        }
-        
-        /* Header */
-        .surface-header {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .surface-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 36px;
-            color: #e0f0ff;
-            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        
-        .surface-subtitle {
-            color: #a0c0ff;
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-        
-        /* Planet Info Card */
-        .planet-card {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .planet-icon {
-            font-size: 48px;
-            min-width: 60px;
-            text-align: center;
-            filter: drop-shadow(0 0 15px #6a8ac0);
-        }
-        
-        .planet-info {
-            flex: 1;
-        }
-        
-        .planet-name {
-            color: #ffffff;
-            font-size: 22px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-            margin-bottom: 4px;
-        }
-        
-        .planet-type {
-            color: #a0c0ff;
-            font-size: 14px;
-        }
-        
-        /* Stats Bar */
-        .stats-bar {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 60px 20px 60px 20px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #ffffff;
-        }
-        
-        .credits {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        
-        .credits span {
-            color: #ffd966;
-            font-size: 22px;
-        }
-        
-        .cargo-mass {
-            font-size: 14px;
-            color: #a0c0ff;
-            text-align: right;
-        }
-        
-        .cargo-mass span {
-            color: #4affaa;
-            font-weight: 600;
-        }
-        
-        /* Auto-Extract Log */
-        .auto-extract-log {
-            background: rgba(74, 255, 170, 0.1);
-            border: 2px solid #4affaa;
-            border-radius: 40px 10px 40px 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .auto-extract-log.visible {
-            display: block;
-        }
-        
-        .log-title {
-            color: #4affaa;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 10px;
-            font-family: 'Exo 2', sans-serif;
-            text-align: center;
-        }
-        
-        .log-items {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }
-        
-        .log-item {
-            background: rgba(0,0,0,0.3);
-            border-radius: 30px 8px 30px 8px;
-            padding: 8px 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-        }
-        
-        .log-item-icon {
-            font-size: 18px;
-        }
-        
-        .log-item-name {
-            color: #ffffff;
-        }
-        
-        .log-item-qty {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        /* Extraction Section */
-        .extraction-section {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .section-title {
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 15px;
-            font-family: 'Exo 2', sans-serif;
-            border-bottom: 1px solid #6a8ac0;
-            padding-bottom: 8px;
-        }
-        
-        .resources-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-        
-        .resource-card {
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #4a8ac0;
-            border-radius: 30% 10% 30% 10%;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        
-        .resource-card:active {
-            background: rgba(74, 138, 192, 0.3);
-            transform: scale(0.97);
-        }
-        
-        .resource-card.selected {
-            border-color: #ffaa4a;
-            box-shadow: 0 0 20px #ffaa4a;
-        }
-        
-        .resource-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-            filter: drop-shadow(0 0 10px #4a8ac0);
-        }
-        
-        .resource-name {
-            color: #ffffff;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        
-        .resource-chance {
-            color: #ffd966;
-            font-size: 12px;
-        }
-        
-        .extraction-controls {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .qty-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: rgba(74, 138, 192, 0.3);
-            border: 2px solid #6a8ac0;
-            color: white;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.1s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .qty-btn:active {
-            background: #6a8ac0;
-            transform: scale(0.9);
-        }
-        
-        .qty-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        #extractQuantity {
-            width: 80px;
-            height: 60px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #6a8ac0;
-            border-radius: 30px 8px 30px 8px;
-            color: white;
-            font-size: 28px;
-            font-weight: bold;
-            text-align: center;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .extract-info {
-            text-align: center;
-            margin: 15px 0;
-            font-size: 14px;
-            color: #a0c0ff;
-        }
-        
-        .extract-mass {
-            color: #4affaa;
-            font-weight: 600;
-            font-size: 18px;
-        }
-        
-        .extract-btn {
-            width: 100%;
-            background: #4affaa;
-            border: none;
-            color: #0a0a1a;
-            padding: 18px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 22px;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.1s;
-            margin-top: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 0 30px #4affaa;
-        }
-        
-        .extract-btn:active {
-            transform: scale(0.97);
-            background: #6affcc;
-        }
-        
-        .extract-btn:disabled {
-            background: #2a4a6a;
-            color: #a0c0ff;
-            box-shadow: none;
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        /* Success Message */
-        .success-message {
-            background: rgba(74, 255, 170, 0.2);
-            border: 2px solid #4affaa;
-            border-radius: 40px 10px 40px 10px;
-            padding: 12px;
-            margin: 10px 0;
-            text-align: center;
-            color: #4affaa;
-            font-weight: 600;
-            display: none;
-        }
-        
-        .success-message.visible {
-            display: block;
-        }
-        
-        /* Capacity Bar */
-        .capacity-bar-container {
-            margin: 10px 0;
-        }
-        
-        .capacity-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: #a0c0ff;
-            margin-bottom: 4px;
-        }
-        
-        .capacity-bar-bg {
-            width: 100%;
-            height: 8px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        .capacity-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
-            transition: width 0.3s;
-        }
-        
-        /* Mass warning */
-        .mass-warning {
-            color: #ff6b6b;
-            font-size: 12px;
-            margin-top: 5px;
-            text-align: center;
-            display: none;
-        }
-        
-        .mass-warning.visible {
-            display: block;
-        }
-        
-        /* Back button */
-        .back-button {
-            position: sticky;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
-            border: 3px solid #ffaa4a;
-            color: #ffffff;
-            padding: 16px 35px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            width: fit-content;
-            min-width: 260px;
-            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            letter-spacing: 1px;
-            margin-top: 20px;
-            animation: subtle-pulse 3s infinite;
-        }
-        
-        @keyframes subtle-pulse {
-            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
-            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-        }
-        
-        .back-button:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #3a5a8a;
-        }
-        
-        .back-arrow {
-            font-size: 28px;
-            color: #ffd966;
-            font-weight: bold;
-        }
-        
-        .back-icon {
-            font-size: 24px;
-            filter: drop-shadow(0 0 5px #ffaa4a);
-        }
-        
-        /* Migration status (debug) */
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
-            display: none;
-        }
     </style>
 </head>
 <body>
     <div class="phone-frame">
         <div class="surface-view" id="surfaceView">
-            <!-- Header -->
-            <div class="surface-header">
-                <div class="surface-title">Surface</div>
-                <div class="surface-subtitle">✦ extract resources ✦</div>
-            </div>
+            <!-- Fullscreen Planet Image -->
+            <img src="assets/images/earth-view.jpg" class="planet-canvas" id="planetImage" alt="Planet surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+            <div class="star-overlay"></div>
             
-            <!-- Planet Info Card -->
-            <div class="planet-card">
-                <div class="planet-icon" id="planetIcon">🌍</div>
-                <div class="planet-info">
-                    <div class="planet-name" id="planetName">Loading...</div>
-                    <div class="planet-type" id="planetType">Loading...</div>
+            <!-- Top Status Bar -->
+            <div class="status-bar">
+                <div class="planet-name">
+                    <span class="planet-name-main" id="planetName">Loading...</span>
+                    <span class="planet-name-type" id="planetType">Loading...</span>
+                </div>
+                <div class="cargo-display">
+                    <span class="cargo-label">CARGO</span>
+                    <span class="cargo-value" id="cargoMass"><span>0</span>/1000 AMU</span>
                 </div>
             </div>
             
-            <!-- Stats Bar -->
-            <div class="stats-bar">
-                <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> --
-                </div>
-                <div class="cargo-mass" id="cargoMassDisplay">
-                    Cargo: <span>--/--</span> AMU
-                </div>
+            <!-- Auto-Extractor Status -->
+            <div class="extractor-status" id="extractorStatus">
+                <span class="extractor-pulse"></span>
+                <span id="extractorText">Auto-extractor active</span>
             </div>
             
-            <!-- Auto-Extract Log -->
-            <div class="auto-extract-log" id="autoExtractLog">
-                <div class="log-title">✨ Auto-extracted on landing</div>
-                <div class="log-items" id="autoExtractItems"></div>
-            </div>
+            <!-- Toast Notifications Container -->
+            <div class="toast-container" id="toastContainer"></div>
             
-            <!-- Extraction Section -->
-            <div class="extraction-section">
-                <div class="section-title">⚡ Available Resources</div>
-                
-                <div class="resources-grid" id="resourcesGrid">
+            <!-- Resource Toggles Bar -->
+            <div class="resource-bar">
+                <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
+                <div class="resource-grid" id="resourceGrid">
                     <!-- Filled by JavaScript -->
-                    <div style="color: #a0c0ff; text-align: center; grid-column: span 2; padding: 20px;">Loading resources...</div>
                 </div>
-                
-                <div class="extraction-controls">
-                    <button class="qty-btn" id="decrementBtn" onclick="decrementQty()">−</button>
-                    <input type="number" id="extractQuantity" value="1" min="1" max="10" readonly>
-                    <button class="qty-btn" id="incrementBtn" onclick="incrementQty()">+</button>
-                </div>
-                
-                <div class="extract-info">
-                    <span>Mass per unit: <span class="extract-mass" id="massPerUnit">0</span> AMU</span>
-                    <span style="margin-left: 15px;">Total: <span class="extract-mass" id="totalMass">0</span> AMU</span>
-                </div>
-                
-                <div class="capacity-bar-container">
-                    <div class="capacity-labels">
-                        <span>Cargo Capacity</span>
-                        <span id="capacityText">0/1000 AMU</span>
-                    </div>
-                    <div class="capacity-bar-bg">
-                        <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div class="mass-warning" id="massWarning">
-                    ⚠️ Not enough cargo space
-                </div>
-                
-                <button class="extract-btn" id="extractBtn" onclick="extractResource()">⛏️ EXTRACT</button>
+                <div class="active-count" id="activeCount">Extracting: 0 resources</div>
             </div>
             
-            <!-- Success Message -->
-            <div class="success-message" id="successMessage">
-                ✨ Resources added to cargo!
-            </div>
-            
-            <!-- Back button -->
-            <button class="back-button" onclick="returnToShip()">
-                <span class="back-arrow">←</span>
-                <span class="back-text">RETURN TO SHIP</span>
-                <span class="back-icon">🚀</span>
-            </button>
+            <!-- Back Button -->
+            <button class="back-button" onclick="returnToShip()">← RETURN TO SHIP</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
-                <div class="loading-text" id="loadingText">extracting...</div>
+                <div class="loading-text" id="loadingText">landing on surface...</div>
             </div>
-            
-            <!-- Migration status (debug) -->
-            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
 
@@ -631,12 +426,9 @@
     <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 
-    <!-- FALLBACK FUNCTIONS -->
+    <!-- Fallback Functions -->
     <script>
     (function() {
-        console.log('Surface.html initializing with fallbacks');
-        
-        // Define fallback functions
         window.getCredits = window.getCredits || function() { 
             return parseInt(localStorage.getItem('voidfarer_credits')) || 5000; 
         };
@@ -683,44 +475,37 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a1a2a');
-            tg.setBackgroundColor('#0a1a2a');
         }
 
         // ===== CONSTANTS =====
         const CARGO_MASS_LIMIT = 1000;
+        const EXTRACTION_INTERVAL = 5000; // 5 seconds
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const resourcesGrid = document.getElementById('resourcesGrid');
-        const extractQuantity = document.getElementById('extractQuantity');
-        const decrementBtn = document.getElementById('decrementBtn');
-        const incrementBtn = document.getElementById('incrementBtn');
-        const massPerUnitSpan = document.getElementById('massPerUnit');
-        const totalMassSpan = document.getElementById('totalMass');
-        const extractBtn = document.getElementById('extractBtn');
-        const successMessage = document.getElementById('successMessage');
-        const capacityBar = document.getElementById('capacityBar');
-        const capacityText = document.getElementById('capacityText');
-        const massWarning = document.getElementById('massWarning');
-        const autoExtractLog = document.getElementById('autoExtractLog');
-        const autoExtractItems = document.getElementById('autoExtractItems');
-        const cargoMassDisplay = document.getElementById('cargoMassDisplay');
+        const planetImage = document.getElementById('planetImage');
+        const planetName = document.getElementById('planetName');
+        const planetType = document.getElementById('planetType');
+        const cargoMass = document.getElementById('cargoMass');
+        const resourceGrid = document.getElementById('resourceGrid');
+        const activeCount = document.getElementById('activeCount');
+        const toastContainer = document.getElementById('toastContainer');
+        const extractorText = document.getElementById('extractorText');
 
         // ===== STATE =====
         let currentPlanet = {
-            name: 'Unknown',
-            type: 'unknown',
-            typeName: 'Unknown',
-            icon: '🌍',
+            name: 'Earth',
+            type: 'lush',
+            typeName: 'Lush',
             resources: []
         };
         
-        let selectedResource = null;
-        let currentCredits = 5000;
+        // Resource states: all active by default
+        let resourceStates = {};
         let currentMass = 0;
-        let autoExtracted = [];
+        let extractionTimer = null;
+        let isExtracting = true;
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
@@ -735,33 +520,27 @@
             'default': '🔹'
         };
 
-        // ===== GET ELEMENT ICON =====
-        function getElementIcon(elementName) {
-            return elementIcons[elementName] || elementIcons.default;
+        // ===== RESOURCE CHANCES =====
+        function getResourceChance(resource) {
+            // Higher chance for common resources, lower for rare
+            if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
+                return Math.floor(Math.random() * 20) + 80; // 80-100%
+            } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
+                return Math.floor(Math.random() * 30) + 50; // 50-80%
+            } else if (['Uranium', 'Thorium'].includes(resource)) {
+                return Math.floor(Math.random() * 30) + 20; // 20-50%
+            } else if (['Promethium'].includes(resource)) {
+                return Math.floor(Math.random() * 15) + 5; // 5-20%
+            }
+            return 70; // Default
         }
 
         // ===== LOAD PLANET DATA =====
         async function loadPlanetData() {
             try {
-                console.log('Loading planet data from localStorage:');
-                console.log('- Planet:', localStorage.getItem('voidfarer_current_planet'));
-                console.log('- Type:', localStorage.getItem('voidfarer_current_planet_type'));
-                console.log('- Resources:', localStorage.getItem('voidfarer_current_planet_resources'));
-                
                 // Get planet data from localStorage
-                const planetName = localStorage.getItem('voidfarer_current_planet');
-                const planetType = localStorage.getItem('voidfarer_current_planet_type');
-                
-                // If no planet data exists, set Earth as default
-                if (!planetName || !planetType) {
-                    console.log('No planet data found, setting Earth as default');
-                    localStorage.setItem('voidfarer_current_planet', 'Earth');
-                    localStorage.setItem('voidfarer_current_planet_type', 'lush');
-                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
-                    
-                    // Reload data
-                    return loadPlanetData();
-                }
+                const planetNameStr = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                const planetTypeStr = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
                 
                 // Get resources
                 let planetResources = [];
@@ -771,18 +550,17 @@
                     try {
                         planetResources = JSON.parse(savedResources);
                     } catch (e) {
-                        console.error('Error parsing resources, using defaults');
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
                     }
                 } else {
                     // Generate resources based on planet type
-                    if (planetType.includes('lush')) {
+                    if (planetTypeStr.includes('lush')) {
                         planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen'];
-                    } else if (planetType.includes('scorched') || planetType.includes('volcanic')) {
+                    } else if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
                         planetResources = ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium'];
-                    } else if (planetType.includes('frozen') || planetType.includes('ice')) {
+                    } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
                         planetResources = ['Hydrogen', 'Helium', 'Oxygen', 'Carbon'];
-                    } else if (planetType.includes('barren')) {
+                    } else if (planetTypeStr.includes('barren')) {
                         planetResources = ['Iron', 'Silicon', 'Aluminum', 'Titanium'];
                     } else {
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
@@ -790,26 +568,41 @@
                 }
                 
                 // Set planet icon based on type
-                let icon = '🌍';
-                if (planetType.includes('scorched') || planetType.includes('volcanic')) icon = '🌋';
-                else if (planetType.includes('frozen') || planetType.includes('ice')) icon = '❄️';
-                else if (planetType.includes('gas')) icon = '🌪️';
-                else if (planetType.includes('barren')) icon = '🪨';
-                else if (planetType.includes('lush')) icon = '🌱';
+                let imageFile = 'earth-view.jpg';
+                if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
+                    imageFile = 'pyros-surface.jpg';
+                } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
+                    imageFile = 'glacier-surface.jpg';
+                } else if (planetTypeStr.includes('lush')) {
+                    imageFile = 'verdant-surface.jpg';
+                } else if (planetTypeStr.includes('barren')) {
+                    imageFile = 'barren-surface.jpg';
+                }
+                
+                // Update planet image
+                planetImage.src = 'assets/images/' + imageFile;
+                planetImage.onerror = function() {
+                    this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
+                };
                 
                 currentPlanet = {
-                    name: planetName,
-                    type: planetType,
-                    typeName: planetType.charAt(0).toUpperCase() + planetType.slice(1),
-                    icon: icon,
+                    name: planetNameStr,
+                    type: planetTypeStr,
+                    typeName: planetTypeStr.charAt(0).toUpperCase() + planetTypeStr.slice(1),
                     resources: planetResources
                 };
                 
-                document.getElementById('planetName').textContent = currentPlanet.name;
-                document.getElementById('planetType').textContent = currentPlanet.typeName;
-                document.getElementById('planetIcon').textContent = currentPlanet.icon;
+                planetName.textContent = currentPlanet.name;
+                planetType.textContent = currentPlanet.typeName;
                 
-                console.log('Planet data loaded successfully:', currentPlanet);
+                // Initialize all resources as active by default
+                currentPlanet.resources.forEach(resource => {
+                    resourceStates[resource] = true;
+                });
+                
+                // Render resource toggles
+                renderResourceToggles();
+                
                 return true;
                 
             } catch (error) {
@@ -821,13 +614,6 @@
         // ===== LOAD CARGO DATA =====
         async function loadCargoData() {
             try {
-                // Get credits
-                if (typeof window.getCredits === 'function') {
-                    currentCredits = await window.getCredits();
-                } else {
-                    currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                }
-                
                 // Get collection
                 let collection = {};
                 if (typeof window.getCollection === 'function') {
@@ -836,9 +622,6 @@
                     const saved = localStorage.getItem('voidfarer_collection');
                     collection = saved ? JSON.parse(saved) : {};
                 }
-                
-                // Update credits display
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${currentCredits.toLocaleString()}`;
                 
                 // Calculate total mass
                 currentMass = 0;
@@ -862,206 +645,158 @@
         // ===== UPDATE CARGO DISPLAY =====
         function updateCargoDisplay() {
             const massPercent = (currentMass / CARGO_MASS_LIMIT) * 100;
-            cargoMassDisplay.innerHTML = `Cargo: <span>${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT}</span> AMU`;
-            capacityBar.style.width = Math.min(100, massPercent) + '%';
-            capacityText.textContent = `${currentMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
+            cargoMass.innerHTML = `<span>${currentMass.toFixed(0)}</span>/${CARGO_MASS_LIMIT} AMU`;
+            
+            // Stop extraction if cargo is full
+            if (currentMass >= CARGO_MASS_LIMIT && isExtracting) {
+                isExtracting = false;
+                extractorText.textContent = 'Cargo full - extraction paused';
+                if (extractionTimer) {
+                    clearInterval(extractionTimer);
+                    extractionTimer = null;
+                }
+            } else if (currentMass < CARGO_MASS_LIMIT && !isExtracting && extractionTimer === null) {
+                // Restart extraction if space available
+                isExtracting = true;
+                extractorText.textContent = 'Auto-extractor active';
+                startExtraction();
+            }
         }
 
-        // ===== RENDER RESOURCES =====
-        function renderResources() {
+        // ===== RENDER RESOURCE TOGGLES =====
+        function renderResourceToggles() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
-                resourcesGrid.innerHTML = '<div style="color: #a0c0ff; text-align: center; grid-column: span 2; padding: 20px;">No resources found on this planet</div>';
+                resourceGrid.innerHTML = '<div style="color: #a0c0ff; padding: 20px;">No resources found</div>';
                 return;
             }
             
             let html = '';
             currentPlanet.resources.forEach(resource => {
-                const chance = Math.floor(Math.random() * 30) + 70; // 70-100% for demo
-                const icon = getElementIcon(resource);
+                const icon = elementIcons[resource] || '🔹';
+                const chance = getResourceChance(resource);
+                const isActive = resourceStates[resource];
                 
                 html += `
-                    <div class="resource-card" onclick="selectResource('${resource}')">
-                        <div class="resource-icon">${icon}</div>
-                        <div class="resource-name">${resource}</div>
-                        <div class="resource-chance">${chance}% chance</div>
+                    <div class="resource-toggle ${isActive ? 'active' : ''}" onclick="toggleResource('${resource}')">
+                        <span class="resource-icon">${icon}</span>
+                        <span class="resource-name">${resource}</span>
+                        <span class="resource-chance">${chance}%</span>
                     </div>
                 `;
             });
             
-            resourcesGrid.innerHTML = html;
-            
-            // Select first resource by default
-            if (currentPlanet.resources.length > 0 && !selectedResource) {
-                selectResource(currentPlanet.resources[0]);
-            }
+            resourceGrid.innerHTML = html;
+            updateActiveCount();
         }
 
-        // ===== PERFORM AUTO-EXTRACT ON LANDING =====
-        async function performAutoExtract() {
-            if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
+        // ===== TOGGLE RESOURCE =====
+        window.toggleResource = function(resource) {
+            resourceStates[resource] = !resourceStates[resource];
+            renderResourceToggles();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        // ===== UPDATE ACTIVE COUNT =====
+        function updateActiveCount() {
+            const activeResources = Object.values(resourceStates).filter(v => v).length;
+            activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
+        }
+
+        // ===== SHOW TOAST NOTIFICATION =====
+        function showToast(resource, success) {
+            const icon = elementIcons[resource] || '🔹';
+            const toast = document.createElement('div');
+            toast.className = `toast ${success ? 'success' : 'fail'}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${icon}</span>
+                <span>${success ? '+' : '✗'} ${resource} ${success ? 'extracted' : 'failed'}</span>
+            `;
             
-            // Auto-extract 1-3 units of random resources
-            const extractCount = Math.floor(Math.random() * 3) + 1;
-            const extracted = [];
+            toastContainer.appendChild(toast);
             
-            for (let i = 0; i < extractCount; i++) {
-                const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
-                const resource = currentPlanet.resources[randomIndex];
-                const quantity = Math.floor(Math.random() * 3) + 1;
-                
-                const mass = window.getElementMass(resource);
-                const totalMass = mass * quantity;
-                
-                if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
-                    if (typeof window.addElementToCollection === 'function') {
-                        await window.addElementToCollection(resource, quantity);
-                    }
-                    
-                    extracted.push({ resource, quantity, icon: getElementIcon(resource) });
-                    currentMass += totalMass;
+            // Remove after animation
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
                 }
-            }
-            
-            if (extracted.length > 0) {
-                let logHtml = '';
-                extracted.forEach(item => {
-                    logHtml += `
-                        <div class="log-item">
-                            <span class="log-item-icon">${item.icon}</span>
-                            <span class="log-item-name">${item.resource}</span>
-                            <span class="log-item-qty">+${item.quantity}</span>
-                        </div>
-                    `;
-                });
-                autoExtractItems.innerHTML = logHtml;
-                autoExtractLog.classList.add('visible');
-                
-                updateCargoDisplay();
-                
-                successMessage.classList.add('visible');
-                setTimeout(() => {
-                    successMessage.classList.remove('visible');
-                }, 3000);
-            }
+            }, 3000);
         }
 
-        // ===== SELECT RESOURCE =====
-        function selectResource(resource) {
-            selectedResource = resource;
-            
-            document.querySelectorAll('.resource-card').forEach(card => {
-                card.classList.remove('selected');
-                if (card.querySelector('.resource-name').textContent === resource) {
-                    card.classList.add('selected');
-                }
-            });
-            
-            const mass = window.getElementMass(resource);
-            massPerUnitSpan.textContent = mass.toFixed(1);
-            updateTotalMass();
-            validateExtraction();
-        }
-
-        // ===== UPDATE TOTAL MASS =====
-        function updateTotalMass() {
-            const qty = parseInt(extractQuantity.value);
-            const mass = parseFloat(massPerUnitSpan.textContent);
-            totalMassSpan.textContent = (qty * mass).toFixed(1);
-        }
-
-        // ===== INCREMENT QUANTITY =====
-        function incrementQty() {
-            let current = parseInt(extractQuantity.value);
-            if (current < 10) {
-                current++;
-                extractQuantity.value = current;
-                updateTotalMass();
-                validateExtraction();
-            }
-        }
-
-        // ===== DECREMENT QUANTITY =====
-        function decrementQty() {
-            let current = parseInt(extractQuantity.value);
-            if (current > 1) {
-                current--;
-                extractQuantity.value = current;
-                updateTotalMass();
-                validateExtraction();
-            }
-        }
-
-        // ===== VALIDATE EXTRACTION =====
-        function validateExtraction() {
-            if (!selectedResource) {
-                extractBtn.disabled = true;
+        // ===== ATTEMPT EXTRACTION =====
+        async function attemptExtraction() {
+            if (!isExtracting) return;
+            if (currentMass >= CARGO_MASS_LIMIT) {
+                isExtracting = false;
+                extractorText.textContent = 'Cargo full - extraction paused';
                 return;
             }
             
-            const qty = parseInt(extractQuantity.value);
-            const mass = parseFloat(massPerUnitSpan.textContent);
-            const totalMass = qty * mass;
+            // Get active resources
+            const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
+            if (activeResources.length === 0) {
+                extractorText.textContent = 'No resources selected';
+                return;
+            }
             
-            if (currentMass + totalMass > CARGO_MASS_LIMIT) {
-                extractBtn.disabled = true;
-                massWarning.classList.add('visible');
+            // Pick a random active resource
+            const randomIndex = Math.floor(Math.random() * activeResources.length);
+            const resource = activeResources[randomIndex];
+            
+            // Determine success based on chance
+            const chance = getResourceChance(resource);
+            const success = Math.random() * 100 < chance;
+            
+            if (success) {
+                const mass = window.getElementMass(resource);
+                
+                // Check if we have space
+                if (currentMass + mass <= CARGO_MASS_LIMIT) {
+                    // Add to collection
+                    if (typeof window.addElementToCollection === 'function') {
+                        await window.addElementToCollection(resource, 1);
+                    }
+                    
+                    currentMass += mass;
+                    updateCargoDisplay();
+                    showToast(resource, true);
+                } else {
+                    // Cargo would overflow
+                    isExtracting = false;
+                    extractorText.textContent = 'Cargo full - extraction paused';
+                    showToast(resource, false);
+                }
             } else {
-                extractBtn.disabled = false;
-                massWarning.classList.remove('visible');
+                showToast(resource, false);
             }
         }
 
-        // ===== EXTRACT RESOURCE =====
-        async function extractResource() {
-            if (!selectedResource || extractBtn.disabled) return;
-            
-            const quantity = parseInt(extractQuantity.value);
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'extracting resources...';
-            
-            try {
-                let result;
-                
-                if (typeof window.addElementToCollection === 'function') {
-                    result = await window.addElementToCollection(selectedResource, quantity);
-                } else {
-                    result = { success: true };
-                }
-                
-                if (result && result.success) {
-                    successMessage.classList.add('visible');
-                    setTimeout(() => {
-                        successMessage.classList.remove('visible');
-                    }, 3000);
-                    
-                    await loadCargoData();
-                    validateExtraction();
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                } else {
-                    alert('Failed to extract resources');
-                }
-                
-            } catch (error) {
-                console.error('Extraction error:', error);
-                alert('Error extracting resources');
+        // ===== START EXTRACTION TIMER =====
+        function startExtraction() {
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
             }
-            
-            loadingOverlay.classList.remove('active');
+            extractionTimer = setInterval(attemptExtraction, EXTRACTION_INTERVAL);
+            extractorText.textContent = 'Auto-extractor active';
         }
 
         // ===== RETURN TO SHIP =====
-        function returnToShip() {
+        window.returnToShip = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            // Stop extraction timer
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+                extractionTimer = null;
+            }
+            
             window.location.href = 'ship-bridge.html';
-        }
+        };
 
         // ===== INITIALIZE =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
-                loadingText.textContent = 'scanning surface...';
+                loadingText.textContent = 'landing on surface...';
                 
                 // Load planet data
                 const planetLoaded = await loadPlanetData();
@@ -1073,21 +808,8 @@
                 // Load cargo data
                 await loadCargoData();
                 
-                // Render resources
-                renderResources();
-                
-                // Set default quantity
-                extractQuantity.value = 1;
-                if (selectedResource) {
-                    const mass = window.getElementMass(selectedResource);
-                    massPerUnitSpan.textContent = mass.toFixed(1);
-                    updateTotalMass();
-                }
-                
-                validateExtraction();
-                
-                // Auto-extract on landing
-                await performAutoExtract();
+                // Start extraction timer
+                startExtraction();
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -1095,24 +817,19 @@
                 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error loading surface';
-                
-                // If no planet data, set defaults and reload
-                if (!localStorage.getItem('voidfarer_current_planet')) {
-                    localStorage.setItem('voidfarer_current_planet', 'Earth');
-                    localStorage.setItem('voidfarer_current_planet_type', 'lush');
-                    localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(['Iron', 'Carbon', 'Silicon', 'Oxygen']));
-                    
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                } else {
-                    setTimeout(() => {
-                        loadingOverlay.classList.remove('active');
-                    }, 2000);
-                }
+                loadingText.textContent = 'error landing';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
             }
         }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+            }
+        });
 
         // ===== START =====
         init();
