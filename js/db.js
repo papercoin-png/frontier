@@ -115,7 +115,7 @@ function getDb() {
         if (!db.objectStoreNames.contains('discoveredLocations')) {
           const store = db.createObjectStore('discoveredLocations', { keyPath: 'id' });
           store.createIndex('by-sector', 'sector');
-          store.createIndex('by-nebula', 'nebula');
+          store.createIndex('by-starSector', 'starSector');
           store.createIndex('by-star', 'star');
           store.createIndex('by-planet', 'planet');
         }
@@ -289,7 +289,7 @@ export async function addElementToCollection(elementName, count = 1, elementData
   await store.put(element);
   await tx.done;
   
-  return element;
+  return { success: true, count: element.count };
 }
 
 // Remove element from collection
@@ -348,8 +348,6 @@ export async function addTaxTransaction(transaction) {
   };
   
   await setItem('taxTransactions', newTx);
-  
-  // Also update player summary (could be done via a separate function)
   
   return newTx;
 }
@@ -455,6 +453,52 @@ export async function addItemToProperty(propertyId, elementName, quantity) {
   return { success: true };
 }
 
+// Remove item from property
+export async function removeItemFromProperty(propertyId, elementName, quantity) {
+  const db = await getDb();
+  const tx = db.transaction(['properties', 'propertyItems'], 'readwrite');
+  
+  const propertyStore = tx.objectStore('properties');
+  const itemsStore = tx.objectStore('propertyItems');
+  
+  // Get property
+  const property = await propertyStore.get(propertyId);
+  if (!property) {
+    await tx.done;
+    return { success: false, reason: 'property_not_found' };
+  }
+  
+  // Find the item
+  const items = await itemsStore.index('by-propertyId').getAll(propertyId);
+  const item = items.find(i => i.elementName === elementName);
+  
+  if (!item) {
+    await tx.done;
+    return { success: false, reason: 'item_not_found' };
+  }
+  
+  if (item.count < quantity) {
+    await tx.done;
+    return { success: false, reason: 'insufficient', available: item.count };
+  }
+  
+  // Update or delete the item
+  item.count -= quantity;
+  if (item.count <= 0) {
+    await itemsStore.delete(item.id);
+  } else {
+    await itemsStore.put(item);
+  }
+  
+  // Update property used space
+  const remainingItems = await itemsStore.index('by-propertyId').getAll(propertyId);
+  property.used = remainingItems.reduce((sum, i) => sum + (i.count || 0), 0);
+  await propertyStore.put(property);
+  
+  await tx.done;
+  return { success: true, newCount: item.count || 0 };
+}
+
 // ===== MIGRATION HELPERS =====
 
 // Check if migration has been performed
@@ -534,6 +578,11 @@ export async function initializeDatabase() {
   }
 }
 
+// ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
+// This is critical for storage.js and other files to work
+window.idb = idb;
+window.getDb = getDb;
+
 // Export a default object with all functions for easy importing
 export default {
   // Core
@@ -566,6 +615,7 @@ export default {
   updateProperty,
   getPropertyItems,
   addItemToProperty,
+  removeItemFromProperty,
   
   // Migration
   isMigrationComplete,
