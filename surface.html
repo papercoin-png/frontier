@@ -446,7 +446,7 @@
                     <span class="extractor-pulse"></span>
                     <span id="extractorText">Auto-extractor active</span>
                 </div>
-                <div class="return-button" onclick="returnToShip()" id="returnButton">
+                <div class="return-button" onclick="window.returnToShip()" id="returnButton">
                     RETURN TO SHIP
                 </div>
             </div>
@@ -493,6 +493,11 @@
         const activeCount = document.getElementById('activeCount');
         const toastContainer = document.getElementById('toastContainer');
         const extractorText = document.getElementById('extractorText');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        // This is the critical fix - all onclick handlers need these
+        window.toggleResource = toggleResource;
+        window.returnToShip = returnToShip;
 
         let currentPlanet = {
             name: 'Earth',
@@ -696,7 +701,7 @@
                 const rarityClass = getRarityClass(resource);
                 
                 html += `
-                    <div class="resource-toggle ${rarityClass} ${isActive ? 'active' : ''}" onclick="toggleResource('${resource}')">
+                    <div class="resource-toggle ${rarityClass} ${isActive ? 'active' : ''}" onclick="window.toggleResource('${resource}')">
                         <span class="resource-symbol">${symbol}</span>
                         <span class="resource-name">${resource}</span>
                         <span class="resource-chance">${chance}%</span>
@@ -708,11 +713,11 @@
             updateActiveCount();
         }
 
-        window.toggleResource = function(resource) {
+        function toggleResource(resource) {
             resourceStates[resource] = !resourceStates[resource];
             renderResourceToggles();
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         function updateActiveCount() {
             const activeResources = Object.values(resourceStates).filter(v => v).length;
@@ -817,7 +822,7 @@
             }, EXTRACTION_INTERVAL);
         }
 
-        window.returnToShip = function() {
+        function returnToShip() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             if (extractionTimer) {
@@ -826,7 +831,7 @@
             }
             
             window.location.href = 'ship-bridge.html';
-        };
+        }
 
         async function performAutoExtract() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
