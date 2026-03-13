@@ -22,7 +22,8 @@ import {
 } from './db.js';
 
 // ===== CONSTANTS =====
-export const CARGO_MASS_LIMIT = 1000; // Maximum atomic mass units the ship can carry
+// UPDATED: Increased from 1000 to 5000 for 20-minute mining experience
+export const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can carry
 
 // ===== STORAGE KEYS (kept for reference, but not used for storage) =====
 export const STORAGE_KEYS = {
@@ -317,7 +318,8 @@ export async function createDefaultPlayer(name = 'Voidfarer') {
         totalDistanceTraveled: 0,
         totalWarps: 0,
         credits: 5000,
-        cargoMassLimit: CARGO_MASS_LIMIT // Store the ship's cargo mass limit
+        // UPDATED: Uses the new 5000 AMU cargo limit
+        cargoMassLimit: CARGO_MASS_LIMIT
     };
     await savePlayer(player);
     return player;
@@ -1086,8 +1088,8 @@ export async function upgradeShip(component) {
 async function upgradeCargoHold(newLevel) {
     const player = await getPlayer();
     if (player) {
-        // Base limit 1000, increase by 500 per level
-        player.cargoMassLimit = CARGO_MASS_LIMIT + (newLevel - 1) * 500;
+        // Base limit 5000, increase by 1000 per level (scaled for new 5000 limit)
+        player.cargoMassLimit = CARGO_MASS_LIMIT + (newLevel - 1) * 1000;
         await savePlayer(player);
     }
 }
@@ -1282,7 +1284,7 @@ window.getPlayer = getPlayer;
 window.savePlayer = savePlayer;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
-window.safeSellElement = safeSellElement;  // ← ADDED THIS LINE FOR EARTH HUB SELLING
+window.safeSellElement = safeSellElement;
 window.getShipFuel = getShipFuel;
 window.getShipPower = getShipPower;
 window.getCurrentSector = getCurrentSector;
@@ -1298,6 +1300,10 @@ window.setCurrentLocation = setCurrentLocation;
 window.setWarpData = setWarpData;
 window.getWarpData = getWarpData;
 window.clearWarpData = clearWarpData;
+window.getTotalCargoMass = getTotalCargoMass;  // Added for bridge display
+window.getRemainingCargoMass = getRemainingCargoMass;  // Added for bridge display
+window.refuelShip = refuelShip;  // Added for quick actions
+window.repairShip = repairShip;  // Added for quick actions
 
 // ===== INITIALIZE ON LOAD =====
 // We'll export the initialization function and let the app call it
