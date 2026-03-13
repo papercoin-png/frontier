@@ -239,6 +239,8 @@
         
         .toast-icon {
             font-size: 18px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
         }
         
         @keyframes slideIn {
@@ -249,10 +251,10 @@
             to { opacity: 0; }
         }
         
-        /* Resource Toggles - Bottom bar - MOVED UP HIGHER */
+        /* Resource Toggles - Bottom bar */
         .resource-bar {
             position: absolute;
-            bottom: 120px; /* Moved up from 30px to 120px */
+            bottom: 120px;
             left: 20px;
             right: 20px;
             background: rgba(10, 10, 26, 0.4);
@@ -260,7 +262,7 @@
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(74, 255, 170, 0.3);
             border-radius: 60px 20px 60px 20px;
-            padding: 12px; /* Slightly reduced padding */
+            padding: 12px;
             z-index: 10;
         }
         
@@ -268,62 +270,103 @@
             color: #a0c0ff;
             font-size: 11px;
             letter-spacing: 1px;
-            margin-bottom: 8px; /* Reduced margin */
+            margin-bottom: 8px;
             text-align: center;
         }
         
         .resource-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px; /* Reduced gap */
+            gap: 6px;
             justify-content: center;
         }
         
         .resource-toggle {
             background: rgba(30, 45, 70, 0.5);
-            border: 2px solid #4a8ac0;
+            border: 2px solid;
             border-radius: 40px 10px 40px 10px;
-            padding: 6px 10px; /* Slightly reduced padding */
+            padding: 6px 10px;
             display: flex;
             align-items: center;
-            gap: 4px; /* Reduced gap */
+            gap: 4px;
             cursor: pointer;
             transition: all 0.1s;
-            min-width: 65px; /* Slightly smaller */
+            min-width: 85px;
             justify-content: center;
-        }
-        
-        .resource-toggle.active {
-            border-color: #4affaa;
-            background: rgba(74, 255, 170, 0.1);
-            box-shadow: 0 0 15px rgba(74, 255, 170, 0.3);
         }
         
         .resource-toggle:active {
             transform: scale(0.95);
         }
         
-        .resource-icon {
-            font-size: 16px; /* Slightly smaller */
+        .resource-toggle.active {
+            background: rgba(74, 255, 170, 0.1);
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        .resource-symbol {
+            font-size: 14px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
         }
         
         .resource-name {
-            color: white;
-            font-size: 12px; /* Slightly smaller */
+            font-size: 12px;
             font-weight: 500;
         }
         
         .resource-chance {
             color: #ffd966;
-            font-size: 10px; /* Slightly smaller */
+            font-size: 10px;
             background: rgba(0,0,0,0.3);
             padding: 2px 4px;
             border-radius: 20px;
         }
         
+        /* Rarity Colors */
+        .rarity-common { 
+            border-color: #ffffff; 
+            color: #ffffff;
+        }
+        .rarity-common.active { 
+            border-color: #ffffff; 
+        }
+        
+        .rarity-uncommon { 
+            border-color: #b0ffb0; 
+            color: #b0ffb0;
+        }
+        .rarity-uncommon.active { 
+            border-color: #b0ffb0; 
+        }
+        
+        .rarity-rare { 
+            border-color: #b0b0ff; 
+            color: #b0b0ff;
+        }
+        .rarity-rare.active { 
+            border-color: #b0b0ff; 
+        }
+        
+        .rarity-very-rare { 
+            border-color: #e0b0ff; 
+            color: #e0b0ff;
+        }
+        .rarity-very-rare.active { 
+            border-color: #e0b0ff; 
+        }
+        
+        .rarity-legendary { 
+            border-color: #ffd700; 
+            color: #ffd700;
+        }
+        .rarity-legendary.active { 
+            border-color: #ffd700; 
+        }
+        
         .active-count {
             text-align: center;
-            margin-top: 8px; /* Reduced margin */
+            margin-top: 8px;
             color: #4affaa;
             font-size: 12px;
             font-family: 'Exo 2', sans-serif;
@@ -411,7 +454,7 @@
             <!-- Toast Notifications Container -->
             <div class="toast-container" id="toastContainer"></div>
             
-            <!-- Resource Toggles Bar - MOVED UP HIGHER -->
+            <!-- Resource Toggles Bar -->
             <div class="resource-bar">
                 <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
                 <div class="resource-grid" id="resourceGrid">
@@ -514,17 +557,40 @@
         let extractionTimer = null;
         let isExtracting = true;
 
-        // ===== ELEMENT ICONS =====
-        const elementIcons = {
-            'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
-            'Boron': '🧪', 'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨',
-            'Fluorine': '🧪', 'Neon': '💡', 'Sodium': '🧂', 'Magnesium': '✨',
-            'Aluminum': '🥫', 'Silicon': '💻', 'Phosphorus': '✨', 'Sulfur': '🟡',
-            'Chlorine': '🧪', 'Argon': '🎈', 'Potassium': '🍌', 'Calcium': '🥛',
-            'Iron': '⚙️', 'Nickel': '🔩', 'Copper': '🔴', 'Zinc': '⚪',
-            'Silver': '⚪', 'Gold': '🟡', 'Platinum': '⬜', 'Titanium': '🔷',
-            'Uranium': '🟣', 'Thorium': '🔮', 'Plutonium': '☢️', 'Promethium': '✨',
-            'default': '🔹'
+        // ===== ELEMENT DATA =====
+        const elementData = {
+            'Hydrogen': { symbol: 'H', rarity: 'common' },
+            'Helium': { symbol: 'He', rarity: 'common' },
+            'Lithium': { symbol: 'Li', rarity: 'common' },
+            'Beryllium': { symbol: 'Be', rarity: 'common' },
+            'Boron': { symbol: 'B', rarity: 'common' },
+            'Sodium': { symbol: 'Na', rarity: 'common' },
+            'Magnesium': { symbol: 'Mg', rarity: 'common' },
+            'Aluminum': { symbol: 'Al', rarity: 'common' },
+            'Silicon': { symbol: 'Si', rarity: 'common' },
+            'Potassium': { symbol: 'K', rarity: 'common' },
+            'Calcium': { symbol: 'Ca', rarity: 'common' },
+            'Carbon': { symbol: 'C', rarity: 'uncommon' },
+            'Nitrogen': { symbol: 'N', rarity: 'uncommon' },
+            'Oxygen': { symbol: 'O', rarity: 'uncommon' },
+            'Fluorine': { symbol: 'F', rarity: 'uncommon' },
+            'Neon': { symbol: 'Ne', rarity: 'uncommon' },
+            'Phosphorus': { symbol: 'P', rarity: 'uncommon' },
+            'Sulfur': { symbol: 'S', rarity: 'uncommon' },
+            'Chlorine': { symbol: 'Cl', rarity: 'uncommon' },
+            'Argon': { symbol: 'Ar', rarity: 'uncommon' },
+            'Iron': { symbol: 'Fe', rarity: 'uncommon' },
+            'Nickel': { symbol: 'Ni', rarity: 'uncommon' },
+            'Copper': { symbol: 'Cu', rarity: 'rare' },
+            'Zinc': { symbol: 'Zn', rarity: 'rare' },
+            'Silver': { symbol: 'Ag', rarity: 'rare' },
+            'Gold': { symbol: 'Au', rarity: 'rare' },
+            'Platinum': { symbol: 'Pt', rarity: 'rare' },
+            'Titanium': { symbol: 'Ti', rarity: 'rare' },
+            'Uranium': { symbol: 'U', rarity: 'very-rare' },
+            'Thorium': { symbol: 'Th', rarity: 'very-rare' },
+            'Plutonium': { symbol: 'Pu', rarity: 'very-rare' },
+            'Promethium': { symbol: 'Pm', rarity: 'legendary' }
         };
 
         // ===== RESOURCE CHANCES =====
@@ -540,6 +606,17 @@
                 return Math.floor(Math.random() * 15) + 5; // 5-20%
             }
             return 70; // Default
+        }
+
+        // ===== GET RARITY CLASS =====
+        function getRarityClass(resource) {
+            const rarity = elementData[resource]?.rarity || 'common';
+            return `rarity-${rarity}`;
+        }
+
+        // ===== GET ELEMENT SYMBOL =====
+        function getElementSymbol(resource) {
+            return elementData[resource]?.symbol || resource.substring(0, 2);
         }
 
         // ===== LOAD PLANET DATA =====
@@ -679,13 +756,14 @@
             
             let html = '';
             currentPlanet.resources.forEach(resource => {
-                const icon = elementIcons[resource] || '🔹';
+                const symbol = getElementSymbol(resource);
                 const chance = getResourceChance(resource);
                 const isActive = resourceStates[resource];
+                const rarityClass = getRarityClass(resource);
                 
                 html += `
-                    <div class="resource-toggle ${isActive ? 'active' : ''}" onclick="toggleResource('${resource}')">
-                        <span class="resource-icon">${icon}</span>
+                    <div class="resource-toggle ${rarityClass} ${isActive ? 'active' : ''}" onclick="toggleResource('${resource}')">
+                        <span class="resource-symbol">${symbol}</span>
                         <span class="resource-name">${resource}</span>
                         <span class="resource-chance">${chance}%</span>
                     </div>
@@ -711,12 +789,12 @@
 
         // ===== SHOW TOAST NOTIFICATION =====
         function showToast(resource, success) {
-            const icon = elementIcons[resource] || '🔹';
+            const symbol = getElementSymbol(resource);
             const toast = document.createElement('div');
             toast.className = `toast ${success ? 'success' : 'fail'}`;
             toast.innerHTML = `
-                <span class="toast-icon">${icon}</span>
-                <span>${success ? '+' : '✗'} ${resource} ${success ? 'extracted' : 'failed'}</span>
+                <span class="toast-icon">${symbol}</span>
+                <span>${success ? '+' : '✗'} ${resource}</span>
             `;
             
             toastContainer.appendChild(toast);
