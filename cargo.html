@@ -795,8 +795,72 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
+    <!-- Load all JS files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+
+    <!-- FALLBACK FUNCTIONS - Ensure cargo displays even if storage.js doesn't expose functions -->
     <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
+    (function() {
+        console.log('Cargo.html initializing with fallbacks');
+        
+        // Define fallback functions that read directly from localStorage
+        window.getCredits = window.getCredits || function() { 
+            console.log('Using fallback getCredits');
+            return parseInt(localStorage.getItem('voidfarer_credits')) || 5000; 
+        };
+
+        window.getCollection = window.getCollection || function() {
+            console.log('Using fallback getCollection');
+            const saved = localStorage.getItem('voidfarer_collection');
+            try {
+                return saved ? JSON.parse(saved) : {};
+            } catch (e) {
+                console.error('Error parsing collection', e);
+                return {};
+            }
+        };
+
+        window.removeElementFromCollection = window.removeElementFromCollection || function(elementName, count) {
+            console.log('Using fallback removeElementFromCollection', elementName, count);
+            try {
+                let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+                if (collection[elementName]) {
+                    collection[elementName].count -= count;
+                    if (collection[elementName].count <= 0) {
+                        delete collection[elementName];
+                    }
+                    localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                }
+                return { success: true };
+            } catch (e) {
+                console.error('Error removing element', e);
+                return { success: false, reason: 'error' };
+            }
+        };
+
+        window.getElementMass = window.getElementMass || function(elementName) {
+            const masses = {
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
+                'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
+                'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
+                'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
+                'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
+                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
+                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
+                'default': 100.0
+            };
+            return masses[elementName] || masses.default;
+        };
+        
+        console.log('Fallback functions installed');
+    })();
+    </script>
+
+    <script>
+        // ===== MAIN CARGO SCRIPT =====
         const { openDB } = idb;
 
         // ===== TELEGRAM INITIALIZATION =====
@@ -809,12 +873,11 @@
         }
 
         // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 1000; // Must match storage.js
+        const CARGO_MASS_LIMIT = 1000;
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
         const cargoGrid = document.getElementById('cargoGrid');
         
         // Eject modal elements
@@ -841,23 +904,14 @@
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
-            // Common
             'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
-            'Boron': '🧪', 'Sodium': '🧂', 'Magnesium': '✨', 'Aluminum': '🥫',
-            'Silicon': '💻', 'Potassium': '🍌', 'Calcium': '🥛',
-            
-            // Uncommon
-            'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨', 'Fluorine': '🧪',
-            'Neon': '💡', 'Phosphorus': '✨', 'Sulfur': '🟡', 'Chlorine': '🧪',
-            'Argon': '🎈', 'Iron': '⚙️', 'Nickel': '🔩', 'Lead': '🔘',
-            
-            // Rare
-            'Gold': '🟡', 'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷',
-            'Copper': '🔴', 'Zinc': '⚪', 'Tin': '🥫', 'Cobalt': '🔵',
-            'Chromium': '✨', 'Mercury': '💧', 'Uranium': '🟣', 'Thorium': '🔮',
-            'Plutonium': '☢️', 'Promethium': '✨',
-            
-            // Default
+            'Boron': '🧪', 'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨',
+            'Fluorine': '🧪', 'Neon': '💡', 'Sodium': '🧂', 'Magnesium': '✨',
+            'Aluminum': '🥫', 'Silicon': '💻', 'Phosphorus': '✨', 'Sulfur': '🟡',
+            'Chlorine': '🧪', 'Argon': '🎈', 'Potassium': '🍌', 'Calcium': '🥛',
+            'Iron': '⚙️', 'Nickel': '🔩', 'Copper': '🔴', 'Zinc': '⚪',
+            'Silver': '⚪', 'Gold': '🟡', 'Platinum': '⬜', 'Titanium': '🔷',
+            'Uranium': '🟣', 'Thorium': '🔮', 'Plutonium': '☢️', 'Promethium': '✨',
             'default': '🔹'
         };
 
@@ -873,32 +927,15 @@
         // ===== ELEMENT BASE VALUES =====
         const elementValues = {
             'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-            'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
-            'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
-            'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
-            'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
-            'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
-            'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Titanium': 1000,
-            'Copper': 1000, 'Zinc': 1000, 'Tin': 1000, 'Cobalt': 1000,
-            'Chromium': 1000, 'Mercury': 1000, 'Uranium': 5000, 'Thorium': 5000,
-            'Plutonium': 5000, 'Promethium': 25000,
+            'Boron': 100, 'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250,
+            'Fluorine': 250, 'Neon': 250, 'Sodium': 100, 'Magnesium': 100,
+            'Aluminum': 100, 'Silicon': 100, 'Phosphorus': 250, 'Sulfur': 250,
+            'Chlorine': 250, 'Argon': 250, 'Potassium': 100, 'Calcium': 100,
+            'Iron': 250, 'Nickel': 250, 'Copper': 1000, 'Zinc': 1000,
+            'Silver': 1000, 'Gold': 1000, 'Platinum': 1000, 'Titanium': 1000,
+            'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000, 'Promethium': 25000,
             'default': 100
         };
-
-        // ===== GET ELEMENT MASS =====
-        function getElementMass(elementName) {
-            // Try the global function first (from storage.js)
-            if (typeof window.getElementMass === 'function') {
-                return window.getElementMass(elementName);
-            }
-            // Fallback
-            const masses = {
-                'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1, 'Uranium': 238.0,
-                'Promethium': 145.0, 'Iron': 55.85, 'Carbon': 12.01, 'Oxygen': 16.00,
-                'Hydrogen': 1.008, 'Helium': 4.003, 'default': 100.0
-            };
-            return masses[elementName] || masses.default;
-        }
 
         // ===== GET ELEMENT ICON =====
         function getElementIcon(elementName) {
@@ -922,10 +959,13 @@
         // ===== LOAD CARGO DATA =====
         async function loadCargoData() {
             try {
+                console.log('Loading cargo data...');
+                
                 // Get credits
                 let credits = 5000;
                 if (typeof window.getCredits === 'function') {
                     credits = await window.getCredits();
+                    console.log('Got credits:', credits);
                 } else {
                     credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
@@ -934,6 +974,7 @@
                 let collection = {};
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
+                    console.log('Got collection:', collection);
                 } else {
                     const saved = localStorage.getItem('voidfarer_collection');
                     collection = saved ? JSON.parse(saved) : {};
@@ -950,7 +991,7 @@
                 
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
-                    const massPerUnit = getElementMass(name);
+                    const massPerUnit = window.getElementMass(name);
                     const totalItemMass = count * massPerUnit;
                     const valuePerUnit = getElementValue(name);
                     const totalItemValue = count * valuePerUnit;
@@ -970,6 +1011,8 @@
                         rarity: getElementRarity(name)
                     });
                 }
+                
+                console.log('Cargo items:', cargoItems);
                 
                 // Update stats
                 document.getElementById('totalItems').textContent = totalItems;
@@ -1164,41 +1207,21 @@
             try {
                 let result;
                 
-                // Call the remove function from storage.js (now exposed globally)
+                // Call the remove function
                 if (typeof window.removeElementFromCollection === 'function') {
                     result = await window.removeElementFromCollection(currentEjectItem, quantity);
                 } else {
-                    // Fallback for testing
+                    // Fallback
                     console.log(`Would eject ${quantity} of ${currentEjectItem}`);
-                    
-                    // Update localStorage directly for demo
-                    let collection = {};
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
-                    
-                    if (collection[currentEjectItem]) {
-                        collection[currentEjectItem].count -= quantity;
-                        if (collection[currentEjectItem].count <= 0) {
-                            delete collection[currentEjectItem];
-                        }
-                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                    }
-                    
                     result = { success: true };
                 }
                 
                 if (result && result.success) {
-                    // Close modal
                     closeEjectModal();
-                    
-                    // Reload cargo data
                     await loadCargoData();
-                    
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
-                    // Show error
                     ejectWarning.textContent = result?.reason || 'Failed to eject cargo';
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                 }
                 
             } catch (error) {
@@ -1221,11 +1244,9 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading cargo hold...';
                 
-                // Wait a moment for storage to be ready
-                setTimeout(async () => {
-                    // Load cargo data
-                    await loadCargoData();
-                    
+                await loadCargoData();
+                
+                setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 500);
                 
@@ -1238,13 +1259,7 @@
             }
         }
 
-        // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
