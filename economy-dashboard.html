@@ -718,7 +718,7 @@
             </div>
             
             <!-- Back Button -->
-            <button class="back-button" onclick="returnToEarthHub()">← EARTH HUB</button>
+            <button class="back-button" onclick="window.returnToEarthHub()">← EARTH HUB</button>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -731,9 +731,18 @@
         </div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/economic-metrics.js"></script>
+    <script type="module" src="js/tax-system.js"></script>
+    <script type="module" src="js/community-fund.js"></script>
+    <script type="module" src="js/economic-events.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
+        import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -748,6 +757,9 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const migrationStatus = document.getElementById('migrationStatus');
+
+        // Make functions available globally for onclick handlers
+        window.returnToEarthHub = returnToEarthHub;
 
         // ===== STATE =====
         let inflationChart = null;
@@ -767,18 +779,18 @@
                 try {
                     // Get metrics with fallbacks
                     let moneySupply = 5000000;
-                    if (typeof getTotalMoneySupply === 'function') {
-                        moneySupply = await getTotalMoneySupply();
+                    if (typeof window.getTotalMoneySupply === 'function') {
+                        moneySupply = await window.getTotalMoneySupply();
                     }
 
                     let inflation = 0.03;
-                    if (typeof calculateInflationRate === 'function') {
-                        inflation = await calculateInflationRate();
+                    if (typeof window.calculateInflationRate === 'function') {
+                        inflation = await window.calculateInflationRate();
                     }
 
                     let gini = 0.35;
-                    if (typeof calculateGiniCoefficient === 'function') {
-                        gini = await calculateGiniCoefficient();
+                    if (typeof window.calculateGiniCoefficient === 'function') {
+                        gini = await window.calculateGiniCoefficient();
                     }
 
                     let wealth = {
@@ -788,13 +800,13 @@
                         totalWealth: moneySupply,
                         playerCount: 1
                     };
-                    if (typeof getWealthPercentiles === 'function') {
-                        wealth = await getWealthPercentiles();
+                    if (typeof window.getWealthPercentiles === 'function') {
+                        wealth = await window.getWealthPercentiles();
                     }
 
                     let velocity = 1.0;
-                    if (typeof calculateMoneyVelocity === 'function') {
-                        velocity = await calculateMoneyVelocity();
+                    if (typeof window.calculateMoneyVelocity === 'function') {
+                        velocity = await window.calculateMoneyVelocity();
                     }
 
                     let health = {
@@ -803,18 +815,18 @@
                         inequality: { value: gini, message: 'Normal inequality' },
                         velocity: { value: velocity, message: 'Healthy velocity' }
                     };
-                    if (typeof assessEconomicHealth === 'function') {
-                        health = await assessEconomicHealth();
+                    if (typeof window.assessEconomicHealth === 'function') {
+                        health = await window.assessEconomicHealth();
                     }
 
                     let metrics = [];
-                    if (typeof getDailyMetrics === 'function') {
-                        metrics = await getDailyMetrics();
+                    if (typeof window.getDailyMetrics === 'function') {
+                        metrics = await window.getDailyMetrics();
                     }
 
                     let events = [];
-                    if (typeof getActiveEvents === 'function') {
-                        events = await getActiveEvents();
+                    if (typeof window.getActiveEvents === 'function') {
+                        events = await window.getActiveEvents();
                     }
 
                     let rates = {
@@ -825,13 +837,13 @@
                         estate: 0.10,
                         registration: 5000
                     };
-                    if (typeof getCurrentRates === 'function') {
-                        rates = await getCurrentRates();
+                    if (typeof window.getCurrentRates === 'function') {
+                        rates = await window.getCurrentRates() || rates;
                     }
 
                     let fund = { balance: 0, contributions: [], allocations: [] };
-                    if (typeof getCommunityFund === 'function') {
-                        fund = await getCommunityFund() || fund;
+                    if (typeof window.getCommunityFund === 'function') {
+                        fund = await window.getCommunityFund() || fund;
                     }
                     
                     // Update summary cards
@@ -839,14 +851,14 @@
                     document.getElementById('inflationRate').textContent = formatPercent(inflation);
                     
                     let playerCount = 1;
-                    if (typeof getPlayerCount === 'function') {
-                        playerCount = await getPlayerCount();
+                    if (typeof window.getPlayerCount === 'function') {
+                        playerCount = await window.getPlayerCount();
                     }
                     document.getElementById('playerCount').textContent = playerCount;
                     
                     let transactionVolume = Math.floor(Math.random() * 100000) + 50000;
-                    if (typeof estimateTransactionVolume === 'function') {
-                        transactionVolume = estimateTransactionVolume();
+                    if (typeof window.estimateTransactionVolume === 'function') {
+                        transactionVolume = window.estimateTransactionVolume();
                     }
                     document.getElementById('transactionVolume').textContent = 
                         Math.floor(transactionVolume / 1000) + 'K';
@@ -1101,8 +1113,8 @@
                 
                 currentPeriod = this.dataset.period;
                 let metrics = [];
-                if (typeof getDailyMetrics === 'function') {
-                    metrics = await getDailyMetrics();
+                if (typeof window.getDailyMetrics === 'function') {
+                    metrics = await window.getDailyMetrics();
                 }
                 updateInflationChart(metrics, currentPeriod);
                 
@@ -1142,14 +1154,5 @@
         // ===== START =====
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/economic-metrics.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/community-fund.js"></script>
-    <script src="js/economic-events.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
