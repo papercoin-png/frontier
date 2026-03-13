@@ -4,8 +4,8 @@ import {
     getItem,
     setItem,
     addTaxRecord as storageAddTaxRecord,
-    getCommunityFund,  // This import is correct
-    addToCommunityFund
+    getCommunityFund as storageGetCommunityFund,  // Rename the import
+    addToCommunityFund as storageAddToCommunityFund  // Rename this too
 } from './storage.js';
 
 // ===== TAX TYPES =====
@@ -334,7 +334,7 @@ export async function payTax(playerId, playerName, taxType, baseAmount, descript
         description
     });
     
-    await addToCommunityFund(taxAmount, record.id);
+    await storageAddToCommunityFund(amount, record.id);
     
     return {
         paid: taxAmount,
@@ -345,7 +345,7 @@ export async function payTax(playerId, playerName, taxType, baseAmount, descript
 }
 
 // ===== COMMUNITY FUND =====
-// ONLY ONE declaration - using the imported function
+// Use the imported functions directly
 export async function getCommunityFund() {
     return await storageGetCommunityFund();
 }
@@ -355,7 +355,7 @@ export async function addToCommunityFund(amount, taxRecordId) {
 }
 
 export async function allocateFromCommunityFund(amount, purpose, description) {
-    const fund = await getCommunityFund();
+    const fund = await storageGetCommunityFund();
     if (!fund || fund.balance < amount) return false;
     
     fund.balance -= amount;
@@ -372,7 +372,7 @@ export async function allocateFromCommunityFund(amount, purpose, description) {
 }
 
 export async function getCommunityFundSummary() {
-    const fund = await getCommunityFund();
+    const fund = await storageGetCommunityFund();
     if (!fund) return null;
     
     const now = Date.now();
@@ -390,27 +390,6 @@ export async function getCommunityFundSummary() {
         contributionCount: (fund.contributions || []).length,
         allocationCount: (fund.allocations || []).length
     };
-}
-
-// Helper functions for community fund
-async function storageGetCommunityFund() {
-    return await getItem('communityFund', 'main');
-}
-
-async function storageAddToCommunityFund(amount, taxRecordId) {
-    const fund = await storageGetCommunityFund();
-    if (!fund) return false;
-    
-    fund.balance += amount;
-    fund.contributions = fund.contributions || [];
-    fund.contributions.push({
-        amount,
-        taxRecordId,
-        timestamp: Date.now()
-    });
-    
-    await setItem('communityFund', fund);
-    return true;
 }
 
 // Helper to get database instance
