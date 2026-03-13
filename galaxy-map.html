@@ -354,7 +354,7 @@
             <span class="current-dot"></span>
             <span id="currentLocationText">Loading location...</span>
         </div>
-        <button class="back-btn" onclick="returnToShip()">← SHIP</button>
+        <button class="back-btn" onclick="window.returnToShip()">← SHIP</button>
         
         <!-- Region boxes will be dynamically created -->
         <div id="regionBoxes"></div>
@@ -392,7 +392,7 @@
             </div>
             
             <!-- ONLY ONE BUTTON - PLOT COURSE -->
-            <button class="travel-btn primary" id="plotBtn" onclick="plotCourseToSector()">🚀 PLOT COURSE TO SECTOR</button>
+            <button class="travel-btn primary" id="plotBtn" onclick="window.plotCourseToSector()">🚀 PLOT COURSE TO SECTOR</button>
         </div>
         
         <canvas id="galaxyCanvas"></canvas>
@@ -406,9 +406,14 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -425,6 +430,10 @@
         const migrationStatus = document.getElementById('migrationStatus');
         const regionPanel = document.getElementById('regionPanel');
         const regionBoxes = document.getElementById('regionBoxes');
+
+        // Make functions available globally for onclick handlers
+        window.returnToShip = returnToShip;
+        window.plotCourseToSector = plotCourseToSector;
 
         // ===== STATE =====
         let currentSector = 'B2';
@@ -499,14 +508,14 @@
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                if (typeof getCurrentSector === 'function') {
-                    currentSector = await getCurrentSector() || 'B2';
+                if (typeof window.getCurrentSector === 'function') {
+                    currentSector = await window.getCurrentSector() || 'B2';
                 } else {
                     currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 }
                 
-                if (typeof getCurrentRegion === 'function') {
-                    currentRegion = await getCurrentRegion() || 'Orion Arm';
+                if (typeof window.getCurrentRegion === 'function') {
+                    currentRegion = await window.getCurrentRegion() || 'Orion Arm';
                 } else {
                     currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
                 }
@@ -588,7 +597,7 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== PLOT COURSE TO SECTOR (USES NAVIGATION.JS) =====
+        // ===== PLOT COURSE TO SECTOR =====
         async function plotCourseToSector() {
             if (!selectedSector || !selectedRegion) {
                 alert('Please select a destination sector first');
@@ -608,9 +617,9 @@
                 });
                 
                 // Save plot data using navigation.js functions
-                if (typeof savePlotData === 'function') {
+                if (typeof window.savePlotData === 'function') {
                     // Use navigation.js
-                    savePlotData({
+                    window.savePlotData({
                         fromSector: currentSector,
                         fromRegion: currentRegion,
                         destSector: selectedSector,
@@ -689,7 +698,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading galaxy map...';
                 
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -717,11 +726,5 @@
 
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
