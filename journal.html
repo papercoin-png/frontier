@@ -1,1 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Journal</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .journal-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .journal-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .journal-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .journal-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .collection-stats {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .stat-label {
+            font-size: 10px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .filter-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .filter-btn.active {
+            background: #6a8ac0;
+            color: #ffffff;
+            border-color: #aac8ff;
+            box-shadow: 0 0 15px #3a5a8a;
+        }
+        
+        .filter-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Search Box */
+        .search-container {
+            margin-bottom: 15px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 20px;
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            color: #ffffff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            outline: none;
+        }
+        
+        .search-input::placeholder {
+            color: #a0c0ff;
+            opacity: 0.6;
+        }
+        
+        /* Sort Bar */
+        .sort-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        
+        .sort-select {
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #ffffff;
+            padding: 8px 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .sort-select option {
+            background: #0a1a2a;
+        }
+        
+        /* Elements Grid */
+        .elements-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .element-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .element-card:active {
+            transform: scale(0.99);
+            background: rgba(60, 90, 140, 0.7);
+        }
+        
+        .element-main-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .element-symbol {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .element-info {
+            flex: 1;
+        }
+        
+        .element-name-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+        
+        .element-name {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .element-count {
+            font-size: 14px;
+            color: #ffd966;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        
+        .element-details {
+            display: flex;
+            gap: 15px;
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .element-first-found {
+            color: #6a8ac0;
+        }
+        
+        .expand-icon {
+            color: #a0c0ff;
+            font-size: 20px;
+            transition: transform 0.3s;
+            margin-left: 10px;
+        }
+        
+        .expand-icon.expanded {
+            transform: rotate(90deg);
+        }
+        
+        /* Expanded Locations */
+        .locations-section {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(74, 138, 192, 0.3);
+        }
+        
+        .locations-section.show {
+            display: block;
+        }
+        
+        .locations-title {
+            color: #a0c0ff;
+            font-size: 12px;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .location-item {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid #4a8ac0;
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .location-item:active {
+            background: rgba(74, 138, 192, 0.3);
+            transform: scale(0.98);
+        }
+        
+        .location-path {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffffff;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        
+        .location-sector {
+            color: #4affaa;
+        }
+        
+        .location-star-sector {
+            color: #ffd966;
+        }
+        
+        .location-star {
+            color: #b0b0ff;
+        }
+        
+        .location-planet {
+            color: #ffaa4a;
+        }
+        
+        .location-arrow {
+            color: #6a8ac0;
+            font-size: 12px;
+        }
+        
+        .warp-hint {
+            color: #4affaa;
+            font-size: 11px;
+            margin-top: 5px;
+            text-align: right;
+            font-style: italic;
+        }
+        
+        /* Rarity Colors */
+        .rarity-common { 
+            border-color: #ffffff; 
+            color: #ffffff;
+        }
+        .rarity-uncommon { 
+            border-color: #b0ffb0; 
+            color: #b0ffb0;
+        }
+        .rarity-rare { 
+            border-color: #b0b0ff; 
+            color: #b0b0ff;
+        }
+        .rarity-very-rare { 
+            border-color: #e0b0ff; 
+            color: #e0b0ff;
+        }
+        .rarity-legendary { 
+            border-color: #ffd700; 
+            color: #ffd700;
+        }
+        
+        /* Warp Confirmation Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(20, 30, 50, 0.95);
+            backdrop-filter: blur(15px);
+            border: 3px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 25px;
+            width: 280px;
+            text-align: center;
+            color: #ffffff;
+            box-shadow: 0 0 30px #4affaa;
+        }
+        
+        .modal-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .modal-destination {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .modal-path {
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .modal-distance {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        
+        .modal-distance-value {
+            color: #4affaa;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            background: rgba(74, 138, 192, 0.3);
+            border: 2px solid #6a8ac0;
+            color: #ffffff;
+            padding: 14px;
+            border-radius: 40px 10px 40px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+        }
+        
+        .modal-btn:active {
+            background: #6a8ac0;
+            transform: scale(0.95);
+        }
+        
+        .modal-btn.warp {
+            background: rgba(74, 255, 170, 0.2);
+            border-color: #4affaa;
+            color: #4affaa;
+        }
+        
+        .modal-btn.warp:active {
+            background: #4affaa;
+            color: #0a0a1a;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #6a8ac0;
+            font-style: italic;
+        }
+        
+        /* Back Button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="journal-view" id="journalView">
+            <!-- Header -->
+            <div class="journal-header">
+                <div class="journal-title">Journal</div>
+                <div class="journal-subtitle">✦ discovered elements ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="collection-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalElements">0</div>
+                        <div class="stat-label">TOTAL</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="uniqueElements">0</div>
+                        <div class="stat-label">UNIQUE</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalMass">0</div>
+                        <div class="stat-label">MASS</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <span class="filter-btn active" onclick="filterElements('all')">All</span>
+                <span class="filter-btn" onclick="filterElements('common')">Common</span>
+                <span class="filter-btn" onclick="filterElements('uncommon')">Uncommon</span>
+                <span class="filter-btn" onclick="filterElements('rare')">Rare</span>
+                <span class="filter-btn" onclick="filterElements('very-rare')">Very Rare</span>
+                <span class="filter-btn" onclick="filterElements('legendary')">Legendary</span>
+            </div>
+            
+            <!-- Search Box -->
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search elements..." oninput="searchElements()">
+            </div>
+            
+            <!-- Sort Bar -->
+            <div class="sort-bar">
+                <select class="sort-select" id="sortSelect" onchange="sortElements()">
+                    <option value="name">Sort by Name</option>
+                    <option value="count">Sort by Quantity</option>
+                    <option value="rarity">Sort by Rarity</option>
+                    <option value="firstFound">Sort by Discovery</option>
+                </select>
+            </div>
+            
+            <!-- Elements Grid -->
+            <div class="elements-grid" id="elementsGrid">
+                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading journal...</div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToBridge()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">SHIP BRIDGE</span>
+                <span class="back-icon">🚀</span>
+            </button>
+        </div>
+        
+        <!-- Warp Confirmation Modal -->
+        <div class="modal-overlay" id="warpModal">
+            <div class="modal-content">
+                <div class="modal-title">🚀 WARP TO PLANET</div>
+                <div class="modal-destination" id="modalPlanet">Earth</div>
+                <div class="modal-path" id="modalPath">Orion Arm › Sol › Earth</div>
+                
+                <div class="modal-distance">
+                    <div>Distance</div>
+                    <div class="modal-distance-value" id="modalDistance">0.0 LY</div>
+                    <div id="modalCycles">0 cycles • 0⭐</div>
+                </div>
+                
+                <p class="warning-text">This will start a warp journey</p>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn warp" onclick="confirmWarp()">WARP</button>
+                    <button class="modal-btn" onclick="closeWarpModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">loading journal...</div>
+        </div>
+        
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
+    </div>
 
+    <!-- Load all JS files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/migration.js"></script>
+
+    <!-- Fallback Functions -->
+    <script>
+    (function() {
+        window.getCollection = window.getCollection || function() {
+            const saved = localStorage.getItem('voidfarer_collection');
+            return saved ? JSON.parse(saved) : {};
+        };
+
+        window.getElementMass = window.getElementMass || function(elementName) {
+            const masses = {
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00,
+                'Fluorine': 19.00, 'Neon': 20.18, 'Sodium': 22.99, 'Magnesium': 24.31,
+                'Aluminum': 26.98, 'Silicon': 28.09, 'Phosphorus': 30.97, 'Sulfur': 32.06,
+                'Chlorine': 35.45, 'Argon': 39.95, 'Potassium': 39.10, 'Calcium': 40.08,
+                'Iron': 55.85, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
+                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
+                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Promethium': 145.0,
+                'default': 100.0
+            };
+            return masses[elementName] || masses.default;
+        };
+    })();
+    </script>
+
+    <script>
+        // ===== MAIN JOURNAL SCRIPT =====
+        const { openDB } = idb;
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a1a2a');
+            tg.setBackgroundColor('#0a1a2a');
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const elementsGrid = document.getElementById('elementsGrid');
+        const warpModal = document.getElementById('warpModal');
+
+        // ===== STATE =====
+        let allElements = [];
+        let filteredElements = [];
+        let currentFilter = 'all';
+        let searchTerm = '';
+        let sortBy = 'name';
+        let expandedElement = null;
+        
+        // Current warp target
+        let currentWarpTarget = null;
+
+        // ===== ELEMENT DATA =====
+        const elementData = {
+            'Hydrogen': { symbol: 'H', rarity: 'common', planets: ['Earth', 'Glacier-7'] },
+            'Helium': { symbol: 'He', rarity: 'common', planets: ['Aether', 'Glacier-7'] },
+            'Lithium': { symbol: 'Li', rarity: 'common', planets: ['Earth', 'Pyros'] },
+            'Beryllium': { symbol: 'Be', rarity: 'common', planets: ['Verdant Prime'] },
+            'Boron': { symbol: 'B', rarity: 'common', planets: ['Verdant Prime'] },
+            'Sodium': { symbol: 'Na', rarity: 'common', planets: ['Earth', 'Glacier-7'] },
+            'Magnesium': { symbol: 'Mg', rarity: 'common', planets: ['Earth', 'Pyros'] },
+            'Aluminum': { symbol: 'Al', rarity: 'common', planets: ['Earth', 'Verdant Prime'] },
+            'Silicon': { symbol: 'Si', rarity: 'common', planets: ['Earth', 'Verdant Prime'] },
+            'Potassium': { symbol: 'K', rarity: 'common', planets: ['Earth', 'Verdant Prime'] },
+            'Calcium': { symbol: 'Ca', rarity: 'common', planets: ['Earth', 'Verdant Prime'] },
+            'Carbon': { symbol: 'C', rarity: 'uncommon', planets: ['Earth', 'Verdant Prime'] },
+            'Nitrogen': { symbol: 'N', rarity: 'uncommon', planets: ['Earth', 'Aether'] },
+            'Oxygen': { symbol: 'O', rarity: 'uncommon', planets: ['Earth', 'Verdant Prime'] },
+            'Iron': { symbol: 'Fe', rarity: 'uncommon', planets: ['Earth', 'Pyros', 'Verdant Prime'] },
+            'Nickel': { symbol: 'Ni', rarity: 'uncommon', planets: ['Pyros', 'Verdant Prime'] },
+            'Copper': { symbol: 'Cu', rarity: 'rare', planets: ['Pyros', 'Verdant Prime'] },
+            'Silver': { symbol: 'Ag', rarity: 'rare', planets: ['Pyros'] },
+            'Gold': { symbol: 'Au', rarity: 'rare', planets: ['Pyros', 'Verdant Prime'] },
+            'Platinum': { symbol: 'Pt', rarity: 'rare', planets: ['Pyros'] },
+            'Titanium': { symbol: 'Ti', rarity: 'rare', planets: ['Verdant Prime', 'Pyros'] },
+            'Uranium': { symbol: 'U', rarity: 'very-rare', planets: ['Pyros-Deep'] },
+            'Thorium': { symbol: 'Th', rarity: 'very-rare', planets: ['Pyros-Deep'] },
+            'Promethium': { symbol: 'Pm', rarity: 'legendary', planets: ['Aether-Veil'] }
+        };
+
+        // ===== GET ELEMENT SYMBOL =====
+        function getElementSymbol(elementName) {
+            return elementData[elementName]?.symbol || elementName.substring(0, 2);
+        }
+
+        // ===== GET ELEMENT RARITY =====
+        function getElementRarity(elementName) {
+            return elementData[elementName]?.rarity || 'common';
+        }
+
+        // ===== GET RARITY CLASS =====
+        function getRarityClass(elementName) {
+            const rarity = getElementRarity(elementName);
+            return `rarity-${rarity}`;
+        }
+
+        // ===== GET PLANET LOCATIONS =====
+        function getPlanetLocations(elementName) {
+            return elementData[elementName]?.planets || ['Earth'];
+        }
+
+        // ===== LOAD JOURNAL DATA =====
+        async function loadJournalData() {
+            try {
+                loadingText.textContent = 'loading journal...';
+                
+                // Get collection
+                let collection = {};
+                if (typeof window.getCollection === 'function') {
+                    collection = await window.getCollection();
+                } else {
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
+                }
+                
+                // Convert to array
+                allElements = [];
+                let totalMass = 0;
+                
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = data.count || 1;
+                    const mass = window.getElementMass(name);
+                    totalMass += count * mass;
+                    
+                    allElements.push({
+                        name: name,
+                        count: count,
+                        mass: mass,
+                        totalMass: count * mass,
+                        firstFound: data.firstFound || new Date().toISOString(),
+                        symbol: getElementSymbol(name),
+                        rarity: getElementRarity(name),
+                        planets: getPlanetLocations(name)
+                    });
+                }
+                
+                // Sort by name default
+                allElements.sort((a, b) => a.name.localeCompare(b.name));
+                
+                // Update stats
+                document.getElementById('totalElements').textContent = allElements.reduce((sum, e) => sum + e.count, 0);
+                document.getElementById('uniqueElements').textContent = allElements.length;
+                document.getElementById('totalMass').textContent = totalMass.toFixed(0);
+                
+                // Apply filters
+                applyFilters();
+                
+            } catch (error) {
+                console.error('Error loading journal:', error);
+                elementsGrid.innerHTML = '<div class="empty-state">Error loading journal</div>';
+            }
+        }
+
+        // ===== APPLY FILTERS =====
+        function applyFilters() {
+            filteredElements = allElements.filter(element => {
+                if (currentFilter !== 'all' && element.rarity !== currentFilter) return false;
+                if (searchTerm && !element.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                return true;
+            });
+            
+            sortElements(false); // false = don't re-trigger filter
+        }
+
+        // ===== FILTER ELEMENTS =====
+        function filterElements(rarity) {
+            currentFilter = rarity;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            applyFilters();
+        }
+
+        // ===== SEARCH ELEMENTS =====
+        function searchElements() {
+            searchTerm = document.getElementById('searchInput').value;
+            applyFilters();
+        }
+
+        // ===== SORT ELEMENTS =====
+        function sortElements(updateFromSelect = true) {
+            if (updateFromSelect) {
+                sortBy = document.getElementById('sortSelect').value;
+            }
+            
+            switch(sortBy) {
+                case 'name':
+                    filteredElements.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'count':
+                    filteredElements.sort((a, b) => b.count - a.count);
+                    break;
+                case 'rarity':
+                    const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
+                    filteredElements.sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0));
+                    break;
+                case 'firstFound':
+                    filteredElements.sort((a, b) => new Date(b.firstFound) - new Date(a.firstFound));
+                    break;
+            }
+            
+            renderElements();
+        }
+
+        // ===== TOGGLE ELEMENT EXPAND =====
+        function toggleExpand(elementName) {
+            if (expandedElement === elementName) {
+                expandedElement = null;
+            } else {
+                expandedElement = elementName;
+            }
+            renderElements();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== SHOW WARP MODAL =====
+        function showWarpModal(planet, path) {
+            // Parse path string to get locations
+            const pathParts = path.split(' › ');
+            const sector = pathParts[0] || 'Orion Arm';
+            const starSector = pathParts[1] || 'Orion Molecular Cloud';
+            const star = pathParts[2] || 'Sol';
+            
+            currentWarpTarget = {
+                planet: planet,
+                sector: sector,
+                starSector: starSector,
+                star: star
+            };
+            
+            // Calculate approximate distance (simplified for demo)
+            const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+            const distance = (currentSector === 'B2') ? 2.3 : 4.6;
+            const cycles = Math.min(5, Math.ceil(distance / 1.5));
+            const fuel = Math.floor(distance * 4) + 5;
+            
+            document.getElementById('modalPlanet').textContent = planet;
+            document.getElementById('modalPath').textContent = path;
+            document.getElementById('modalDistance').textContent = distance.toFixed(1) + ' LY';
+            document.getElementById('modalCycles').textContent = cycles + ' cycles • ' + fuel + '⭐';
+            
+            warpModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE WARP MODAL =====
+        function closeWarpModal() {
+            warpModal.classList.remove('active');
+            currentWarpTarget = null;
+        }
+
+        // ===== CONFIRM WARP =====
+        function confirmWarp() {
+            if (!currentWarpTarget) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'plotting course...';
+            
+            try {
+                // Prepare warp data
+                const warpData = {
+                    destination: currentWarpTarget.planet,
+                    destinationType: 'planet',
+                    startLocation: localStorage.getItem('voidfarer_current_planet') || 'Earth',
+                    startLocationType: 'planet',
+                    totalDistance: parseFloat(document.getElementById('modalDistance').textContent),
+                    warpCycles: parseInt(document.getElementById('modalCycles').textContent.split(' ')[0]),
+                    fuelCost: parseInt(document.getElementById('modalCycles').textContent.split('•')[1].trim().replace('⭐', '')),
+                    returnPage: 'surface.html',
+                    
+                    // Store destination info
+                    destSector: currentWarpTarget.sector,
+                    destRegion: currentWarpTarget.sector,
+                    destStarSector: currentWarpTarget.starSector,
+                    destStar: currentWarpTarget.star,
+                    destPlanet: currentWarpTarget.planet
+                };
+                
+                localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
+                
+                setTimeout(() => {
+                    window.location.href = 'warp.html';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Warp error:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to plot course');
+            }
+            
+            closeWarpModal();
+        }
+
+        // ===== RENDER ELEMENTS =====
+        function renderElements() {
+            if (filteredElements.length === 0) {
+                elementsGrid.innerHTML = '<div class="empty-state">No elements found in your journal</div>';
+                return;
+            }
+            
+            let html = '';
+            filteredElements.forEach(element => {
+                const rarityClass = getRarityClass(element.name);
+                const isExpanded = expandedElement === element.name;
+                const firstFoundDate = new Date(element.firstFound).toLocaleDateString();
+                
+                // Generate location items
+                let locationsHtml = '';
+                element.planets.forEach(planet => {
+                    // Construct a plausible path (simplified for demo)
+                    let path = '';
+                    if (planet.includes('Pyros')) {
+                        path = 'Sagittarius Arm › Pyros Nebula › Pyros Star › ' + planet;
+                    } else if (planet.includes('Earth')) {
+                        path = 'Orion Arm › Orion Molecular Cloud › Sol › Earth';
+                    } else if (planet.includes('Verdant')) {
+                        path = 'Orion Arm › Orion Molecular Cloud › Verdant Star › ' + planet;
+                    } else if (planet.includes('Glacier')) {
+                        path = 'Outer Arm › Glacier Nebula › Glacier Star › ' + planet;
+                    } else {
+                        path = 'Orion Arm › Orion Molecular Cloud › Sol › ' + planet;
+                    }
+                    
+                    locationsHtml += `
+                        <div class="location-item" onclick="showWarpModal('${planet}', '${path}')">
+                            <div class="location-path">
+                                <span class="location-sector">${path.split(' › ')[0]}</span>
+                                <span class="location-arrow">→</span>
+                                <span class="location-star-sector">${path.split(' › ')[1]}</span>
+                                <span class="location-arrow">→</span>
+                                <span class="location-star">${path.split(' › ')[2]}</span>
+                                <span class="location-arrow">→</span>
+                                <span class="location-planet">${planet}</span>
+                            </div>
+                            <div class="warp-hint">Tap to warp →</div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                    <div class="element-card ${rarityClass}">
+                        <div class="element-main-row" onclick="toggleExpand('${element.name}')">
+                            <div class="element-symbol">${element.symbol}</div>
+                            <div class="element-info">
+                                <div class="element-name-row">
+                                    <span class="element-name">${element.name}</span>
+                                    <span class="element-count">${element.count}</span>
+                                </div>
+                                <div class="element-details">
+                                    <span>⚖️ ${element.totalMass.toFixed(1)} AMU</span>
+                                    <span class="element-first-found">📅 ${firstFoundDate}</span>
+                                </div>
+                            </div>
+                            <div class="expand-icon ${isExpanded ? 'expanded' : ''}">▶</div>
+                        </div>
+                        
+                        <div class="locations-section ${isExpanded ? 'show' : ''}">
+                            <div class="locations-title">📍 Found on these planets:</div>
+                            ${locationsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            elementsGrid.innerHTML = html;
+        }
+
+        // ===== RETURN TO BRIDGE =====
+        function returnToBridge() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'opening journal...';
+                
+                await loadJournalData();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading journal';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // Expose functions globally
+        window.filterElements = filterElements;
+        window.searchElements = searchElements;
+        window.sortElements = sortElements;
+        window.toggleExpand = toggleExpand;
+        window.showWarpModal = showWarpModal;
+        window.closeWarpModal = closeWarpModal;
+        window.confirmWarp = confirmWarp;
+        window.returnToBridge = returnToBridge;
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
