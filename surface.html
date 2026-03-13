@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
+        /* Keep all existing styles the same */
         * {
             margin: 0;
             padding: 0;
@@ -504,6 +505,11 @@
         let isExtracting = true;
         let extractionTimer = null;
         
+        // Cache for cargo mass to avoid frequent database reads
+        let cachedCargoMass = 0;
+        let lastMassUpdate = 0;
+        const MASS_UPDATE_INTERVAL = 2000; // Update mass every 2 seconds
+        
         const elementData = {
             'Hydrogen': { symbol: 'H', rarity: 'common' },
             'Helium': { symbol: 'He', rarity: 'common' },
@@ -575,16 +581,24 @@
         }
 
         async function getCurrentCargoMass() {
+            const now = Date.now();
+            // Use cached value if it's recent
+            if (cachedCargoMass > 0 && now - lastMassUpdate < MASS_UPDATE_INTERVAL) {
+                return cachedCargoMass;
+            }
+            
             try {
                 const collection = await window.getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     mass += (data.count || 1) * getElementMass(name);
                 }
+                cachedCargoMass = mass;
+                lastMassUpdate = now;
                 return mass;
             } catch (error) {
                 console.error('Error getting cargo mass:', error);
-                return 0;
+                return cachedCargoMass || 0;
             }
         }
 
@@ -720,14 +734,13 @@
             }, 3000);
         }
 
-        // FIXED: Use setInterval but with a flag to prevent overlap
-        async function attemptExtraction() {
+        // FIXED: Much faster extraction - no await on database operations
+        function attemptExtraction() {
             if (!isExtracting) return;
             
             try {
-                const currentMass = await updateCargoDisplay();
-                
-                if (currentMass >= CARGO_MASS_LIMIT) {
+                // Use cached mass - much faster
+                if (cachedCargoMass >= CARGO_MASS_LIMIT) {
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
                     if (extractionTimer) {
@@ -753,16 +766,22 @@
                 if (success) {
                     const mass = getElementMass(resource);
                     
-                    if (currentMass + mass <= CARGO_MASS_LIMIT) {
+                    if (cachedCargoMass + mass <= CARGO_MASS_LIMIT) {
                         if (typeof window.addElementToCollection === 'function') {
-                            const result = await window.addElementToCollection(resource, 1);
-                            
-                            if (result && result.success) {
-                                await updateCargoDisplay();
-                                showToast(resource, true);
-                            } else {
+                            // Don't await - let it happen in background
+                            window.addElementToCollection(resource, 1).then(result => {
+                                if (result && result.success) {
+                                    // Update cache optimistically
+                                    cachedCargoMass += mass;
+                                    updateCargoDisplay();
+                                    showToast(resource, true);
+                                } else {
+                                    showToast(resource, false);
+                                }
+                            }).catch(error => {
+                                console.error('Extraction error:', error);
                                 showToast(resource, false);
-                            }
+                            });
                         }
                     }
                 } else {
@@ -803,12 +822,13 @@
                 const resource = currentPlanet.resources[randomIndex];
                 const mass = getElementMass(resource);
                 
-                const currentMass = await updateCargoDisplay();
+                await updateCargoDisplay();
                 
-                if (currentMass + mass <= CARGO_MASS_LIMIT) {
+                if (cachedCargoMass + mass <= CARGO_MASS_LIMIT) {
                     if (typeof window.addElementToCollection === 'function') {
                         const result = await window.addElementToCollection(resource, 1);
                         if (result && result.success) {
+                            cachedCargoMass += mass;
                             await updateCargoDisplay();
                             showToast(resource, true);
                         }
