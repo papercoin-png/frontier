@@ -483,10 +483,13 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
+    <script type="module">
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -506,6 +509,12 @@
         const cumulativeInfoEl = document.getElementById('cumulativeInfo');
         const previousDistanceEl = document.getElementById('previousDistance');
         const afterThisLegEl = document.getElementById('afterThisLeg');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        // This is the critical fix - all onclick handlers need these
+        window.returnToSectors = returnToSectors;
+        window.handleStarAction = handleStarAction;
+        window.hideStarInfo = hideStarInfo;
 
         // ===== CONSTANTS =====
         const UNIVERSE_SEED = 42793;
@@ -634,9 +643,9 @@
         async function loadClusterData() {
             try {
                 // Load data from storage
-                const star = typeof getCurrentStar === 'function' ? await getCurrentStar() : '';
-                const starSector = typeof getCurrentNebula === 'function' ? await getCurrentNebula() : 'Orion Molecular Cloud';
-                const count = typeof getCurrentSectorStars === 'function' ? await getCurrentSectorStars() : 85;
+                const star = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : '';
+                const starSector = typeof window.getCurrentNebula === 'function' ? await window.getCurrentNebula() : 'Orion Molecular Cloud';
+                const count = typeof window.getCurrentSectorStars === 'function' ? await window.getCurrentSectorStars() : 85;
 
                 currentStarName = star || '';
                 clusterName = starSector || 'Orion Molecular Cloud';
@@ -680,7 +689,7 @@
                     planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
                 }
                 
-                const isCurrent = (starType.name === currentStarName);
+                const isCurrent = (star.name === currentStarName);
                 const distance = generateStarDistance(i, isCurrent);
                 
                 stars.push({
@@ -769,8 +778,8 @@
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
                 
                 // Save star data
-                if (typeof setCurrentStar === 'function') {
-                    await setCurrentStar(
+                if (typeof window.setCurrentStar === 'function') {
+                    await window.setCurrentStar(
                         selectedStar.name,
                         selectedStar.type,
                         selectedStar.index,
@@ -816,8 +825,8 @@
                 });
                 
                 // Save star data using navigation.js if available
-                if (typeof savePlotStar === 'function') {
-                    savePlotStar(selectedStar.name, selectedStar.distance);
+                if (typeof window.savePlotStar === 'function') {
+                    window.savePlotStar(selectedStar.name, selectedStar.distance);
                 } else {
                     // Fallback to direct localStorage
                     localStorage.setItem('voidfarer_plot_star', selectedStar.name);
@@ -892,7 +901,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star cluster...';
 
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -917,11 +926,5 @@
 
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
