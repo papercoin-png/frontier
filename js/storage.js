@@ -278,6 +278,16 @@ export async function canAddToCargo(elementName, quantity = 1) {
     }
 }
 
+// ===== HELPER: Settings storage (keep in localStorage for simplicity) =====
+function getSetting(key, defaultValue) {
+    const value = localStorage.getItem(key);
+    return value !== null ? value : defaultValue;
+}
+
+function setSetting(key, value) {
+    localStorage.setItem(key, value.toString());
+}
+
 // ===== INITIALIZATION =====
 export async function initializeStorage() {
     console.log('Initializing storage...');
@@ -421,6 +431,7 @@ export async function addElementToCollection(elementName, count = 1) {
                 await savePlayer(player);
             }
             
+            // Return the actual new count from the database
             return { success: true, newCount: result.count };
         } else {
             return { success: false, reason: 'database_error', error: result?.error };
