@@ -550,7 +550,7 @@
         
         <!-- UI Elements -->
         <div class="ui-header" id="systemName">Loading System...</div>
-        <button class="back-btn" onclick="goBack()">← STAR CLUSTER</button>
+        <button class="back-btn" onclick="window.goBack()">← STAR CLUSTER</button>
         
         <div class="system-info" id="systemInfo">
             <div id="planetCount">-- planets</div>
@@ -619,8 +619,8 @@
             <p class="warning-text" id="planetWarning"></p>
             
             <!-- Dynamic Action Button -->
-            <button class="action-btn" id="actionBtn" onclick="handlePlanetAction()">🚀 SET COURSE</button>
-            <button class="close-btn" onclick="hidePlanetInfo()">CLOSE</button>
+            <button class="action-btn" id="actionBtn" onclick="window.handlePlanetAction()">🚀 SET COURSE</button>
+            <button class="close-btn" onclick="window.hidePlanetInfo()">CLOSE</button>
         </div>
         
         <!-- Loading Overlay -->
@@ -633,9 +633,15 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <script>
-        // ===== MAKE SURE idb IS AVAILABLE =====
-        const { openDB } = idb;
+    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/warp-calculator.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@8/build/umd.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -656,6 +662,11 @@
         const totalDistanceEl = document.getElementById('totalDistance');
         const totalCyclesEl = document.getElementById('totalCycles');
         const totalFuelEl = document.getElementById('totalFuel');
+
+        // Make functions available globally for onclick handlers
+        window.goBack = goBack;
+        window.handlePlanetAction = handlePlanetAction;
+        window.hidePlanetInfo = hidePlanetInfo;
 
         // ===== STATE =====
         let starData = null;
@@ -836,14 +847,14 @@
         // ===== LOAD CURRENT LOCATION =====
         async function loadCurrentLocation() {
             try {
-                if (typeof getCurrentSector === 'function') {
-                    currentSector = await getCurrentSector() || 'B2';
+                if (typeof window.getCurrentSector === 'function') {
+                    currentSector = await window.getCurrentSector() || 'B2';
                 } else {
                     currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 }
                 
-                if (typeof getCurrentRegion === 'function') {
-                    currentRegion = await getCurrentRegion() || 'Orion Arm';
+                if (typeof window.getCurrentRegion === 'function') {
+                    currentRegion = await window.getCurrentRegion() || 'Orion Arm';
                 } else {
                     currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
                 }
@@ -861,7 +872,7 @@
         // ===== LOAD STAR DATA =====
         async function loadStarData() {
             try {
-                currentStarName = typeof getCurrentStar === 'function' ? await getCurrentStar() : 'Unknown Star';
+                currentStarName = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : 'Unknown Star';
                 const starSeed = UNIVERSE_SEED + (currentStarName ? hashString(currentStarName) : 0);
                 
                 const starTypeObj = getStarType(starSeed, 0);
@@ -1193,9 +1204,9 @@
         // ===== GO BACK =====
         function goBack() {
             if (isPlotMode) {
-                window.location.href = 'star-cluster.html?mode=plot';
+                window.location.href = 'cluster-view.html?mode=plot';
             } else {
-                window.location.href = 'star-cluster.html';
+                window.location.href = 'cluster-view.html';
             }
         }
 
@@ -1205,7 +1216,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading star system...';
 
-                const credits = typeof getCredits === 'function' ? await getCredits() : 5000;
+                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
                 if (!credits) {
                     window.location.href = 'index.html';
                     return;
@@ -1237,12 +1248,5 @@
 
         init();
     </script>
-    
-    <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/warp-calculator.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
 </body>
 </html>
