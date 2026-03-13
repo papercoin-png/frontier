@@ -326,14 +326,8 @@
             display: flex;
             align-items: center;
             gap: 15px;
-            cursor: pointer;
             transition: all 0.1s;
             position: relative;
-        }
-        
-        .cargo-item:active {
-            background: rgba(60, 90, 140, 0.7);
-            transform: scale(0.99);
         }
         
         .item-icon {
@@ -403,42 +397,6 @@
             color: white;
             transform: scale(0.95);
         }
-        
-        .item-market {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            margin-right: 10px;
-        }
-        
-        .item-market-price {
-            color: #4affaa;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        
-        .item-market-change {
-            font-size: 11px;
-        }
-        
-        .price-up { color: #4affaa; }
-        .price-down { color: #ff6b6b; }
-        
-        .item-rarity {
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 30px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid currentColor;
-            min-width: 70px;
-            text-align: center;
-        }
-        
-        .rarity-common { color: #ffffff; }
-        .rarity-uncommon { color: #b0ffb0; }
-        .rarity-rare { color: #b0b0ff; }
-        .rarity-very-rare { color: #e0b0ff; }
-        .rarity-legendary { color: #ffd700; }
         
         /* Eject Modal */
         .modal-overlay {
@@ -954,7 +912,6 @@
 
         // ===== GET ELEMENT RARITY =====
         function getElementRarity(elementName) {
-            // This would ideally come from a database
             if (['Gold', 'Silver', 'Platinum', 'Titanium', 'Copper'].includes(elementName)) return 'rare';
             if (['Uranium', 'Thorium', 'Plutonium'].includes(elementName)) return 'very-rare';
             if (['Promethium'].includes(elementName)) return 'legendary';
@@ -987,29 +944,32 @@
                 
                 // Convert collection to array
                 cargoItems = [];
+                let totalMass = 0;
+                let totalItems = 0;
+                let totalValue = 0;
+                
                 for (const [name, data] of Object.entries(collection)) {
                     const count = data.count || 1;
                     const massPerUnit = getElementMass(name);
-                    const totalMass = count * massPerUnit;
+                    const totalItemMass = count * massPerUnit;
                     const valuePerUnit = getElementValue(name);
-                    const totalValue = count * valuePerUnit;
+                    const totalItemValue = count * valuePerUnit;
+                    
+                    totalMass += totalItemMass;
+                    totalItems += count;
+                    totalValue += totalItemValue;
                     
                     cargoItems.push({
                         name: name,
                         count: count,
                         massPerUnit: massPerUnit,
-                        totalMass: totalMass,
+                        totalMass: totalItemMass,
                         valuePerUnit: valuePerUnit,
-                        totalValue: totalValue,
+                        totalValue: totalItemValue,
                         icon: getElementIcon(name),
                         rarity: getElementRarity(name)
                     });
                 }
-                
-                // Calculate totals
-                const totalMass = cargoItems.reduce((sum, item) => sum + item.totalMass, 0);
-                const totalItems = cargoItems.reduce((sum, item) => sum + item.count, 0);
-                const totalValue = cargoItems.reduce((sum, item) => sum + item.totalValue, 0);
                 
                 // Update stats
                 document.getElementById('totalItems').textContent = totalItems;
@@ -1210,6 +1170,20 @@
                 } else {
                     // Fallback for testing
                     console.log(`Would eject ${quantity} of ${currentEjectItem}`);
+                    
+                    // Update localStorage directly for demo
+                    let collection = {};
+                    const saved = localStorage.getItem('voidfarer_collection');
+                    collection = saved ? JSON.parse(saved) : {};
+                    
+                    if (collection[currentEjectItem]) {
+                        collection[currentEjectItem].count -= quantity;
+                        if (collection[currentEjectItem].count <= 0) {
+                            delete collection[currentEjectItem];
+                        }
+                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
+                    }
+                    
                     result = { success: true };
                 }
                 
@@ -1247,10 +1221,11 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading cargo hold...';
                 
-                // Load cargo data
-                await loadCargoData();
-                
-                setTimeout(() => {
+                // Wait a moment for storage to be ready
+                setTimeout(async () => {
+                    // Load cargo data
+                    await loadCargoData();
+                    
                     loadingOverlay.classList.remove('active');
                 }, 500);
                 
@@ -1268,8 +1243,8 @@
     </script>
     
     <!-- Load all JS files -->
-    <script src="js/storage.js"></script>
     <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
 </body>
 </html>
