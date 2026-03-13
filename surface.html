@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* Keep all existing styles the same */
+        /* Keep all existing styles */
         * {
             margin: 0;
             padding: 0;
@@ -734,7 +734,7 @@
             }, 3000);
         }
 
-        // FIXED: Much faster extraction - no await on database operations
+        // FIXED: Reliable extraction with proper success handling
         function attemptExtraction() {
             if (!isExtracting) return;
             
@@ -761,30 +761,51 @@
                 const randomIndex = Math.floor(Math.random() * activeResources.length);
                 const resource = activeResources[randomIndex];
                 const chance = resourceChances[resource] || 70;
-                const success = Math.random() * 100 < chance;
+                
+                // Simulate extraction success/failure based on chance
+                const roll = Math.random() * 100;
+                const success = roll < chance;
+                
+                // Always show extraction attempt for debugging
+                console.log(`Extracting ${resource}: roll=${roll.toFixed(1)}%, chance=${chance}%, success=${success}`);
                 
                 if (success) {
                     const mass = getElementMass(resource);
                     
                     if (cachedCargoMass + mass <= CARGO_MASS_LIMIT) {
                         if (typeof window.addElementToCollection === 'function') {
-                            // Don't await - let it happen in background
-                            window.addElementToCollection(resource, 1).then(result => {
-                                if (result && result.success) {
-                                    // Update cache optimistically
-                                    cachedCargoMass += mass;
-                                    updateCargoDisplay();
-                                    showToast(resource, true);
-                                } else {
+                            // Use await in an async IIFE to ensure proper handling
+                            (async () => {
+                                try {
+                                    const result = await window.addElementToCollection(resource, 1);
+                                    console.log('Extraction result:', result);
+                                    
+                                    if (result && result.success) {
+                                        // Update cache optimistically
+                                        cachedCargoMass += mass;
+                                        lastMassUpdate = Date.now(); // Reset cache timer
+                                        await updateCargoDisplay(); // Force update
+                                        showToast(resource, true);
+                                        console.log(`Successfully extracted ${resource}`);
+                                    } else {
+                                        console.warn(`Failed to extract ${resource}:`, result);
+                                        showToast(resource, false);
+                                    }
+                                } catch (error) {
+                                    console.error('Extraction error:', error);
                                     showToast(resource, false);
                                 }
-                            }).catch(error => {
-                                console.error('Extraction error:', error);
-                                showToast(resource, false);
-                            });
+                            })();
+                        } else {
+                            console.error('addElementToCollection function not found');
+                            showToast(resource, false);
                         }
+                    } else {
+                        console.log(`Not enough cargo space for ${resource}`);
+                        showToast(resource, false);
                     }
                 } else {
+                    console.log(`Extraction failed (chance roll) for ${resource}`);
                     showToast(resource, false);
                 }
             } catch (error) {
