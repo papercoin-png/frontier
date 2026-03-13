@@ -438,26 +438,10 @@ export async function saveCollection(collection) {
     }
 }
 
+// FIXED: Removed cargo space check since surface.html already handles it
 export async function addElementToCollection(elementName, count = 1) {
     try {
         console.log(`Adding ${count} of ${elementName} to collection`);
-        
-        // Check if we have enough cargo space
-        const canAdd = await canAddToCargo(elementName, count);
-        if (!canAdd) {
-            const remaining = await getRemainingCargoMass();
-            const elementMass = getElementMass(elementName);
-            const maxCanAdd = Math.floor(remaining / elementMass);
-            
-            console.log('Insufficient cargo space');
-            return { 
-                success: false, 
-                reason: 'insufficient_cargo_space',
-                remainingMass: remaining,
-                elementMass: elementMass,
-                maxCanAdd: maxCanAdd
-            };
-        }
         
         const result = await dbAddElement(elementName, count);
         console.log('dbAddElement result:', result);
@@ -1422,7 +1406,6 @@ export async function getPlayerName() {
 }
 
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
-// This is CRITICAL for earth-hub.html, surface.html, cargo.html and other HTML files to work
 window.getCredits = getCredits;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
