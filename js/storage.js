@@ -17,7 +17,7 @@ export const {
     getPlayerTransactions,
     getAllProperties,
     getProperty,
-    addProperty,  // Keep the original name
+    addProperty,
     updateProperty,
     getPropertyItems,
     addItemToProperty,
@@ -1005,10 +1005,6 @@ export async function saveRealEstate(realEstateData) {
     await tx.done;
     saveTimestamp();
 }
-
-// Remove the duplicate addProperty declaration - it's already exported from db
-// The following functions are already exported from db, so we don't need to redeclare them:
-// getProperty, updateProperty, etc.
 
 // ===== TAX TRANSACTIONS =====
 export async function addTaxRecord(record) {
