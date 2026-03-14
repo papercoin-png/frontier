@@ -1,15 +1,8 @@
 // js/warp-calculator.js - Distance and warp calculation utilities for Voidfarer
 // Handles all warp-related math including fuel costs, travel time, and cycle calculations
 
-// ===== CONSTANTS =====
-const WARP_CONFIG = {
-    CYCLE_DURATION: 2000, // 2 seconds per cycle
-    BASE_FUEL_COST: 5, // Minimum fuel for any jump
-    FUEL_PER_LY: 4, // Fuel cost per light year
-    MAX_CYCLES: 5, // Maximum warp cycles
-    LY_PER_CYCLE: 2.3, // Average light years per cycle
-    SPEED_FACTOR: 1.0, // Base speed multiplier
-};
+// ===== WARP CONFIG is now imported from navigation.js via window object =====
+// We'll use window.WARP_CONFIG if available, otherwise fallback to local values
 
 // ===== DISTANCE TO CYCLES MAPPING =====
 function getWarpCyclesFromDistance(distance) {
@@ -22,16 +15,20 @@ function getWarpCyclesFromDistance(distance) {
 
 // ===== FUEL COST CALCULATION =====
 function getFuelCostFromDistance(distance) {
-    return Math.floor(distance * WARP_CONFIG.FUEL_PER_LY) + WARP_CONFIG.BASE_FUEL_COST;
+    const fuelPerLy = window.WARP_CONFIG?.FUEL_PER_LY || 4;
+    const baseFuel = window.WARP_CONFIG?.BASE_FUEL_COST || 5;
+    return Math.floor(distance * fuelPerLy) + baseFuel;
 }
 
 // ===== TRAVEL TIME CALCULATION =====
 function getTravelTimeFromCycles(cycles) {
-    return cycles * (WARP_CONFIG.CYCLE_DURATION / 1000); // Returns seconds
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
+    return cycles * (cycleDuration / 1000); // Returns seconds
 }
 
 function getTravelTimeMsFromCycles(cycles) {
-    return cycles * WARP_CONFIG.CYCLE_DURATION; // Returns milliseconds
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
+    return cycles * cycleDuration; // Returns milliseconds
 }
 
 // ===== DISTANCE TO LIGHT YEARS =====
@@ -213,8 +210,9 @@ function clearWarpData() {
 // ===== WARP CYCLE PROGRESS =====
 // Calculate progress within a warp cycle (0 to 1)
 function getCycleProgress(cycleStartTime, currentTime) {
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
     const elapsed = currentTime - cycleStartTime;
-    return Math.min(elapsed / WARP_CONFIG.CYCLE_DURATION, 1.0);
+    return Math.min(elapsed / cycleDuration, 1.0);
 }
 
 // ===== WARP SPEED FACTOR =====
@@ -235,22 +233,25 @@ function getWarpSpeedFactor(cycleProgress) {
 // ===== TOTAL WARP PROGRESS =====
 // Calculate overall warp progress (0 to 1)
 function getTotalWarpProgress(startTime, currentTime, totalCycles) {
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
+    const totalDuration = totalCycles * cycleDuration;
     const elapsed = currentTime - startTime;
-    const totalDuration = totalCycles * WARP_CONFIG.CYCLE_DURATION;
     return Math.min(elapsed / totalDuration, 1.0);
 }
 
 // ===== CURRENT CYCLE NUMBER =====
 // Get current cycle number based on elapsed time
 function getCurrentCycle(startTime, currentTime) {
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
     const elapsed = currentTime - startTime;
-    return Math.floor(elapsed / WARP_CONFIG.CYCLE_DURATION) + 1;
+    return Math.floor(elapsed / cycleDuration) + 1;
 }
 
 // ===== IS WARP COMPLETE =====
 function isWarpComplete(startTime, currentTime, totalCycles) {
+    const cycleDuration = window.WARP_CONFIG?.CYCLE_DURATION || 2000;
     const elapsed = currentTime - startTime;
-    const totalDuration = totalCycles * WARP_CONFIG.CYCLE_DURATION;
+    const totalDuration = totalCycles * cycleDuration;
     return elapsed >= totalDuration;
 }
 
@@ -280,7 +281,7 @@ function getStarSize(z, speedFactor, baseSize = 1) {
 }
 
 // ===== EXPOSE TO WINDOW =====
-window.WARP_CONFIG = WARP_CONFIG;
+// Note: WARP_CONFIG is already exposed by navigation.js
 window.getWarpCyclesFromDistance = getWarpCyclesFromDistance;
 window.getFuelCostFromDistance = getFuelCostFromDistance;
 window.getTravelTimeFromCycles = getTravelTimeFromCycles;
