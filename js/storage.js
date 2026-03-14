@@ -226,28 +226,41 @@ async function getCollection() {
     }
 }
 
-async function addElementToCollection(elementName, count = 1) {
+// FIXED: Renamed internal function to avoid recursion
+async function _addElementToCollection(elementName, count = 1) {
     try {
-        const result = await window.addElementToCollection(elementName, count);
-        if (result?.success) {
-            const player = await getPlayer();
-            if (player) {
-                player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
-                await savePlayer(player);
-            }
-            return { success: true, newCount: result.count };
+        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
+        const tx = db.transaction('collection', 'readwrite');
+        const store = tx.objectStore('collection');
+        
+        let element = await store.get(elementName);
+        
+        if (!element) {
+            element = {
+                name: elementName,
+                count: count,
+                firstFound: new Date().toISOString(),
+                rarity: 'common',
+                value: 100
+            };
+        } else {
+            element.count = (element.count || 1) + count;
         }
-        return { success: false, reason: 'database_error', error: result?.error };
+        
+        await store.put(element);
+        await tx.done;
+        
+        return { success: true, count: element.count };
+        
     } catch (error) {
-        console.error('Error adding element to collection:', error);
-        return { success: false, reason: 'error', error: error.message };
+        console.error('Error in _addElementToCollection:', error);
+        return { success: false, error: error.message };
     }
 }
 
-// FIXED: Use a different name for the local function
+// FIXED: Renamed internal function to avoid recursion
 async function _removeElementFromCollection(elementName, count = 1) {
     try {
-        // Call the db function directly using the db object, not window
         const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
         const tx = db.transaction('collection', 'readwrite');
         const store = tx.objectStore('collection');
@@ -267,16 +280,27 @@ async function _removeElementFromCollection(elementName, count = 1) {
         
         if (element.count <= 0) {
             await store.delete(elementName);
+            await tx.done;
+            return { success: true, newCount: 0 };
         } else {
             await store.put(element);
+            await tx.done;
+            return { success: true, newCount: element.count };
         }
         
-        await tx.done;
-        return { success: true, newCount: element.count >= 0 ? element.count : 0 };
     } catch (error) {
         console.error('Error in _removeElementFromCollection:', error);
-        return { success: false, reason: 'error', error: error.message };
+        return { success: false, error: error.message };
     }
+}
+
+// Public wrapper functions
+async function addElementToCollection(elementName, count = 1) {
+    return await _addElementToCollection(elementName, count);
+}
+
+async function removeElementFromCollection(elementName, count = 1) {
+    return await _removeElementFromCollection(elementName, count);
 }
 
 // ===== SAFE SELL ELEMENT =====
@@ -298,7 +322,7 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
             return { success: false, reason: 'insufficient', available: availableCount };
         }
         
-        // Remove from collection - call the local function directly
+        // Remove from collection using internal function
         const removeResult = await _removeElementFromCollection(elementName, quantity);
         console.log('Remove result:', removeResult);
         
@@ -701,7 +725,7 @@ window.savePlayer = savePlayer;
 window.createDefaultPlayer = createDefaultPlayer;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
-// Don't expose _removeElementFromCollection - it's internal
+window.removeElementFromCollection = removeElementFromCollection;
 window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
