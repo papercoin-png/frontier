@@ -879,15 +879,15 @@
         </div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
-    <script type="module" src="js/storage.js"></script>
-    <script type="module" src="js/market-dynamics.js"></script>
-    <script type="module" src="js/economic-events.js"></script>
-    <script type="module" src="js/tax-system.js"></script>
-    <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/migration.js"></script>
+    <!-- Load all JavaScript files (no module type) -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/market-dynamics.js"></script>
+    <script src="js/economic-events.js"></script>
+    <script src="js/tax-system.js"></script>
+    <script src="js/migration.js"></script>
 
-    <script type="module">
+    <script>
         // Chart is available globally from the UMD script
         const Chart = window.Chart;
 
@@ -896,8 +896,7 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a2a3a');
-            tg.setBackgroundColor('#0a2a3a');
+            // Remove unsupported methods
         }
 
         // ===== DOM ELEMENTS =====
@@ -906,7 +905,6 @@
         const migrationStatus = document.getElementById('migrationStatus');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        // This is the critical fix - all onclick handlers need these
         window.navigateTo = navigateTo;
         window.returnToMenu = returnToMenu;
         window.updatePriceChart = updatePriceChart;
@@ -923,7 +921,11 @@
 
         // ===== NAVIGATION FUNCTIONS =====
         function navigateTo(screen) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'navigating...';
             setTimeout(() => {
@@ -946,20 +948,15 @@
                     await window.updateDailyPrices();
                 }
 
-                // Load all data with fallbacks
+                // Load all data
                 let credits = 5000;
                 if (typeof window.getCredits === 'function') {
                     credits = await window.getCredits();
-                } else {
-                    credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 }
 
                 let collection = {};
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
-                } else {
-                    const saved = localStorage.getItem('voidfarer_collection');
-                    collection = saved ? JSON.parse(saved) : {};
                 }
 
                 let planet = 'Earth';
@@ -1229,7 +1226,11 @@
                 expandedGroup = rarity;
             }
             renderMarket(currentCollection);
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
         }
 
         // ===== SELL ITEM =====
@@ -1247,32 +1248,24 @@
             try {
                 let result;
                 
+                // Use the proper storage function
                 if (typeof window.safeSellElement === 'function') {
                     result = await window.safeSellElement(elementName, quantity, price);
+                    console.log('Sale result:', result);
                 } else {
-                    // Fallback for testing
-                    console.log(`Selling ${quantity} of ${elementName} for ${price}⭐ each`);
-                    
-                    // Update localStorage directly
-                    let collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
-                    if (collection[elementName]) {
-                        collection[elementName].count -= quantity;
-                        if (collection[elementName].count <= 0) {
-                            delete collection[elementName];
-                        }
-                        localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                    }
-                    
-                    let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                    credits += quantity * price;
-                    localStorage.setItem('voidfarer_credits', credits.toString());
-                    
-                    result = { success: true, earnings: quantity * price };
+                    console.error('safeSellElement not available');
+                    result = { success: false, reason: 'function not available' };
                 }
                 
                 if (result && result.success) {
+                    // Reload all data to update the UI
                     await loadAllData();
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    
+                    if (tg?.HapticFeedback) {
+                        try {
+                            tg.HapticFeedback.notificationOccurred('success');
+                        } catch (e) {}
+                    }
                 } else {
                     alert('Sale failed: ' + (result?.reason || 'unknown error'));
                 }
@@ -1319,16 +1312,17 @@
                             if (result.success) {
                                 totalEarnings += result.earnings;
                             }
-                        } else {
-                            // Fallback
-                            totalEarnings += sellQuantity * element.marketPrice;
                         }
                     }
                 }
                 
                 if (totalEarnings > 0) {
                     await loadAllData();
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    if (tg?.HapticFeedback) {
+                        try {
+                            tg.HapticFeedback.notificationOccurred('success');
+                        } catch (e) {}
+                    }
                     alert(`Sold for ${totalEarnings}⭐`);
                 }
             } catch (error) {
@@ -1390,7 +1384,11 @@
                 
                 if (totalEarned > 0) {
                     await loadAllData();
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    if (tg?.HapticFeedback) {
+                        try {
+                            tg.HapticFeedback.notificationOccurred('success');
+                        } catch (e) {}
+                    }
                     alert(`Sold for ${totalEarned}⭐`);
                 } else {
                     alert('Not enough items to reach that amount');
@@ -1508,6 +1506,11 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'connecting to Earth Hub...';
+
+                // Initialize database if needed
+                if (typeof window.initializeDatabase === 'function') {
+                    await window.initializeDatabase();
+                }
 
                 // Load all data
                 await loadAllData();
