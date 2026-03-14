@@ -481,6 +481,7 @@
     <script src="js/db.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/migration.js"></script>
+    <script src="js/planet-utils.js"></script>
 
     <script>
         // ===== TELEGRAM INITIALIZATION =====
@@ -492,7 +493,6 @@
 
         // ===== CONSTANTS =====
         const EXTRACTION_INTERVAL = 5000; // 5 seconds
-        const UNIVERSE_SEED = 42793; // Must match procedural-universe.js - DECLARED ONCE
         const CARGO_MASS_LIMIT = 5000; // Match storage.js
         
         // ===== RARITY CONFIGURATION =====
@@ -589,36 +589,64 @@
         let cachedCargoMass = 0;
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
-        
-        // ===== SEEDED RANDOM FUNCTIONS =====
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        }
-
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
-        }
 
         // ===== RESOURCE RARITY MAPPING =====
         function getResourceRarity(resourceName) {
             const rareMap = {
+                // Rare elements
                 'Gold': 'rare', 'Silver': 'rare', 'Platinum': 'rare', 'Titanium': 'rare',
+                'Copper': 'rare', 'Zinc': 'rare', 'Tin': 'rare', 'Cobalt': 'rare',
+                'Chromium': 'rare', 'Nickel': 'rare', 'Lead': 'rare', 'Mercury': 'rare',
+                
+                // Very Rare
                 'Uranium': 'very-rare', 'Thorium': 'very-rare', 'Plutonium': 'very-rare',
+                'Radium': 'very-rare', 'Polonium': 'very-rare',
+                
+                // Legendary
                 'Promethium': 'legendary', 'Technetium': 'legendary',
-                'Carbon': 'uncommon', 'Iron': 'uncommon', 'Copper': 'uncommon',
-                'Nickel': 'uncommon', 'Lead': 'uncommon'
+                'Astatine': 'legendary', 'Francium': 'legendary',
+                'Neptunium': 'legendary', 'Americium': 'legendary', 'Curium': 'legendary',
+                'Berkelium': 'legendary', 'Californium': 'legendary', 'Einsteinium': 'legendary',
+                'Fermium': 'legendary', 'Mendelevium': 'legendary', 'Nobelium': 'legendary',
+                'Lawrencium': 'legendary', 'Rutherfordium': 'legendary', 'Dubnium': 'legendary',
+                'Seaborgium': 'legendary', 'Bohrium': 'legendary', 'Hassium': 'legendary',
+                'Meitnerium': 'legendary', 'Darmstadtium': 'legendary', 'Roentgenium': 'legendary',
+                'Copernicium': 'legendary', 'Nihonium': 'legendary', 'Flerovium': 'legendary',
+                'Moscovium': 'legendary', 'Livermorium': 'legendary', 'Tennessine': 'legendary',
+                'Oganesson': 'legendary',
+                
+                // Uncommon
+                'Carbon': 'uncommon', 'Oxygen': 'uncommon', 'Nitrogen': 'uncommon',
+                'Iron': 'uncommon', 'Aluminum': 'uncommon', 'Silicon': 'uncommon',
+                'Magnesium': 'uncommon', 'Calcium': 'uncommon', 'Sodium': 'uncommon',
+                'Potassium': 'uncommon', 'Sulfur': 'uncommon', 'Phosphorus': 'uncommon',
+                'Chlorine': 'uncommon', 'Argon': 'uncommon', 'Fluorine': 'uncommon',
+                'Neon': 'uncommon', 'Helium': 'uncommon', 'Hydrogen': 'uncommon'
             };
+            
+            // Default to common for everything else
+            const commonElements = [
+                'Lithium', 'Beryllium', 'Boron', 'Scandium', 'Vanadium', 'Manganese',
+                'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton',
+                'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
+                'Ruthenium', 'Rhodium', 'Palladium', 'Cadmium', 'Indium', 'Antimony',
+                'Tellurium', 'Iodine', 'Xenon', 'Cesium', 'Barium', 'Lanthanum',
+                'Cerium', 'Praseodymium', 'Neodymium', 'Samarium', 'Europium', 'Gadolinium',
+                'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium',
+                'Lutetium', 'Hafnium', 'Tantalum', 'Tungsten', 'Rhenium', 'Osmium',
+                'Iridium', 'Thallium', 'Bismuth'
+            ];
+            
+            if (commonElements.includes(resourceName)) {
+                return 'common';
+            }
+            
             return rareMap[resourceName] || 'common';
         }
 
         // ===== ELEMENT DATA =====
         const elementData = {
+            // Common
             'Hydrogen': { symbol: 'H', rarity: 'common' },
             'Helium': { symbol: 'He', rarity: 'common' },
             'Lithium': { symbol: 'Li', rarity: 'common' },
@@ -630,6 +658,11 @@
             'Silicon': { symbol: 'Si', rarity: 'common' },
             'Potassium': { symbol: 'K', rarity: 'common' },
             'Calcium': { symbol: 'Ca', rarity: 'common' },
+            'Scandium': { symbol: 'Sc', rarity: 'common' },
+            'Vanadium': { symbol: 'V', rarity: 'common' },
+            'Manganese': { symbol: 'Mn', rarity: 'common' },
+            
+            // Uncommon
             'Carbon': { symbol: 'C', rarity: 'uncommon' },
             'Nitrogen': { symbol: 'N', rarity: 'uncommon' },
             'Oxygen': { symbol: 'O', rarity: 'uncommon' },
@@ -642,16 +675,29 @@
             'Iron': { symbol: 'Fe', rarity: 'uncommon' },
             'Nickel': { symbol: 'Ni', rarity: 'uncommon' },
             'Lead': { symbol: 'Pb', rarity: 'uncommon' },
+            
+            // Rare
             'Copper': { symbol: 'Cu', rarity: 'rare' },
             'Zinc': { symbol: 'Zn', rarity: 'rare' },
             'Silver': { symbol: 'Ag', rarity: 'rare' },
             'Gold': { symbol: 'Au', rarity: 'rare' },
             'Platinum': { symbol: 'Pt', rarity: 'rare' },
             'Titanium': { symbol: 'Ti', rarity: 'rare' },
+            'Cobalt': { symbol: 'Co', rarity: 'rare' },
+            'Chromium': { symbol: 'Cr', rarity: 'rare' },
+            'Tin': { symbol: 'Sn', rarity: 'rare' },
+            'Mercury': { symbol: 'Hg', rarity: 'rare' },
+            
+            // Very Rare
             'Uranium': { symbol: 'U', rarity: 'very-rare' },
             'Thorium': { symbol: 'Th', rarity: 'very-rare' },
             'Plutonium': { symbol: 'Pu', rarity: 'very-rare' },
-            'Promethium': { symbol: 'Pm', rarity: 'legendary' }
+            'Radium': { symbol: 'Ra', rarity: 'very-rare' },
+            'Polonium': { symbol: 'Po', rarity: 'very-rare' },
+            
+            // Legendary
+            'Promethium': { symbol: 'Pm', rarity: 'legendary' },
+            'Technetium': { symbol: 'Tc', rarity: 'legendary' }
         };
 
         function getElementSymbol(resource) {
@@ -660,15 +706,31 @@
 
         function getElementMass(elementName) {
             const masses = {
-                'Iron': 55.85, 'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1,
-                'Carbon': 12.01, 'Oxygen': 16.00, 'Hydrogen': 1.008, 'Uranium': 238.0,
-                'Titanium': 47.87, 'Copper': 63.55, 'Aluminum': 26.98, 'Silicon': 28.09,
-                'Nickel': 58.69, 'Lead': 207.2, 'Thorium': 232.0, 'Plutonium': 244.0,
-                'Promethium': 145.0, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
-                'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Potassium': 39.10,
-                'Calcium': 40.08, 'Nitrogen': 14.01, 'Fluorine': 19.00, 'Neon': 20.18,
-                'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45, 'Argon': 39.95,
-                'Zinc': 65.38, 'default': 100.0
+                // Common
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
+                'Silicon': 28.09, 'Potassium': 39.10, 'Calcium': 40.08,
+                'Scandium': 44.96, 'Vanadium': 50.94, 'Manganese': 54.94,
+                
+                // Uncommon
+                'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00, 'Fluorine': 19.00,
+                'Neon': 20.18, 'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45,
+                'Argon': 39.95, 'Iron': 55.85, 'Nickel': 58.69, 'Lead': 207.2,
+                
+                // Rare
+                'Copper': 63.55, 'Zinc': 65.38, 'Silver': 107.9, 'Gold': 197.0,
+                'Platinum': 195.1, 'Titanium': 47.87, 'Cobalt': 58.93, 'Chromium': 52.00,
+                'Tin': 118.7, 'Mercury': 200.6,
+                
+                // Very Rare
+                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0,
+                'Radium': 226.0, 'Polonium': 209.0,
+                
+                // Legendary
+                'Promethium': 145.0, 'Technetium': 98.0,
+                
+                // Default
+                'default': 100.0
             };
             return masses[elementName] || masses.default;
         }
@@ -704,60 +766,68 @@
             return mass;
         }
 
-        // ===== DETERMINISTIC PLANET RESOURCE GENERATION =====
-        function generatePlanetResources(planetName, planetType) {
-            // Create a seed based on planet name and universe seed
-            const nameHash = hashString(planetName);
-            const planetSeed = UNIVERSE_SEED + nameHash;
-            
-            // Resource pools by planet type
-            const resourcePools = {
-                'lush': ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen', 'Gold', 'Copper', 'Titanium'],
-                'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury'],
-                'volcanic': ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury'],
-                'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice', 'Methane', 'Nitrogen', 'Argon'],
-                'ice': ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice', 'Methane', 'Nitrogen', 'Argon'],
-                'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium', 'Nickel', 'Magnesium', 'Calcium', 'Lead']
+        // ===== FALLBACK RESOURCE GENERATION =====
+        function generateFallbackResources(planetType) {
+            const fallbackPools = {
+                'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium'],
+                'lush': ['Carbon', 'Oxygen', 'Hydrogen', 'Silicon'],
+                'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'gas': ['Hydrogen', 'Helium', 'Methane', 'Ammonia'],
+                'oceanic': ['Hydrogen', 'Oxygen', 'Sodium', 'Chlorine'],
+                'toxic': ['Sulfur', 'Chlorine', 'Mercury', 'Arsenic'],
+                'asteroid': ['Iron', 'Nickel', 'Cobalt', 'Platinum']
             };
             
-            const pool = resourcePools[planetType] || resourcePools['lush'];
-            
-            // Determine number of resources (4-8 based on seed)
-            const resourceCount = Math.floor(seededRandom(planetSeed, 0) * 5) + 4;
-            
-            // Select resources deterministically
-            const resources = [];
-            for (let i = 0; i < resourceCount; i++) {
-                const index = Math.floor(seededRandom(planetSeed, i + 1) * pool.length);
-                const resource = pool[index];
-                if (!resources.includes(resource)) {
-                    resources.push(resource);
-                }
-            }
-            
-            // Ensure at least 3 resources
-            while (resources.length < 3) {
-                const fallback = pool[Math.floor(seededRandom(planetSeed, resources.length + 10) * pool.length)];
-                if (!resources.includes(fallback)) {
-                    resources.push(fallback);
-                }
-            }
-            
-            console.log(`Generated resources for ${planetName} (${planetType}):`, resources);
-            return resources;
+            return fallbackPools[planetType] || fallbackPools['barren'];
         }
 
+        // ===== LOAD PLANET DATA FROM STORAGE =====
         async function loadPlanetData() {
             try {
-                const planetNameStr = localStorage.getItem('voidfarer_current_planet') || 'Earth';
-                const planetTypeStr = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                // First try to get planet data from localStorage (set by system-view)
+                let planetNameStr = localStorage.getItem('voidfarer_current_planet');
+                let planetTypeStr = localStorage.getItem('voidfarer_current_planet_type');
+                let planetResources = [];
                 
-                // Generate deterministic resources based on planet name
-                let planetResources = generatePlanetResources(planetNameStr, planetTypeStr);
+                // Try to get pre-generated resources
+                const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
+                if (savedResources) {
+                    try {
+                        planetResources = JSON.parse(savedResources);
+                        console.log('Loaded pre-generated resources:', planetResources);
+                    } catch (e) {
+                        console.error('Failed to parse saved resources:', e);
+                    }
+                }
                 
-                // Also save them to localStorage for persistence
-                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(planetResources));
+                // If no planet data, try warp data
+                if (!planetNameStr || !planetTypeStr) {
+                    const warpData = localStorage.getItem('voidfarer_warp_data');
+                    if (warpData) {
+                        try {
+                            const data = JSON.parse(warpData);
+                            planetNameStr = data.destPlanet || data.destination;
+                            planetTypeStr = data.destPlanetType || data.destinationType;
+                            planetResources = data.destPlanetResources || [];
+                            console.log('Loaded planet data from warp:', planetNameStr, planetTypeStr, planetResources);
+                        } catch (e) {
+                            console.error('Failed to parse warp data:', e);
+                        }
+                    }
+                }
                 
+                // Fallback to defaults if still nothing
+                if (!planetNameStr) planetNameStr = 'Earth';
+                if (!planetTypeStr) planetTypeStr = 'lush';
+                
+                // If no resources, generate them (fallback)
+                if (!planetResources || planetResources.length === 0) {
+                    console.warn('No resources found, generating fallback');
+                    planetResources = generateFallbackResources(planetTypeStr);
+                }
+                
+                // Determine image based on planet type
                 let imageFile = 'earth-view.jpg';
                 if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
                     imageFile = 'pyros-surface.jpg';
@@ -767,11 +837,31 @@
                     imageFile = 'verdant-surface.jpg';
                 } else if (planetTypeStr.includes('barren')) {
                     imageFile = 'barren-surface.jpg';
+                } else if (planetTypeStr.includes('gas')) {
+                    imageFile = 'gas-surface.jpg';
+                } else if (planetTypeStr.includes('oceanic')) {
+                    imageFile = 'oceanic-surface.jpg';
+                } else if (planetTypeStr.includes('toxic')) {
+                    imageFile = 'toxic-surface.jpg';
+                } else if (planetTypeStr.includes('asteroid')) {
+                    imageFile = 'asteroid-field.jpg';
                 }
                 
+                // Set image with fallback
                 planetImage.src = 'assets/images/' + imageFile;
                 planetImage.onerror = function() {
-                    this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
+                    // Fallback images by type
+                    const fallbacks = {
+                        'oceanic': 'https://i.postimg.cc/65hLYQpB/oceanic-placeholder.jpg',
+                        'toxic': 'https://i.postimg.cc/2y0vWwR2/toxic-placeholder.jpg',
+                        'asteroid': 'https://i.postimg.cc/GpzJ1VY1/asteroid-placeholder.jpg'
+                    };
+                    
+                    if (fallbacks[planetTypeStr]) {
+                        this.src = fallbacks[planetTypeStr];
+                    } else {
+                        this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
+                    }
                 };
                 
                 currentPlanet = {
@@ -797,6 +887,7 @@
                 renderResourceToggles();
                 await updateCargoDisplay();
                 
+                console.log('Planet loaded:', currentPlanet);
                 return true;
                 
             } catch (error) {
@@ -987,13 +1078,11 @@
                 pityCounters[resource].attempts++;
                 
                 // Check if guaranteed by pity
-                let isGuaranteed = false;
                 let wasPity = false;
                 let success = false;
                 
                 if (pityCounters[resource].attempts >= pityCounters[resource].threshold) {
                     // FORCE SUCCESS - no random roll needed
-                    isGuaranteed = true;
                     wasPity = true;
                     success = true;
                     console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts - FORCED SUCCESS`);
