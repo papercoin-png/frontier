@@ -385,7 +385,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
             
             // Save location data ONLY if it's from planetary mining
             // This preserves the journal for elements found on surfaces
-            if (locationData && typeof window.saveElementLocation === 'function') {
+            if (locationData && typeof window._originalSaveElementLocation === 'function') {
                 // Get planet name and type
                 const planetName = locationData.planet || getCurrentPlanetName();
                 const planetType = locationData.planetType || getCurrentPlanetType();
@@ -403,7 +403,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 
                 try {
                     // Call the db.js function with full metadata
-                    await window.saveElementLocation(elementName, planetName, enhancedLocationData);
+                    await window._originalSaveElementLocation(elementName, planetName, enhancedLocationData);
                     console.log(`📍 Journal entry: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
@@ -833,15 +833,50 @@ function getPlayerId() {
     return playerId;
 }
 
+// ===== PRESERVE ORIGINAL DB FUNCTIONS =====
+// Store references to the original db.js functions before we might override them
+// These will be set during initialization
+let _originalGetPlanetStatus = null;
+let _originalUpdatePlanetStatus = null;
+let _originalClaimPlanet = null;
+let _originalGetClaimedPlanets = null;
+let _originalSaveElementLocation = null;
+
+// Call this after db.js is loaded to capture the original functions
+function captureOriginalFunctions() {
+    if (typeof window.getPlanetStatus === 'function' && !_originalGetPlanetStatus) {
+        _originalGetPlanetStatus = window.getPlanetStatus;
+    }
+    if (typeof window.updatePlanetStatusFromLocations === 'function' && !_originalUpdatePlanetStatus) {
+        _originalUpdatePlanetStatus = window.updatePlanetStatusFromLocations;
+    }
+    if (typeof window.claimPlanet === 'function' && !_originalClaimPlanet) {
+        _originalClaimPlanet = window.claimPlanet;
+    }
+    if (typeof window.getClaimedPlanets === 'function' && !_originalGetClaimedPlanets) {
+        _originalGetClaimedPlanets = window.getClaimedPlanets;
+    }
+    if (typeof window.saveElementLocation === 'function' && !_originalSaveElementLocation) {
+        _originalSaveElementLocation = window.saveElementLocation;
+    }
+    console.log('Original DB functions captured');
+}
+
+// Try to capture immediately
+setTimeout(captureOriginalFunctions, 100);
+
 // ===== PLANET STATUS HELPERS (FIXED - NO RECURSION) =====
-// These are simple wrappers that call the db.js functions directly
-// They use different names to avoid recursion
+// These are simple wrappers that call the original db.js functions directly
 
 async function getPlanetStatusWrapper(planetName) {
     try {
-        // Call the db.js function directly
-        if (typeof window.getPlanetStatus === 'function') {
-            return await window.getPlanetStatus(planetName);
+        // Make sure we have the original function
+        if (!_originalGetPlanetStatus) {
+            captureOriginalFunctions();
+        }
+        // Call the original db.js function directly
+        if (_originalGetPlanetStatus) {
+            return await _originalGetPlanetStatus(planetName);
         }
         return null;
     } catch (error) {
@@ -852,9 +887,13 @@ async function getPlanetStatusWrapper(planetName) {
 
 async function updatePlanetStatusFromLocationsWrapper(planetName) {
     try {
-        // Call the db.js function directly
-        if (typeof window.updatePlanetStatusFromLocations === 'function') {
-            return await window.updatePlanetStatusFromLocations(planetName);
+        // Make sure we have the original function
+        if (!_originalUpdatePlanetStatus) {
+            captureOriginalFunctions();
+        }
+        // Call the original db.js function directly
+        if (_originalUpdatePlanetStatus) {
+            return await _originalUpdatePlanetStatus(planetName);
         }
         return null;
     } catch (error) {
@@ -865,9 +904,13 @@ async function updatePlanetStatusFromLocationsWrapper(planetName) {
 
 async function claimPlanetWrapper(planetName) {
     try {
-        // Call the db.js function directly
-        if (typeof window.claimPlanet === 'function') {
-            return await window.claimPlanet(planetName);
+        // Make sure we have the original function
+        if (!_originalClaimPlanet) {
+            captureOriginalFunctions();
+        }
+        // Call the original db.js function directly
+        if (_originalClaimPlanet) {
+            return await _originalClaimPlanet(planetName);
         }
         return false;
     } catch (error) {
@@ -878,9 +921,13 @@ async function claimPlanetWrapper(planetName) {
 
 async function getClaimedPlanetsWrapper() {
     try {
-        // Call the db.js function directly
-        if (typeof window.getClaimedPlanets === 'function') {
-            return await window.getClaimedPlanets();
+        // Make sure we have the original function
+        if (!_originalGetClaimedPlanets) {
+            captureOriginalFunctions();
+        }
+        // Call the original db.js function directly
+        if (_originalGetClaimedPlanets) {
+            return await _originalGetClaimedPlanets();
         }
         return [];
     } catch (error) {
@@ -958,7 +1005,7 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Planet status helpers (FIXED - using wrapper functions with different names)
+// Planet status helpers (FIXED - using wrapper functions with preserved original references)
 window.getPlanetStatus = getPlanetStatusWrapper;
 window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocationsWrapper;
 window.claimPlanet = claimPlanetWrapper;
