@@ -548,7 +548,7 @@
 
         function initializePityCounters() {
             currentPlanet.resources.forEach(resource => {
-                const rarity = getResourceRarity(resource);
+                const rarity = getElementRarity(resource);
                 pityCounters[resource] = {
                     attempts: 0,
                     threshold: PITY_CONFIG[rarity].threshold
@@ -591,114 +591,113 @@
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
 
-        // ===== RESOURCE RARITY MAPPING =====
-        function getResourceRarity(resourceName) {
-            const rareMap = {
-                // Rare elements
-                'Gold': 'rare', 'Silver': 'rare', 'Platinum': 'rare', 'Titanium': 'rare',
-                'Copper': 'rare', 'Zinc': 'rare', 'Tin': 'rare', 'Cobalt': 'rare',
-                'Chromium': 'rare', 'Nickel': 'rare', 'Lead': 'rare', 'Mercury': 'rare',
-                
-                // Very Rare
-                'Uranium': 'very-rare', 'Thorium': 'very-rare', 'Plutonium': 'very-rare',
-                'Radium': 'very-rare', 'Polonium': 'very-rare',
-                
-                // Legendary
-                'Promethium': 'legendary', 'Technetium': 'legendary',
-                'Astatine': 'legendary', 'Francium': 'legendary',
-                'Neptunium': 'legendary', 'Americium': 'legendary', 'Curium': 'legendary',
-                'Berkelium': 'legendary', 'Californium': 'legendary', 'Einsteinium': 'legendary',
-                'Fermium': 'legendary', 'Mendelevium': 'legendary', 'Nobelium': 'legendary',
-                'Lawrencium': 'legendary', 'Rutherfordium': 'legendary', 'Dubnium': 'legendary',
-                'Seaborgium': 'legendary', 'Bohrium': 'legendary', 'Hassium': 'legendary',
-                'Meitnerium': 'legendary', 'Darmstadtium': 'legendary', 'Roentgenium': 'legendary',
-                'Copernicium': 'legendary', 'Nihonium': 'legendary', 'Flerovium': 'legendary',
-                'Moscovium': 'legendary', 'Livermorium': 'legendary', 'Tennessine': 'legendary',
-                'Oganesson': 'legendary',
-                
-                // Uncommon
-                'Carbon': 'uncommon', 'Oxygen': 'uncommon', 'Nitrogen': 'uncommon',
-                'Iron': 'uncommon', 'Aluminum': 'uncommon', 'Silicon': 'uncommon',
-                'Magnesium': 'uncommon', 'Calcium': 'uncommon', 'Sodium': 'uncommon',
-                'Potassium': 'uncommon', 'Sulfur': 'uncommon', 'Phosphorus': 'uncommon',
-                'Chlorine': 'uncommon', 'Argon': 'uncommon', 'Fluorine': 'uncommon',
-                'Neon': 'uncommon', 'Helium': 'uncommon', 'Hydrogen': 'uncommon'
-            };
-            
-            // Default to common for everything else
-            const commonElements = [
-                'Lithium', 'Beryllium', 'Boron', 'Scandium', 'Vanadium', 'Manganese',
-                'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton',
-                'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
-                'Ruthenium', 'Rhodium', 'Palladium', 'Cadmium', 'Indium', 'Antimony',
-                'Tellurium', 'Iodine', 'Xenon', 'Cesium', 'Barium', 'Lanthanum',
-                'Cerium', 'Praseodymium', 'Neodymium', 'Samarium', 'Europium', 'Gadolinium',
-                'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium',
-                'Lutetium', 'Hafnium', 'Tantalum', 'Tungsten', 'Rhenium', 'Osmium',
-                'Iridium', 'Thallium', 'Bismuth'
+        // ===== CONSISTENT RARITY MAPPING (matches storage.js and db.js) =====
+        function getElementRarity(elementName) {
+            const rareElements = [
+                'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
+                'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
+                'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
             ];
             
-            if (commonElements.includes(resourceName)) {
-                return 'common';
+            if (rareElements.includes(elementName)) {
+                if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
+                    return 'legendary';
+                }
+                if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
+                    return 'very-rare';
+                }
+                return 'rare';
             }
             
-            return rareMap[resourceName] || 'common';
+            const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
+            if (uncommonElements.includes(elementName)) {
+                return 'uncommon';
+            }
+            
+            return 'common';
         }
 
         // ===== ELEMENT DATA =====
         const elementData = {
             // Common
-            'Hydrogen': { symbol: 'H', rarity: 'common' },
-            'Helium': { symbol: 'He', rarity: 'common' },
-            'Lithium': { symbol: 'Li', rarity: 'common' },
-            'Beryllium': { symbol: 'Be', rarity: 'common' },
-            'Boron': { symbol: 'B', rarity: 'common' },
-            'Sodium': { symbol: 'Na', rarity: 'common' },
-            'Magnesium': { symbol: 'Mg', rarity: 'common' },
-            'Aluminum': { symbol: 'Al', rarity: 'common' },
-            'Silicon': { symbol: 'Si', rarity: 'common' },
-            'Potassium': { symbol: 'K', rarity: 'common' },
-            'Calcium': { symbol: 'Ca', rarity: 'common' },
-            'Scandium': { symbol: 'Sc', rarity: 'common' },
-            'Vanadium': { symbol: 'V', rarity: 'common' },
-            'Manganese': { symbol: 'Mn', rarity: 'common' },
+            'Hydrogen': { symbol: 'H' },
+            'Helium': { symbol: 'He' },
+            'Lithium': { symbol: 'Li' },
+            'Beryllium': { symbol: 'Be' },
+            'Boron': { symbol: 'B' },
+            'Sodium': { symbol: 'Na' },
+            'Magnesium': { symbol: 'Mg' },
+            'Aluminum': { symbol: 'Al' },
+            'Silicon': { symbol: 'Si' },
+            'Potassium': { symbol: 'K' },
+            'Calcium': { symbol: 'Ca' },
+            'Scandium': { symbol: 'Sc' },
+            'Vanadium': { symbol: 'V' },
+            'Manganese': { symbol: 'Mn' },
             
             // Uncommon
-            'Carbon': { symbol: 'C', rarity: 'uncommon' },
-            'Nitrogen': { symbol: 'N', rarity: 'uncommon' },
-            'Oxygen': { symbol: 'O', rarity: 'uncommon' },
-            'Fluorine': { symbol: 'F', rarity: 'uncommon' },
-            'Neon': { symbol: 'Ne', rarity: 'uncommon' },
-            'Phosphorus': { symbol: 'P', rarity: 'uncommon' },
-            'Sulfur': { symbol: 'S', rarity: 'uncommon' },
-            'Chlorine': { symbol: 'Cl', rarity: 'uncommon' },
-            'Argon': { symbol: 'Ar', rarity: 'uncommon' },
-            'Iron': { symbol: 'Fe', rarity: 'uncommon' },
-            'Nickel': { symbol: 'Ni', rarity: 'uncommon' },
-            'Lead': { symbol: 'Pb', rarity: 'uncommon' },
+            'Carbon': { symbol: 'C' },
+            'Nitrogen': { symbol: 'N' },
+            'Oxygen': { symbol: 'O' },
+            'Fluorine': { symbol: 'F' },
+            'Neon': { symbol: 'Ne' },
+            'Phosphorus': { symbol: 'P' },
+            'Sulfur': { symbol: 'S' },
+            'Chlorine': { symbol: 'Cl' },
+            'Argon': { symbol: 'Ar' },
+            'Iron': { symbol: 'Fe' },
+            'Nickel': { symbol: 'Ni' },
+            'Lead': { symbol: 'Pb' },
             
             // Rare
-            'Copper': { symbol: 'Cu', rarity: 'rare' },
-            'Zinc': { symbol: 'Zn', rarity: 'rare' },
-            'Silver': { symbol: 'Ag', rarity: 'rare' },
-            'Gold': { symbol: 'Au', rarity: 'rare' },
-            'Platinum': { symbol: 'Pt', rarity: 'rare' },
-            'Titanium': { symbol: 'Ti', rarity: 'rare' },
-            'Cobalt': { symbol: 'Co', rarity: 'rare' },
-            'Chromium': { symbol: 'Cr', rarity: 'rare' },
-            'Tin': { symbol: 'Sn', rarity: 'rare' },
-            'Mercury': { symbol: 'Hg', rarity: 'rare' },
+            'Copper': { symbol: 'Cu' },
+            'Zinc': { symbol: 'Zn' },
+            'Silver': { symbol: 'Ag' },
+            'Gold': { symbol: 'Au' },
+            'Platinum': { symbol: 'Pt' },
+            'Titanium': { symbol: 'Ti' },
+            'Cobalt': { symbol: 'Co' },
+            'Chromium': { symbol: 'Cr' },
+            'Tin': { symbol: 'Sn' },
+            'Mercury': { symbol: 'Hg' },
             
             // Very Rare
-            'Uranium': { symbol: 'U', rarity: 'very-rare' },
-            'Thorium': { symbol: 'Th', rarity: 'very-rare' },
-            'Plutonium': { symbol: 'Pu', rarity: 'very-rare' },
-            'Radium': { symbol: 'Ra', rarity: 'very-rare' },
-            'Polonium': { symbol: 'Po', rarity: 'very-rare' },
+            'Uranium': { symbol: 'U' },
+            'Thorium': { symbol: 'Th' },
+            'Plutonium': { symbol: 'Pu' },
+            'Radium': { symbol: 'Ra' },
+            'Polonium': { symbol: 'Po' },
             
             // Legendary
-            'Promethium': { symbol: 'Pm', rarity: 'legendary' },
-            'Technetium': { symbol: 'Tc', rarity: 'legendary' }
+            'Promethium': { symbol: 'Pm' },
+            'Technetium': { symbol: 'Tc' },
+            'Astatine': { symbol: 'At' },
+            'Francium': { symbol: 'Fr' },
+            'Neptunium': { symbol: 'Np' },
+            'Americium': { symbol: 'Am' },
+            'Curium': { symbol: 'Cm' },
+            'Berkelium': { symbol: 'Bk' },
+            'Californium': { symbol: 'Cf' },
+            'Einsteinium': { symbol: 'Es' },
+            'Fermium': { symbol: 'Fm' },
+            'Mendelevium': { symbol: 'Md' },
+            'Nobelium': { symbol: 'No' },
+            'Lawrencium': { symbol: 'Lr' },
+            'Rutherfordium': { symbol: 'Rf' },
+            'Dubnium': { symbol: 'Db' },
+            'Seaborgium': { symbol: 'Sg' },
+            'Bohrium': { symbol: 'Bh' },
+            'Hassium': { symbol: 'Hs' },
+            'Meitnerium': { symbol: 'Mt' },
+            'Darmstadtium': { symbol: 'Ds' },
+            'Roentgenium': { symbol: 'Rg' },
+            'Copernicium': { symbol: 'Cn' },
+            'Nihonium': { symbol: 'Nh' },
+            'Flerovium': { symbol: 'Fl' },
+            'Moscovium': { symbol: 'Mc' },
+            'Livermorium': { symbol: 'Lv' },
+            'Tennessine': { symbol: 'Ts' },
+            'Oganesson': { symbol: 'Og' }
         };
 
         function getElementSymbol(resource) {
@@ -891,7 +890,7 @@
                 // Initialize all resources as active by default
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
-                    const rarity = getResourceRarity(resource);
+                    const rarity = getElementRarity(resource);
                     resourceChances[resource] = RARITY_CONFIG[rarity].baseChance;
                 });
                 
@@ -918,7 +917,7 @@
             
             let html = '';
             currentPlanet.resources.forEach(resource => {
-                const rarity = getResourceRarity(resource);
+                const rarity = getElementRarity(resource);
                 const config = RARITY_CONFIG[rarity];
                 const symbol = getElementSymbol(resource);
                 const chance = resourceChances[resource] || config.baseChance;
@@ -957,7 +956,7 @@
 
         // ===== TOAST FUNCTIONS =====
         function showSuccessToast(resource, quantity, isRichFind, isPity) {
-            const rarity = getResourceRarity(resource);
+            const rarity = getElementRarity(resource);
             const config = RARITY_CONFIG[rarity];
             
             const toast = document.createElement('div');
@@ -983,7 +982,7 @@
         }
 
         function showFailToast(resource, attempts, threshold) {
-            const rarity = getResourceRarity(resource);
+            const rarity = getElementRarity(resource);
             
             const toast = document.createElement('div');
             toast.className = `toast fail rarity-${rarity}`;
@@ -1061,7 +1060,7 @@
                 // Weighted selection based on rarity
                 let weightedResources = [];
                 activeResources.forEach(resource => {
-                    const rarity = getResourceRarity(resource);
+                    const rarity = getElementRarity(resource);
                     let weight = 1;
                     
                     if (rarity === 'uncommon') weight = 0.7;
@@ -1076,7 +1075,7 @@
                 
                 const randomIndex = Math.floor(Math.random() * weightedResources.length);
                 const resource = weightedResources[randomIndex];
-                const rarity = getResourceRarity(resource);
+                const rarity = getElementRarity(resource);
                 const config = RARITY_CONFIG[rarity];
                 const massPerUnit = getElementMass(resource);
                 
