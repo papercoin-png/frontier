@@ -62,9 +62,6 @@ const STORAGE_KEYS = {
     EVENT_HISTORY: 'voidfarer_event_history'
 };
 
-// ===== UNIVERSE CONSTANTS =====
-const UNIVERSE_SEED = 42793;
-
 // ===== ELEMENT MASS DATABASE =====
 const ELEMENT_MASS = {
     'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
@@ -142,8 +139,10 @@ function getCurrentPlanetName() {
 async function initializeStorage() {
     console.log('Initializing storage...');
     
-    if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED)) {
-        localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, UNIVERSE_SEED.toString());
+    // Use the UNIVERSE_SEED from the HTML file (already declared globally)
+    // This value is accessible via window.UNIVERSE_SEED
+    if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED) && typeof window.UNIVERSE_SEED !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, window.UNIVERSE_SEED.toString());
     }
     
     const player = await getPlayer();
@@ -802,7 +801,7 @@ async function getUniquePlanetsForElement(elementName) {
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = CARGO_MASS_LIMIT;
 window.STORAGE_KEYS = STORAGE_KEYS;
-window.UNIVERSE_SEED = UNIVERSE_SEED;
+window.UNIVERSE_SEED = typeof window.UNIVERSE_SEED !== 'undefined' ? window.UNIVERSE_SEED : 42793;
 window.ELEMENT_MASS = ELEMENT_MASS;
 window.getElementMass = getElementMass;
 window.getTotalCargoMass = getTotalCargoMass;
