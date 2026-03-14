@@ -1048,7 +1048,17 @@
                     const avgQuantity = Math.floor(config.massTarget / massPerUnit);
                     const isRichFind = quantity > avgQuantity * 1.5;
                     
-                    const result = await window.addElementToCollection(resource, quantity);
+                    // Capture location data for journal
+                    const locationData = {
+                        planet: currentPlanet.name,
+                        sector: localStorage.getItem('voidfarer_current_sector') || 'B2',
+                        region: localStorage.getItem('voidfarer_current_region') || 'Orion Arm',
+                        star: localStorage.getItem('voidfarer_current_star') || 'Sol',
+                        starSector: localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud'
+                    };
+                    
+                    // Pass location data to addElementToCollection
+                    const result = await window.addElementToCollection(resource, quantity, locationData);
                     
                     if (result && result.success) {
                         cachedCargoMass = currentMass + totalMass;
@@ -1056,10 +1066,7 @@
                         await updateCargoDisplay();
                         showSuccessToast(resource, quantity, isRichFind, wasPity);
                         
-                        // Save location for journal
-                        if (typeof window.saveElementLocation === 'function') {
-                            await window.saveElementLocation(resource, currentPlanet.name);
-                        }
+                        console.log(`✅ Successfully added ${quantity} ${resource} at ${currentPlanet.name}`);
                     } else {
                         showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     }
