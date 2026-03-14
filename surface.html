@@ -278,20 +278,24 @@
             flex-wrap: wrap;
             gap: 6px;
             justify-content: center;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 5px;
         }
         
         .resource-toggle {
             background: rgba(30, 45, 70, 0.5);
             border: 2px solid;
             border-radius: 40px 10px 40px 10px;
-            padding: 6px 10px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             cursor: pointer;
             transition: all 0.1s;
-            min-width: 85px;
-            justify-content: center;
+            min-width: 110px;
+            justify-content: space-between;
+            position: relative;
         }
         
         .resource-toggle:active {
@@ -305,27 +309,35 @@
         }
         
         .resource-toggle:not(.active) {
-            opacity: 0.4;
-            filter: grayscale(0.5);
+            opacity: 0.5;
+            filter: grayscale(0.7);
         }
         
         .resource-symbol {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 700;
             font-family: 'Courier New', monospace;
+            min-width: 30px;
         }
         
         .resource-name {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
+            flex: 1;
         }
         
         .resource-chance {
             color: #ffd966;
-            font-size: 10px;
+            font-size: 11px;
             background: rgba(0,0,0,0.3);
-            padding: 2px 4px;
+            padding: 2px 6px;
             border-radius: 20px;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .resource-icon {
+            font-size: 14px;
         }
         
         .rarity-common { 
@@ -466,12 +478,11 @@
         </div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
-    <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/storage.js"></script>
-    <script type="module" src="js/migration.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
 
-    <script type="module">
+    <script>
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -479,9 +490,50 @@
             tg.expand();
         }
 
+        // ===== CONSTANTS =====
         const CARGO_MASS_LIMIT = 5000;
-        const EXTRACTION_INTERVAL = 5000;
+        const EXTRACTION_INTERVAL = 5000; // 5 seconds
         
+        // ===== RARITY CONFIGURATION =====
+        const RARITY_CONFIG = {
+            'common': {
+                baseChance: 65,
+                massTarget: 28,
+                variety: 0.6,
+                icon: '⚪',
+                color: '#ffffff'
+            },
+            'uncommon': {
+                baseChance: 45,
+                massTarget: 20,
+                variety: 0.5,
+                icon: '🟢',
+                color: '#b0ffb0'
+            },
+            'rare': {
+                baseChance: 25,
+                massTarget: 12,
+                variety: 0.4,
+                icon: '🔵',
+                color: '#b0b0ff'
+            },
+            'very-rare': {
+                baseChance: 12,
+                massTarget: 7,
+                variety: 0.3,
+                icon: '🟣',
+                color: '#e0b0ff'
+            },
+            'legendary': {
+                baseChance: 4,
+                massTarget: 4,
+                variety: 0.2,
+                icon: '✨',
+                color: '#ffd700'
+            }
+        };
+
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const planetImage = document.getElementById('planetImage');
@@ -494,10 +546,10 @@
         const extractorText = document.getElementById('extractorText');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        // This is the critical fix - all onclick handlers need these
         window.toggleResource = toggleResource;
         window.returnToShip = returnToShip;
 
+        // ===== STATE =====
         let currentPlanet = {
             name: 'Earth',
             type: 'lush',
@@ -515,6 +567,19 @@
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
         
+        // ===== RESOURCE RARITY MAPPING =====
+        function getResourceRarity(resourceName) {
+            const rareMap = {
+                'Gold': 'rare', 'Silver': 'rare', 'Platinum': 'rare', 'Titanium': 'rare',
+                'Uranium': 'very-rare', 'Thorium': 'very-rare', 'Plutonium': 'very-rare',
+                'Promethium': 'legendary', 'Technetium': 'legendary',
+                'Carbon': 'uncommon', 'Iron': 'uncommon', 'Copper': 'uncommon',
+                'Nickel': 'uncommon', 'Lead': 'uncommon'
+            };
+            return rareMap[resourceName] || 'common';
+        }
+
+        // ===== ELEMENT DATA =====
         const elementData = {
             'Hydrogen': { symbol: 'H', rarity: 'common' },
             'Helium': { symbol: 'He', rarity: 'common' },
@@ -538,6 +603,7 @@
             'Argon': { symbol: 'Ar', rarity: 'uncommon' },
             'Iron': { symbol: 'Fe', rarity: 'uncommon' },
             'Nickel': { symbol: 'Ni', rarity: 'uncommon' },
+            'Lead': { symbol: 'Pb', rarity: 'uncommon' },
             'Copper': { symbol: 'Cu', rarity: 'rare' },
             'Zinc': { symbol: 'Zn', rarity: 'rare' },
             'Silver': { symbol: 'Ag', rarity: 'rare' },
@@ -550,35 +616,21 @@
             'Promethium': { symbol: 'Pm', rarity: 'legendary' }
         };
 
-        function calculateResourceChance(resource) {
-            if (['Iron', 'Carbon', 'Oxygen', 'Silicon', 'Hydrogen'].includes(resource)) {
-                return 90;
-            } else if (['Gold', 'Silver', 'Platinum', 'Titanium'].includes(resource)) {
-                return 70;
-            } else if (['Uranium', 'Thorium'].includes(resource)) {
-                return 50;
-            } else if (['Promethium'].includes(resource)) {
-                return 30;
-            }
-            return 80;
-        }
-
-        function getRarityClass(resource) {
-            const rarity = elementData[resource]?.rarity || 'common';
-            return `rarity-${rarity}`;
-        }
-
         function getElementSymbol(resource) {
             return elementData[resource]?.symbol || resource.substring(0, 2);
         }
 
-        // FIXED: Direct mass lookup without self-reference
         function getElementMass(elementName) {
             const masses = {
                 'Iron': 55.85, 'Gold': 197.0, 'Silver': 107.9, 'Platinum': 195.1,
                 'Carbon': 12.01, 'Oxygen': 16.00, 'Hydrogen': 1.008, 'Uranium': 238.0,
                 'Titanium': 47.87, 'Copper': 63.55, 'Aluminum': 26.98, 'Silicon': 28.09,
-                'default': 100.0
+                'Nickel': 58.69, 'Lead': 207.2, 'Thorium': 232.0, 'Plutonium': 244.0,
+                'Promethium': 145.0, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Potassium': 39.10,
+                'Calcium': 40.08, 'Nitrogen': 14.01, 'Fluorine': 19.00, 'Neon': 20.18,
+                'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45, 'Argon': 39.95,
+                'Zinc': 65.38, 'default': 100.0
             };
             return masses[elementName] || masses.default;
         }
@@ -590,9 +642,7 @@
             }
             
             try {
-                // Check if window.getCollection exists before calling
                 if (typeof window.getCollection !== 'function') {
-                    console.warn('window.getCollection not available yet');
                     return cachedCargoMass || 0;
                 }
                 
@@ -632,13 +682,13 @@
                     }
                 } else {
                     if (planetTypeStr.includes('lush')) {
-                        planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen'];
+                        planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen', 'Gold'];
                     } else if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
-                        planetResources = ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium'];
+                        planetResources = ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum'];
                     } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
-                        planetResources = ['Hydrogen', 'Helium', 'Oxygen', 'Carbon'];
+                        planetResources = ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice'];
                     } else if (planetTypeStr.includes('barren')) {
-                        planetResources = ['Iron', 'Silicon', 'Aluminum', 'Titanium'];
+                        planetResources = ['Iron', 'Silicon', 'Aluminum', 'Titanium', 'Nickel'];
                     } else {
                         planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
                     }
@@ -670,9 +720,11 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
+                // Initialize all resources as active by default
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
-                    resourceChances[resource] = calculateResourceChance(resource);
+                    const rarity = getResourceRarity(resource);
+                    resourceChances[resource] = RARITY_CONFIG[rarity].baseChance;
                 });
                 
                 renderResourceToggles();
@@ -694,16 +746,20 @@
             
             let html = '';
             currentPlanet.resources.forEach(resource => {
+                const rarity = getResourceRarity(resource);
+                const config = RARITY_CONFIG[rarity];
                 const symbol = getElementSymbol(resource);
-                const chance = resourceChances[resource] || 70;
+                const chance = resourceChances[resource] || config.baseChance;
                 const isActive = resourceStates[resource];
-                const rarityClass = getRarityClass(resource);
                 
                 html += `
-                    <div class="resource-toggle ${rarityClass} ${isActive ? 'active' : ''}" onclick="window.toggleResource('${resource}')">
+                    <div class="resource-toggle rarity-${rarity} ${isActive ? 'active' : ''}" 
+                         onclick="window.toggleResource('${resource}')"
+                         title="Chance: ${chance}%">
                         <span class="resource-symbol">${symbol}</span>
                         <span class="resource-name">${resource}</span>
                         <span class="resource-chance">${chance}%</span>
+                        <span class="resource-icon">${config.icon}</span>
                     </div>
                 `;
             });
@@ -715,7 +771,11 @@
         function toggleResource(resource) {
             resourceStates[resource] = !resourceStates[resource];
             renderResourceToggles();
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
         }
 
         function updateActiveCount() {
@@ -723,14 +783,25 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        function showToast(resource, quantity) {
+        function showToast(resource, quantity, isRichFind) {
+            const rarity = getResourceRarity(resource);
+            const config = RARITY_CONFIG[rarity];
             const symbol = getElementSymbol(resource);
-            const rarityClass = getRarityClass(resource);
+            
             const toast = document.createElement('div');
-            toast.className = 'toast success';
+            toast.className = `toast success rarity-${rarity}`;
+            
+            let icon = config.icon;
+            let extraText = '';
+            
+            if (isRichFind) {
+                icon = '✨';
+                extraText = ' RICH FIND!';
+            }
+            
             toast.innerHTML = `
-                <span class="toast-icon">${symbol}</span>
-                <span class="toast-name ${rarityClass}">+${quantity} ${resource}</span>
+                <span class="toast-icon">${icon}</span>
+                <span class="toast-name">+${quantity} ${resource}${extraText}</span>
             `;
             
             toastContainer.appendChild(toast);
@@ -742,6 +813,7 @@
             }, 3000);
         }
 
+        // ===== MAIN EXTRACTION FUNCTION =====
         async function attemptExtraction() {
             if (!isExtracting) return;
             
@@ -766,32 +838,62 @@
                     extractorText.textContent = 'Auto-extractor active';
                 }
                 
-                const randomIndex = Math.floor(Math.random() * activeResources.length);
-                const resource = activeResources[randomIndex];
-                const chance = resourceChances[resource] || 70;
-                
-                let quantity = 1;
-                const roll = Math.random() * 100;
-                
-                if (roll < chance) {
-                    if (roll < chance * 0.2) {
-                        quantity = 4;
-                    } else if (roll < chance * 0.5) {
-                        quantity = 3;
-                    } else if (roll < chance * 0.8) {
-                        quantity = 2;
+                // Weighted selection based on rarity
+                let weightedResources = [];
+                activeResources.forEach(resource => {
+                    const rarity = getResourceRarity(resource);
+                    let weight = 1;
+                    
+                    if (rarity === 'uncommon') weight = 0.7;
+                    else if (rarity === 'rare') weight = 0.4;
+                    else if (rarity === 'very-rare') weight = 0.2;
+                    else if (rarity === 'legendary') weight = 0.1;
+                    
+                    for (let i = 0; i < weight * 10; i++) {
+                        weightedResources.push(resource);
                     }
+                });
+                
+                const randomIndex = Math.floor(Math.random() * weightedResources.length);
+                const resource = weightedResources[randomIndex];
+                const rarity = getResourceRarity(resource);
+                const config = RARITY_CONFIG[rarity];
+                const massPerUnit = getElementMass(resource);
+                
+                // Roll for success
+                let roll = Math.random() * 100;
+                let quantity = 0;
+                
+                if (roll < config.baseChance) {
+                    // Calculate base quantity to reach mass target
+                    let baseQuantity = Math.floor(config.massTarget / massPerUnit);
+                    baseQuantity = Math.max(1, baseQuantity);
+                    
+                    // Apply variety
+                    const minVariety = 1 - (config.variety / 2);
+                    const maxVariety = 1 + (config.variety / 2);
+                    const varietyFactor = minVariety + (Math.random() * (maxVariety - minVariety));
+                    
+                    quantity = Math.floor(baseQuantity * varietyFactor);
+                    quantity = Math.max(1, quantity);
+                    
+                    // Cap maximum quantity
+                    const maxQuantity = Math.floor((config.massTarget * 2) / massPerUnit);
+                    quantity = Math.min(quantity, maxQuantity);
                 }
                 
-                const massPerUnit = getElementMass(resource);
+                if (quantity === 0) return;
+                
                 const totalMass = massPerUnit * quantity;
                 
                 if (currentMass + totalMass <= CARGO_MASS_LIMIT) {
-                    // Check if addElementToCollection exists
                     if (typeof window.addElementToCollection !== 'function') {
-                        console.warn('window.addElementToCollection not available yet');
+                        console.warn('window.addElementToCollection not available');
                         return;
                     }
+                    
+                    const avgQuantity = Math.floor(config.massTarget / massPerUnit);
+                    const isRichFind = quantity > avgQuantity * 1.5;
                     
                     const result = await window.addElementToCollection(resource, quantity);
                     
@@ -799,7 +901,7 @@
                         cachedCargoMass = currentMass + totalMass;
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
-                        showToast(resource, quantity);
+                        showToast(resource, quantity, isRichFind);
                     }
                 }
             } catch (error) {
@@ -822,7 +924,11 @@
         }
 
         function returnToShip() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
             
             if (extractionTimer) {
                 clearInterval(extractionTimer);
@@ -836,24 +942,8 @@
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
             if (typeof window.addElementToCollection !== 'function') return;
             
-            const extractCount = Math.floor(Math.random() * 3) + 1;
-            
-            for (let i = 0; i < extractCount; i++) {
-                const randomIndex = Math.floor(Math.random() * currentPlanet.resources.length);
-                const resource = currentPlanet.resources[randomIndex];
-                const mass = getElementMass(resource);
-                
-                const currentMass = await getCurrentCargoMass();
-                
-                if (currentMass + mass <= CARGO_MASS_LIMIT) {
-                    const result = await window.addElementToCollection(resource, 1);
-                    if (result && result.success) {
-                        cachedCargoMass = currentMass + mass;
-                        await updateCargoDisplay();
-                        showToast(resource, 1);
-                    }
-                }
-            }
+            // Do one quick extraction on load
+            await attemptExtraction();
         }
 
         async function init() {
