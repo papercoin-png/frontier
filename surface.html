@@ -492,6 +492,7 @@
 
         // ===== CONSTANTS =====
         const EXTRACTION_INTERVAL = 5000; // 5 seconds
+        const UNIVERSE_SEED = 42793; // Must match procedural-universe.js
         
         // ===== RARITY CONFIGURATION =====
         const RARITY_CONFIG = {
@@ -588,6 +589,21 @@
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
         
+        // ===== SEEDED RANDOM FUNCTIONS =====
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
+        function seededRandom(seed, index) {
+            const x = Math.sin(seed * (index + 1)) * 10000;
+            return x - Math.floor(x);
+        }
+
         // ===== RESOURCE RARITY MAPPING =====
         function getResourceRarity(resourceName) {
             const rareMap = {
@@ -687,33 +703,59 @@
             return mass;
         }
 
+        // ===== DETERMINISTIC PLANET RESOURCE GENERATION =====
+        function generatePlanetResources(planetName, planetType) {
+            // Create a seed based on planet name and universe seed
+            const nameHash = hashString(planetName);
+            const planetSeed = UNIVERSE_SEED + nameHash;
+            
+            // Resource pools by planet type
+            const resourcePools = {
+                'lush': ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen', 'Gold', 'Copper', 'Titanium'],
+                'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury'],
+                'volcanic': ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury'],
+                'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice', 'Methane', 'Nitrogen', 'Argon'],
+                'ice': ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice', 'Methane', 'Nitrogen', 'Argon'],
+                'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium', 'Nickel', 'Magnesium', 'Calcium', 'Lead']
+            };
+            
+            const pool = resourcePools[planetType] || resourcePools['lush'];
+            
+            // Determine number of resources (4-8 based on seed)
+            const resourceCount = Math.floor(seededRandom(planetSeed, 0) * 5) + 4;
+            
+            // Select resources deterministically
+            const resources = [];
+            for (let i = 0; i < resourceCount; i++) {
+                const index = Math.floor(seededRandom(planetSeed, i + 1) * pool.length);
+                const resource = pool[index];
+                if (!resources.includes(resource)) {
+                    resources.push(resource);
+                }
+            }
+            
+            // Ensure at least 3 resources
+            while (resources.length < 3) {
+                const fallback = pool[Math.floor(seededRandom(planetSeed, resources.length + 10) * pool.length)];
+                if (!resources.includes(fallback)) {
+                    resources.push(fallback);
+                }
+            }
+            
+            console.log(`Generated resources for ${planetName} (${planetType}):`, resources);
+            return resources;
+        }
+
         async function loadPlanetData() {
             try {
                 const planetNameStr = localStorage.getItem('voidfarer_current_planet') || 'Earth';
                 const planetTypeStr = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
                 
-                let planetResources = [];
-                const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
+                // Generate deterministic resources based on planet name
+                let planetResources = generatePlanetResources(planetNameStr, planetTypeStr);
                 
-                if (savedResources) {
-                    try {
-                        planetResources = JSON.parse(savedResources);
-                    } catch (e) {
-                        planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
-                    }
-                } else {
-                    if (planetTypeStr.includes('lush')) {
-                        planetResources = ['Carbon', 'Oxygen', 'Iron', 'Silicon', 'Hydrogen', 'Gold'];
-                    } else if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
-                        planetResources = ['Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum'];
-                    } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
-                        planetResources = ['Hydrogen', 'Helium', 'Oxygen', 'Carbon', 'Ice'];
-                    } else if (planetTypeStr.includes('barren')) {
-                        planetResources = ['Iron', 'Silicon', 'Aluminum', 'Titanium', 'Nickel'];
-                    } else {
-                        planetResources = ['Iron', 'Carbon', 'Silicon', 'Oxygen'];
-                    }
-                }
+                // Also save them to localStorage for persistence
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(planetResources));
                 
                 let imageFile = 'earth-view.jpg';
                 if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
@@ -967,7 +1009,7 @@
                     // Reset pity counter on success
                     pityCounters[resource].attempts = 0;
                     
-                    // Calculate base quantity to reach mass target - USE CEIL TO ENSURE AT LEAST 1
+                    // Calculate base quantity to reach mass target
                     let baseQuantity = Math.ceil(config.massTarget / massPerUnit);
                     baseQuantity = Math.max(1, baseQuantity);
                     
@@ -977,9 +1019,9 @@
                     const varietyFactor = minVariety + (Math.random() * (maxVariety - minVariety));
                     
                     quantity = Math.floor(baseQuantity * varietyFactor);
-                    quantity = Math.max(1, quantity); // Ensure at least 1
+                    quantity = Math.max(1, quantity);
                     
-                    // Cap maximum quantity (but ensure at least 1)
+                    // Cap maximum quantity
                     const maxQuantity = Math.max(1, Math.floor((config.massTarget * 2) / massPerUnit));
                     quantity = Math.min(quantity, maxQuantity);
                     
@@ -991,7 +1033,6 @@
                 }
                 
                 if (quantity === 0) {
-                    // Show failure toast with pity info
                     showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     return;
                 }
@@ -1014,6 +1055,11 @@
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
                         showSuccessToast(resource, quantity, isRichFind, wasPity);
+                        
+                        // Save location for journal
+                        if (typeof window.saveElementLocation === 'function') {
+                            await window.saveElementLocation(resource, currentPlanet.name);
+                        }
                     } else {
                         showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     }
