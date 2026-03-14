@@ -382,14 +382,17 @@
         </div>
     </div>
 
-    <script src="js/storage.js"></script>
-    <script src="js/navigation.js"></script>
-    <script src="js/warp-calculator.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/migration.js"></script>
-    <script src="js/planet-utils.js"></script>
+    <!-- CRITICAL: All scripts loaded as modules -->
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/warp-calculator.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-utils.js"></script>
 
-    <script>
+    <script type="module">
+        import { PLANET_TYPE_DATA } from './js/planet-utils.js';
+
         // ===== CANVAS ELEMENTS =====
         const starfieldCanvas = document.getElementById('starfieldCanvas');
         const starfieldCtx = starfieldCanvas.getContext('2d');
@@ -483,7 +486,7 @@
                     // Fallback demo data
                     warpData = {
                         destination: 'Pyros-3',
-                        destinationType: 'volcanic',
+                        destinationType: 'scorched',
                         startLocation: 'Earth',
                         startLocationType: 'planet',
                         totalDistance: 16.3,
@@ -507,7 +510,7 @@
                 const destTypeStr = (warpData.destinationType || '').toLowerCase();
                 if (destTypeStr.includes('gas')) {
                     destIcon.textContent = '🌪️';
-                } else if (destTypeStr.includes('lush') || destTypeStr.includes('verdant')) {
+                } else if (destTypeStr.includes('lush')) {
                     destIcon.textContent = '🌱';
                 } else if (destTypeStr.includes('frozen') || destTypeStr.includes('ice')) {
                     destIcon.textContent = '❄️';
@@ -540,7 +543,9 @@
                     
                     let typeDisplay = 'Unknown';
                     if (warpData.destPlanetType) {
-                        typeDisplay = warpData.destPlanetType.charAt(0).toUpperCase() + warpData.destPlanetType.slice(1);
+                        const planetData = PLANET_TYPE_DATA[warpData.destPlanetType];
+                        typeDisplay = planetData ? planetData.name : 
+                            warpData.destPlanetType.charAt(0).toUpperCase() + warpData.destPlanetType.slice(1);
                     }
                     previewType.textContent = typeDisplay + ' Planet';
                     
