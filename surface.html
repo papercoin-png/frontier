@@ -478,12 +478,13 @@
         </div>
     </div>
 
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
-    <script src="js/planet-utils.js"></script>
+    <!-- CRITICAL: All scripts loaded as modules -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-utils.js"></script>
 
-    <script>
+    <script type="module">
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -770,9 +771,11 @@
         function generateFallbackResources(planetType) {
             const fallbackPools = {
                 'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'volcanic': ['Iron', 'Sulfur', 'Copper', 'Gold'],
                 'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium'],
                 'lush': ['Carbon', 'Oxygen', 'Hydrogen', 'Silicon'],
                 'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'ice': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
                 'gas': ['Hydrogen', 'Helium', 'Methane', 'Ammonia'],
                 'oceanic': ['Hydrogen', 'Oxygen', 'Sodium', 'Chlorine'],
                 'toxic': ['Sulfur', 'Chlorine', 'Mercury', 'Arsenic'],
@@ -827,6 +830,12 @@
                     planetResources = generateFallbackResources(planetTypeStr);
                 }
                 
+                // Ensure we have exactly the resources that were pre-generated (max 4)
+                // But don't exceed 4
+                if (planetResources.length > 4) {
+                    planetResources = planetResources.slice(0, 4);
+                }
+                
                 // Determine image based on planet type
                 let imageFile = 'earth-view.jpg';
                 if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
@@ -854,7 +863,12 @@
                     const fallbacks = {
                         'oceanic': 'https://i.postimg.cc/65hLYQpB/oceanic-placeholder.jpg',
                         'toxic': 'https://i.postimg.cc/2y0vWwR2/toxic-placeholder.jpg',
-                        'asteroid': 'https://i.postimg.cc/GpzJ1VY1/asteroid-placeholder.jpg'
+                        'asteroid': 'https://i.postimg.cc/GpzJ1VY1/asteroid-placeholder.jpg',
+                        'scorched': 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg',
+                        'barren': 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg',
+                        'lush': 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg',
+                        'frozen': 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg',
+                        'gas': 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'
                     };
                     
                     if (fallbacks[planetTypeStr]) {
