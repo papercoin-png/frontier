@@ -231,10 +231,10 @@
             to { opacity: 0; }
         }
         
-        /* Resource Bar - moved up to make room for buttons */
+        /* Resource Bar - positioned to leave room for buttons */
         .resource-bar {
             position: absolute;
-            bottom: 140px;
+            bottom: 120px;
             left: 20px;
             right: 20px;
             background: rgba(10, 10, 26, 0.4);
@@ -243,6 +243,8 @@
             border-radius: 60px 20px 60px 20px;
             padding: 12px;
             z-index: 10;
+            max-height: 200px;
+            overflow-y: auto;
         }
         
         .resource-label {
@@ -258,7 +260,7 @@
             flex-wrap: wrap;
             gap: 6px;
             justify-content: center;
-            max-height: 200px;
+            max-height: 140px;
             overflow-y: auto;
             padding: 5px;
         }
@@ -267,15 +269,16 @@
             background: rgba(30, 45, 70, 0.5);
             border: 2px solid;
             border-radius: 40px 10px 40px 10px;
-            padding: 8px 12px;
+            padding: 6px 10px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             cursor: pointer;
             transition: all 0.1s;
-            min-width: 110px;
+            min-width: 95px;
             justify-content: space-between;
             position: relative;
+            font-size: 12px;
         }
         
         .resource-toggle:active {
@@ -294,30 +297,35 @@
         }
         
         .resource-symbol {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 700;
             font-family: 'Courier New', monospace;
-            min-width: 30px;
+            min-width: 25px;
+            text-align: center;
         }
         
         .resource-name {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 500;
             flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 50px;
         }
         
         .resource-chance {
             color: #ffd966;
-            font-size: 11px;
+            font-size: 10px;
             background: rgba(0,0,0,0.3);
-            padding: 2px 6px;
+            padding: 2px 4px;
             border-radius: 20px;
-            min-width: 40px;
+            min-width: 35px;
             text-align: center;
         }
         
         .resource-icon {
-            font-size: 14px;
+            font-size: 12px;
         }
         
         .rarity-common { 
@@ -362,21 +370,21 @@
         
         .active-count {
             text-align: center;
-            margin-top: 8px;
+            margin-top: 5px;
             color: #4affaa;
-            font-size: 12px;
+            font-size: 11px;
             font-family: 'Exo 2', sans-serif;
         }
         
-        /* Action Buttons Container - FIXED */
+        /* Action Buttons Container */
         .action-buttons {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
+            bottom: 10px;
+            left: 15px;
+            right: 15px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
             z-index: 100;
             pointer-events: auto;
         }
@@ -388,9 +396,9 @@
             backdrop-filter: blur(10px);
             border: 2px solid gold;
             color: #0a0a1a;
-            padding: 16px;
+            padding: 12px;
             border-radius: 60px 20px 60px 20px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
@@ -398,7 +406,7 @@
             text-align: center;
             letter-spacing: 1px;
             box-shadow: 0 0 30px gold;
-            display: none; /* Hidden by default, shown when planet is fully explored */
+            display: none;
         }
         
         .claim-btn.visible {
@@ -419,10 +427,10 @@
             pointer-events: none;
         }
         
-        /* Navigation Buttons - ALWAYS VISIBLE */
+        /* Navigation Buttons */
         .nav-buttons {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             width: 100%;
         }
         
@@ -432,9 +440,9 @@
             backdrop-filter: blur(10px);
             border: 2px solid #6a8ac0;
             color: white;
-            padding: 16px 0;
+            padding: 12px 0;
             border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
@@ -458,6 +466,7 @@
             color: #0a0a1a;
         }
         
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -504,6 +513,33 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Adjust for very small screens */
+        @media (max-height: 800px) {
+            .resource-bar {
+                bottom: 110px;
+                max-height: 160px;
+            }
+            
+            .resource-grid {
+                max-height: 100px;
+            }
+            
+            .resource-toggle {
+                min-width: 85px;
+                padding: 4px 8px;
+            }
+            
+            .nav-btn {
+                padding: 10px 0;
+                font-size: 13px;
+            }
+            
+            .claim-btn {
+                padding: 10px;
+                font-size: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -538,12 +574,12 @@
                 <div class="active-count" id="activeCount">Extracting: 0 resources</div>
             </div>
             
-            <!-- Action Buttons - Always visible navigation buttons -->
+            <!-- Action Buttons -->
             <div class="action-buttons">
                 <!-- Claim Button (appears when planet is fully explored) -->
                 <button class="claim-btn" id="claimBtn" onclick="window.claimCurrentPlanet()">✨ CLAIM PLANET</button>
                 
-                <!-- Navigation Buttons - ALWAYS VISIBLE -->
+                <!-- Navigation Buttons - Always visible -->
                 <div class="nav-buttons">
                     <button class="nav-btn system-btn" id="systemBtn" onclick="window.returnToSystem()">🪐 SYSTEM VIEW</button>
                     <button class="nav-btn" id="shipBtn" onclick="window.returnToShip()">🚀 RETURN TO SHIP</button>
