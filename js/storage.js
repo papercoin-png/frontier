@@ -253,6 +253,52 @@ async function removeElementFromCollection(elementName, count = 1) {
     }
 }
 
+// ===== SAFE SELL ELEMENT =====
+async function safeSellElement(elementName, quantity, pricePerUnit) {
+    try {
+        console.log('safeSellElement called:', elementName, quantity, pricePerUnit);
+        const collection = await getCollection();
+        const credits = await getCredits();
+        
+        console.log('Current collection:', collection);
+        console.log('Current credits:', credits);
+        
+        if (!collection[elementName]) {
+            return { success: false, reason: 'not_found' };
+        }
+        
+        const availableCount = collection[elementName].count || 1;
+        if (availableCount < quantity) {
+            return { success: false, reason: 'insufficient', available: availableCount };
+        }
+        
+        // Remove from collection
+        const removeResult = await window.removeElementFromCollection(elementName, quantity);
+        console.log('Remove result:', removeResult);
+        
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add credits
+        const earnings = quantity * pricePerUnit;
+        const newCredits = credits + earnings;
+        await saveCredits(newCredits);
+        
+        console.log('New credits:', newCredits);
+        
+        return { 
+            success: true, 
+            earnings: earnings,
+            newCredits: newCredits
+        };
+        
+    } catch (error) {
+        console.error('Error in safeSellElement:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
+}
+
 // ===== CREDITS =====
 async function getCredits() {
     try {
@@ -634,6 +680,7 @@ window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
+window.safeSellElement = safeSellElement;  // CRITICAL: This was missing!
 window.getShipFuel = getShipFuel;
 window.saveShipFuel = saveShipFuel;
 window.refuelShip = refuelShip;
