@@ -3,6 +3,24 @@
 // All players share the same seed = same universe for everyone
 // This is a pure calculation module - no storage dependencies
 
+import { 
+    PLANET_TYPES, 
+    PLANET_TYPE_DATA, 
+    RESOURCE_POOLS,
+    seededRandom as utilsSeededRandom,
+    hashString as utilsHashString,
+    getRandomPlanetType,
+    generatePlanetResources,
+    generatePlanet,
+    generateStar
+} from './planet-utils.js';
+
+import {
+    generatePlanetName,
+    generateStarName,
+    seededRandom as namesSeededRandom
+} from './planet-names.js';
+
 // ===== CONSTANTS =====
 export const UNIVERSE_SEED = 42793; // Fixed seed - every player sees the same universe
 
@@ -12,39 +30,14 @@ export const GALAXY_CONFIG = {
     sectors: 12, // 3x4 grid (A1-C4)
     nebulaePerSector: 6, // 6 nebulae per sector × 12 sectors = 72 nebulae
     starsPerNebula: 50, // 50 stars per nebula × 72 = 3,600 stars
-    planetsPerStar: { min: 2, max: 12 }, // Average ~5 planets = 18,000 planets
+    planetsPerStar: { min: 2, max: 8 }, // Average ~4 planets = 14,400 planets (with 4 max per planet)
     anomaliesPerSector: 5 // Special points of interest
 };
 
 // ===== SEEDED RANDOM NUMBER GENERATOR =====
-// All random numbers are deterministic based on seeds
-// Same inputs always produce same outputs
-
-export function seededRandom(seed, index = 0) {
-    // Using sin for pseudo-random but deterministic results
-    const x = Math.sin(seed * (index + 1)) * 10000;
-    return x - Math.floor(x);
-}
-
-export function seededRandomRange(seed, index, min, max) {
-    return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
-}
-
-export function seededRandomChoice(seed, index, array) {
-    if (!array || array.length === 0) return null;
-    const choice = Math.floor(seededRandom(seed, index) * array.length);
-    return array[choice];
-}
-
-// ===== HASH FUNCTION FOR STRINGS =====
-export function hashString(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash |= 0; // Convert to 32-bit integer
-    }
-    return Math.abs(hash);
-}
+// Re-export for backward compatibility
+export const seededRandom = utilsSeededRandom;
+export const hashString = utilsHashString;
 
 // ===== LOCATION SEED GENERATION =====
 // Every location in the universe gets a unique seed
@@ -73,61 +66,30 @@ export function getAnomalySeed(sectorSeed, anomalyIndex) {
     return sectorSeed + 500000 + (anomalyIndex * 1000);
 }
 
-// ===== NAME GENERATION =====
-const namePrefixes = [
-    'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
-    'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-    'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
-];
+// ===== PLANET TYPE GENERATION (re-export from planet-utils) =====
+export const planetTypes = Object.values(PLANET_TYPES).map(type => ({
+    type: type,
+    name: PLANET_TYPE_DATA[type].name,
+    prob: PLANET_TYPE_DATA[type].prob,
+    temp: PLANET_TYPE_DATA[type].temp,
+    atmos: PLANET_TYPE_DATA[type].atmos,
+    gravity: PLANET_TYPE_DATA[type].gravity,
+    landable: PLANET_TYPE_DATA[type].landable,
+    icon: PLANET_TYPE_DATA[type].icon
+}));
 
-const nameSuffixes = [
-    'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
-    'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
-    'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
-];
-
-const planetPrefixes = [
-    'Verdant', 'Pyros', 'Glacier', 'Aether', 'Ignis', 'Terra', 'Aqua', 'Ventus',
-    'Saxum', 'Silva', 'Desertum', 'Lux', 'Umbra', 'Crystal', 'Feral', 'Eden',
-    'Nova', 'Prime', 'Secundus', 'Tertius', 'Quartus', 'Quintus'
-];
-
-const anomalyPrefixes = [
-    'Dark', 'Veil', 'Crimson', 'Void', 'Mystic', 'Ancient', 'Forgotten', 'Eternal',
-    'Silent', 'Whispering', 'Screaming', 'Dying', 'Living', 'Cursed', 'Blessed',
-    'Infernal', 'Celestial', 'Abyssal', 'Chaotic', 'Ordered'
-];
-
-const anomalySuffixes = [
-    'Reach', 'Expanse', 'Void', 'Abyss', 'Maw', 'Heart', 'Eye', 'Core', 'Rift', 'Hollow',
-    'Gate', 'Portal', 'Nexus', 'Conduit', 'Stream', 'Field', 'Zone', 'Sector', 'Domain'
-];
-
-export function generateStarName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
-    const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
-    return prefix + ' ' + suffix;
-}
-
-export function generatePlanetName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 5, planetPrefixes) || 'Terra';
-    const number = seededRandomRange(seed, index * 5 + 1, 1, 12);
-    return prefix + '-' + number;
-}
-
-export function generateAnomalyName(seed, index) {
-    const prefix = seededRandomChoice(seed, index * 7, anomalyPrefixes) || 'Mystic';
-    const suffix = seededRandomChoice(seed, index * 7 + 1, anomalySuffixes) || 'Reach';
-    return prefix + ' ' + suffix;
+export function getPlanetType(seed, index) {
+    const type = getRandomPlanetType(seed, index);
+    return PLANET_TYPE_DATA[type];
 }
 
 // ===== STAR TYPE GENERATION =====
 export const starTypes = [
-    { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
-    { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
-    { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
-    { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0 },
-    { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
+    { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8, icon: '🟡' },
+    { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5, icon: '🔴' },
+    { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12, icon: '🔵' },
+    { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0, icon: '💫' },
+    { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0, icon: '⚫' }
 ];
 
 export function getStarType(seed, index) {
@@ -144,81 +106,18 @@ export function getStarType(seed, index) {
     return { ...starTypes[0] }; // Default to main sequence
 }
 
-// ===== PLANET TYPE GENERATION =====
-export const planetTypes = [
-    { type: 'scorched', name: 'Scorched', prob: 0.15, temp: '450°C', atmos: 'Toxic', gravity: '1.2g', landable: true, icon: '🔥' },
-    { type: 'barren', name: 'Barren', prob: 0.25, temp: '-50°C', atmos: 'Thin', gravity: '0.8g', landable: true, icon: '🪨' },
-    { type: 'lush', name: 'Lush', prob: 0.15, temp: '22°C', atmos: 'Breathable', gravity: '0.9g', landable: true, icon: '🌱' },
-    { type: 'frozen', name: 'Frozen', prob: 0.20, temp: '-80°C', atmos: 'Thin', gravity: '0.7g', landable: true, icon: '❄️' },
-    { type: 'gas', name: 'Gas Giant', prob: 0.25, temp: '-120°C', atmos: 'Dense', gravity: '2.1g', landable: false, icon: '🌪️' }
-];
-
-export function getPlanetType(seed, index) {
-    const rand = seededRandom(seed, index);
-    let cumulative = 0;
-    
-    for (const type of planetTypes) {
-        cumulative += type.prob;
-        if (rand < cumulative) {
-            return { ...type }; // Return copy
-        }
-    }
-    
-    return { ...planetTypes[1] }; // Default to barren
+// ===== RESOURCE GENERATION (re-export from planet-utils) =====
+export function generateResources(seed, index, planetType, count = 4) {
+    return generatePlanetResources(seed, planetType, count);
 }
 
-// ===== RESOURCE GENERATION =====
-export const resourcePools = {
-    common: ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Potassium', 'Calcium'],
-    uncommon: ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Nickel', 'Sulfur', 'Phosphorus', 'Chlorine', 'Argon', 'Lead'],
-    rare: ['Gold', 'Silver', 'Platinum', 'Copper', 'Titanium', 'Zinc', 'Tin', 'Mercury', 'Cobalt', 'Chromium'],
-    veryRare: ['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'],
-    legendary: ['Promethium', 'Technetium', 'Astatine', 'Francium']
-};
-
-export function generateResources(seed, index, planetType, count = null) {
-    // Determine resource count based on planet type
-    if (count === null) {
-        if (planetType === 'gas') count = seededRandomRange(seed, index, 2, 4);
-        else if (planetType === 'barren') count = seededRandomRange(seed, index, 1, 3);
-        else if (planetType === 'scorched') count = seededRandomRange(seed, index, 2, 4);
-        else if (planetType === 'frozen') count = seededRandomRange(seed, index, 2, 4);
-        else if (planetType === 'lush') count = seededRandomRange(seed, index, 3, 5);
-        else count = 2;
-    }
-    
-    const resources = [];
-    const availablePools = [];
-    
-    // Add probability for each rarity tier
-    if (seededRandom(seed, index + 10) < 0.8) availablePools.push(...resourcePools.common);
-    if (seededRandom(seed, index + 11) < 0.5) availablePools.push(...resourcePools.uncommon);
-    if (seededRandom(seed, index + 12) < 0.2) availablePools.push(...resourcePools.rare);
-    if (seededRandom(seed, index + 13) < 0.05) availablePools.push(...resourcePools.veryRare);
-    if (seededRandom(seed, index + 14) < 0.01) availablePools.push(...resourcePools.legendary);
-    
-    // Ensure at least common resources
-    if (availablePools.length === 0) {
-        availablePools.push(...resourcePools.common);
-    }
-    
-    // Select unique resources
-    while (resources.length < count && availablePools.length > 0) {
-        const resourceIndex = Math.floor(seededRandom(seed, index + resources.length * 100) * availablePools.length);
-        const resource = availablePools[resourceIndex];
-        
-        if (!resources.includes(resource)) {
-            resources.push(resource);
-        }
-    }
-    
-    return resources;
-}
-
-// ===== STAR GENERATION =====
-export function generateStar(nebulaSeed, starIndex) {
+// ===== STAR GENERATION (enhanced) =====
+export function generateStar(nebulaSeed, starIndex, sectorId = null) {
     const seed = getStarSeed(nebulaSeed, starIndex);
     const starType = getStarType(seed, 0);
+    
+    // Generate star name using planet-names
+    const starName = generateStarName(seed, 2);
     
     // Calculate planet count based on star type
     let planetCount = 0;
@@ -226,13 +125,49 @@ export function generateStar(nebulaSeed, starIndex) {
         planetCount = seededRandomRange(seed, 1, starType.minPlanets, starType.maxPlanets);
     }
     
+    // Generate planets
+    const planets = [];
+    for (let i = 0; i < planetCount; i++) {
+        const planetSeed = getPlanetSeed(seed, i);
+        const planetType = getRandomPlanetType(planetSeed, i);
+        const planetData = PLANET_TYPE_DATA[planetType];
+        
+        // Generate planet name
+        const planetName = generatePlanetName(planetSeed, i, sectorId, planetType);
+        
+        // Generate resources (max 4)
+        const resources = generatePlanetResources(planetSeed, planetType);
+        
+        planets.push({
+            index: i,
+            name: planetName,
+            type: planetType,
+            typeName: planetData.name,
+            icon: planetData.icon,
+            color: planetData.color,
+            temp: planetData.temp,
+            atmos: planetData.atmos,
+            gravity: planetData.gravity,
+            landable: planetData.landable,
+            description: planetData.description,
+            resources: resources,
+            seed: planetSeed,
+            distanceFromStar: 0.5 + (i * 0.8), // Approximate distance in LY
+            orbitRadius: 70 + i * 40,
+            orbitSpeed: 0.002 - (i * 0.0002),
+            angle: seededRandom(planetSeed, 100) * Math.PI * 2
+        });
+    }
+    
     return {
         index: starIndex,
-        name: generateStarName(seed, 2),
+        name: starName,
         type: starType.type,
         typeName: starType.name,
         color: starType.color,
+        icon: starType.icon,
         planetCount: planetCount,
+        planets: planets,
         seed: seed,
         position: {
             x: seededRandom(seed, 3) * 90 + 5, // 5-95% range
@@ -241,10 +176,17 @@ export function generateStar(nebulaSeed, starIndex) {
     };
 }
 
-// ===== PLANET GENERATION =====
-export function generatePlanet(starSeed, planetIndex, starType) {
+// ===== PLANET GENERATION (re-export with name) =====
+export function generatePlanet(starSeed, planetIndex, starType, sectorId = null) {
     const seed = getPlanetSeed(starSeed, planetIndex);
-    const planetType = getPlanetType(seed, 0);
+    const planetType = getRandomPlanetType(seed, 0);
+    const planetData = PLANET_TYPE_DATA[planetType];
+    
+    // Generate planet name
+    const planetName = generatePlanetName(seed, planetIndex, sectorId, planetType);
+    
+    // Generate resources (max 4)
+    const resources = generatePlanetResources(seed, planetType);
     
     // Adjust temperature based on star type and position
     let tempOffset = 0;
@@ -252,33 +194,36 @@ export function generatePlanet(starSeed, planetIndex, starType) {
     else if (starType === 'red') tempOffset = 50; // Red dwarfs are cooler
     
     // Parse temperature string and adjust
-    let baseTemp = parseInt(planetType.temp);
+    let baseTemp = parseInt(planetData.temp);
     let newTemp = baseTemp + tempOffset;
     let tempString = newTemp + '°C';
     
     return {
         index: planetIndex,
-        name: generatePlanetName(seed, 1),
-        type: planetType.type,
-        typeName: planetType.name,
-        icon: planetType.icon,
+        name: planetName,
+        type: planetType,
+        typeName: planetData.name,
+        icon: planetData.icon,
+        color: planetData.color,
         temp: tempString,
-        atmos: planetType.atmos,
-        gravity: planetType.gravity,
-        landable: planetType.landable,
-        resources: generateResources(seed, 2, planetType.type),
+        atmos: planetData.atmos,
+        gravity: planetData.gravity,
+        landable: planetData.landable,
+        description: planetData.description,
+        resources: resources,
         seed: seed,
         orbitRadius: 50 + planetIndex * 15, // Distance from star
         orbitSpeed: 0.001 - (planetIndex * 0.0001), // Slower for outer planets
-        hasMoons: planetType.type === 'gas' ? true : seededRandom(seed, 3) < 0.3,
-        moonCount: planetType.type === 'gas' ? 
+        angle: seededRandom(seed, 100) * Math.PI * 2,
+        hasMoons: planetType === 'gas' ? true : seededRandom(seed, 3) < 0.3,
+        moonCount: planetType === 'gas' ? 
             seededRandomRange(seed, 4, 3, 10) : 
             (seededRandom(seed, 5) < 0.3 ? seededRandomRange(seed, 6, 1, 2) : 0)
     };
 }
 
 // ===== NEBULA GENERATION =====
-export function generateNebula(sectorSeed, nebulaIndex) {
+export function generateNebula(sectorSeed, nebulaIndex, sectorId = null) {
     const seed = getNebulaSeed(sectorSeed, nebulaIndex);
     
     const nebulaNames = [
@@ -294,12 +239,19 @@ export function generateNebula(sectorSeed, nebulaIndex) {
     const typeIndex = seededRandomRange(seed, 1, 0, nebulaTypes.length - 1);
     const colorIndex = seededRandomRange(seed, 2, 0, colors.length - 1);
     
+    // Generate stars in this nebula
+    const stars = [];
+    for (let i = 0; i < GALAXY_CONFIG.starsPerNebula; i++) {
+        stars.push(generateStar(seed, i, sectorId));
+    }
+    
     return {
         index: nebulaIndex,
         name: nebulaNames[nameIndex] + ' Nebula',
         type: nebulaTypes[typeIndex],
         color: colors[colorIndex],
         systems: GALAXY_CONFIG.starsPerNebula,
+        stars: stars,
         seed: seed,
         position: {
             x: 20 + (nebulaIndex * 12) % 80,
@@ -332,9 +284,12 @@ export function generateAnomaly(sectorSeed, anomalyIndex) {
         }
     }
     
+    // Generate anomaly name
+    const anomalyName = generateAnomalyName(seed, 1);
+    
     return {
         index: anomalyIndex,
-        name: generateAnomalyName(seed, 1),
+        name: anomalyName,
         type: anomalyType.type,
         typeName: anomalyType.name,
         icon: anomalyType.icon,
@@ -349,21 +304,42 @@ export function generateAnomaly(sectorSeed, anomalyIndex) {
     };
 }
 
+// ===== ANOMALY NAME GENERATION =====
+export function generateAnomalyName(seed, index) {
+    const prefixes = [
+        'Dark', 'Veil', 'Crimson', 'Void', 'Mystic', 'Ancient', 'Forgotten', 'Eternal',
+        'Silent', 'Whispering', 'Screaming', 'Dying', 'Living', 'Cursed', 'Blessed',
+        'Infernal', 'Celestial', 'Abyssal', 'Chaotic', 'Ordered', 'Quantum', 'Singular',
+        'Gravitational', 'Magnetic', 'Electric', 'Plasma', 'Radiant', 'Nuclear'
+    ];
+    
+    const suffixes = [
+        'Reach', 'Expanse', 'Void', 'Abyss', 'Maw', 'Heart', 'Eye', 'Core', 'Rift', 'Hollow',
+        'Gate', 'Portal', 'Nexus', 'Conduit', 'Stream', 'Field', 'Zone', 'Sector', 'Domain',
+        'Anomaly', 'Phenomenon', 'Occurrence', 'Event', 'Incident', 'Outbreak'
+    ];
+    
+    const prefix = prefixes[Math.floor(seededRandom(seed, index * 2) * prefixes.length)];
+    const suffix = suffixes[Math.floor(seededRandom(seed, index * 2 + 1) * suffixes.length)];
+    
+    return prefix + ' ' + suffix;
+}
+
 // ===== SECTOR GENERATION =====
 export function generateSector(sectorId) {
     const sectorSeed = getSectorSeed(sectorId);
     
     const sectorNames = {
-        'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Outer Arm',
-        'A2': 'Sagittarius', 'B2': 'Orion Arm', 'C2': 'Carina Arm',
-        'A3': 'Norma Arm', 'B3': 'Scutum Arm', 'C3': 'Centaurus',
-        'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'Fringe'
+        'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
+        'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
+        'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
+        'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
     };
     
     // Generate nebulae for this sector
     const nebulae = [];
     for (let i = 0; i < GALAXY_CONFIG.nebulaePerSector; i++) {
-        nebulae.push(generateNebula(sectorSeed, i));
+        nebulae.push(generateNebula(sectorSeed, i, sectorId));
     }
     
     // Generate anomalies for this sector
@@ -383,22 +359,27 @@ export function generateSector(sectorId) {
 }
 
 // ===== STAR SYSTEM GENERATION =====
-export function generateStarSystem(nebulaSeed, starIndex) {
-    const star = generateStar(nebulaSeed, starIndex);
+export function generateStarSystem(nebulaSeed, starIndex, sectorId = null) {
+    const star = generateStar(nebulaSeed, starIndex, sectorId);
     
-    // Generate planets for this star
-    const planets = [];
-    for (let i = 0; i < star.planetCount; i++) {
-        planets.push(generatePlanet(star.seed, i, star.type));
-    }
-    
+    // Planets are already generated inside generateStar
     return {
         star: star,
-        planets: planets
+        planets: star.planets
     };
 }
 
 // ===== UTILITY FUNCTIONS =====
+export function seededRandomRange(seed, index, min, max) {
+    return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
+}
+
+export function seededRandomChoice(seed, index, array) {
+    if (!array || array.length === 0) return null;
+    const choice = Math.floor(seededRandom(seed, index) * array.length);
+    return array[choice];
+}
+
 export function getSectorFromLocation(location) {
     // Extract sector from location string or object
     if (typeof location === 'string') {
@@ -446,10 +427,32 @@ export function generateAllStarsInNebula(sectorId, nebulaIndex) {
     const stars = [];
     
     for (let i = 0; i < GALAXY_CONFIG.starsPerNebula; i++) {
-        stars.push(generateStar(nebulaSeed, i));
+        stars.push(generateStar(nebulaSeed, i, sectorId));
     }
     
     return stars;
+}
+
+// ===== PLANET COUNT STATISTICS =====
+export function getGalaxyStatistics() {
+    const totalSectors = GALAXY_CONFIG.sectors;
+    const totalNebulae = totalSectors * GALAXY_CONFIG.nebulaePerSector;
+    const totalStars = totalNebulae * GALAXY_CONFIG.starsPerNebula;
+    
+    // Average planets per star (based on star type distribution)
+    let totalPlanets = 0;
+    for (const starType of starTypes) {
+        const avgPlanets = (starType.minPlanets + starType.maxPlanets) / 2;
+        totalPlanets += totalStars * starType.prob * avgPlanets;
+    }
+    
+    return {
+        totalSectors,
+        totalNebulae,
+        totalStars,
+        totalPlanets: Math.round(totalPlanets),
+        planetTypes: Object.keys(PLANET_TYPES).length
+    };
 }
 
 // ===== EXPORT =====
@@ -464,9 +467,6 @@ export default {
     getNebulaSeed,
     getStarSeed,
     getPlanetSeed,
-    generateStarName,
-    generatePlanetName,
-    generateAnomalyName,
     getStarType,
     getPlanetType,
     generateResources,
@@ -478,12 +478,14 @@ export default {
     generateStarSystem,
     generateAllSectors,
     generateAllStarsInNebula,
+    generateAnomalyName,
     getSectorFromLocation,
     getNebulaFromLocation,
     getStarFromLocation,
     getPlanetFromLocation,
+    getGalaxyStatistics,
     starTypes,
     planetTypes,
     anomalyTypes,
-    resourcePools
+    resourcePools: RESOURCE_POOLS
 };
