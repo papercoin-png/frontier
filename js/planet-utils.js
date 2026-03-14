@@ -1,6 +1,7 @@
 // js/planet-utils.js
 // Shared planet generation utilities for Voidfarer
 // Handles planet types, resource generation, and planet properties
+// This is a module - must be loaded with type="module"
 
 // ===== PLANET TYPE DEFINITIONS =====
 export const PLANET_TYPES = {
@@ -191,6 +192,10 @@ export function hashString(str) {
         hash |= 0;
     }
     return Math.abs(hash);
+}
+
+export function seededRandomRange(seed, index, min, max) {
+    return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
 }
 
 // ===== PLANET TYPE SELECTION =====
@@ -420,6 +425,7 @@ export default {
     RESOURCE_POOLS,
     RARITY_WEIGHTS,
     seededRandom,
+    seededRandomRange,
     hashString,
     getRandomPlanetType,
     generatePlanetResources,
