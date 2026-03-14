@@ -295,8 +295,34 @@ async function _removeElementFromCollection(elementName, count = 1) {
 }
 
 // Public wrapper functions
-async function addElementToCollection(elementName, count = 1) {
-    return await _addElementToCollection(elementName, count);
+async function addElementToCollection(elementName, count = 1, locationData = null) {
+    try {
+        const result = await _addElementToCollection(elementName, count);
+        
+        if (result && result.success) {
+            // Update player stats
+            const player = await getPlayer();
+            if (player) {
+                player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
+                await savePlayer(player);
+            }
+            
+            // Save location data if provided
+            if (locationData && typeof window.saveElementLocation === 'function') {
+                try {
+                    await window.saveElementLocation(elementName, locationData.planet, locationData);
+                } catch (locError) {
+                    console.error('Failed to save location:', locError);
+                }
+            }
+            
+            return { success: true, newCount: result.count };
+        }
+        return { success: false, reason: 'database_error', error: result?.error };
+    } catch (error) {
+        console.error('Error in addElementToCollection:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
 }
 
 async function removeElementFromCollection(elementName, count = 1) {
@@ -711,6 +737,56 @@ function getPlayerId() {
     return playerId;
 }
 
+// ===== ELEMENT LOCATIONS HELPERS =====
+async function saveElementLocation(elementName, planetName, locationData = {}) {
+    try {
+        // This function now lives in db.js, but we provide a wrapper here
+        if (typeof window.saveElementLocation === 'function') {
+            return await window.saveElementLocation(elementName, planetName, locationData);
+        }
+        return false;
+    } catch (error) {
+        console.error('Error in saveElementLocation wrapper:', error);
+        return false;
+    }
+}
+
+async function getElementLocations(elementName) {
+    try {
+        if (typeof window.getElementLocations === 'function') {
+            return await window.getElementLocations(elementName);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error in getElementLocations wrapper:', error);
+        return [];
+    }
+}
+
+async function getPlayerLocations() {
+    try {
+        if (typeof window.getPlayerLocations === 'function') {
+            return await window.getPlayerLocations();
+        }
+        return [];
+    } catch (error) {
+        console.error('Error in getPlayerLocations wrapper:', error);
+        return [];
+    }
+}
+
+async function getUniquePlanetsForElement(elementName) {
+    try {
+        if (typeof window.getUniquePlanetsForElement === 'function') {
+            return await window.getUniquePlanetsForElement(elementName);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error in getUniquePlanetsForElement wrapper:', error);
+        return [];
+    }
+}
+
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = CARGO_MASS_LIMIT;
 window.STORAGE_KEYS = STORAGE_KEYS;
@@ -773,3 +849,9 @@ window.saveShipUpgrades = saveShipUpgrades;
 window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
+
+// Location helpers
+window.saveElementLocation = saveElementLocation;
+window.getElementLocations = getElementLocations;
+window.getPlayerLocations = getPlayerLocations;
+window.getUniquePlanetsForElement = getUniquePlanetsForElement;
