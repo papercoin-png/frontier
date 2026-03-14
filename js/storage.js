@@ -244,8 +244,10 @@ async function addElementToCollection(elementName, count = 1) {
     }
 }
 
+// FIXED: Remove the recursive call
 async function removeElementFromCollection(elementName, count = 1) {
     try {
+        // Call the db function directly, not recursively
         return await window.removeElementFromCollection(elementName, count);
     } catch (error) {
         console.error('Error removing element from collection:', error);
@@ -272,7 +274,7 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
             return { success: false, reason: 'insufficient', available: availableCount };
         }
         
-        // Remove from collection
+        // Remove from collection - call db function directly
         const removeResult = await window.removeElementFromCollection(elementName, quantity);
         console.log('Remove result:', removeResult);
         
@@ -680,7 +682,7 @@ window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
-window.safeSellElement = safeSellElement;  // CRITICAL: This was missing!
+window.safeSellElement = safeSellElement;
 window.getShipFuel = getShipFuel;
 window.saveShipFuel = saveShipFuel;
 window.refuelShip = refuelShip;
