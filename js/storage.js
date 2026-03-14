@@ -2,7 +2,8 @@
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 
 // ===== CONSTANTS =====
-const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can carry
+// CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
+// We'll use the value from window or fallback to 5000
 
 // ===== STORAGE KEYS =====
 const STORAGE_KEYS = {
@@ -103,6 +104,11 @@ function getElementMass(elementName) {
     return ELEMENT_MASS[elementName] || DEFAULT_MASS;
 }
 
+// Helper to get cargo mass limit from window (defined in HTML) or use fallback
+function getCargoMassLimit() {
+    return typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
+}
+
 // ===== CARGO MASS UTILITIES =====
 async function getTotalCargoMass() {
     try {
@@ -122,11 +128,11 @@ async function getRemainingCargoMass() {
     try {
         const totalMass = await getTotalCargoMass();
         const player = await getPlayer();
-        const massLimit = player?.cargoMassLimit || CARGO_MASS_LIMIT;
+        const massLimit = player?.cargoMassLimit || getCargoMassLimit();
         return Math.max(0, massLimit - totalMass);
     } catch (error) {
         console.error('Error calculating remaining cargo mass:', error);
-        return CARGO_MASS_LIMIT;
+        return getCargoMassLimit();
     }
 }
 
@@ -209,7 +215,7 @@ async function createDefaultPlayer(name = 'Voidfarer') {
             totalDistanceTraveled: 0,
             totalWarps: 0,
             credits: 5000,
-            cargoMassLimit: CARGO_MASS_LIMIT
+            cargoMassLimit: getCargoMassLimit()
         };
         await savePlayer(player);
         console.log('Created default player');
@@ -799,7 +805,7 @@ async function getUniquePlanetsForElement(elementName) {
 }
 
 // ===== EXPOSE TO WINDOW =====
-window.CARGO_MASS_LIMIT = CARGO_MASS_LIMIT;
+window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 window.STORAGE_KEYS = STORAGE_KEYS;
 window.UNIVERSE_SEED = typeof window.UNIVERSE_SEED !== 'undefined' ? window.UNIVERSE_SEED : 42793;
 window.ELEMENT_MASS = ELEMENT_MASS;
