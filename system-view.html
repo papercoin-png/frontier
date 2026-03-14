@@ -279,6 +279,26 @@
             color: #ffd966;
             font-weight: 600;
             margin: 10px 0;
+            background: rgba(0,0,0,0.3);
+            padding: 8px;
+            border-radius: 20px;
+        }
+        
+        .planet-info .resource-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: center;
+            margin: 5px 0;
+        }
+        
+        .resource-badge {
+            background: rgba(74, 138, 192, 0.3);
+            border: 1px solid #4a8ac0;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 12px;
+            color: #ffd966;
         }
         
         .distance-calculator {
@@ -337,6 +357,11 @@
             padding: 12px;
             margin: 15px 0;
             border: 1px solid #ffaa4a;
+            display: none;
+        }
+        
+        .cumulative-info.visible {
+            display: block;
         }
         
         .cumulative-row {
@@ -361,6 +386,11 @@
             padding: 15px;
             margin: 15px 0;
             border: 2px solid #4affaa;
+            display: none;
+        }
+        
+        .total-journey.visible {
+            display: block;
         }
         
         .total-journey-row {
@@ -459,6 +489,31 @@
             z-index: 25;
         }
         
+        /* Planet type colors */
+        .planet-scorched .planet-core { background: radial-gradient(circle at 30% 30%, #ffb090, #cd5c5c); }
+        .planet-scorched .planet-glow { background: rgba(255, 150, 100, 0.4); }
+        
+        .planet-barren .planet-core { background: radial-gradient(circle at 30% 30%, #c0b0a0, #8b6b4a); }
+        .planet-barren .planet-glow { background: rgba(160, 140, 120, 0.4); }
+        
+        .planet-lush .planet-core { background: radial-gradient(circle at 30% 30%, #a0ffa0, #2e8b57); }
+        .planet-lush .planet-glow { background: rgba(100, 200, 100, 0.4); }
+        
+        .planet-frozen .planet-core { background: radial-gradient(circle at 30% 30%, #d0f0ff, #4682b4); }
+        .planet-frozen .planet-glow { background: rgba(150, 200, 255, 0.4); }
+        
+        .planet-gas .planet-core { background: radial-gradient(circle at 30% 30%, #e0c0ff, #9370db); }
+        .planet-gas .planet-glow { background: rgba(200, 150, 255, 0.4); }
+        
+        .planet-oceanic .planet-core { background: radial-gradient(circle at 30% 30%, #4aa0ff, #1a4a8a); }
+        .planet-oceanic .planet-glow { background: rgba(74, 160, 255, 0.4); }
+        
+        .planet-toxic .planet-core { background: radial-gradient(circle at 30% 30%, #b0ff4a, #5a8a1a); }
+        .planet-toxic .planet-glow { background: rgba(176, 255, 74, 0.4); }
+        
+        .planet-asteroid .planet-core { background: radial-gradient(circle at 30% 30%, #c0c0c0, #6a6a6a); }
+        .planet-asteroid .planet-glow { background: rgba(192, 192, 192, 0.4); }
+        
         /* Loading overlay */
         .loading-overlay {
             position: fixed;
@@ -505,22 +560,6 @@
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.05); opacity: 0.95; }
         }
-        
-        /* Planet type colors */
-        .planet-lush .planet-core { background: radial-gradient(circle at 30% 30%, #a0ffa0, #2e8b57); }
-        .planet-lush .planet-glow { background: rgba(100, 200, 100, 0.4); }
-        
-        .planet-barren .planet-core { background: radial-gradient(circle at 30% 30%, #c0b0a0, #8b6b4a); }
-        .planet-barren .planet-glow { background: rgba(160, 140, 120, 0.4); }
-        
-        .planet-frozen .planet-core { background: radial-gradient(circle at 30% 30%, #d0f0ff, #4682b4); }
-        .planet-frozen .planet-glow { background: rgba(150, 200, 255, 0.4); }
-        
-        .planet-scorched .planet-core { background: radial-gradient(circle at 30% 30%, #ffb090, #cd5c5c); }
-        .planet-scorched .planet-glow { background: rgba(255, 150, 100, 0.4); }
-        
-        .planet-gas .planet-core { background: radial-gradient(circle at 30% 30%, #e0c0ff, #9370db); }
-        .planet-gas .planet-glow { background: rgba(200, 150, 255, 0.4); }
 
         /* Migration status (debug) */
         .migration-status {
@@ -574,7 +613,10 @@
             <p id="planetTemp"></p>
             <p id="planetAtmos"></p>
             <p id="planetGravity"></p>
-            <p class="planet-resources" id="planetResources"></p>
+            <div class="planet-resources" id="planetResources">
+                <div>Resources:</div>
+                <div class="resource-list" id="resourceList"></div>
+            </div>
             
             <!-- Distance Calculator -->
             <div class="distance-calculator">
@@ -639,8 +681,13 @@
     <script type="module" src="js/warp-calculator.js"></script>
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-utils.js"></script>
+    <script type="module" src="js/planet-names.js"></script>
 
     <script type="module">
+        import { PLANET_TYPE_DATA } from './js/planet-utils.js';
+        import { generatePlanetName } from './js/planet-names.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) tg.expand();
@@ -660,15 +707,15 @@
         const totalDistanceEl = document.getElementById('totalDistance');
         const totalCyclesEl = document.getElementById('totalCycles');
         const totalFuelEl = document.getElementById('totalFuel');
+        const resourceList = document.getElementById('resourceList');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        // This is the critical fix - all onclick handlers need these
         window.goBack = goBack;
         window.handlePlanetAction = handlePlanetAction;
         window.hidePlanetInfo = hidePlanetInfo;
 
         // ===== STATE =====
-        let starData = null;
+        let systemData = null;
         let planets = [];
         let currentPlanet = null;
         let currentSector = 'B2';
@@ -676,7 +723,6 @@
         let currentStarName = '';
 
         // ===== CONSTANTS =====
-        const UNIVERSE_SEED = 42793;
         const ORBITAL_DESCENT = 0.5;
 
         // ===== CHECK FOR PLOT MODE =====
@@ -699,104 +745,6 @@
             starDistance: 0,
             cumulativeBeforePlanet: 0
         };
-
-        // ===== SECTOR NAMES =====
-        const sectorNames = {
-            'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
-            'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
-            'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
-            'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
-        };
-
-        // ===== SECTOR COORDINATES =====
-        const sectorCoords = {
-            'A1': { x: 0, y: 0 }, 'B1': { x: 1, y: 0 }, 'C1': { x: 2, y: 0 },
-            'A2': { x: 0, y: 1 }, 'B2': { x: 1, y: 1 }, 'C2': { x: 2, y: 1 },
-            'A3': { x: 0, y: 2 }, 'B3': { x: 1, y: 2 }, 'C3': { x: 2, y: 2 },
-            'A4': { x: 0, y: 3 }, 'B4': { x: 1, y: 3 }, 'C4': { x: 2, y: 3 }
-        };
-
-        // ===== HASH FUNCTION =====
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        }
-
-        // ===== SEEDED RANDOM =====
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
-        }
-
-        function seededRandomRange(seed, index, min, max) {
-            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
-        }
-
-        function seededRandomChoice(seed, index, array) {
-            const choice = Math.floor(seededRandom(seed, index) * array.length);
-            return array[choice];
-        }
-
-        // ===== STAR TYPES =====
-        const starTypes = [
-            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8 },
-            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5 },
-            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12 },
-            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0 },
-            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0 }
-        ];
-
-        function getStarType(seed, index) {
-            const rand = seededRandom(seed, index);
-            let cumulative = 0;
-            
-            for (const type of starTypes) {
-                cumulative += type.prob;
-                if (rand < cumulative) {
-                    return { ...type };
-                }
-            }
-            return { ...starTypes[0] };
-        }
-
-        // ===== PLANET TYPES =====
-        const planetTypes = [
-            { type: 'scorched', name: 'Scorched', prob: 0.15, temp: '450°C', atmos: 'Toxic', gravity: '1.2g', landable: true, icon: '🔥' },
-            { type: 'barren', name: 'Barren', prob: 0.25, temp: '-50°C', atmos: 'Thin', gravity: '0.8g', landable: true, icon: '🪨' },
-            { type: 'lush', name: 'Lush', prob: 0.15, temp: '22°C', atmos: 'Breathable', gravity: '0.9g', landable: true, icon: '🌱' },
-            { type: 'frozen', name: 'Frozen', prob: 0.20, temp: '-80°C', atmos: 'Thin', gravity: '0.7g', landable: true, icon: '❄️' },
-            { type: 'gas', name: 'Gas Giant', prob: 0.25, temp: '-120°C', atmos: 'Dense', gravity: '2.1g', landable: false, icon: '🌪️' }
-        ];
-
-        function getPlanetType(seed, index) {
-            const rand = seededRandom(seed, index);
-            let cumulative = 0;
-            
-            for (const type of planetTypes) {
-                cumulative += type.prob;
-                if (rand < cumulative) {
-                    return { ...type };
-                }
-            }
-            return { ...planetTypes[1] };
-        }
-
-        // ===== NAME GENERATION =====
-        const planetPrefixes = [
-            'Verdant', 'Pyros', 'Glacier', 'Aether', 'Ignis', 'Terra', 'Aqua', 'Ventus',
-            'Saxum', 'Silva', 'Desertum', 'Lux', 'Umbra', 'Crystal', 'Eden',
-            'Nova', 'Prime', 'Secundus', 'Tertius', 'Quartus'
-        ];
-
-        function generatePlanetName(seed, index) {
-            const prefix = planetPrefixes[Math.floor(seededRandom(seed, index * 5) * planetPrefixes.length)];
-            const number = Math.floor(seededRandom(seed, index * 5 + 1) * 12) + 1;
-            return prefix + '-' + number;
-        }
 
         // ===== WARP CALCULATION FUNCTIONS =====
         function getWarpCyclesFromDistance(distance) {
@@ -868,77 +816,88 @@
             }
         }
 
-        // ===== LOAD STAR DATA =====
-        async function loadStarData() {
+        // ===== LOAD SYSTEM DATA =====
+        async function loadSystemData() {
             try {
-                currentStarName = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : 'Unknown Star';
-                const starSeed = UNIVERSE_SEED + (currentStarName ? hashString(currentStarName) : 0);
+                // Try to load pre-generated system data from localStorage
+                const savedSystemData = localStorage.getItem('voidfarer_system_data');
                 
-                const starTypeObj = getStarType(starSeed, 0);
-                starData = {
-                    type: starTypeObj.type,
-                    typeName: starTypeObj.name,
-                    color: starTypeObj.color
-                };
-                
-                const planetCount = Math.floor(Math.random() * 6) + 3;
-                planets = [];
-                
-                const orbitRadii = [70, 110, 150, 190, 230, 270, 310, 350];
-                
-                for (let i = 0; i < planetCount; i++) {
-                    const planetSeed = starSeed + i * 100;
-                    const planetType = getPlanetType(planetSeed, i);
+                if (savedSystemData) {
+                    systemData = JSON.parse(savedSystemData);
                     
-                    const possibleResources = ['Carbon', 'Iron', 'Silicon', 'Gold', 'Silver', 'Platinum', 
-                                              'Uranium', 'Titanium', 'Oxygen', 'Hydrogen', 'Helium', 'Copper'];
-                    const resourceCount = Math.floor(Math.random() * 3) + 2;
-                    const resources = [];
+                    // Extract data
+                    const star = systemData.star;
+                    planets = systemData.planets || [];
+                    currentStarName = star.name;
                     
-                    for (let r = 0; r < resourceCount; r++) {
-                        const resource = possibleResources[Math.floor(Math.random() * possibleResources.length)];
-                        if (!resources.includes(resource)) {
-                            resources.push(resource);
-                        }
-                    }
-                    
-                    const distanceFromCurrent = (Math.random() * 5 + 1).toFixed(1);
-                    
-                    planets.push({
-                        index: i,
-                        name: generatePlanetName(planetSeed, i),
-                        type: planetType.type,
-                        typeName: planetType.name,
-                        icon: planetType.icon,
-                        temp: planetType.temp,
-                        atmos: planetType.atmos,
-                        gravity: planetType.gravity,
-                        landable: planetType.landable,
-                        resources: resources,
-                        distanceFromCurrent: parseFloat(distanceFromCurrent),
-                        orbitRadius: orbitRadii[i],
-                        orbitSpeed: 0.002 - (i * 0.0002),
-                        angle: Math.random() * Math.PI * 2,
-                        sector: currentSector,
-                        region: currentRegion
+                    console.log('Loaded pre-generated system:', {
+                        star: star.name,
+                        planetCount: planets.length,
+                        samplePlanet: planets[0]
                     });
+                    
+                    // Update UI
+                    document.getElementById('starName').textContent = star.name;
+                    document.getElementById('systemName').textContent = star.name + ' System';
+                    document.getElementById('planetCount').textContent = planets.length + ' planets';
+                    
+                    // Style the star
+                    const starEl = document.getElementById('star');
+                    const color = star.color || '#ffd700';
+                    starEl.style.background = `radial-gradient(circle at 30% 30%, #fff, ${color})`;
+                    starEl.style.boxShadow = `0 0 40px ${color}`;
+                    
+                    return true;
+                } else {
+                    console.error('No system data found in localStorage');
+                    // Fallback: generate a simple system
+                    return generateFallbackSystem();
                 }
-
-                document.getElementById('starName').textContent = currentStarName || 'Unknown Star';
-                document.getElementById('systemName').textContent = (currentStarName || 'Unknown') + ' System';
-                document.getElementById('planetCount').textContent = planets.length + ' planets';
-
-                const starEl = document.getElementById('star');
-                const color = starData?.color || '#ffd700';
-                starEl.style.background = `radial-gradient(circle at 30% 30%, #fff, ${color})`;
-                starEl.style.boxShadow = `0 0 40px ${color}`;
-
-                return true;
-
             } catch (error) {
-                console.error('Error loading star data:', error);
-                return false;
+                console.error('Error loading system data:', error);
+                return generateFallbackSystem();
             }
+        }
+
+        // ===== GENERATE FALLBACK SYSTEM (if no data) =====
+        function generateFallbackSystem() {
+            console.warn('Generating fallback system');
+            
+            currentStarName = 'Unknown Star';
+            planets = [];
+            
+            // Generate 3-6 random planets
+            const planetCount = Math.floor(Math.random() * 4) + 3;
+            const planetTypes = ['scorched', 'barren', 'lush', 'frozen', 'gas', 'oceanic', 'toxic', 'asteroid'];
+            
+            for (let i = 0; i < planetCount; i++) {
+                const type = planetTypes[Math.floor(Math.random() * planetTypes.length)];
+                const planetData = PLANET_TYPE_DATA[type];
+                
+                planets.push({
+                    index: i,
+                    name: `Planet-${i + 1}`,
+                    type: type,
+                    typeName: planetData.name,
+                    icon: planetData.icon,
+                    color: planetData.color,
+                    temp: planetData.temp,
+                    atmos: planetData.atmos,
+                    gravity: planetData.gravity,
+                    landable: type !== 'gas',
+                    description: planetData.description,
+                    resources: ['Iron', 'Carbon', 'Silicon'].slice(0, Math.floor(Math.random() * 3) + 1),
+                    distanceFromStar: 0.5 + (i * 0.8),
+                    orbitRadius: 70 + i * 40,
+                    orbitSpeed: 0.002 - (i * 0.0002)
+                });
+            }
+            
+            document.getElementById('starName').textContent = currentStarName;
+            document.getElementById('systemName').textContent = 'Unknown System';
+            document.getElementById('planetCount').textContent = planets.length + ' planets';
+            
+            return true;
         }
 
         // ===== CREATE ORBIT RINGS =====
@@ -974,7 +933,8 @@
         // ===== ANIMATION LOOP =====
         function animate() {
             planets.forEach(planet => {
-                planet.angle += planet.orbitSpeed;
+                if (!planet.angle) planet.angle = Math.random() * Math.PI * 2;
+                planet.angle += planet.orbitSpeed || 0.001;
                 
                 const x = Math.cos(planet.angle) * planet.orbitRadius;
                 const y = Math.sin(planet.angle) * planet.orbitRadius * 0.6;
@@ -995,7 +955,7 @@
             currentPlanet = planet;
             
             // Calculate this leg distance (star to planet + descent)
-            const legDistance = planet.distanceFromCurrent + ORBITAL_DESCENT;
+            const legDistance = planet.distanceFromStar + ORBITAL_DESCENT;
             
             // Update basic planet info
             document.getElementById('planetName').textContent = planet.name;
@@ -1003,10 +963,24 @@
             document.getElementById('planetTemp').textContent = 'Temperature: ' + planet.temp;
             document.getElementById('planetAtmos').textContent = 'Atmosphere: ' + planet.atmos;
             document.getElementById('planetGravity').textContent = 'Gravity: ' + planet.gravity;
-            document.getElementById('planetResources').textContent = 'Resources: ' + (planet.resources.length ? planet.resources.join(', ') : 'None');
+            
+            // Update resources
+            const resourceList = document.getElementById('resourceList');
+            resourceList.innerHTML = '';
+            
+            if (planet.resources && planet.resources.length > 0) {
+                planet.resources.forEach(resource => {
+                    const badge = document.createElement('span');
+                    badge.className = 'resource-badge';
+                    badge.textContent = resource;
+                    resourceList.appendChild(badge);
+                });
+            } else {
+                resourceList.innerHTML = '<span style="color: #a0c0ff;">No resources detected</span>';
+            }
             
             // Update distance display
-            document.getElementById('distanceFromCurrent').textContent = planet.distanceFromCurrent.toFixed(1) + ' LY';
+            document.getElementById('distanceFromCurrent').textContent = planet.distanceFromStar.toFixed(1) + ' LY';
             document.getElementById('descentDistance').textContent = ORBITAL_DESCENT.toFixed(1) + ' LY';
             document.getElementById('legDistance').textContent = legDistance.toFixed(1) + ' LY';
             
@@ -1018,11 +992,11 @@
                 const totalFuel = getFuelCostFromDistance(totalDistance);
                 
                 // Update cumulative info
-                cumulativeInfoEl.style.display = 'block';
+                cumulativeInfoEl.classList.add('visible');
                 previousDistanceEl.textContent = plotData.cumulativeBeforePlanet.toFixed(1) + ' LY';
                 
                 // Update total journey
-                totalJourneyEl.style.display = 'block';
+                totalJourneyEl.classList.add('visible');
                 totalDistanceEl.textContent = totalDistance.toFixed(1) + ' LY';
                 totalCyclesEl.textContent = totalCycles;
                 totalFuelEl.textContent = totalFuel + '⭐';
@@ -1033,8 +1007,8 @@
                 actionBtn.textContent = '🚀 COMPLETE JOURNEY TO ' + planet.name;
             } else {
                 // Hide plot mode sections
-                cumulativeInfoEl.style.display = 'none';
-                totalJourneyEl.style.display = 'none';
+                cumulativeInfoEl.classList.remove('visible');
+                totalJourneyEl.classList.remove('visible');
                 
                 // Normal mode button
                 const actionBtn = document.getElementById('actionBtn');
@@ -1082,13 +1056,25 @@
             loadingText.textContent = 'plotting course...';
             
             try {
-                const legDistance = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
+                const legDistance = currentPlanet.distanceFromStar + ORBITAL_DESCENT;
                 const warpCycles = getWarpCyclesFromDistance(legDistance);
                 const fuelCost = getFuelCostFromDistance(legDistance);
                 
-                // Save to localStorage
-                localStorage.setItem('voidfarer_current_sector', currentPlanet.sector);
-                localStorage.setItem('voidfarer_current_region', currentPlanet.region);
+                // Save planet data to localStorage
+                localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
+                localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources || []));
+                
+                // Save star and sector data
+                localStorage.setItem('voidfarer_current_star', currentStarName);
+                localStorage.setItem('voidfarer_current_sector', currentSector);
+                localStorage.setItem('voidfarer_current_region', currentRegion);
+                
+                console.log('Saved planet data:', {
+                    planet: currentPlanet.name,
+                    type: currentPlanet.type,
+                    resources: currentPlanet.resources
+                });
                 
                 // Prepare warp data
                 const warpData = {
@@ -1099,14 +1085,16 @@
                     totalDistance: legDistance,
                     warpCycles: warpCycles,
                     fuelCost: fuelCost,
-                    returnPage: 'surface.html'
+                    returnPage: 'surface.html',
+                    destPlanet: currentPlanet.name,
+                    destPlanetType: currentPlanet.type,
+                    destPlanetResources: currentPlanet.resources || []
                 };
                 
                 localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
                 
-                localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
-                localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
-                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources));
+                // Clear system data
+                localStorage.removeItem('voidfarer_system_data');
                 
                 setTimeout(() => {
                     window.location.href = 'warp.html';
@@ -1128,7 +1116,7 @@
             
             try {
                 // Calculate this leg (star to planet + descent)
-                const planetLeg = currentPlanet.distanceFromCurrent + ORBITAL_DESCENT;
+                const planetLeg = currentPlanet.distanceFromStar + ORBITAL_DESCENT;
                 
                 // Get all distances
                 const sectorDist = plotData.sectorDistance;
@@ -1148,6 +1136,11 @@
                 console.log(`  TOTAL: ${totalDistance.toFixed(1)} LY`);
                 console.log(`  Cycles: ${totalCycles}, Fuel: ${totalFuel}⭐`);
                 
+                // Save planet data
+                localStorage.setItem('voidfarer_current_planet', currentPlanet.name);
+                localStorage.setItem('voidfarer_current_planet_type', currentPlanet.type);
+                localStorage.setItem('voidfarer_current_planet_resources', JSON.stringify(currentPlanet.resources || []));
+                
                 // Prepare warp data for complete journey
                 const warpData = {
                     destination: currentPlanet.name,
@@ -1166,7 +1159,7 @@
                     destStar: plotData.destStar,
                     destPlanet: currentPlanet.name,
                     destPlanetType: currentPlanet.type,
-                    destPlanetResources: currentPlanet.resources,
+                    destPlanetResources: currentPlanet.resources || [],
                     
                     // Store leg distances for display
                     sectorDistance: sectorDist,
@@ -1187,6 +1180,9 @@
                     'voidfarer_plot_star_distance', 'voidfarer_plot_sector_distance', 'voidfarer_plot_cumulative_distance'
                 ];
                 plotKeys.forEach(key => localStorage.removeItem(key));
+                
+                // Clear system data
+                localStorage.removeItem('voidfarer_system_data');
                 
                 // GO TO WARP!
                 setTimeout(() => {
@@ -1222,7 +1218,11 @@
                 }
 
                 await loadCurrentLocation();
-                await loadStarData();
+                const loaded = await loadSystemData();
+                
+                if (!loaded) {
+                    throw new Error('Failed to load system data');
+                }
                 
                 if (isPlotMode) {
                     loadPlotData();
