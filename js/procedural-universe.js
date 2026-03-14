@@ -11,8 +11,7 @@ import {
     hashString as utilsHashString,
     getRandomPlanetType,
     generatePlanetResources,
-    generatePlanet,
-    generateStar
+    generatePlanet as utilsGeneratePlanet
 } from './planet-utils.js';
 
 import {
@@ -111,7 +110,7 @@ export function generateResources(seed, index, planetType, count = 4) {
     return generatePlanetResources(seed, planetType, count);
 }
 
-// ===== STAR GENERATION (enhanced) =====
+// ===== STAR GENERATION (local version - not imported) =====
 export function generateStar(nebulaSeed, starIndex, sectorId = null) {
     const seed = getStarSeed(nebulaSeed, starIndex);
     const starType = getStarType(seed, 0);
@@ -176,50 +175,9 @@ export function generateStar(nebulaSeed, starIndex, sectorId = null) {
     };
 }
 
-// ===== PLANET GENERATION (re-export with name) =====
+// ===== PLANET GENERATION (using utils with name) =====
 export function generatePlanet(starSeed, planetIndex, starType, sectorId = null) {
-    const seed = getPlanetSeed(starSeed, planetIndex);
-    const planetType = getRandomPlanetType(seed, 0);
-    const planetData = PLANET_TYPE_DATA[planetType];
-    
-    // Generate planet name
-    const planetName = generatePlanetName(seed, planetIndex, sectorId, planetType);
-    
-    // Generate resources (max 4)
-    const resources = generatePlanetResources(seed, planetType);
-    
-    // Adjust temperature based on star type and position
-    let tempOffset = 0;
-    if (starType === 'blue') tempOffset = -50; // Blue giants are hotter
-    else if (starType === 'red') tempOffset = 50; // Red dwarfs are cooler
-    
-    // Parse temperature string and adjust
-    let baseTemp = parseInt(planetData.temp);
-    let newTemp = baseTemp + tempOffset;
-    let tempString = newTemp + '°C';
-    
-    return {
-        index: planetIndex,
-        name: planetName,
-        type: planetType,
-        typeName: planetData.name,
-        icon: planetData.icon,
-        color: planetData.color,
-        temp: tempString,
-        atmos: planetData.atmos,
-        gravity: planetData.gravity,
-        landable: planetData.landable,
-        description: planetData.description,
-        resources: resources,
-        seed: seed,
-        orbitRadius: 50 + planetIndex * 15, // Distance from star
-        orbitSpeed: 0.001 - (planetIndex * 0.0001), // Slower for outer planets
-        angle: seededRandom(seed, 100) * Math.PI * 2,
-        hasMoons: planetType === 'gas' ? true : seededRandom(seed, 3) < 0.3,
-        moonCount: planetType === 'gas' ? 
-            seededRandomRange(seed, 4, 3, 10) : 
-            (seededRandom(seed, 5) < 0.3 ? seededRandomRange(seed, 6, 1, 2) : 0)
-    };
+    return utilsGeneratePlanet(starSeed, planetIndex, starType, sectorId);
 }
 
 // ===== NEBULA GENERATION =====
