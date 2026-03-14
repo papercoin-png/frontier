@@ -491,6 +491,7 @@
     <script type="module" src="js/planet-utils.js"></script>
     <script type="module" src="js/planet-names.js"></script>
     <script type="module" src="js/procedural-universe.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
 
     <script type="module">
         import { 
@@ -506,6 +507,7 @@
         
         import { generatePlanetName } from './js/planet-names.js';
         import { generatePlanetResources, PLANET_TYPE_DATA } from './js/planet-utils.js';
+        import { getPlanetStatus } from './js/planet-status.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -542,9 +544,32 @@
         let cumulativeBefore = 0;
         let currentSectorId = 'B2'; // Default to Orion Arm
         
+        // Cache for planet statuses to check explored systems
+        let exploredPlanetsCache = new Set();
+
         // ===== CHECK FOR PLOT MODE =====
         const urlParams = new URLSearchParams(window.location.search);
         const isPlotMode = urlParams.get('mode') === 'plot';
+
+        // ===== LOAD EXPLORED PLANETS =====
+        async function loadExploredPlanets() {
+            try {
+                const locations = await window.getPlayerLocations();
+                locations.forEach(loc => {
+                    if (loc.planet) {
+                        exploredPlanetsCache.add(loc.planet);
+                    }
+                });
+                console.log(`Loaded ${exploredPlanetsCache.size} explored planets`);
+            } catch (error) {
+                console.error('Error loading explored planets:', error);
+            }
+        }
+
+        // ===== CHECK IF STAR SYSTEM HAS ANY EXPLORED PLANETS =====
+        function hasExploredPlanets(star) {
+            return star.planets.some(planet => exploredPlanetsCache.has(planet.name));
+        }
 
         // ===== LOAD JOURNEY DISTANCE =====
         function loadJourneyDistance() {
@@ -677,6 +702,9 @@
                     loadCumulativeDistance();
                 }
 
+                // Load explored planets
+                await loadExploredPlanets();
+
                 return true;
 
             } catch (error) {
@@ -716,9 +744,15 @@
                     planetCount: planets.length,
                     distance: distance,
                     isCurrent: isCurrent,
-                    seed: starSeed
+                    seed: starSeed,
+                    hasExplored: false // Will be set after checking cache
                 });
             }
+
+            // Check which stars have explored planets
+            stars.forEach(star => {
+                star.hasExplored = hasExploredPlanets(star);
+            });
 
             // Sort stars: Current star first, then by distance
             stars.sort((a, b) => {
@@ -914,6 +948,13 @@
                 if (star.isCurrent) {
                     card.classList.add('current');
                 }
+                
+                // Add a subtle indicator if system has explored planets
+                if (star.hasExplored) {
+                    card.style.borderColor = '#4affaa';
+                    card.style.boxShadow = '0 0 15px rgba(74, 255, 170, 0.3)';
+                }
+                
                 card.onclick = function() { showStarInfo(star); };
                 
                 let distanceDisplay = '';
@@ -926,11 +967,14 @@
                 // Get planet icons for preview (max 3)
                 const planetIcons = star.planets.slice(0, 3).map(p => p.icon).join(' ');
                 
+                // Add exploration indicator
+                const exploredIndicator = star.hasExplored ? ' ✦' : '';
+                
                 card.innerHTML = `
                     ${distanceDisplay}
                     <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
                     <div class="star-info">
-                        <div class="star-name" style="color: ${star.color}">${star.name}</div>
+                        <div class="star-name" style="color: ${star.color}">${star.name}${exploredIndicator}</div>
                         <div class="star-type">${star.type}</div>
                         <div class="star-details">
                             <span>⏺️ ${star.planetCount} planets</span>
