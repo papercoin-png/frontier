@@ -24,7 +24,7 @@ const EVENT_SEVERITY = {
     EPIC: 'epic'
 };
 
-// ===== EVENT DURATIONS =====
+// ===== EVENT DURATIONS (in days) =====
 const EVENT_DURATIONS = {
     [EVENT_SEVERITY.MINOR]: { min: 1, max: 3 },
     [EVENT_SEVERITY.MODERATE]: { min: 3, max: 7 },
@@ -34,13 +34,13 @@ const EVENT_DURATIONS = {
 
 // ===== EVENT PRICE EFFECTS =====
 const PRICE_EFFECTS = {
-    [EVENT_SEVERITY.MINOR]: { min: -0.15, max: 0.15 },
-    [EVENT_SEVERITY.MODERATE]: { min: -0.3, max: 0.3 },
-    [EVENT_SEVERITY.MAJOR]: { min: -0.5, max: 0.5 },
-    [EVENT_SEVERITY.EPIC]: { min: -0.8, max: 0.8 }
+    [EVENT_SEVERITY.MINOR]: { min: -0.15, max: 0.15 },      // ±15%
+    [EVENT_SEVERITY.MODERATE]: { min: -0.3, max: 0.3 },     // ±30%
+    [EVENT_SEVERITY.MAJOR]: { min: -0.5, max: 0.5 },        // ±50%
+    [EVENT_SEVERITY.EPIC]: { min: -0.8, max: 0.8 }          // ±80%
 };
 
-// ===== STORAGE KEYS =====
+// ===== STORAGE KEYS (for localStorage settings) =====
 const EVENT_STORAGE_KEYS = {
     EVENT_NOTIFICATIONS: 'voidfarer_event_notifications',
     EVENT_SETTINGS: 'voidfarer_event_settings',
@@ -78,18 +78,22 @@ const COLONY_NAMES = [
 
 // ===== INITIALIZE EVENT SYSTEM =====
 async function initializeEventSystem() {
+    // Initialize active events in IndexedDB
     const events = await window.getAll('activeEvents') || [];
     
+    // Initialize event history in IndexedDB
     const history = await window.getAll('eventHistory') || [];
     
+    // Initialize event notifications in localStorage
     if (!localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS)) {
         localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify([]));
     }
     
+    // Initialize event settings in localStorage
     if (!localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS)) {
         const settings = {
             enabled: true,
-            frequency: 0.3,
+            frequency: 0.3,           // 30% chance per day
             maxActiveEvents: 5,
             notifyPlayers: true,
             severityWeights: {
@@ -116,6 +120,7 @@ async function initializeEventSystem() {
         localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
     }
     
+    // Set last event check
     if (!localStorage.getItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK)) {
         localStorage.setItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK, Date.now().toString());
     }
@@ -123,12 +128,24 @@ async function initializeEventSystem() {
     console.log('Economic event system initialized');
 }
 
-// ===== EVENT MANAGEMENT =====
+// ===== EVENT MANAGEMENT (IndexedDB) =====
 async function getActiveEvents() {
     return await window.getAll('activeEvents') || [];
 }
 
+async function saveActiveEvents(events) {
+    const db = await getDb();
+    const tx = db.transaction('activeEvents', 'readwrite');
+    await tx.objectStore('activeEvents').clear();
+    
+    for (const event of events) {
+        await tx.objectStore('activeEvents').put(event);
+    }
+    await tx.done;
+}
+
 async function addEvent(event) {
+    // Ensure event has all required fields
     const newEvent = {
         id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         type: event.type,
@@ -150,7 +167,13 @@ async function addEvent(event) {
     };
     
     await window.setItem('activeEvents', newEvent);
-    await addToEventHistory({ ...newEvent, ended: false, addedAt: Date.now() });
+    
+    // Add to history
+    await addToEventHistory({
+        ...newEvent,
+        ended: false,
+        addedAt: Date.now()
+    });
     
     return newEvent;
 }
@@ -159,6 +182,7 @@ async function removeEvent(eventId) {
     const event = await window.getItem('activeEvents', eventId);
     
     if (event) {
+        // Add to history as ended
         await addToEventHistory({
             ...event,
             ended: true,
@@ -171,7 +195,17 @@ async function removeEvent(eventId) {
     return await getActiveEvents();
 }
 
-// ===== EVENT HISTORY =====
+async function updateEvent(eventId, updates) {
+    const event = await window.getItem('activeEvents', eventId);
+    
+    if (!event) return null;
+    
+    const updatedEvent = { ...event, ...updates };
+    await window.setItem('activeEvents', updatedEvent);
+    return updatedEvent;
+}
+
+// ===== EVENT HISTORY (IndexedDB) =====
 async function getEventHistory(limit = 100) {
     const allHistory = await window.getAll('eventHistory') || [];
     return allHistory.slice(-limit);
@@ -186,6 +220,7 @@ async function addToEventHistory(entry) {
     
     await window.setItem('eventHistory', newEntry);
     
+    // Keep only last 1000 events (optional cleanup)
     const allHistory = await window.getAll('eventHistory') || [];
     if (allHistory.length > 1000) {
         const toDelete = allHistory.slice(0, allHistory.length - 1000);
@@ -197,7 +232,7 @@ async function addToEventHistory(entry) {
     return newEntry;
 }
 
-// ===== EVENT NOTIFICATIONS =====
+// ===== EVENT NOTIFICATIONS (localStorage) =====
 function getEventNotifications(playerId, unreadOnly = false) {
     const notifications = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS);
     const allNotes = notifications ? JSON.parse(notifications) : [];
@@ -228,7 +263,22 @@ function addEventNotification(playerId, event, message) {
         date: new Date().toISOString()
     });
     
+    // Keep only last 100 per player (will filter later)
     localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify(allNotes));
+}
+
+function markEventNotificationRead(notificationId) {
+    const notifications = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS);
+    const allNotes = notifications ? JSON.parse(notifications) : [];
+    
+    const updated = allNotes.map(n => {
+        if (n.id === notificationId) {
+            n.read = true;
+        }
+        return n;
+    });
+    
+    localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify(updated));
 }
 
 // ===== EVENT GENERATION =====
@@ -262,18 +312,28 @@ function getEventSettings() {
     };
 }
 
+function saveEventSettings(settings) {
+    localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
+}
+
 async function generateRandomEvent() {
     const settings = getEventSettings();
     if (!settings.enabled) return null;
     
+    // Check if we should generate an event
     if (Math.random() > settings.frequency) return null;
     
+    // Check max active events
     const activeEvents = await getActiveEvents();
     if (activeEvents.length >= settings.maxActiveEvents) return null;
     
+    // Select severity based on weights
     const severity = selectWeightedItem(settings.severityWeights);
+    
+    // Select type based on weights
     const type = selectWeightedItem(settings.typeWeights);
     
+    // Generate event based on type
     let event = null;
     
     switch(type) {
@@ -318,10 +378,12 @@ async function generateRandomEvent() {
     if (event) {
         const newEvent = await addEvent(event);
         
+        // Send notifications to players if enabled
         if (settings.notifyPlayers) {
             broadcastEventNotification(newEvent);
         }
         
+        // Log the event generation
         addToAdjustmentLog({
             type: 'EVENT_GENERATED',
             eventId: newEvent.id,
@@ -599,7 +661,7 @@ function generateFestivalEvent(severity) {
         priceMultiplier: 1.1,
         demandMultiplier: 1.3,
         supplyMultiplier: 1.0,
-        taxMultiplier: 0.9
+        taxMultiplier: 0.9 // Festival tax break
     };
 }
 
@@ -634,6 +696,7 @@ function generateMigrationEvent(severity) {
         location: 'interstellar',
         fromSector,
         toSector,
+        // No direct price effects, but affects professional pools
         laborShift: severity === EVENT_SEVERITY.MINOR ? 0.1 :
                     severity === EVENT_SEVERITY.MODERATE ? 0.2 :
                     severity === EVENT_SEVERITY.MAJOR ? 0.3 : 0.5
@@ -797,6 +860,7 @@ async function checkAndExpireEvents() {
             await removeEvent(event.id);
             expired = true;
             
+            // Log the expiration
             addToAdjustmentLog({
                 type: 'EVENT_EXPIRED',
                 eventId: event.id,
@@ -817,9 +881,11 @@ async function checkAndGenerateEvents() {
     const now = Date.now();
     const hoursSinceLastCheck = (now - lastCheck) / (1000 * 60 * 60);
     
+    // Generate events based on time passed
     const eventsGenerated = [];
     
     if (hoursSinceLastCheck >= 24) {
+        // Check for each day passed
         const daysPassed = Math.floor(hoursSinceLastCheck / 24);
         
         for (let i = 0; i < daysPassed; i++) {
@@ -834,8 +900,15 @@ async function checkAndGenerateEvents() {
 }
 
 function broadcastEventNotification(event) {
+    // In a real implementation, this would send to all active players
     console.log(`EVENT: ${event.name} - ${event.description}`);
-    addToEventHistory({ ...event, broadcasted: true, broadcastedAt: Date.now() });
+    
+    // Add to event history with broadcast flag
+    addToEventHistory({
+        ...event,
+        broadcasted: true,
+        broadcastedAt: Date.now()
+    });
 }
 
 async function getEventPriceMultiplier(resource, sector) {
@@ -844,11 +917,16 @@ async function getEventPriceMultiplier(resource, sector) {
     
     events.forEach(event => {
         if (event.priceMultiplier) {
+            // Galaxy-wide event
             if (!event.affectedSector) {
                 multiplier *= event.priceMultiplier;
-            } else if (event.affectedSector === sector) {
+            }
+            // Sector-specific event
+            else if (event.affectedSector === sector) {
                 multiplier *= event.priceMultiplier;
-            } else if (event.affectedResource === resource) {
+            }
+            // Resource-specific event
+            else if (event.affectedResource === resource) {
                 multiplier *= event.priceMultiplier;
             }
         }
@@ -951,9 +1029,13 @@ async function getEventStats() {
 async function runDailyEventMaintenance() {
     console.log('Running daily event maintenance...');
     
+    // Check for expired events
     const expired = await checkAndExpireEvents();
+    
+    // Generate new events
     const newEvents = await checkAndGenerateEvents();
     
+    // Log the maintenance
     addToAdjustmentLog({
         type: 'EVENT_MAINTENANCE',
         expiredCount: expired ? 1 : 0,
@@ -961,7 +1043,10 @@ async function runDailyEventMaintenance() {
         timestamp: Date.now()
     });
     
-    return { expired, newEvents };
+    return {
+        expired,
+        newEvents
+    };
 }
 
 // Helper function to add to adjustment log
@@ -976,6 +1061,7 @@ function addToAdjustmentLog(entry) {
             date: new Date().toISOString()
         });
         
+        // Keep only last 1000 entries
         if (allLogs.length > 1000) {
             allLogs.shift();
         }
@@ -986,26 +1072,35 @@ function addToAdjustmentLog(entry) {
     }
 }
 
-// ===== EXPOSE TO WINDOW =====
+// Helper to get database instance
+async function getDb() {
+    return window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
+}
+
+// ===== EXPORT TO WINDOW =====
 window.EVENT_TYPES = EVENT_TYPES;
 window.EVENT_SEVERITY = EVENT_SEVERITY;
 window.initializeEventSystem = initializeEventSystem;
 window.getActiveEvents = getActiveEvents;
+window.saveActiveEvents = saveActiveEvents;
 window.addEvent = addEvent;
 window.removeEvent = removeEvent;
+window.updateEvent = updateEvent;
 window.getEventHistory = getEventHistory;
+window.addToEventHistory = addToEventHistory;
 window.getEventNotifications = getEventNotifications;
+window.addEventNotification = addEventNotification;
+window.markEventNotificationRead = markEventNotificationRead;
+window.getEventSettings = getEventSettings;
+window.saveEventSettings = saveEventSettings;
 window.generateRandomEvent = generateRandomEvent;
 window.checkAndExpireEvents = checkAndExpireEvents;
 window.checkAndGenerateEvents = checkAndGenerateEvents;
+window.broadcastEventNotification = broadcastEventNotification;
 window.getEventPriceMultiplier = getEventPriceMultiplier;
 window.getEventDemandMultiplier = getEventDemandMultiplier;
 window.getEventSupplyMultiplier = getEventSupplyMultiplier;
 window.getEventTaxMultiplier = getEventTaxMultiplier;
 window.getActiveEventsSummary = getActiveEventsSummary;
 window.getEventStats = getEventStats;
-window.getEventSettings = getEventSettings;
-window.saveEventSettings = function(settings) {
-    localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
-};
 window.runDailyEventMaintenance = runDailyEventMaintenance;
