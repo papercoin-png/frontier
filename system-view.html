@@ -230,7 +230,7 @@
             background: rgba(255, 215, 0, 0.3);
         }
         
-        /* Complete (all resources found) */
+        /* Complete (all resources found) - SHARED WITH CLAIMED */
         .planet-complete {
             position: relative;
         }
@@ -240,6 +240,29 @@
         }
         
         .planet-complete::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
+            animation: gentle-glow 4s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        /* Claimed planets keep the same golden glow as complete planets */
+        .planet-claimed {
+            position: relative;
+        }
+        
+        .planet-claimed .planet-core {
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6) !important;
+        }
+        
+        .planet-claimed::after {
             content: '';
             position: absolute;
             top: -10px;
@@ -778,9 +801,6 @@
             <!-- Exploration Status -->
             <div class="exploration-status" id="explorationStatus"></div>
             
-            <!-- Claim Button -->
-            <button class="claim-btn" id="claimBtn" onclick="window.claimCurrentPlanet()">✨ CLAIM PLANET</button>
-            
             <div class="planet-resources" id="planetResources">
                 <div>Resources:</div>
                 <div class="resource-list" id="resourceList"></div>
@@ -885,13 +905,11 @@
         const totalFuelEl = document.getElementById('totalFuel');
         const resourceList = document.getElementById('resourceList');
         const explorationStatus = document.getElementById('explorationStatus');
-        const claimBtn = document.getElementById('claimBtn');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.goBack = goBack;
         window.handlePlanetAction = handlePlanetAction;
         window.hidePlanetInfo = hidePlanetInfo;
-        window.claimCurrentPlanet = claimCurrentPlanet;
 
         // ===== STATE =====
         let systemData = null;
@@ -1113,7 +1131,18 @@
                 
                 // Get planet status and determine CSS class
                 const status = planetStatusCache.get(planet.name);
-                const cssClass = status ? getPlanetCssClass(status) : 'planet-unexplored';
+                let cssClass = 'planet-unexplored';
+                
+                if (status) {
+                    if (status.claimed) {
+                        // Claimed planets keep their color + golden glow
+                        cssClass = `planet-${status.highestRarity || 'common'} planet-claimed`;
+                    } else if (status.fullyExplored) {
+                        cssClass = `planet-${status.highestRarity || 'common'} planet-complete`;
+                    } else if (status.explored) {
+                        cssClass = `planet-${status.highestRarity || 'common'}`;
+                    }
+                }
                 
                 planetEl.className = `planet planet-${planet.type} ${cssClass}`;
                 planetEl.id = `planet-${index}`;
@@ -1164,7 +1193,18 @@
             // Update planet visual if needed (in case status changed)
             const planetEl = document.getElementById(`planet-${index}`);
             if (planetEl) {
-                const cssClass = status ? getPlanetCssClass(status) : 'planet-unexplored';
+                let cssClass = 'planet-unexplored';
+                
+                if (status) {
+                    if (status.claimed) {
+                        cssClass = `planet-${status.highestRarity || 'common'} planet-claimed`;
+                    } else if (status.fullyExplored) {
+                        cssClass = `planet-${status.highestRarity || 'common'} planet-complete`;
+                    } else if (status.explored) {
+                        cssClass = `planet-${status.highestRarity || 'common'}`;
+                    }
+                }
+                
                 planetEl.className = `planet planet-${planet.type} ${cssClass}`;
                 
                 const label = status ? getPlanetLabel(planet.name, status) : `${planet.name} ???`;
@@ -1190,25 +1230,12 @@
                 } else {
                     statusText = `🔍 Explored (${status.resourceCount}/${status.totalResources} resources)`;
                     if (status.fullyExplored) {
-                        statusText = '✅ Fully Explored - Ready to Claim';
+                        statusText = status.claimed ? '✅ Claimed' : '✅ Fully Explored - Ready to Claim';
                     }
                 }
                 explorationStatus.textContent = statusText;
-                
-                // Show/hide claim button
-                if (status.fullyExplored && !status.claimed) {
-                    claimBtn.classList.add('visible');
-                    claimBtn.disabled = false;
-                } else if (status.claimed) {
-                    claimBtn.classList.add('visible');
-                    claimBtn.disabled = true;
-                    claimBtn.textContent = '✓ CLAIMED';
-                } else {
-                    claimBtn.classList.remove('visible');
-                }
             } else {
                 explorationStatus.textContent = '✨ Unexplored';
-                claimBtn.classList.remove('visible');
             }
             
             // Update resources
@@ -1278,37 +1305,6 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== CLAIM CURRENT PLANET =====
-        async function claimCurrentPlanet() {
-            if (!currentPlanet) return;
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'claiming planet...';
-            
-            try {
-                const success = await claimPlanet(currentPlanet.name);
-                
-                if (success) {
-                    // Update status
-                    const status = await getPlanetStatus(currentPlanet.name);
-                    planetStatusCache.set(currentPlanet.name, status);
-                    
-                    // Update UI
-                    await showPlanetInfo(currentPlanet.index);
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                } else {
-                    alert('Failed to claim planet. It may not be fully explored yet.');
-                }
-                
-            } catch (error) {
-                console.error('Error claiming planet:', error);
-                alert('Error claiming planet');
-            }
-            
-            loadingOverlay.classList.remove('active');
-        }
-
         // ===== HIDE PLANET INFO =====
         function hidePlanetInfo() {
             planetInfo.classList.remove('visible');
@@ -1376,8 +1372,8 @@
                 
                 localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
                 
-                // Clear system data
-                localStorage.removeItem('voidfarer_system_data');
+                // DO NOT clear system data - we want to keep it for returning to system view
+                // localStorage.removeItem('voidfarer_system_data');
                 
                 setTimeout(() => {
                     window.location.href = 'warp.html';
@@ -1464,8 +1460,8 @@
                 ];
                 plotKeys.forEach(key => localStorage.removeItem(key));
                 
-                // Clear system data
-                localStorage.removeItem('voidfarer_system_data');
+                // DO NOT clear system data
+                // localStorage.removeItem('voidfarer_system_data');
                 
                 // GO TO WARP!
                 setTimeout(() => {
