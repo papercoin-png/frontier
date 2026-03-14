@@ -233,7 +233,8 @@ async function storageGetTaxHistory(playerId, limit = 100) {
 
 async function getAllTaxTransactions() {
     try {
-        const db = await getDb();
+        // Use the global getDb from db.js
+        const db = window.getDb ? window.getDb() : idb.openDB('VoidfarerDB', 1);
         return await db.getAll('taxTransactions') || [];
     } catch (error) {
         console.error('Error getting all tax transactions:', error);
@@ -330,7 +331,7 @@ async function payTax(playerId, playerName, taxType, baseAmount, description = '
         description
     });
     
-    // Add to community fund (using storage function)
+    // Add to community fund
     // await addToCommunityFund(taxAmount, record.id);
     
     return {
@@ -398,11 +399,6 @@ async function getCommunityFundSummary() {
         contributionCount: (fund.contributions || []).length,
         allocationCount: (fund.allocations || []).length
     };
-}
-
-// Helper to get database instance
-async function getDb() {
-    return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
 }
 
 // ===== TAX RATE FORMATTING =====
