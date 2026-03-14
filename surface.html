@@ -836,7 +836,6 @@
 
         function showFailToast(resource, attempts, threshold) {
             const rarity = getResourceRarity(resource);
-            const config = RARITY_CONFIG[rarity];
             
             const toast = document.createElement('div');
             toast.className = `toast fail rarity-${rarity}`;
@@ -946,24 +945,26 @@
                 
                 // Check if guaranteed by pity
                 let isGuaranteed = false;
+                let wasPity = false;
+                let success = false;
+                
                 if (pityCounters[resource].attempts >= pityCounters[resource].threshold) {
+                    // FORCE SUCCESS - no random roll needed
                     isGuaranteed = true;
-                    console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts`);
+                    wasPity = true;
+                    success = true;
+                    console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts - FORCED SUCCESS`);
+                } else {
+                    // Normal random roll
+                    let roll = Math.random() * 100;
+                    success = roll < config.baseChance;
+                    console.log(`Normal roll for ${resource}: ${roll.toFixed(1)}% vs ${config.baseChance}% = ${success ? 'SUCCESS' : 'FAIL'}`);
                 }
                 
-                // Roll for success
-                let roll = Math.random() * 100;
                 let quantity = 0;
-                let wasPity = false;
                 
-                if (isGuaranteed || roll < config.baseChance) {
-                    // Success!
-                    if (isGuaranteed) {
-                        wasPity = true;
-                        console.log(`✨ PITY SUCCESS for ${resource} at attempt ${pityCounters[resource].attempts}`);
-                    }
-                    
-                    // Reset pity counter
+                if (success) {
+                    // Reset pity counter on success
                     pityCounters[resource].attempts = 0;
                     
                     // Calculate base quantity to reach mass target
@@ -985,6 +986,7 @@
                     // Bonus for pity success (50% extra)
                     if (wasPity) {
                         quantity = Math.floor(quantity * 1.5);
+                        console.log(`✨ PITY BONUS: Quantity increased to ${quantity}`);
                     }
                 }
                 
