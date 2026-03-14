@@ -1,44 +1,11 @@
 // js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 
-import * as db from './db.js';
-
-// ===== RE-EXPORT DB FUNCTIONS =====
-export const {
-    getItem,
-    setItem,
-    getAll,
-    getAllFromIndex,
-    deleteItem,
-    clearStore,
-    countItems,
-    addTaxTransaction,
-    getPlayerTransactions,
-    getAllProperties,
-    getProperty,
-    addProperty,
-    updateProperty,
-    getPropertyItems,
-    addItemToProperty,
-    removeItemFromProperty,
-    addPriceHistory,
-    getPriceHistoryForElement,
-    addTradeHistory,
-    getTradeHistoryForElement,
-    isMigrationComplete,
-    setMigrationComplete,
-    resetAllData,
-    getDatabaseStats,
-    getCurrentRates,
-    getCommunityFund,
-    addToCommunityFund  // Add this export
-} = db;
-
 // ===== CONSTANTS =====
-export const CARGO_MASS_LIMIT = 5000;
+const CARGO_MASS_LIMIT = 5000; // Maximum atomic mass units the ship can carry
 
 // ===== STORAGE KEYS =====
-export const STORAGE_KEYS = {
+const STORAGE_KEYS = {
     PLAYER: 'voidfarer_player',
     COLLECTION: 'voidfarer_collection',
     MISSIONS: 'voidfarer_missions',
@@ -96,10 +63,10 @@ export const STORAGE_KEYS = {
 };
 
 // ===== UNIVERSE CONSTANTS =====
-export const UNIVERSE_SEED = 42793;
+const UNIVERSE_SEED = 42793;
 
 // ===== ELEMENT MASS DATABASE =====
-export const ELEMENT_MASS = {
+const ELEMENT_MASS = {
     'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
     'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
     'Silicon': 28.09, 'Potassium': 39.10, 'Calcium': 40.08,
@@ -135,12 +102,12 @@ export const ELEMENT_MASS = {
 
 const DEFAULT_MASS = 100.0;
 
-export function getElementMass(elementName) {
+function getElementMass(elementName) {
     return ELEMENT_MASS[elementName] || DEFAULT_MASS;
 }
 
 // ===== CARGO MASS UTILITIES =====
-export async function getTotalCargoMass() {
+async function getTotalCargoMass() {
     try {
         const collection = await getCollection();
         let totalMass = 0;
@@ -154,7 +121,7 @@ export async function getTotalCargoMass() {
     }
 }
 
-export async function getRemainingCargoMass() {
+async function getRemainingCargoMass() {
     try {
         const totalMass = await getTotalCargoMass();
         const player = await getPlayer();
@@ -167,7 +134,7 @@ export async function getRemainingCargoMass() {
 }
 
 // ===== INITIALIZATION =====
-export async function initializeStorage() {
+async function initializeStorage() {
     console.log('Initializing storage...');
     
     if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED)) {
@@ -203,18 +170,18 @@ export async function initializeStorage() {
 }
 
 // ===== PLAYER DATA =====
-export async function getPlayer() {
+async function getPlayer() {
     try {
-        return await getItem('player', 'main');
+        return await window.getItem('player', 'main');
     } catch (error) {
         console.error('Error getting player:', error);
         return null;
     }
 }
 
-export async function savePlayer(playerData) {
+async function savePlayer(playerData) {
     try {
-        await setItem('player', { id: 'main', ...playerData });
+        await window.setItem('player', { id: 'main', ...playerData });
         saveTimestamp();
         return true;
     } catch (error) {
@@ -223,7 +190,7 @@ export async function savePlayer(playerData) {
     }
 }
 
-export async function createDefaultPlayer(name = 'Voidfarer') {
+async function createDefaultPlayer(name = 'Voidfarer') {
     try {
         const player = {
             id: 'main',
@@ -250,18 +217,18 @@ export async function createDefaultPlayer(name = 'Voidfarer') {
 }
 
 // ===== COLLECTION DATA =====
-export async function getCollection() {
+async function getCollection() {
     try {
-        return await db.getCollectionAsObject();
+        return await window.getCollectionAsObject();
     } catch (error) {
         console.error('Error getting collection:', error);
         return {};
     }
 }
 
-export async function addElementToCollection(elementName, count = 1) {
+async function addElementToCollection(elementName, count = 1) {
     try {
-        const result = await db.addElementToCollection(elementName, count);
+        const result = await window.addElementToCollection(elementName, count);
         if (result?.success) {
             const player = await getPlayer();
             if (player) {
@@ -277,39 +244,17 @@ export async function addElementToCollection(elementName, count = 1) {
     }
 }
 
-export async function removeElementFromCollection(elementName, count = 1) {
+async function removeElementFromCollection(elementName, count = 1) {
     try {
-        return await db.removeElementFromCollection(elementName, count);
+        return await window.removeElementFromCollection(elementName, count);
     } catch (error) {
         console.error('Error removing element from collection:', error);
         return { success: false, reason: 'error', error: error.message };
     }
 }
 
-export async function safeSellElement(elementName, quantity, pricePerUnit) {
-    try {
-        const collection = await getCollection();
-        const credits = await getCredits();
-        
-        if (!collection[elementName] || collection[elementName].count < quantity) {
-            return { success: false, reason: 'insufficient', available: collection[elementName]?.count || 0 };
-        }
-        
-        const removeResult = await db.removeElementFromCollection(elementName, quantity);
-        if (!removeResult.success) return removeResult;
-        
-        const earnings = quantity * pricePerUnit;
-        await saveCredits(credits + earnings);
-        
-        return { success: true, earnings, newCredits: credits + earnings };
-    } catch (error) {
-        console.error('Error selling element:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
 // ===== CREDITS =====
-export async function getCredits() {
+async function getCredits() {
     try {
         const player = await getPlayer();
         return player?.credits || 5000;
@@ -319,7 +264,7 @@ export async function getCredits() {
     }
 }
 
-export async function saveCredits(credits) {
+async function saveCredits(credits) {
     try {
         const player = await getPlayer();
         if (player) {
@@ -334,7 +279,7 @@ export async function saveCredits(credits) {
     }
 }
 
-export async function addCredits(amount) {
+async function addCredits(amount) {
     try {
         const current = await getCredits();
         const newTotal = current + amount;
@@ -352,7 +297,7 @@ export async function addCredits(amount) {
     }
 }
 
-export async function spendCredits(amount) {
+async function spendCredits(amount) {
     try {
         const current = await getCredits();
         if (current >= amount) {
@@ -367,7 +312,7 @@ export async function spendCredits(amount) {
 }
 
 // ===== SHIP FUEL =====
-export function getShipFuel() {
+function getShipFuel() {
     try {
         return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_FUEL)) || 100;
     } catch (error) {
@@ -376,7 +321,7 @@ export function getShipFuel() {
     }
 }
 
-export function saveShipFuel(fuel) {
+function saveShipFuel(fuel) {
     try {
         localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
     } catch (error) {
@@ -384,7 +329,7 @@ export function saveShipFuel(fuel) {
     }
 }
 
-export function refuelShip(amount) {
+function refuelShip(amount) {
     try {
         const current = getShipFuel();
         saveShipFuel(Math.min(100, current + amount));
@@ -394,7 +339,7 @@ export function refuelShip(amount) {
 }
 
 // ===== SHIP POWER =====
-export function getShipPower() {
+function getShipPower() {
     try {
         return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) || 100;
     } catch (error) {
@@ -403,7 +348,7 @@ export function getShipPower() {
     }
 }
 
-export function setShipPower(power) {
+function setShipPower(power) {
     try {
         localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
     } catch (error) {
@@ -411,7 +356,7 @@ export function setShipPower(power) {
     }
 }
 
-export function repairShip(amount) {
+function repairShip(amount) {
     try {
         const current = getShipPower();
         setShipPower(Math.min(100, current + amount));
@@ -421,45 +366,45 @@ export function repairShip(amount) {
 }
 
 // ===== LOCATION DATA =====
-export function getCurrentSector() {
+function getCurrentSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR) || 'B2';
 }
 
-export function getCurrentRegion() {
+function getCurrentRegion() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_REGION) || 'Orion Arm';
 }
 
-export function setCurrentSector(sector, region) {
+function setCurrentSector(sector, region) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR, sector);
     localStorage.setItem(STORAGE_KEYS.CURRENT_REGION, region);
 }
 
-export function getCurrentStarSector() {
+function getCurrentStarSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_SECTOR) || 'Orion Molecular Cloud';
 }
 
-export function getCurrentStar() {
+function getCurrentStar() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || 'Sol';
 }
 
-export function getCurrentPlanet() {
+function getCurrentPlanet() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
 }
 
-export function getCurrentPlanetType() {
+function getCurrentPlanetType() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'lush';
 }
 
-export function getCurrentPlanetResources() {
+function getCurrentPlanetResources() {
     const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
     return resources ? JSON.parse(resources) : ['Iron', 'Carbon', 'Silicon'];
 }
 
-export function getCurrentPlanetImage() {
+function getCurrentPlanetImage() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE) || 'earth-view.jpg';
 }
 
-export function setCurrentPlanet(name, type, resources) {
+function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
@@ -474,7 +419,7 @@ export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE, image);
 }
 
-export function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
+function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
     setCurrentSector(sector, region);
     if (starSector) {
         localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_SECTOR, starSector);
@@ -487,7 +432,7 @@ export function setCurrentLocation(region, sector, starSector, starSectorType, s
 }
 
 // ===== WARP DATA =====
-export function setWarpData(destination, returnPage, cycles, distance, fuel) {
+function setWarpData(destination, returnPage, cycles, distance, fuel) {
     localStorage.setItem(STORAGE_KEYS.WARP_DESTINATION, destination);
     localStorage.setItem(STORAGE_KEYS.WARP_RETURN, returnPage);
     localStorage.setItem(STORAGE_KEYS.WARP_CYCLES, cycles.toString());
@@ -495,7 +440,7 @@ export function setWarpData(destination, returnPage, cycles, distance, fuel) {
     if (fuel) localStorage.setItem(STORAGE_KEYS.WARP_FUEL, fuel.toString());
 }
 
-export function getWarpData() {
+function getWarpData() {
     return {
         destination: localStorage.getItem(STORAGE_KEYS.WARP_DESTINATION) || 'Unknown',
         returnPage: localStorage.getItem(STORAGE_KEYS.WARP_RETURN) || 'galaxy-map.html',
@@ -505,7 +450,7 @@ export function getWarpData() {
     };
 }
 
-export function clearWarpData() {
+function clearWarpData() {
     const keys = [
         STORAGE_KEYS.WARP_DESTINATION,
         STORAGE_KEYS.WARP_RETURN,
@@ -517,137 +462,108 @@ export function clearWarpData() {
 }
 
 // ===== COLONIES =====
-export async function getColonies() {
-    return await getAll('colonies');
+async function getColonies() {
+    return await window.getAll('colonies');
 }
 
 // ===== MISSIONS =====
-export async function getMissions() {
-    return await getAll('missions');
+async function getMissions() {
+    return await window.getAll('missions');
 }
 
-export async function getCompletedMissions() {
-    return await getAll('completedMissions');
+async function getCompletedMissions() {
+    return await window.getAll('completedMissions');
 }
 
 // ===== SCAN HISTORY =====
-export async function getScanHistory() {
-    const scans = await getAll('scanHistory');
+async function getScanHistory() {
+    const scans = await window.getAll('scanHistory');
     return scans.sort((a, b) => b.timestamp - a.timestamp);
 }
 
-export async function addScan(scanData) {
+async function addScan(scanData) {
     const scan = {
         timestamp: Date.now(),
         ...scanData,
         date: new Date().toISOString()
     };
-    await setItem('scanHistory', scan);
+    await window.setItem('scanHistory', scan);
     return await getScanHistory();
 }
 
 // ===== REAL ESTATE =====
-export async function getRealEstate() {
-    const properties = await getAllProperties();
+async function getRealEstate() {
+    const properties = await window.getAllProperties();
     return { properties: properties };
 }
 
-export async function saveRealEstate(realEstateData) {
-    const dbConn = await db.getDb();
-    const tx = dbConn.transaction(['properties', 'propertyItems'], 'readwrite');
-    
-    await tx.objectStore('properties').clear();
-    await tx.objectStore('propertyItems').clear();
-    
-    for (const property of realEstateData.properties || []) {
-        await tx.objectStore('properties').put(property);
-        if (property.items) {
-            for (const [elementName, itemData] of Object.entries(property.items)) {
-                await tx.objectStore('propertyItems').put({
-                    id: `item_${property.id}_${elementName}`,
-                    propertyId: property.id,
-                    elementName: elementName,
-                    count: itemData.count || 1,
-                    mass: getElementMass(elementName)
-                });
-            }
-        }
-    }
-    await tx.done;
-    saveTimestamp();
-}
-
 // ===== TAX TRANSACTIONS =====
-export async function addTaxRecord(record) {
-    return await addTaxTransaction(record);
-}
-
-export async function getTaxHistory(playerId, limit = 100) {
+async function getTaxHistory(playerId, limit = 100) {
     if (playerId) {
-        return await getPlayerTransactions(playerId, limit);
+        return await window.getPlayerTransactions(playerId, limit);
     }
-    const all = await getAll('taxTransactions');
+    const all = await window.getAll('taxTransactions');
     return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
 // ===== SETTINGS =====
-export function getHapticsEnabled() {
+function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
 }
 
-export function setHapticsEnabled(enabled) {
+function setHapticsEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, enabled.toString());
 }
 
-export function getAutoGatherEnabled() {
+function getAutoGatherEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER) !== 'false';
 }
 
-export function setAutoGatherEnabled(enabled) {
+function setAutoGatherEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, enabled.toString());
 }
 
-export function getOrbitSpeed() {
+function getOrbitSpeed() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED) || 'gentle';
 }
 
-export function setOrbitSpeed(speed) {
+function setOrbitSpeed(speed) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, speed);
 }
 
-export function getMusicVolume() {
+function getMusicVolume() {
     return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) || 50;
 }
 
-export function setMusicVolume(volume) {
+function setMusicVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, volume.toString());
 }
 
-export function getAmbientVolume() {
+function getAmbientVolume() {
     return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) || 50;
 }
 
-export function setAmbientVolume(volume) {
+function setAmbientVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
 }
 
 // ===== SHIP UPGRADES =====
-export async function getShipUpgrades() {
-    const upgrades = await getItem('shipUpgrades', 'current');
+async function getShipUpgrades() {
+    const upgrades = await window.getItem('shipUpgrades', 'current');
     return upgrades || { engine: 1, shields: 1, miningLaser: 1, cargoHold: 1, warpDrive: 1, scanner: 1 };
 }
 
-export async function saveShipUpgrades(upgrades) {
-    await setItem('shipUpgrades', { id: 'current', ...upgrades });
+async function saveShipUpgrades(upgrades) {
+    await window.setItem('shipUpgrades', { id: 'current', ...upgrades });
 }
 
 // ===== SAVE TIMESTAMP =====
-export function saveTimestamp() {
+function saveTimestamp() {
     localStorage.setItem(STORAGE_KEYS.LAST_SAVE, new Date().toISOString());
 }
 
 // ===== RESET GAME =====
-export async function resetGame() {
+async function resetGame() {
     const settings = {
         haptics: getHapticsEnabled(),
         autoGather: getAutoGatherEnabled(),
@@ -656,7 +572,7 @@ export async function resetGame() {
         ambient: getAmbientVolume()
     };
     
-    await resetAllData();
+    await window.resetAllData();
     
     const locationKeys = [
         STORAGE_KEYS.CURRENT_SECTOR,
@@ -690,7 +606,7 @@ export async function resetGame() {
 }
 
 // ===== PLAYER ID =====
-export function getPlayerId() {
+function getPlayerId() {
     let playerId = localStorage.getItem('voidfarer_player_id');
     if (!playerId) {
         playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
@@ -700,20 +616,33 @@ export function getPlayerId() {
 }
 
 // ===== EXPOSE TO WINDOW =====
-window.getCredits = getCredits;
+window.CARGO_MASS_LIMIT = CARGO_MASS_LIMIT;
+window.STORAGE_KEYS = STORAGE_KEYS;
+window.UNIVERSE_SEED = UNIVERSE_SEED;
+window.ELEMENT_MASS = ELEMENT_MASS;
+window.getElementMass = getElementMass;
+window.getTotalCargoMass = getTotalCargoMass;
+window.getRemainingCargoMass = getRemainingCargoMass;
+window.initializeStorage = initializeStorage;
+window.getPlayer = getPlayer;
+window.savePlayer = savePlayer;
+window.createDefaultPlayer = createDefaultPlayer;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
 window.removeElementFromCollection = removeElementFromCollection;
-window.getElementMass = getElementMass;
-window.getPlayer = getPlayer;
-window.savePlayer = savePlayer;
+window.getCredits = getCredits;
+window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
-window.safeSellElement = safeSellElement;
 window.getShipFuel = getShipFuel;
+window.saveShipFuel = saveShipFuel;
+window.refuelShip = refuelShip;
 window.getShipPower = getShipPower;
+window.setShipPower = setShipPower;
+window.repairShip = repairShip;
 window.getCurrentSector = getCurrentSector;
 window.getCurrentRegion = getCurrentRegion;
+window.setCurrentSector = setCurrentSector;
 window.getCurrentStarSector = getCurrentStarSector;
 window.getCurrentStar = getCurrentStar;
 window.getCurrentPlanet = getCurrentPlanet;
@@ -725,7 +654,25 @@ window.setCurrentLocation = setCurrentLocation;
 window.setWarpData = setWarpData;
 window.getWarpData = getWarpData;
 window.clearWarpData = clearWarpData;
-window.getTotalCargoMass = getTotalCargoMass;
-window.getRemainingCargoMass = getRemainingCargoMass;
-window.refuelShip = refuelShip;
-window.repairShip = repairShip;
+window.getColonies = getColonies;
+window.getMissions = getMissions;
+window.getCompletedMissions = getCompletedMissions;
+window.getScanHistory = getScanHistory;
+window.addScan = addScan;
+window.getRealEstate = getRealEstate;
+window.getTaxHistory = getTaxHistory;
+window.getHapticsEnabled = getHapticsEnabled;
+window.setHapticsEnabled = setHapticsEnabled;
+window.getAutoGatherEnabled = getAutoGatherEnabled;
+window.setAutoGatherEnabled = setAutoGatherEnabled;
+window.getOrbitSpeed = getOrbitSpeed;
+window.setOrbitSpeed = setOrbitSpeed;
+window.getMusicVolume = getMusicVolume;
+window.setMusicVolume = setMusicVolume;
+window.getAmbientVolume = getAmbientVolume;
+window.setAmbientVolume = setAmbientVolume;
+window.getShipUpgrades = getShipUpgrades;
+window.saveShipUpgrades = saveShipUpgrades;
+window.saveTimestamp = saveTimestamp;
+window.resetGame = resetGame;
+window.getPlayerId = getPlayerId;
