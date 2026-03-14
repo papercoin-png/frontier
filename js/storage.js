@@ -65,37 +65,37 @@ const STORAGE_KEYS = {
 
 // ===== ELEMENT MASS DATABASE =====
 const ELEMENT_MASS = {
+    // Common
     'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
     'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
     'Silicon': 28.09, 'Potassium': 39.10, 'Calcium': 40.08,
-    'Carbon': 12.01, 'Nitrogen': 14.01, 'Oxygen': 16.00, 'Fluorine': 19.00,
-    'Neon': 20.18, 'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45,
-    'Argon': 39.95, 'Iron': 55.85, 'Nickel': 58.69, 'Lead': 207.2,
     'Scandium': 44.96, 'Titanium': 47.87, 'Vanadium': 50.94, 'Chromium': 52.00,
-    'Manganese': 54.94, 'Cobalt': 58.93, 'Copper': 63.55, 'Zinc': 65.38,
-    'Gallium': 69.72, 'Germanium': 72.63, 'Arsenic': 74.92, 'Selenium': 78.97,
-    'Bromine': 79.90, 'Krypton': 83.80, 'Rubidium': 85.47, 'Strontium': 87.62,
-    'Yttrium': 88.91, 'Zirconium': 91.22, 'Niobium': 92.91, 'Molybdenum': 95.95,
-    'Ruthenium': 101.1, 'Rhodium': 102.9, 'Palladium': 106.4, 'Silver': 107.9,
-    'Cadmium': 112.4, 'Indium': 114.8, 'Tin': 118.7, 'Antimony': 121.8,
-    'Tellurium': 127.6, 'Iodine': 126.9, 'Xenon': 131.3, 'Cesium': 132.9,
-    'Barium': 137.3, 'Lanthanum': 138.9, 'Cerium': 140.1, 'Praseodymium': 140.9,
-    'Neodymium': 144.2, 'Samarium': 150.4, 'Europium': 152.0, 'Gadolinium': 157.3,
+    'Manganese': 54.94, 'Iron': 55.85, 'Cobalt': 58.93, 'Nickel': 58.69,
+    'Copper': 63.55, 'Zinc': 65.38, 'Gallium': 69.72, 'Germanium': 72.63,
+    'Arsenic': 74.92, 'Selenium': 78.97, 'Bromine': 79.90, 'Krypton': 83.80,
+    'Rubidium': 85.47, 'Strontium': 87.62, 'Yttrium': 88.91, 'Zirconium': 91.22,
+    'Niobium': 92.91, 'Molybdenum': 95.95, 'Technetium': 98.0, 'Ruthenium': 101.1,
+    'Rhodium': 102.9, 'Palladium': 106.4, 'Silver': 107.9, 'Cadmium': 112.4,
+    'Indium': 114.8, 'Tin': 118.7, 'Antimony': 121.8, 'Tellurium': 127.6,
+    'Iodine': 126.9, 'Xenon': 131.3, 'Cesium': 132.9, 'Barium': 137.3,
+    'Lanthanum': 138.9, 'Cerium': 140.1, 'Praseodymium': 140.9, 'Neodymium': 144.2,
+    'Promethium': 145.0, 'Samarium': 150.4, 'Europium': 152.0, 'Gadolinium': 157.3,
     'Terbium': 158.9, 'Dysprosium': 162.5, 'Holmium': 164.9, 'Erbium': 167.3,
     'Thulium': 168.9, 'Ytterbium': 173.0, 'Lutetium': 175.0, 'Hafnium': 178.5,
     'Tantalum': 180.9, 'Tungsten': 183.8, 'Rhenium': 186.2, 'Osmium': 190.2,
     'Iridium': 192.2, 'Platinum': 195.1, 'Gold': 197.0, 'Mercury': 200.6,
-    'Thallium': 204.4, 'Bismuth': 209.0,
-    'Polonium': 209.0, 'Radon': 222.0, 'Radium': 226.0, 'Actinium': 227.0,
-    'Thorium': 232.0, 'Protactinium': 231.0, 'Uranium': 238.0,
-    'Technetium': 98.0, 'Promethium': 145.0, 'Astatine': 210.0, 'Francium': 223.0,
-    'Neptunium': 237.0, 'Plutonium': 244.0, 'Americium': 243.0, 'Curium': 247.0,
-    'Berkelium': 247.0, 'Californium': 251.0, 'Einsteinium': 252.0, 'Fermium': 257.0,
-    'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0, 'Rutherfordium': 267.0,
-    'Dubnium': 268.0, 'Seaborgium': 269.0, 'Bohrium': 270.0, 'Hassium': 277.0,
-    'Meitnerium': 278.0, 'Darmstadtium': 281.0, 'Roentgenium': 282.0, 'Copernicium': 285.0,
-    'Nihonium': 286.0, 'Flerovium': 289.0, 'Moscovium': 290.0, 'Livermorium': 293.0,
-    'Tennessine': 294.0, 'Oganesson': 294.0
+    'Thallium': 204.4, 'Lead': 207.2, 'Bismuth': 209.0,
+    
+    // Very Rare
+    'Polonium': 209.0, 'Astatine': 210.0, 'Radon': 222.0, 'Francium': 223.0,
+    'Radium': 226.0, 'Actinium': 227.0, 'Thorium': 232.0, 'Protactinium': 231.0,
+    'Uranium': 238.0, 'Neptunium': 237.0, 'Plutonium': 244.0, 'Americium': 243.0,
+    'Curium': 247.0, 'Berkelium': 247.0, 'Californium': 251.0, 'Einsteinium': 252.0,
+    'Fermium': 257.0, 'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0,
+    'Rutherfordium': 267.0, 'Dubnium': 268.0, 'Seaborgium': 269.0, 'Bohrium': 270.0,
+    'Hassium': 277.0, 'Meitnerium': 278.0, 'Darmstadtium': 281.0, 'Roentgenium': 282.0,
+    'Copernicium': 285.0, 'Nihonium': 286.0, 'Flerovium': 289.0, 'Moscovium': 290.0,
+    'Livermorium': 293.0, 'Tennessine': 294.0, 'Oganesson': 294.0
 };
 
 const DEFAULT_MASS = 100.0;
@@ -136,9 +136,18 @@ async function getRemainingCargoMass() {
     }
 }
 
-// ===== CURRENT PLANET HELPER (SIMPLIFIED) =====
+// ===== CURRENT PLANET HELPER =====
 function getCurrentPlanetName() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
+}
+
+function getCurrentPlanetType() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'unknown';
+}
+
+function getCurrentPlanetResources() {
+    const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
+    return resources ? JSON.parse(resources) : [];
 }
 
 // ===== INITIALIZATION =====
@@ -236,7 +245,7 @@ async function getCollection() {
     }
 }
 
-// FIXED: Renamed internal function to avoid recursion
+// Internal function to add element to collection (no recursion)
 async function _addElementToCollection(elementName, count = 1) {
     try {
         const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
@@ -250,8 +259,8 @@ async function _addElementToCollection(elementName, count = 1) {
                 name: elementName,
                 count: count,
                 firstFound: new Date().toISOString(),
-                rarity: 'common',
-                value: 100
+                rarity: getElementRarity(elementName),
+                value: getElementValue(elementName)
             };
         } else {
             element.count = (element.count || 1) + count;
@@ -268,7 +277,7 @@ async function _addElementToCollection(elementName, count = 1) {
     }
 }
 
-// FIXED: Renamed internal function to avoid recursion
+// Internal function to remove element from collection
 async function _removeElementFromCollection(elementName, count = 1) {
     try {
         const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
@@ -304,7 +313,63 @@ async function _removeElementFromCollection(elementName, count = 1) {
     }
 }
 
-// Public wrapper functions - SIMPLIFIED: only mines on planetary surfaces need location
+// Helper to get element rarity
+function getElementRarity(elementName) {
+    const rareElements = [
+        'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
+        'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
+        'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
+    ];
+    
+    if (rareElements.includes(elementName)) {
+        if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
+            return 'legendary';
+        }
+        if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
+            return 'very-rare';
+        }
+        return 'rare';
+    }
+    
+    const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
+    if (uncommonElements.includes(elementName)) {
+        return 'uncommon';
+    }
+    
+    return 'common';
+}
+
+// Helper to get element value
+function getElementValue(elementName) {
+    const values = {
+        // Common - 100
+        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
+        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
+        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
+        'Scandium': 100, 'Vanadium': 100, 'Manganese': 100,
+        
+        // Uncommon - 250
+        'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
+        'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
+        'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
+        
+        // Rare - 1000
+        'Copper': 1000, 'Zinc': 1000, 'Silver': 1000, 'Gold': 1000,
+        'Platinum': 1000, 'Titanium': 1000, 'Cobalt': 1000, 'Chromium': 1000,
+        'Tin': 1000, 'Mercury': 1000,
+        
+        // Very Rare - 5000
+        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
+        'Radium': 5000, 'Polonium': 5000,
+        
+        // Legendary - 25000
+        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
+    };
+    
+    return values[elementName] || 100;
+}
+
+// Public wrapper function - adds element to collection and saves location
 async function addElementToCollection(elementName, count = 1, locationData = null) {
     try {
         const result = await _addElementToCollection(elementName, count);
@@ -324,7 +389,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 const planetName = locationData.planet || getCurrentPlanetName();
                 
                 try {
-                    // Call the db.js function directly - NO WRAPPER NEEDED
+                    // Call the db.js function directly
                     await window.saveElementLocation(elementName, planetName, { planet: planetName });
                     console.log(`📍 Journal entry: ${elementName} found on ${planetName}`);
                 } catch (locError) {
@@ -352,9 +417,6 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
         const collection = await getCollection();
         const credits = await getCredits();
         
-        console.log('Current collection:', collection);
-        console.log('Current credits:', credits);
-        
         if (!collection[elementName]) {
             return { success: false, reason: 'not_found' };
         }
@@ -366,7 +428,6 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
         
         // Remove from collection using internal function
         const removeResult = await _removeElementFromCollection(elementName, quantity);
-        console.log('Remove result:', removeResult);
         
         if (!removeResult.success) {
             return removeResult;
@@ -376,8 +437,6 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
         const earnings = quantity * pricePerUnit;
         const newCredits = credits + earnings;
         await saveCredits(newCredits);
-        
-        console.log('New credits:', newCredits);
         
         return { 
             success: true, 
@@ -553,6 +612,9 @@ function setCurrentPlanet(name, type, resources) {
     else if (type.includes('lush')) image = 'verdant-surface.jpg';
     else if (type.includes('barren')) image = 'barren-surface.jpg';
     else if (type.includes('gas')) image = 'gas-surface.jpg';
+    else if (type.includes('oceanic')) image = 'oceanic-surface.jpg';
+    else if (type.includes('toxic')) image = 'toxic-surface.jpg';
+    else if (type.includes('asteroid')) image = 'asteroid-field.jpg';
     
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE, image);
 }
@@ -597,6 +659,20 @@ function clearWarpData() {
         STORAGE_KEYS.WARP_FUEL
     ];
     keys.forEach(key => localStorage.removeItem(key));
+}
+
+// ===== SYSTEM DATA MANAGEMENT =====
+function saveSystemData(systemData) {
+    localStorage.setItem('voidfarer_system_data', JSON.stringify(systemData));
+}
+
+function loadSystemData() {
+    const data = localStorage.getItem('voidfarer_system_data');
+    return data ? JSON.parse(data) : null;
+}
+
+function clearSystemData() {
+    localStorage.removeItem('voidfarer_system_data');
 }
 
 // ===== COLONIES =====
@@ -753,10 +829,6 @@ function getPlayerId() {
     return playerId;
 }
 
-// ===== ELEMENT LOCATIONS HELPERS - NO WRAPPERS NEEDED =====
-// These functions are already defined in db.js and exposed to window
-// We don't need to redefine or wrap them here to avoid recursion
-
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 window.STORAGE_KEYS = STORAGE_KEYS;
@@ -766,6 +838,8 @@ window.getElementMass = getElementMass;
 window.getTotalCargoMass = getTotalCargoMass;
 window.getRemainingCargoMass = getRemainingCargoMass;
 window.getCurrentPlanetName = getCurrentPlanetName;
+window.getCurrentPlanetType = getCurrentPlanetType;
+window.getCurrentPlanetResources = getCurrentPlanetResources;
 window.initializeStorage = initializeStorage;
 window.getPlayer = getPlayer;
 window.savePlayer = savePlayer;
@@ -798,6 +872,9 @@ window.setCurrentLocation = setCurrentLocation;
 window.setWarpData = setWarpData;
 window.getWarpData = getWarpData;
 window.clearWarpData = clearWarpData;
+window.saveSystemData = saveSystemData;
+window.loadSystemData = loadSystemData;
+window.clearSystemData = clearSystemData;
 window.getColonies = getColonies;
 window.getMissions = getMissions;
 window.getCompletedMissions = getCompletedMissions;
@@ -820,7 +897,3 @@ window.saveShipUpgrades = saveShipUpgrades;
 window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
-
-// Location helpers - these come directly from db.js
-// We don't need to redefine them here - they're already on window from db.js
-// Just ensure they're available (db.js should be loaded before storage.js)
