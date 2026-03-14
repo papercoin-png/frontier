@@ -126,7 +126,7 @@
             padding: 20px;
             border-radius: 40px 15px 40px 15px;
             z-index: 40;
-            min-width: 240px;
+            min-width: 260px;
             display: none;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
@@ -160,6 +160,30 @@
         .info-value {
             color: #ffd966;
             font-weight: bold;
+        }
+        
+        .exploration-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .exploration-low {
+            background: rgba(255, 255, 255, 0.2);
+            color: #cccccc;
+        }
+        
+        .exploration-medium {
+            background: rgba(74, 255, 170, 0.2);
+            color: #4affaa;
+        }
+        
+        .exploration-high {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
         }
         
         .distance-value {
@@ -247,6 +271,16 @@
             box-shadow: 0 0 30px #ffaa4a;
         }
         
+        .region-box.explored {
+            border-color: #4affaa;
+            box-shadow: 0 0 20px rgba(74, 255, 170, 0.3);
+        }
+        
+        .region-box.fully-explored {
+            border-color: #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+        }
+        
         .region-label {
             color: white;
             font-family: 'Exo 2', sans-serif;
@@ -278,6 +312,22 @@
             align-items: center;
             justify-content: center;
             border: 2px solid white;
+        }
+        
+        .exploration-indicator {
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4affaa;
+            box-shadow: 0 0 10px #4affaa;
+        }
+        
+        .exploration-indicator.full {
+            background: #ffd700;
+            box-shadow: 0 0 10px #ffd700;
         }
         
         /* Loading overlay */
@@ -374,6 +424,11 @@
                 <span class="info-label">Stars:</span>
                 <span class="info-value" id="starsCount">300</span>
             </div>
+            <div class="info-row">
+                <span class="info-label">Explored:</span>
+                <span class="info-value" id="explorationPercent">0%</span>
+                <span class="exploration-badge" id="explorationBadge">Unknown</span>
+            </div>
             
             <!-- Warp Information -->
             <div class="warp-info">
@@ -406,13 +461,16 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <!-- CRITICAL: All scripts loaded as modules -->
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
 
     <script type="module">
+        import { getPlanetStatus, getClaimedPlanets } from './js/planet-status.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -430,7 +488,6 @@
         const regionBoxes = document.getElementById('regionBoxes');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        // This is the critical fix - all onclick handlers need these
         window.returnToShip = returnToShip;
         window.plotCourseToSector = plotCourseToSector;
 
@@ -439,6 +496,10 @@
         let currentRegion = 'Orion Arm';
         let selectedRegion = null;
         let selectedSector = null;
+        
+        // Exploration data cache
+        let sectorExplorationData = {};
+        let playerLocations = [];
 
         // ===== SECTOR COORDINATES =====
         const sectorCoordinates = {
@@ -479,6 +540,58 @@
             'Reach': { left: '10%', top: '30%', width: '120px', height: '80px' },
             'Fringe': { left: '75%', top: '20%', width: '120px', height: '80px' }
         };
+
+        // ===== LOAD EXPLORATION DATA =====
+        async function loadExplorationData() {
+            try {
+                // Get all player locations
+                if (typeof window.getPlayerLocations === 'function') {
+                    playerLocations = await window.getPlayerLocations() || [];
+                }
+                
+                // Initialize exploration data for each sector
+                for (const [sectorId, data] of Object.entries(sectorCoordinates)) {
+                    // Filter locations in this sector
+                    const sectorLocations = playerLocations.filter(loc => {
+                        // This assumes locations have sector info - you may need to adjust
+                        // For now, we'll use a simplified approach
+                        return true; // Placeholder
+                    });
+                    
+                    // Count unique planets in this sector
+                    const uniquePlanets = new Set();
+                    playerLocations.forEach(loc => {
+                        if (loc.planet) uniquePlanets.add(loc.planet);
+                    });
+                    
+                    // Calculate exploration percentage (simplified)
+                    // In reality, you'd want to know total planets per sector
+                    const totalPlanetsInSector = 300; // Approximate
+                    const exploredCount = uniquePlanets.size;
+                    const percentage = Math.min(100, Math.floor((exploredCount / totalPlanetsInSector) * 100));
+                    
+                    // Check if any planets in this sector are claimed
+                    const claimedPlanets = await getClaimedPlanets();
+                    const claimedInSector = claimedPlanets.filter(p => {
+                        // Would need sector mapping - simplified
+                        return false;
+                    }).length;
+                    
+                    sectorExplorationData[sectorId] = {
+                        exploredCount,
+                        totalEstimate: totalPlanetsInSector,
+                        percentage,
+                        hasExplored: exploredCount > 0,
+                        hasClaimed: claimedInSector > 0
+                    };
+                }
+                
+                console.log('Exploration data loaded:', sectorExplorationData);
+                
+            } catch (error) {
+                console.error('Error loading exploration data:', error);
+            }
+        }
 
         // ===== WARP CALCULATION FUNCTIONS =====
         function getWarpCyclesFromDistance(distance) {
@@ -545,6 +658,16 @@
                 box.style.width = pos.width;
                 box.style.height = pos.height;
                 
+                // Add exploration class based on data
+                const expData = sectorExplorationData[sectorId];
+                if (expData) {
+                    if (expData.hasClaimed) {
+                        box.classList.add('fully-explored');
+                    } else if (expData.hasExplored) {
+                        box.classList.add('explored');
+                    }
+                }
+                
                 box.onclick = function() { selectRegion(data.displayName, sectorId); };
                 
                 if (sectorId === currentSector) {
@@ -553,9 +676,17 @@
                     box.style.borderWidth = '3px';
                 }
                 
+                // Add exploration indicator if sector has been visited
+                let indicatorHtml = '';
+                if (expData && expData.hasExplored) {
+                    const indicatorClass = expData.hasClaimed ? 'exploration-indicator full' : 'exploration-indicator';
+                    indicatorHtml = `<div class="${indicatorClass}"></div>`;
+                }
+                
                 box.innerHTML = `
                     <span class="region-label">${data.displayName}</span>
                     <span class="region-count">${data.nebulae}</span>
+                    ${indicatorHtml}
                 `;
                 
                 regionBoxes.appendChild(box);
@@ -578,6 +709,7 @@
             selectedSector = sector;
             
             const sectorData = sectorCoordinates[sector];
+            const expData = sectorExplorationData[sector] || { percentage: 0, hasExplored: false };
             
             const distance = getSectorDistance(currentSector, sector);
             const cycles = getWarpCyclesFromDistance(distance);
@@ -587,6 +719,20 @@
             document.getElementById('sectorId').textContent = sector;
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
+            document.getElementById('explorationPercent').textContent = expData.percentage + '%';
+            
+            const badge = document.getElementById('explorationBadge');
+            if (expData.hasClaimed) {
+                badge.textContent = 'Fully Explored';
+                badge.className = 'exploration-badge exploration-high';
+            } else if (expData.hasExplored) {
+                badge.textContent = 'Partially Explored';
+                badge.className = 'exploration-badge exploration-medium';
+            } else {
+                badge.textContent = 'Unexplored';
+                badge.className = 'exploration-badge exploration-low';
+            }
+            
             document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
             document.getElementById('warpCycles').textContent = cycles;
             document.getElementById('fuelCost').textContent = fuel + '⭐';
@@ -667,6 +813,7 @@
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
+            // Draw stars
             for (let i = 0; i < 1000; i++) {
                 const x = Math.random() * canvas.width;
                 const y = Math.random() * canvas.height;
@@ -679,16 +826,38 @@
                 ctx.fill();
             }
             
+            // Draw galactic core glow
             const gradient = ctx.createRadialGradient(
                 centerX, centerY, 0,
                 centerX, centerY, canvas.width * 0.3
             );
-            gradient.addColorStop(0, 'rgba(255, 220, 180, 0.1)');
-            gradient.addColorStop(0.5, 'rgba(160, 140, 200, 0.05)');
+            gradient.addColorStop(0, 'rgba(255, 220, 180, 0.15)');
+            gradient.addColorStop(0.5, 'rgba(160, 140, 200, 0.08)');
             gradient.addColorStop(1, 'transparent');
             
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw spiral arm hints
+            ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)';
+            ctx.lineWidth = 2;
+            
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                ctx.beginPath();
+                for (let r = 0.1; r < 0.9; r += 0.1) {
+                    const spiralAngle = angle + r * 10;
+                    const x = centerX + Math.cos(spiralAngle) * r * canvas.width * 0.4;
+                    const y = centerY + Math.sin(spiralAngle) * r * canvas.height * 0.4;
+                    
+                    if (r === 0.1) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
         }
 
         // ===== INITIALIZE =====
@@ -704,6 +873,7 @@
                 }
                 
                 await loadCurrentLocation();
+                await loadExplorationData();
                 
                 resizeCanvas();
                 window.addEventListener('resize', resizeCanvas);
