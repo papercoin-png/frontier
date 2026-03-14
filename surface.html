@@ -67,7 +67,7 @@
             z-index: 2;
         }
         
-        /* Status Bar - Fixed at top */
+        /* Top Status Bar */
         .status-bar {
             position: absolute;
             top: 20px;
@@ -128,7 +128,7 @@
             font-size: 12px;
         }
         
-        /* Extractor Status - Below status bar */
+        /* Extractor Status */
         .extractor-status {
             position: absolute;
             top: 90px;
@@ -163,72 +163,66 @@
             100% { opacity: 0.5; transform: scale(1); }
         }
         
-        /* Toast Container - Fixed at top right */
+        /* Toast Notifications - Centered */
         .toast-container {
             position: absolute;
-            top: 140px;
-            right: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             z-index: 20;
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
+            align-items: center;
             gap: 8px;
             pointer-events: none;
+            width: 100%;
+            max-width: 280px;
         }
         
         .toast {
-            background: rgba(10, 10, 26, 0.6);
+            background: rgba(10, 10, 26, 0.8);
             backdrop-filter: blur(10px);
             border: 1px solid;
             border-radius: 40px 10px 40px 10px;
-            padding: 8px 16px;
+            padding: 12px 20px;
             color: white;
-            font-size: 14px;
+            font-size: 16px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            transform: translateX(120%);
-            animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards;
-            max-width: 220px;
-            box-shadow: 0 0 20px currentColor;
+            justify-content: center;
+            gap: 10px;
+            opacity: 0;
+            animation: fadeInOut 3s forwards;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 30px currentColor;
         }
         
         .toast.success {
             border-color: #4affaa;
+            color: #4affaa;
         }
         
         .toast.fail {
             border-color: #ff6b6b;
+            color: #ff6b6b;
         }
         
         .toast-icon {
-            font-size: 18px;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
+            font-size: 20px;
         }
         
-        .toast-name {
-            font-weight: 500;
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: scale(0.8); }
+            10% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.8); }
         }
         
-        .toast-name.rarity-common { color: #ffffff; }
-        .toast-name.rarity-uncommon { color: #b0ffb0; }
-        .toast-name.rarity-rare { color: #b0b0ff; }
-        .toast-name.rarity-very-rare { color: #e0b0ff; }
-        .toast-name.rarity-legendary { color: #ffd700; }
-        
-        @keyframes slideIn {
-            to { transform: translateX(0); }
-        }
-        
-        @keyframes fadeOut {
-            to { opacity: 0; }
-        }
-        
-        /* Action Buttons - Positioned above resource bar with fixed spacing */
+        /* Action Buttons Container - Bottom aligned */
         .action-buttons {
             position: absolute;
-            bottom: 200px;
+            bottom: 30px;
             left: 20px;
             right: 20px;
             display: flex;
@@ -314,10 +308,10 @@
             color: #0a0a1a;
         }
         
-        /* Resource Bar - Fixed at bottom with enough space */
+        /* Resource Bar - Above buttons */
         .resource-bar {
             position: absolute;
-            bottom: 20px;
+            bottom: 150px;
             left: 20px;
             right: 20px;
             background: rgba(10, 10, 26, 0.4);
@@ -326,7 +320,7 @@
             border-radius: 60px 20px 60px 20px;
             padding: 15px;
             z-index: 10;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
         }
         
@@ -343,7 +337,7 @@
             flex-wrap: wrap;
             gap: 8px;
             justify-content: center;
-            max-height: 120px;
+            max-height: 160px;
             overflow-y: auto;
             padding: 5px;
         }
@@ -506,36 +500,36 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Adjust for smaller screens */
+        /* Responsive adjustments */
         @media (max-height: 800px) {
-            .action-buttons {
-                bottom: 180px;
+            .resource-bar {
+                bottom: 140px;
+                max-height: 200px;
+            }
+            
+            .resource-grid {
+                max-height: 120px;
             }
             
             .nav-btn {
                 padding: 14px 0;
                 font-size: 15px;
             }
-            
-            .claim-btn {
-                padding: 14px;
-                font-size: 16px;
-            }
         }
         
         @media (max-height: 700px) {
-            .action-buttons {
-                bottom: 160px;
+            .resource-bar {
+                bottom: 130px;
+                max-height: 180px;
+            }
+            
+            .resource-grid {
+                max-height: 100px;
             }
             
             .nav-btn {
                 padding: 12px 0;
                 font-size: 14px;
-            }
-            
-            .resource-toggle {
-                padding: 6px 8px;
-                min-width: 90px;
             }
         }
     </style>
@@ -564,10 +558,17 @@
                 <span id="extractorText">Auto-extractor active</span>
             </div>
             
-            <!-- Toast Notifications -->
+            <!-- Toast Notifications - Centered -->
             <div class="toast-container" id="toastContainer"></div>
             
-            <!-- Action Buttons - Above resource bar -->
+            <!-- Resource Bar - Above buttons -->
+            <div class="resource-bar">
+                <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
+                <div class="resource-grid" id="resourceGrid"></div>
+                <div class="active-count" id="activeCount">Extracting: 0 resources</div>
+            </div>
+            
+            <!-- Action Buttons - Bottom aligned -->
             <div class="action-buttons">
                 <!-- Claim Button (appears when planet is fully explored) -->
                 <button class="claim-btn" id="claimBtn" onclick="window.claimCurrentPlanet()">✨ CLAIM PLANET</button>
@@ -577,13 +578,6 @@
                     <button class="nav-btn system-btn" id="systemBtn" onclick="window.returnToSystem()">🪐 SYSTEM VIEW</button>
                     <button class="nav-btn" id="shipBtn" onclick="window.returnToShip()">🚀 RETURN TO SHIP</button>
                 </div>
-            </div>
-            
-            <!-- Resource Bar - At the bottom -->
-            <div class="resource-bar">
-                <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
-                <div class="resource-grid" id="resourceGrid"></div>
-                <div class="active-count" id="activeCount">Extracting: 0 resources</div>
             </div>
             
             <!-- Loading Overlay -->
@@ -1089,91 +1083,44 @@
         }
 
         // ===== TOAST FUNCTIONS =====
-        function showSuccessToast(resource, quantity, isRichFind, isPity) {
-            const rarity = getElementRarity(resource);
-            const config = RARITY_CONFIG[rarity];
-            
+        function showSuccessToast(message) {
             const toast = document.createElement('div');
-            toast.className = `toast success rarity-${rarity}`;
-            
-            let icon = isPity ? '🎯' : (isRichFind ? '✨' : config.icon);
-            let text = `+${quantity} ${resource}`;
-            if (isRichFind) text += ' RICH FIND!';
-            if (isPity) text += ' (PITY)';
-            
+            toast.className = 'toast success';
             toast.innerHTML = `
-                <span class="toast-icon">${icon}</span>
-                <span class="toast-name">${text}</span>
+                <span class="toast-icon">✨</span>
+                <span>${message}</span>
             `;
-            
             toastContainer.appendChild(toast);
             
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
                 }
-            }, 3000);
+            }, 2800);
         }
 
-        function showFailToast(resource, attempts, threshold) {
-            const rarity = getElementRarity(resource);
-            
-            const toast = document.createElement('div');
-            toast.className = `toast fail rarity-${rarity}`;
-            
-            const progressPercent = Math.floor((attempts / threshold) * 100);
-            const remainingAttempts = threshold - attempts;
-            
-            toast.innerHTML = `
-                <span class="toast-icon">⏳</span>
-                <span class="toast-name" style="display: flex; flex-direction: column; align-items: flex-start;">
-                    <span>No ${resource} found</span>
-                    <span style="font-size: 8px; color: #a0c0ff;">Pity: ${remainingAttempts} more</span>
-                    <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.1); margin-top: 2px;">
-                        <div style="width: ${progressPercent}%; height: 2px; background: #ffaa4a;"></div>
-                    </div>
-                </span>
-            `;
-            
-            toastContainer.appendChild(toast);
-            
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 3000);
-        }
-
-        function showErrorToast() {
+        function showFailToast(message) {
             const toast = document.createElement('div');
             toast.className = 'toast fail';
             toast.innerHTML = `
                 <span class="toast-icon">⚠️</span>
-                <span class="toast-name">Extraction error</span>
+                <span>${message}</span>
             `;
             toastContainer.appendChild(toast);
+            
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
                 }
-            }, 3000);
+            }, 2800);
         }
 
-        function showMessageToast(message, isSuccess = true) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${isSuccess ? 'success' : 'fail'}`;
-            toast.innerHTML = `
-                <span class="toast-icon">${isSuccess ? '✨' : '⚠️'}</span>
-                <span class="toast-name">${message}</span>
-            `;
-            
-            toastContainer.appendChild(toast);
-            
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 3000);
+        function showMessageToast(message, isSuccess) {
+            if (isSuccess) {
+                showSuccessToast(message);
+            } else {
+                showFailToast(message);
+            }
         }
 
         // ===== MAIN EXTRACTION FUNCTION =====
@@ -1197,6 +1144,7 @@
                         clearInterval(extractionTimer);
                         extractionTimer = null;
                     }
+                    showFailToast('Cargo full!');
                     return;
                 }
                 
@@ -1254,7 +1202,6 @@
                     // Normal random roll
                     let roll = Math.random() * 100;
                     success = roll < config.baseChance;
-                    console.log(`Normal roll for ${resource}: ${roll.toFixed(1)}% vs ${config.baseChance}% = ${success ? 'SUCCESS' : 'FAIL'}`);
                 }
                 
                 let quantity = 0;
@@ -1282,12 +1229,10 @@
                     // Bonus for pity success (50% extra)
                     if (wasPity) {
                         quantity = Math.max(1, Math.floor(quantity * 1.5));
-                        console.log(`✨ PITY BONUS: Quantity increased to ${quantity}`);
                     }
                 }
                 
                 if (quantity === 0) {
-                    showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     return;
                 }
                 
@@ -1317,28 +1262,25 @@
                         cachedCargoMass = currentMass + totalMass;
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
-                        showSuccessToast(resource, quantity, isRichFind, wasPity);
                         
-                        console.log(`✅ Successfully added ${quantity} ${resource} (${rarity}) at ${currentPlanet.name}`);
+                        let message = `+${quantity} ${resource}`;
+                        if (isRichFind) message += ' (Rich Find!)';
+                        if (wasPity) message += ' (Pity!)';
+                        showSuccessToast(message);
                         
                         // Update claim button status after new discovery
                         await updateClaimButton();
-                    } else {
-                        showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     }
-                } else {
-                    showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
-                showErrorToast();
+                showFailToast('Extraction failed');
             }
         }
 
         function startExtraction() {
             console.log('Starting extraction timer...');
             if (extractionTimer) {
-                console.log('Clearing existing timer');
                 clearInterval(extractionTimer);
                 extractionTimer = null;
             }
@@ -1393,19 +1335,19 @@
                 const success = await claimPlanet(currentPlanet.name);
                 
                 if (success) {
-                    showMessageToast(`✨ Planet ${currentPlanet.name} claimed!`, true);
+                    showSuccessToast(`✨ Planet ${currentPlanet.name} claimed!`);
                     await updateClaimButton();
                     
                     if (tg?.HapticFeedback) {
                         tg.HapticFeedback.notificationOccurred('success');
                     }
                 } else {
-                    showMessageToast('Failed to claim planet', false);
+                    showFailToast('Failed to claim planet');
                 }
                 
             } catch (error) {
                 console.error('Error claiming planet:', error);
-                showMessageToast('Error claiming planet', false);
+                showFailToast('Error claiming planet');
             } finally {
                 loadingOverlay.classList.remove('active');
             }
