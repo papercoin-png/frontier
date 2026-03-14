@@ -483,7 +483,7 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <!-- CRITICAL: All scripts loaded as modules -->
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/db.js"></script>
@@ -630,14 +630,35 @@
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
-                // Load data from storage
-                const star = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : '';
-                const starSector = typeof window.getCurrentStarSector === 'function' ? await window.getCurrentStarSector() : 'Orion Molecular Cloud';
-                const count = typeof window.getCurrentSectorStars === 'function' ? await window.getCurrentSectorStars() : 85;
+                // Load data from storage functions
+                let star = '';
+                let starSector = '';
+                let count = 85;
+                
+                if (typeof window.getCurrentStar === 'function') {
+                    star = await window.getCurrentStar() || '';
+                } else {
+                    star = localStorage.getItem('voidfarer_current_star') || '';
+                }
+                
+                if (typeof window.getCurrentStarSector === 'function') {
+                    starSector = await window.getCurrentStarSector() || 'Orion Molecular Cloud';
+                } else {
+                    starSector = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
+                }
+                
+                if (typeof window.getCurrentSectorStars === 'function') {
+                    count = await window.getCurrentSectorStars() || 85;
+                } else {
+                    count = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
+                }
                 
                 // Get current sector ID for planet naming
-                currentSectorId = typeof window.getCurrentSector === 'function' ? 
-                    await window.getCurrentSector() : localStorage.getItem('voidfarer_current_sector') || 'B2';
+                if (typeof window.getCurrentSector === 'function') {
+                    currentSectorId = await window.getCurrentSector() || 'B2';
+                } else {
+                    currentSectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                }
 
                 currentStarName = star || '';
                 clusterName = starSector || 'Orion Molecular Cloud';
@@ -862,7 +883,7 @@
                     localStorage.setItem('voidfarer_plot_star', selectedStar.name);
                     localStorage.setItem('voidfarer_plot_star_distance', selectedStar.distance.toString());
                     
-                    // CRITICAL: Update cumulative distance
+                    // Update cumulative distance
                     localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
                 }
                 
@@ -902,7 +923,7 @@
                     distanceDisplay = `<div class="distance-badge">${star.distance.toFixed(1)} LY</div>`;
                 }
                 
-                // Get planet icons for preview
+                // Get planet icons for preview (max 3)
                 const planetIcons = star.planets.slice(0, 3).map(p => p.icon).join(' ');
                 
                 card.innerHTML = `
