@@ -324,7 +324,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 const planetName = locationData.planet || getCurrentPlanetName();
                 
                 try {
-                    // Call the db.js function directly
+                    // Call the db.js function directly - NO WRAPPER NEEDED
                     await window.saveElementLocation(elementName, planetName, { planet: planetName });
                     console.log(`📍 Journal entry: ${elementName} found on ${planetName}`);
                 } catch (locError) {
@@ -753,59 +753,9 @@ function getPlayerId() {
     return playerId;
 }
 
-// ===== ELEMENT LOCATIONS HELPERS (SIMPLIFIED WRAPPERS) =====
-// Note: These are wrappers that call the actual implementations in db.js
-// They use different names to avoid recursive loops
-
-async function saveElementLocationWrapper(elementName, planetName, locationData = {}) {
-    try {
-        // Call the db.js function directly
-        if (typeof window.saveElementLocation === 'function') {
-            const planet = planetName || locationData.planet || getCurrentPlanetName();
-            return await window.saveElementLocation(elementName, planet, { planet: planet });
-        }
-        return false;
-    } catch (error) {
-        console.error('Error in saveElementLocation wrapper:', error);
-        return false;
-    }
-}
-
-async function getElementLocationsWrapper(elementName) {
-    try {
-        if (typeof window.getElementLocations === 'function') {
-            return await window.getElementLocations(elementName);
-        }
-        return [];
-    } catch (error) {
-        console.error('Error in getElementLocations wrapper:', error);
-        return [];
-    }
-}
-
-async function getPlayerLocationsWrapper() {
-    try {
-        if (typeof window.getPlayerLocations === 'function') {
-            return await window.getPlayerLocations();
-        }
-        return [];
-    } catch (error) {
-        console.error('Error in getPlayerLocations wrapper:', error);
-        return [];
-    }
-}
-
-async function getUniquePlanetsForElementWrapper(elementName) {
-    try {
-        if (typeof window.getUniquePlanetsForElement === 'function') {
-            return await window.getUniquePlanetsForElement(elementName);
-        }
-        return [];
-    } catch (error) {
-        console.error('Error in getUniquePlanetsForElement wrapper:', error);
-        return [];
-    }
-}
+// ===== ELEMENT LOCATIONS HELPERS - NO WRAPPERS NEEDED =====
+// These functions are already defined in db.js and exposed to window
+// We don't need to redefine or wrap them here to avoid recursion
 
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
@@ -871,8 +821,6 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Location helpers (simplified) - using wrapper functions to avoid recursion
-window.saveElementLocation = saveElementLocationWrapper;
-window.getElementLocations = getElementLocationsWrapper;
-window.getPlayerLocations = getPlayerLocationsWrapper;
-window.getUniquePlanetsForElement = getUniquePlanetsForElementWrapper;
+// Location helpers - these come directly from db.js
+// We don't need to redefine them here - they're already on window from db.js
+// Just ensure they're available (db.js should be loaded before storage.js)
