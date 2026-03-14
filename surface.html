@@ -216,7 +216,7 @@
             gap: 8px;
             transform: translateX(120%);
             animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards;
-            max-width: 200px;
+            max-width: 220px;
             box-shadow: 0 0 20px currentColor;
         }
         
@@ -532,6 +532,28 @@
             }
         };
 
+        // ===== PITY COUNTER SYSTEM =====
+        let pityCounters = {}; // Track attempts per resource
+        
+        const PITY_CONFIG = {
+            'common': { threshold: 2 },    // 65% chance → guarantee after 2 failures
+            'uncommon': { threshold: 3 },   // 45% chance → guarantee after 3 failures
+            'rare': { threshold: 4 },       // 25% chance → guarantee after 4 failures
+            'very-rare': { threshold: 9 },  // 12% chance → guarantee after 9 failures
+            'legendary': { threshold: 25 }  // 4% chance → guarantee after 25 failures
+        };
+
+        function initializePityCounters() {
+            currentPlanet.resources.forEach(resource => {
+                const rarity = getResourceRarity(resource);
+                pityCounters[resource] = {
+                    attempts: 0,
+                    threshold: PITY_CONFIG[rarity].threshold
+                };
+            });
+            console.log('Pity counters initialized:', pityCounters);
+        }
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -726,6 +748,9 @@
                     resourceChances[resource] = RARITY_CONFIG[rarity].baseChance;
                 });
                 
+                // Initialize pity counters
+                initializePityCounters();
+                
                 renderResourceToggles();
                 await updateCargoDisplay();
                 
@@ -782,17 +807,18 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        function showToast(resource, quantity, isRichFind, isFail = false) {
+        // ===== TOAST FUNCTIONS =====
+        function showSuccessToast(resource, quantity, isRichFind, isPity) {
             const rarity = getResourceRarity(resource);
             const config = RARITY_CONFIG[rarity];
-            const symbol = getElementSymbol(resource);
             
             const toast = document.createElement('div');
-            toast.className = `toast ${isFail ? 'fail' : 'success'} rarity-${rarity}`;
+            toast.className = `toast success rarity-${rarity}`;
             
-            let icon = isFail ? '⚫' : (isRichFind ? '✨' : config.icon);
-            let text = isFail ? 'No resources found' : `+${quantity} ${resource}`;
+            let icon = isPity ? '🎯' : (isRichFind ? '✨' : config.icon);
+            let text = `+${quantity} ${resource}`;
             if (isRichFind) text += ' RICH FIND!';
+            if (isPity) text += ' (PITY)';
             
             toast.innerHTML = `
                 <span class="toast-icon">${icon}</span>
@@ -801,6 +827,51 @@
             
             toastContainer.appendChild(toast);
             
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+
+        function showFailToast(resource, attempts, threshold) {
+            const rarity = getResourceRarity(resource);
+            const config = RARITY_CONFIG[rarity];
+            
+            const toast = document.createElement('div');
+            toast.className = `toast fail rarity-${rarity}`;
+            
+            const progressPercent = Math.floor((attempts / threshold) * 100);
+            const remainingAttempts = threshold - attempts;
+            
+            toast.innerHTML = `
+                <span class="toast-icon">⏳</span>
+                <span class="toast-name" style="display: flex; flex-direction: column; align-items: flex-start;">
+                    <span>No ${resource} found</span>
+                    <span style="font-size: 8px; color: #a0c0ff;">Pity: ${remainingAttempts} more</span>
+                    <div style="width: 100%; height: 2px; background: rgba(255,255,255,0.1); margin-top: 2px;">
+                        <div style="width: ${progressPercent}%; height: 2px; background: #ffaa4a;"></div>
+                    </div>
+                </span>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+
+        function showErrorToast() {
+            const toast = document.createElement('div');
+            toast.className = 'toast fail';
+            toast.innerHTML = `
+                <span class="toast-icon">⚠️</span>
+                <span class="toast-name">Extraction error</span>
+            `;
+            toastContainer.appendChild(toast);
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
@@ -862,11 +933,39 @@
                 const config = RARITY_CONFIG[rarity];
                 const massPerUnit = getElementMass(resource);
                 
+                // Initialize pity counter if not exists
+                if (!pityCounters[resource]) {
+                    pityCounters[resource] = {
+                        attempts: 0,
+                        threshold: PITY_CONFIG[rarity].threshold
+                    };
+                }
+                
+                // Increment attempt counter
+                pityCounters[resource].attempts++;
+                
+                // Check if guaranteed by pity
+                let isGuaranteed = false;
+                if (pityCounters[resource].attempts >= pityCounters[resource].threshold) {
+                    isGuaranteed = true;
+                    console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts`);
+                }
+                
                 // Roll for success
                 let roll = Math.random() * 100;
                 let quantity = 0;
+                let wasPity = false;
                 
-                if (roll < config.baseChance) {
+                if (isGuaranteed || roll < config.baseChance) {
+                    // Success!
+                    if (isGuaranteed) {
+                        wasPity = true;
+                        console.log(`✨ PITY SUCCESS for ${resource} at attempt ${pityCounters[resource].attempts}`);
+                    }
+                    
+                    // Reset pity counter
+                    pityCounters[resource].attempts = 0;
+                    
                     // Calculate base quantity to reach mass target
                     let baseQuantity = Math.floor(config.massTarget / massPerUnit);
                     baseQuantity = Math.max(1, baseQuantity);
@@ -882,11 +981,16 @@
                     // Cap maximum quantity
                     const maxQuantity = Math.floor((config.massTarget * 2) / massPerUnit);
                     quantity = Math.min(quantity, maxQuantity);
+                    
+                    // Bonus for pity success (50% extra)
+                    if (wasPity) {
+                        quantity = Math.floor(quantity * 1.5);
+                    }
                 }
                 
                 if (quantity === 0) {
-                    // Show failure toast
-                    showToast(resource, 0, false, true);
+                    // Show failure toast with pity info
+                    showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     return;
                 }
                 
@@ -907,30 +1011,16 @@
                         cachedCargoMass = currentMass + totalMass;
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
-                        showToast(resource, quantity, isRichFind, false);
+                        showSuccessToast(resource, quantity, isRichFind, wasPity);
                     } else {
-                        // Show failure if add failed
-                        showToast(resource, 0, false, true);
+                        showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                     }
                 } else {
-                    // Show failure if not enough space
-                    showToast(resource, 0, false, true);
+                    showFailToast(resource, pityCounters[resource].attempts, pityCounters[resource].threshold);
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
-                // Show generic failure toast
-                const failToast = document.createElement('div');
-                failToast.className = 'toast fail';
-                failToast.innerHTML = `
-                    <span class="toast-icon">⚠️</span>
-                    <span class="toast-name">Extraction error</span>
-                `;
-                toastContainer.appendChild(failToast);
-                setTimeout(() => {
-                    if (failToast.parentNode) {
-                        failToast.remove();
-                    }
-                }, 3000);
+                showErrorToast();
             }
         }
 
