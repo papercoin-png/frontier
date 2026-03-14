@@ -244,13 +244,37 @@ async function addElementToCollection(elementName, count = 1) {
     }
 }
 
-// FIXED: Remove the recursive call
-async function removeElementFromCollection(elementName, count = 1) {
+// FIXED: Use a different name for the local function
+async function _removeElementFromCollection(elementName, count = 1) {
     try {
-        // Call the db function directly, not recursively
-        return await window.removeElementFromCollection(elementName, count);
+        // Call the db function directly using the db object, not window
+        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
+        const tx = db.transaction('collection', 'readwrite');
+        const store = tx.objectStore('collection');
+        
+        const element = await store.get(elementName);
+        if (!element) {
+            await tx.done;
+            return { success: false, reason: 'not_found' };
+        }
+        
+        if (element.count < count) {
+            await tx.done;
+            return { success: false, reason: 'insufficient', available: element.count };
+        }
+        
+        element.count -= count;
+        
+        if (element.count <= 0) {
+            await store.delete(elementName);
+        } else {
+            await store.put(element);
+        }
+        
+        await tx.done;
+        return { success: true, newCount: element.count >= 0 ? element.count : 0 };
     } catch (error) {
-        console.error('Error removing element from collection:', error);
+        console.error('Error in _removeElementFromCollection:', error);
         return { success: false, reason: 'error', error: error.message };
     }
 }
@@ -274,8 +298,8 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
             return { success: false, reason: 'insufficient', available: availableCount };
         }
         
-        // Remove from collection - call db function directly
-        const removeResult = await window.removeElementFromCollection(elementName, quantity);
+        // Remove from collection - call the local function directly
+        const removeResult = await _removeElementFromCollection(elementName, quantity);
         console.log('Remove result:', removeResult);
         
         if (!removeResult.success) {
@@ -677,7 +701,7 @@ window.savePlayer = savePlayer;
 window.createDefaultPlayer = createDefaultPlayer;
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
-window.removeElementFromCollection = removeElementFromCollection;
+// Don't expose _removeElementFromCollection - it's internal
 window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
