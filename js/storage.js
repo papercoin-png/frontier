@@ -60,7 +60,8 @@ const STORAGE_KEYS = {
     TAX_HISTORY: 'voidfarer_tax_history',
     COMMUNITY_FUND: 'voidfarer_community_fund',
     ACTIVE_EVENTS: 'voidfarer_active_events',
-    EVENT_HISTORY: 'voidfarer_event_history'
+    EVENT_HISTORY: 'voidfarer_event_history',
+    CLAIMED_PLANETS: 'voidfarer_claimed_planets'
 };
 
 // ===== ELEMENT MASS DATABASE =====
@@ -388,13 +389,14 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 // Get planet name and type
                 const planetName = locationData.planet || getCurrentPlanetName();
                 const planetType = locationData.planetType || getCurrentPlanetType();
+                const rarity = locationData.rarity || getElementRarity(elementName);
                 
                 // Create enhanced location data with all metadata
                 const enhancedLocationData = {
                     planet: planetName,
                     planetType: planetType,
                     quantity: count,
-                    rarity: getElementRarity(elementName),
+                    rarity: rarity,
                     value: getElementValue(elementName),
                     timestamp: Date.now()
                 };
@@ -402,7 +404,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 try {
                     // Call the db.js function with full metadata
                     await window.saveElementLocation(elementName, planetName, enhancedLocationData);
-                    console.log(`📍 Journal entry: ${count}x ${elementName} (${enhancedLocationData.rarity}) found on ${planetName}`);
+                    console.log(`📍 Journal entry: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
                 }
@@ -831,6 +833,55 @@ function getPlayerId() {
     return playerId;
 }
 
+// ===== PLANET STATUS HELPERS (NEW) =====
+async function getPlanetStatus(planetName) {
+    try {
+        if (typeof window.getPlanetStatus === 'function') {
+            return await window.getPlanetStatus(planetName);
+        }
+        return null;
+    } catch (error) {
+        console.error('Error in getPlanetStatus wrapper:', error);
+        return null;
+    }
+}
+
+async function updatePlanetStatusFromLocations(planetName) {
+    try {
+        if (typeof window.updatePlanetStatusFromLocations === 'function') {
+            return await window.updatePlanetStatusFromLocations(planetName);
+        }
+        return null;
+    } catch (error) {
+        console.error('Error in updatePlanetStatusFromLocations wrapper:', error);
+        return null;
+    }
+}
+
+async function claimPlanet(planetName) {
+    try {
+        if (typeof window.claimPlanet === 'function') {
+            return await window.claimPlanet(planetName);
+        }
+        return false;
+    } catch (error) {
+        console.error('Error in claimPlanet wrapper:', error);
+        return false;
+    }
+}
+
+async function getClaimedPlanets() {
+    try {
+        if (typeof window.getClaimedPlanets === 'function') {
+            return await window.getClaimedPlanets();
+        }
+        return [];
+    } catch (error) {
+        console.error('Error in getClaimedPlanets wrapper:', error);
+        return [];
+    }
+}
+
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 window.STORAGE_KEYS = STORAGE_KEYS;
@@ -899,3 +950,9 @@ window.saveShipUpgrades = saveShipUpgrades;
 window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
+
+// Planet status helpers (wrappers for db.js functions)
+window.getPlanetStatus = getPlanetStatus;
+window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocations;
+window.claimPlanet = claimPlanet;
+window.getClaimedPlanets = getClaimedPlanets;
