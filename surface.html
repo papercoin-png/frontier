@@ -491,8 +491,6 @@
         }
 
         // ===== CONSTANTS =====
-        // CARGO_MASS_LIMIT is already defined in storage.js and available via window
-        // Just use it directly - no need to redeclare
         const EXTRACTION_INTERVAL = 5000; // 5 seconds
         
         // ===== RARITY CONFIGURATION =====
@@ -784,25 +782,21 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        function showToast(resource, quantity, isRichFind) {
+        function showToast(resource, quantity, isRichFind, isFail = false) {
             const rarity = getResourceRarity(resource);
             const config = RARITY_CONFIG[rarity];
             const symbol = getElementSymbol(resource);
             
             const toast = document.createElement('div');
-            toast.className = `toast success rarity-${rarity}`;
+            toast.className = `toast ${isFail ? 'fail' : 'success'} rarity-${rarity}`;
             
-            let icon = config.icon;
-            let extraText = '';
-            
-            if (isRichFind) {
-                icon = '✨';
-                extraText = ' RICH FIND!';
-            }
+            let icon = isFail ? '⚫' : (isRichFind ? '✨' : config.icon);
+            let text = isFail ? 'No resources found' : `+${quantity} ${resource}`;
+            if (isRichFind) text += ' RICH FIND!';
             
             toast.innerHTML = `
                 <span class="toast-icon">${icon}</span>
-                <span class="toast-name">+${quantity} ${resource}${extraText}</span>
+                <span class="toast-name">${text}</span>
             `;
             
             toastContainer.appendChild(toast);
@@ -816,13 +810,19 @@
 
         // ===== MAIN EXTRACTION FUNCTION =====
         async function attemptExtraction() {
-            if (!isExtracting) return;
+            console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
+            
+            if (!isExtracting) {
+                console.log('Extraction paused');
+                return;
+            }
             
             try {
                 const currentMass = await getCurrentCargoMass();
                 const cargoLimit = window.CARGO_MASS_LIMIT || 5000;
                 
                 if (currentMass >= cargoLimit) {
+                    console.log('Cargo full - stopping extraction');
                     isExtracting = false;
                     extractorText.textContent = 'Cargo full - extraction paused';
                     if (extractionTimer) {
@@ -884,7 +884,11 @@
                     quantity = Math.min(quantity, maxQuantity);
                 }
                 
-                if (quantity === 0) return;
+                if (quantity === 0) {
+                    // Show failure toast
+                    showToast(resource, 0, false, true);
+                    return;
+                }
                 
                 const totalMass = massPerUnit * quantity;
                 
@@ -903,26 +907,59 @@
                         cachedCargoMass = currentMass + totalMass;
                         lastMassUpdate = Date.now();
                         await updateCargoDisplay();
-                        showToast(resource, quantity, isRichFind);
+                        showToast(resource, quantity, isRichFind, false);
+                    } else {
+                        // Show failure if add failed
+                        showToast(resource, 0, false, true);
                     }
+                } else {
+                    // Show failure if not enough space
+                    showToast(resource, 0, false, true);
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
+                // Show generic failure toast
+                const failToast = document.createElement('div');
+                failToast.className = 'toast fail';
+                failToast.innerHTML = `
+                    <span class="toast-icon">⚠️</span>
+                    <span class="toast-name">Extraction error</span>
+                `;
+                toastContainer.appendChild(failToast);
+                setTimeout(() => {
+                    if (failToast.parentNode) {
+                        failToast.remove();
+                    }
+                }, 3000);
             }
         }
 
         function startExtraction() {
+            console.log('Starting extraction timer...');
             if (extractionTimer) {
+                console.log('Clearing existing timer');
                 clearInterval(extractionTimer);
+                extractionTimer = null;
             }
+            
             isExtracting = true;
             extractorText.textContent = 'Auto-extractor active';
             
+            // Do an immediate extraction
+            console.log('Performing initial extraction...');
+            attemptExtraction().catch(console.error);
+            
+            // Then set up the interval
             extractionTimer = setInterval(() => {
+                console.log('Extraction interval triggered');
                 if (isExtracting) {
                     attemptExtraction().catch(console.error);
+                } else {
+                    console.log('Extraction paused, skipping');
                 }
             }, EXTRACTION_INTERVAL);
+            
+            console.log('Extraction timer set with interval:', EXTRACTION_INTERVAL);
         }
 
         function returnToShip() {
@@ -940,14 +977,6 @@
             window.location.href = 'ship-bridge.html';
         }
 
-        async function performAutoExtract() {
-            if (!currentPlanet.resources || currentPlanet.resources.length === 0) return;
-            if (typeof window.addElementToCollection !== 'function') return;
-            
-            // Do one quick extraction on load
-            await attemptExtraction();
-        }
-
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
@@ -959,11 +988,11 @@
                     throw new Error('Failed to load planet data');
                 }
                 
+                // Start extraction immediately
                 startExtraction();
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
-                    performAutoExtract();
                 }, 500);
                 
             } catch (error) {
