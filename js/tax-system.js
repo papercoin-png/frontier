@@ -231,11 +231,23 @@ async function storageGetTaxHistory(playerId, limit = 100) {
     }
 }
 
+// FIXED: Proper IndexedDB transaction handling
 async function getAllTaxTransactions() {
     try {
-        // Use the global getDb from db.js
-        const db = window.getDb ? window.getDb() : idb.openDB('VoidfarerDB', 1);
-        return await db.getAll('taxTransactions') || [];
+        // Get the database connection
+        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
+        
+        // Create a transaction and get the store
+        const tx = db.transaction('taxTransactions', 'readonly');
+        const store = tx.objectStore('taxTransactions');
+        
+        // Get all records
+        const allTransactions = await store.getAll();
+        
+        // Complete the transaction
+        await tx.done;
+        
+        return allTransactions || [];
     } catch (error) {
         console.error('Error getting all tax transactions:', error);
         return [];
@@ -330,9 +342,6 @@ async function payTax(playerId, playerName, taxType, baseAmount, description = '
         baseAmount,
         description
     });
-    
-    // Add to community fund
-    // await addToCommunityFund(taxAmount, record.id);
     
     return {
         paid: taxAmount,
