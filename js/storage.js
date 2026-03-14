@@ -385,7 +385,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
             
             // Save location data ONLY if it's from planetary mining
             // This preserves the journal for elements found on surfaces
-            if (locationData && typeof window.saveElementLocation === 'function') {
+            if (locationData && typeof window._dbSaveElementLocation === 'function') {
                 // Get planet name and type
                 const planetName = locationData.planet || getCurrentPlanetName();
                 const planetType = locationData.planetType || getCurrentPlanetType();
@@ -403,18 +403,8 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 
                 try {
                     // Call the db.js function with full metadata
-                    await window.saveElementLocation(elementName, planetName, enhancedLocationData);
+                    await window._dbSaveElementLocation(elementName, planetName, enhancedLocationData);
                     console.log(`📍 Journal entry: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
-                    
-                    // Also update planet status - call db.js function directly
-                    if (typeof window.updatePlanetStatusFromLocations === 'function') {
-                        // Use setTimeout to avoid any potential recursion issues
-                        setTimeout(() => {
-                            window.updatePlanetStatusFromLocations(planetName).catch(e => 
-                                console.error('Error updating planet status:', e)
-                            );
-                        }, 10);
-                    }
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
                 }
@@ -843,78 +833,6 @@ function getPlayerId() {
     return playerId;
 }
 
-// ===== SIMPLE PLANET STATUS HELPERS - NO WRAPPERS =====
-// These just call the db.js functions directly
-// No wrappers means no recursion!
-
-async function getPlanetStatus(planetName) {
-    try {
-        // Call the db.js function directly
-        if (typeof window._dbGetPlanetStatus === 'function') {
-            return await window._dbGetPlanetStatus(planetName);
-        }
-        // Fallback to direct call
-        if (typeof window.getPlanetStatus === 'function') {
-            return await window.getPlanetStatus(planetName);
-        }
-        return null;
-    } catch (error) {
-        console.error('Error getting planet status:', error);
-        return null;
-    }
-}
-
-async function updatePlanetStatusFromLocations(planetName) {
-    try {
-        // Call the db.js function directly
-        if (typeof window._dbUpdatePlanetStatus === 'function') {
-            return await window._dbUpdatePlanetStatus(planetName);
-        }
-        // Fallback to direct call
-        if (typeof window.updatePlanetStatusFromLocations === 'function') {
-            return await window.updatePlanetStatusFromLocations(planetName);
-        }
-        return null;
-    } catch (error) {
-        console.error('Error updating planet status:', error);
-        return null;
-    }
-}
-
-async function claimPlanet(planetName) {
-    try {
-        // Call the db.js function directly
-        if (typeof window._dbClaimPlanet === 'function') {
-            return await window._dbClaimPlanet(planetName);
-        }
-        // Fallback to direct call
-        if (typeof window.claimPlanet === 'function') {
-            return await window.claimPlanet(planetName);
-        }
-        return false;
-    } catch (error) {
-        console.error('Error claiming planet:', error);
-        return false;
-    }
-}
-
-async function getClaimedPlanets() {
-    try {
-        // Call the db.js function directly
-        if (typeof window._dbGetClaimedPlanets === 'function') {
-            return await window._dbGetClaimedPlanets();
-        }
-        // Fallback to direct call
-        if (typeof window.getClaimedPlanets === 'function') {
-            return await window.getClaimedPlanets();
-        }
-        return [];
-    } catch (error) {
-        console.error('Error getting claimed planets:', error);
-        return [];
-    }
-}
-
 // ===== EXPOSE TO WINDOW =====
 window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 window.STORAGE_KEYS = STORAGE_KEYS;
@@ -984,8 +902,6 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Planet status helpers - these are simple functions that call db.js
-window.getPlanetStatus = getPlanetStatus;
-window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocations;
-window.claimPlanet = claimPlanet;
-window.getClaimedPlanets = getClaimedPlanets;
+// NOTE: Planet status functions are now handled directly in db.js
+// We don't need to redefine them here to avoid recursion
+// The functions from db.js are already available on the window object
