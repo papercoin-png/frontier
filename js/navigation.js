@@ -3,7 +3,7 @@
 
 // ===== SECTOR COORDINATES =====
 // 3x4 grid of sectors (A1 through C4)
-export const SECTOR_COORDS = {
+const SECTOR_COORDS = {
     'A1': { x: 0, y: 0, name: 'Cygnus', displayName: 'Cygnus Arm' },
     'B1': { x: 1, y: 0, name: 'Perseus', displayName: 'Perseus Arm' },
     'C1': { x: 2, y: 0, name: 'Core', displayName: 'Galactic Core' },
@@ -19,7 +19,7 @@ export const SECTOR_COORDS = {
 };
 
 // ===== WARP CONSTANTS =====
-export const WARP_CONFIG = {
+const WARP_CONFIG = {
     CYCLE_DURATION: 2000,        // 2 seconds per cycle
     BASE_FUEL_COST: 5,           // Minimum fuel for any jump
     FUEL_PER_LY: 4,              // Fuel cost per light year
@@ -31,7 +31,7 @@ export const WARP_CONFIG = {
 
 // ===== SECTOR DISTANCE CALCULATION =====
 // Calculate distance between two sectors using Manhattan distance
-export function getSectorDistance(sector1, sector2) {
+function getSectorDistance(sector1, sector2) {
     const s1 = SECTOR_COORDS[sector1] || SECTOR_COORDS['B2'];
     const s2 = SECTOR_COORDS[sector2] || SECTOR_COORDS['B2'];
     
@@ -46,7 +46,7 @@ export function getSectorDistance(sector1, sector2) {
 
 // ===== WARP CYCLE CALCULATION =====
 // Convert distance to warp cycles (1 cycle = 2 seconds)
-export function getWarpCyclesFromDistance(distance) {
+function getWarpCyclesFromDistance(distance) {
     if (distance <= 1.0) return 1;      // Very close (0-1 LY)
     if (distance <= 2.5) return 2;      // Close (1-2.5 LY)
     if (distance <= 4.5) return 3;      // Medium (2.5-4.5 LY)
@@ -56,23 +56,23 @@ export function getWarpCyclesFromDistance(distance) {
 
 // ===== FUEL COST CALCULATION =====
 // Calculate fuel cost based on distance
-export function getFuelCostFromDistance(distance) {
+function getFuelCostFromDistance(distance) {
     return Math.floor(distance * WARP_CONFIG.FUEL_PER_LY) + WARP_CONFIG.BASE_FUEL_COST;
 }
 
 // ===== TRAVEL TIME CALCULATION =====
 // Get travel time in seconds and milliseconds
-export function getTravelTimeFromCycles(cycles) {
+function getTravelTimeFromCycles(cycles) {
     return cycles * (WARP_CONFIG.CYCLE_DURATION / 1000); // Returns seconds
 }
 
-export function getTravelTimeMsFromCycles(cycles) {
+function getTravelTimeMsFromCycles(cycles) {
     return cycles * WARP_CONFIG.CYCLE_DURATION; // Returns milliseconds
 }
 
 // ===== COMPLETE JOURNEY CALCULATION =====
 // Calculate total journey distance across all legs
-export function calculateCompleteJourney(legs) {
+function calculateCompleteJourney(legs) {
     const {
         sectorDistance = 0,
         starSectorDistance = 0,
@@ -113,19 +113,19 @@ export function calculateCompleteJourney(legs) {
 }
 
 // ===== FORMATTING FUNCTIONS =====
-export function formatDistance(distance) {
+function formatDistance(distance) {
     return distance.toFixed(1) + ' LY';
 }
 
-export function formatCycles(cycles) {
+function formatCycles(cycles) {
     return cycles + ' cycle' + (cycles > 1 ? 's' : '');
 }
 
-export function formatFuel(fuel) {
+function formatFuel(fuel) {
     return fuel + ' ⭐';
 }
 
-export function formatTime(seconds) {
+function formatTime(seconds) {
     if (seconds < 60) {
         return seconds + ' sec';
     } else {
@@ -137,7 +137,7 @@ export function formatTime(seconds) {
 
 // ===== JOURNEY DATA MANAGEMENT =====
 // Save journey data to localStorage for warp.html
-export function saveJourneyData(journeyData) {
+function saveJourneyData(journeyData) {
     const data = {
         destination: journeyData.destination,
         destinationType: journeyData.destinationType,
@@ -169,7 +169,7 @@ export function saveJourneyData(journeyData) {
 }
 
 // Load journey data from localStorage
-export function loadJourneyData() {
+function loadJourneyData() {
     const saved = localStorage.getItem('voidfarer_warp_data');
     if (saved) {
         return JSON.parse(saved);
@@ -178,13 +178,13 @@ export function loadJourneyData() {
 }
 
 // Clear journey data
-export function clearJourneyData() {
+function clearJourneyData() {
     localStorage.removeItem('voidfarer_warp_data');
 }
 
 // ===== PLOT MODE DATA MANAGEMENT =====
 // Save plot mode data when starting a journey
-export function savePlotData(plotData) {
+function savePlotData(plotData) {
     const {
         fromSector, fromRegion, fromStarSector, fromStar, fromPlanet,
         destSector, destRegion,
@@ -208,7 +208,7 @@ export function savePlotData(plotData) {
 }
 
 // Save star sector selection during plot mode
-export function savePlotStarSector(starSector) {
+function savePlotStarSector(starSector) {
     localStorage.setItem('voidfarer_plot_starSector', starSector.name);
     localStorage.setItem('voidfarer_plot_starSector_type', starSector.type);
     localStorage.setItem('voidfarer_plot_starSector_distance', starSector.distance.toString());
@@ -225,7 +225,7 @@ export function savePlotStarSector(starSector) {
 }
 
 // Save star selection during plot mode
-export function savePlotStar(starName, starDistance) {
+function savePlotStar(starName, starDistance) {
     localStorage.setItem('voidfarer_plot_star', starName);
     localStorage.setItem('voidfarer_plot_star_distance', starDistance.toString());
     
@@ -238,7 +238,7 @@ export function savePlotStar(starName, starDistance) {
 }
 
 // Load all plot data
-export function loadPlotData() {
+function loadPlotData() {
     return {
         fromSector: localStorage.getItem('voidfarer_plot_from_sector'),
         fromRegion: localStorage.getItem('voidfarer_plot_from_region'),
@@ -260,7 +260,7 @@ export function loadPlotData() {
 }
 
 // Clear all plot data
-export function clearPlotData() {
+function clearPlotData() {
     const keys = [
         'voidfarer_plot_from_sector',
         'voidfarer_plot_from_region',
@@ -286,7 +286,7 @@ export function clearPlotData() {
 
 // ===== LOCATION MANAGEMENT =====
 // Save current location (all levels)
-export function saveCurrentLocation(location) {
+function saveCurrentLocation(location) {
     const {
         sector, sectorId,
         region,
@@ -330,7 +330,7 @@ export function saveCurrentLocation(location) {
 }
 
 // Load current location (all levels)
-export function loadCurrentLocation() {
+function loadCurrentLocation() {
     return {
         sector: localStorage.getItem('voidfarer_current_sector') || 'B2',
         region: localStorage.getItem('voidfarer_current_region') || 'Orion Arm',
@@ -347,29 +347,29 @@ export function loadCurrentLocation() {
 
 // ===== JOURNEY DISTANCE TRACKING =====
 // Update journey distance (accumulated across screens)
-export function updateJourneyDistance(additionalDistance) {
+function updateJourneyDistance(additionalDistance) {
     const current = parseFloat(localStorage.getItem('voidfarer_journey_distance') || '0');
     const newTotal = current + additionalDistance;
     localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
     return newTotal;
 }
 
-export function getJourneyDistance() {
+function getJourneyDistance() {
     return parseFloat(localStorage.getItem('voidfarer_journey_distance') || '0');
 }
 
-export function resetJourneyDistance() {
+function resetJourneyDistance() {
     localStorage.setItem('voidfarer_journey_distance', '0');
 }
 
 // ===== UTILITY FUNCTIONS =====
 // Get display name for a sector ID
-export function getSectorDisplayName(sectorId) {
+function getSectorDisplayName(sectorId) {
     return SECTOR_COORDS[sectorId]?.displayName || 'Unknown Sector';
 }
 
 // Get sector ID from display name (approximate)
-export function getSectorIdFromDisplayName(displayName) {
+function getSectorIdFromDisplayName(displayName) {
     for (const [id, data] of Object.entries(SECTOR_COORDS)) {
         if (data.displayName === displayName) {
             return id;
@@ -379,26 +379,26 @@ export function getSectorIdFromDisplayName(displayName) {
 }
 
 // Calculate distance between two points (Euclidean)
-export function getEuclideanDistance(x1, y1, x2, y2) {
+function getEuclideanDistance(x1, y1, x2, y2) {
     const dx = x1 - x2;
     const dy = y1 - y2;
     return Math.sqrt(dx*dx + dy*dy);
 }
 
 // Calculate distance between two points (Manhattan)
-export function getManhattanDistance(x1, y1, x2, y2) {
+function getManhattanDistance(x1, y1, x2, y2) {
     return Math.abs(x1 - x2) + Math.abs(y1 - y2);
 }
 
 // ===== WARP VISUALIZATION HELPERS =====
 // Calculate progress within a warp cycle (0 to 1)
-export function getCycleProgress(cycleStartTime, currentTime) {
+function getCycleProgress(cycleStartTime, currentTime) {
     const elapsed = currentTime - cycleStartTime;
     return Math.min(elapsed / WARP_CONFIG.CYCLE_DURATION, 1.0);
 }
 
 // Get speed factor based on cycle progress (accelerate then decelerate)
-export function getWarpSpeedFactor(cycleProgress) {
+function getWarpSpeedFactor(cycleProgress) {
     if (cycleProgress < 0.3) {
         // Accelerating phase
         return 0.3 + (cycleProgress / 0.3) * 0.7;
@@ -412,20 +412,20 @@ export function getWarpSpeedFactor(cycleProgress) {
 }
 
 // Get current cycle number based on elapsed time
-export function getCurrentCycle(startTime, currentTime) {
+function getCurrentCycle(startTime, currentTime) {
     const elapsed = currentTime - startTime;
     return Math.floor(elapsed / WARP_CONFIG.CYCLE_DURATION) + 1;
 }
 
 // Check if warp is complete
-export function isWarpComplete(startTime, currentTime, totalCycles) {
+function isWarpComplete(startTime, currentTime, totalCycles) {
     const elapsed = currentTime - startTime;
     const totalDuration = totalCycles * WARP_CONFIG.CYCLE_DURATION;
     return elapsed >= totalDuration;
 }
 
 // Get warp status message based on progress
-export function getWarpStatusMessage(cycle, totalCycles, progress) {
+function getWarpStatusMessage(cycle, totalCycles, progress) {
     if (cycle === 1) return 'INITIATING WARP';
     if (progress < 0.2) return 'ACCELERATING';
     if (progress < 0.3) return 'LEAVING SYSTEM';
@@ -441,57 +441,38 @@ export function getWarpStatusMessage(cycle, totalCycles, progress) {
     return `WARP CYCLE ${cycle}`;
 }
 
-// ===== EXPORT =====
-export default {
-    // Constants
-    SECTOR_COORDS,
-    WARP_CONFIG,
-    
-    // Core calculations
-    getSectorDistance,
-    getWarpCyclesFromDistance,
-    getFuelCostFromDistance,
-    getTravelTimeFromCycles,
-    getTravelTimeMsFromCycles,
-    calculateCompleteJourney,
-    
-    // Formatting
-    formatDistance,
-    formatCycles,
-    formatFuel,
-    formatTime,
-    
-    // Journey data management
-    saveJourneyData,
-    loadJourneyData,
-    clearJourneyData,
-    
-    // Plot mode data management
-    savePlotData,
-    savePlotStarSector,
-    savePlotStar,
-    loadPlotData,
-    clearPlotData,
-    
-    // Location management
-    saveCurrentLocation,
-    loadCurrentLocation,
-    
-    // Journey distance tracking
-    updateJourneyDistance,
-    getJourneyDistance,
-    resetJourneyDistance,
-    
-    // Utility
-    getSectorDisplayName,
-    getSectorIdFromDisplayName,
-    getEuclideanDistance,
-    getManhattanDistance,
-    
-    // Warp visualization
-    getCycleProgress,
-    getWarpSpeedFactor,
-    getCurrentCycle,
-    isWarpComplete,
-    getWarpStatusMessage
-};
+// ===== EXPOSE TO WINDOW =====
+window.SECTOR_COORDS = SECTOR_COORDS;
+window.WARP_CONFIG = WARP_CONFIG;
+window.getSectorDistance = getSectorDistance;
+window.getWarpCyclesFromDistance = getWarpCyclesFromDistance;
+window.getFuelCostFromDistance = getFuelCostFromDistance;
+window.getTravelTimeFromCycles = getTravelTimeFromCycles;
+window.getTravelTimeMsFromCycles = getTravelTimeMsFromCycles;
+window.calculateCompleteJourney = calculateCompleteJourney;
+window.formatDistance = formatDistance;
+window.formatCycles = formatCycles;
+window.formatFuel = formatFuel;
+window.formatTime = formatTime;
+window.saveJourneyData = saveJourneyData;
+window.loadJourneyData = loadJourneyData;
+window.clearJourneyData = clearJourneyData;
+window.savePlotData = savePlotData;
+window.savePlotStarSector = savePlotStarSector;
+window.savePlotStar = savePlotStar;
+window.loadPlotData = loadPlotData;
+window.clearPlotData = clearPlotData;
+window.saveCurrentLocation = saveCurrentLocation;
+window.loadCurrentLocation = loadCurrentLocation;
+window.updateJourneyDistance = updateJourneyDistance;
+window.getJourneyDistance = getJourneyDistance;
+window.resetJourneyDistance = resetJourneyDistance;
+window.getSectorDisplayName = getSectorDisplayName;
+window.getSectorIdFromDisplayName = getSectorIdFromDisplayName;
+window.getEuclideanDistance = getEuclideanDistance;
+window.getManhattanDistance = getManhattanDistance;
+window.getCycleProgress = getCycleProgress;
+window.getWarpSpeedFactor = getWarpSpeedFactor;
+window.getCurrentCycle = getCurrentCycle;
+window.isWarpComplete = isWarpComplete;
+window.getWarpStatusMessage = getWarpStatusMessage;
