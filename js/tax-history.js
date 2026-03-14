@@ -4,7 +4,7 @@
 import { 
     addTaxRecord as storageAddTaxRecord,
     getTaxHistory as storageGetTaxHistory,
-    getAllTransactions,
+    getAllTransactions as storageGetAllTransactions,
     getPlayerTransactions,
     getPlayerTaxSummary as storageGetPlayerTaxSummary
 } from './storage.js';
@@ -42,7 +42,7 @@ export async function initializeTaxHistory() {
 // ===== TRANSACTION MANAGEMENT =====
 export async function getAllTransactions(limit = 1000) {
     // Use storage.js function
-    return await storageGetTaxHistory(null, limit);
+    return await storageGetAllTransactions(limit);
 }
 
 export async function addTransaction(transaction) {
