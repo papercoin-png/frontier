@@ -833,9 +833,13 @@ function getPlayerId() {
     return playerId;
 }
 
-// ===== PLANET STATUS HELPERS (NEW) =====
-async function getPlanetStatus(planetName) {
+// ===== PLANET STATUS HELPERS (FIXED - NO RECURSION) =====
+// These are simple wrappers that call the db.js functions directly
+// They use different names to avoid recursion
+
+async function getPlanetStatusWrapper(planetName) {
     try {
+        // Call the db.js function directly
         if (typeof window.getPlanetStatus === 'function') {
             return await window.getPlanetStatus(planetName);
         }
@@ -846,8 +850,9 @@ async function getPlanetStatus(planetName) {
     }
 }
 
-async function updatePlanetStatusFromLocations(planetName) {
+async function updatePlanetStatusFromLocationsWrapper(planetName) {
     try {
+        // Call the db.js function directly
         if (typeof window.updatePlanetStatusFromLocations === 'function') {
             return await window.updatePlanetStatusFromLocations(planetName);
         }
@@ -858,8 +863,9 @@ async function updatePlanetStatusFromLocations(planetName) {
     }
 }
 
-async function claimPlanet(planetName) {
+async function claimPlanetWrapper(planetName) {
     try {
+        // Call the db.js function directly
         if (typeof window.claimPlanet === 'function') {
             return await window.claimPlanet(planetName);
         }
@@ -870,8 +876,9 @@ async function claimPlanet(planetName) {
     }
 }
 
-async function getClaimedPlanets() {
+async function getClaimedPlanetsWrapper() {
     try {
+        // Call the db.js function directly
         if (typeof window.getClaimedPlanets === 'function') {
             return await window.getClaimedPlanets();
         }
@@ -951,8 +958,8 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Planet status helpers (wrappers for db.js functions)
-window.getPlanetStatus = getPlanetStatus;
-window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocations;
-window.claimPlanet = claimPlanet;
-window.getClaimedPlanets = getClaimedPlanets;
+// Planet status helpers (FIXED - using wrapper functions with different names)
+window.getPlanetStatus = getPlanetStatusWrapper;
+window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocationsWrapper;
+window.claimPlanet = claimPlanetWrapper;
+window.getClaimedPlanets = getClaimedPlanetsWrapper;
