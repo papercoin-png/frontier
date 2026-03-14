@@ -1,760 +1,1011 @@
-// js/market-dynamics.js - Dynamic pricing engine for Voidfarer
-// Now using IndexedDB via storage.js for unlimited storage
-// Handles supply/demand calculations, price history, and market trends
-// Updated to consider element mass in pricing
+// js/economic-events.js - Dynamic economic events system for Voidfarer
 
-import {
-    getItem,
-    setItem,
-    getAll,
-    getAllFromIndex,
-    addElementToCollection,
-    removeElementFromCollection,
-    getCollection,
-    getCredits,
-    addCredits,
-    spendCredits,
-    getElementMass
-} from './storage.js';
-
-// ===== BASE PRICES =====
-export const BASE_PRICES = {
-    // Common
-    'Hydrogen': 100,
-    'Helium': 100,
-    'Lithium': 100,
-    'Beryllium': 100,
-    'Boron': 100,
-    'Sodium': 100,
-    'Magnesium': 100,
-    'Aluminum': 100,
-    'Silicon': 100,
-    'Potassium': 100,
-    'Calcium': 100,
-    
-    // Uncommon
-    'Carbon': 250,
-    'Nitrogen': 250,
-    'Oxygen': 250,
-    'Fluorine': 250,
-    'Neon': 250,
-    'Phosphorus': 250,
-    'Sulfur': 250,
-    'Chlorine': 250,
-    'Argon': 250,
-    'Iron': 250,
-    'Nickel': 250,
-    'Lead': 250,
-    
-    // Rare
-    'Scandium': 1000,
-    'Titanium': 1000,
-    'Vanadium': 1000,
-    'Chromium': 1000,
-    'Manganese': 1000,
-    'Cobalt': 1000,
-    'Copper': 1000,
-    'Zinc': 1000,
-    'Gallium': 1000,
-    'Germanium': 1000,
-    'Arsenic': 1000,
-    'Selenium': 1000,
-    'Bromine': 1000,
-    'Krypton': 1000,
-    'Rubidium': 1000,
-    'Strontium': 1000,
-    'Yttrium': 1000,
-    'Zirconium': 1000,
-    'Niobium': 1000,
-    'Molybdenum': 1000,
-    'Ruthenium': 1000,
-    'Rhodium': 1000,
-    'Palladium': 1000,
-    'Silver': 1000,
-    'Cadmium': 1000,
-    'Indium': 1000,
-    'Tin': 1000,
-    'Antimony': 1000,
-    'Tellurium': 1000,
-    'Iodine': 1000,
-    'Xenon': 1000,
-    'Cesium': 1000,
-    'Barium': 1000,
-    'Lanthanum': 1000,
-    'Cerium': 1000,
-    'Praseodymium': 1000,
-    'Neodymium': 1000,
-    'Samarium': 1000,
-    'Europium': 1000,
-    'Gadolinium': 1000,
-    'Terbium': 1000,
-    'Dysprosium': 1000,
-    'Holmium': 1000,
-    'Erbium': 1000,
-    'Thulium': 1000,
-    'Ytterbium': 1000,
-    'Lutetium': 1000,
-    'Hafnium': 1000,
-    'Tantalum': 1000,
-    'Tungsten': 1000,
-    'Rhenium': 1000,
-    'Osmium': 1000,
-    'Iridium': 1000,
-    'Platinum': 1000,
-    'Gold': 1000,
-    'Mercury': 1000,
-    'Thallium': 1000,
-    'Bismuth': 1000,
-    
-    // Very Rare
-    'Polonium': 5000,
-    'Radon': 5000,
-    'Radium': 5000,
-    'Actinium': 5000,
-    'Thorium': 5000,
-    'Protactinium': 5000,
-    'Uranium': 5000,
-    
-    // Legendary
-    'Technetium': 25000,
-    'Promethium': 25000,
-    'Astatine': 25000,
-    'Francium': 25000,
-    'Neptunium': 25000,
-    'Plutonium': 25000,
-    'Americium': 25000,
-    'Curium': 25000,
-    'Berkelium': 25000,
-    'Californium': 25000,
-    'Einsteinium': 25000,
-    'Fermium': 25000,
-    'Mendelevium': 25000,
-    'Nobelium': 25000,
-    'Lawrencium': 25000,
-    'Rutherfordium': 25000,
-    'Dubnium': 25000,
-    'Seaborgium': 25000,
-    'Bohrium': 25000,
-    'Hassium': 25000,
-    'Meitnerium': 25000,
-    'Darmstadtium': 25000,
-    'Roentgenium': 25000,
-    'Copernicium': 25000,
-    'Nihonium': 25000,
-    'Flerovium': 25000,
-    'Moscovium': 25000,
-    'Livermorium': 25000,
-    'Tennessine': 25000,
-    'Oganesson': 25000
+// ===== EVENT TYPES =====
+const EVENT_TYPES = {
+    BOOM: 'boom',
+    BUST: 'bust',
+    SHORTAGE: 'shortage',
+    SURPLUS: 'surplus',
+    DISCOVERY: 'discovery',
+    DISASTER: 'disaster',
+    FESTIVAL: 'festival',
+    MIGRATION: 'migration',
+    TECHNOLOGY: 'technology',
+    SPECULATION: 'speculation',
+    POLICY: 'policy',
+    HOLIDAY: 'holiday'
 };
 
-// ===== RARITY MAPPING =====
-export const ELEMENT_RARITY = {
-    // Common
-    'Hydrogen': 'common', 'Helium': 'common', 'Lithium': 'common', 'Beryllium': 'common',
-    'Boron': 'common', 'Sodium': 'common', 'Magnesium': 'common', 'Aluminum': 'common',
-    'Silicon': 'common', 'Potassium': 'common', 'Calcium': 'common',
-    
-    // Uncommon
-    'Carbon': 'uncommon', 'Nitrogen': 'uncommon', 'Oxygen': 'uncommon', 'Fluorine': 'uncommon',
-    'Neon': 'uncommon', 'Phosphorus': 'uncommon', 'Sulfur': 'uncommon', 'Chlorine': 'uncommon',
-    'Argon': 'uncommon', 'Iron': 'uncommon', 'Nickel': 'uncommon', 'Lead': 'uncommon',
-    
-    // Rare
-    'Scandium': 'rare', 'Titanium': 'rare', 'Vanadium': 'rare', 'Chromium': 'rare',
-    'Manganese': 'rare', 'Cobalt': 'rare', 'Copper': 'rare', 'Zinc': 'rare',
-    'Gallium': 'rare', 'Germanium': 'rare', 'Arsenic': 'rare', 'Selenium': 'rare',
-    'Bromine': 'rare', 'Krypton': 'rare', 'Rubidium': 'rare', 'Strontium': 'rare',
-    'Yttrium': 'rare', 'Zirconium': 'rare', 'Niobium': 'rare', 'Molybdenum': 'rare',
-    'Ruthenium': 'rare', 'Rhodium': 'rare', 'Palladium': 'rare', 'Silver': 'rare',
-    'Cadmium': 'rare', 'Indium': 'rare', 'Tin': 'rare', 'Antimony': 'rare',
-    'Tellurium': 'rare', 'Iodine': 'rare', 'Xenon': 'rare', 'Cesium': 'rare',
-    'Barium': 'rare', 'Lanthanum': 'rare', 'Cerium': 'rare', 'Praseodymium': 'rare',
-    'Neodymium': 'rare', 'Samarium': 'rare', 'Europium': 'rare', 'Gadolinium': 'rare',
-    'Terbium': 'rare', 'Dysprosium': 'rare', 'Holmium': 'rare', 'Erbium': 'rare',
-    'Thulium': 'rare', 'Ytterbium': 'rare', 'Lutetium': 'rare', 'Hafnium': 'rare',
-    'Tantalum': 'rare', 'Tungsten': 'rare', 'Rhenium': 'rare', 'Osmium': 'rare',
-    'Iridium': 'rare', 'Platinum': 'rare', 'Gold': 'rare', 'Mercury': 'rare',
-    'Thallium': 'rare', 'Bismuth': 'rare',
-    
-    // Very Rare
-    'Polonium': 'very-rare', 'Radon': 'very-rare', 'Radium': 'very-rare',
-    'Actinium': 'very-rare', 'Thorium': 'very-rare', 'Protactinium': 'very-rare',
-    'Uranium': 'very-rare',
-    
-    // Legendary
-    'Technetium': 'legendary', 'Promethium': 'legendary', 'Astatine': 'legendary',
-    'Francium': 'legendary', 'Neptunium': 'legendary', 'Plutonium': 'legendary',
-    'Americium': 'legendary', 'Curium': 'legendary', 'Berkelium': 'legendary',
-    'Californium': 'legendary', 'Einsteinium': 'legendary', 'Fermium': 'legendary',
-    'Mendelevium': 'legendary', 'Nobelium': 'legendary', 'Lawrencium': 'legendary',
-    'Rutherfordium': 'legendary', 'Dubnium': 'legendary', 'Seaborgium': 'legendary',
-    'Bohrium': 'legendary', 'Hassium': 'legendary', 'Meitnerium': 'legendary',
-    'Darmstadtium': 'legendary', 'Roentgenium': 'legendary', 'Copernicium': 'legendary',
-    'Nihonium': 'legendary', 'Flerovium': 'legendary', 'Moscovium': 'legendary',
-    'Livermorium': 'legendary', 'Tennessine': 'legendary', 'Oganesson': 'legendary'
+// ===== EVENT SEVERITY =====
+const EVENT_SEVERITY = {
+    MINOR: 'minor',
+    MODERATE: 'moderate',
+    MAJOR: 'major',
+    EPIC: 'epic'
 };
 
-// ===== VOLATILITY BY RARITY =====
-export const VOLATILITY = {
-    'common': 0.08,      // 8% daily fluctuation
-    'uncommon': 0.12,    // 12%
-    'rare': 0.18,        // 18%
-    'very-rare': 0.25,   // 25%
-    'legendary': 0.35    // 35%
+// ===== EVENT DURATIONS =====
+const EVENT_DURATIONS = {
+    [EVENT_SEVERITY.MINOR]: { min: 1, max: 3 },
+    [EVENT_SEVERITY.MODERATE]: { min: 3, max: 7 },
+    [EVENT_SEVERITY.MAJOR]: { min: 7, max: 14 },
+    [EVENT_SEVERITY.EPIC]: { min: 14, max: 30 }
 };
 
-// ===== MASS PRICE FACTOR =====
-// Heavier elements cost more to transport, affecting price
-export const MASS_PRICE_FACTOR = 0.05; // 5% price increase per 100 AMU
-
-// ===== MARKET TRENDS =====
-export const TREND_TYPES = {
-    BULL: 'bull',        // Price increasing
-    BEAR: 'bear',        // Price decreasing
-    STABLE: 'stable',    // Little movement
-    VOLATILE: 'volatile' // High fluctuation
+// ===== EVENT PRICE EFFECTS =====
+const PRICE_EFFECTS = {
+    [EVENT_SEVERITY.MINOR]: { min: -0.15, max: 0.15 },
+    [EVENT_SEVERITY.MODERATE]: { min: -0.3, max: 0.3 },
+    [EVENT_SEVERITY.MAJOR]: { min: -0.5, max: 0.5 },
+    [EVENT_SEVERITY.EPIC]: { min: -0.8, max: 0.8 }
 };
 
-// ===== STORAGE KEYS (for localStorage fallback) =====
-const MARKET_STORAGE_KEYS = {
-    PRICE_HISTORY_PREFIX: 'market_price_',
-    TRADE_HISTORY_PREFIX: 'market_trades_',
-    LAST_UPDATE: 'market_last_update',
-    GLOBAL_SUPPLY: 'market_global_supply',
-    GLOBAL_DEMAND: 'market_global_demand'
+// ===== STORAGE KEYS =====
+const EVENT_STORAGE_KEYS = {
+    EVENT_NOTIFICATIONS: 'voidfarer_event_notifications',
+    EVENT_SETTINGS: 'voidfarer_event_settings',
+    LAST_EVENT_CHECK: 'voidfarer_last_event_check'
 };
+
+// ===== RESOURCE POOLS =====
+const COMMON_RESOURCES = [
+    'Iron', 'Copper', 'Carbon', 'Silicon', 'Hydrogen', 'Oxygen',
+    'Titanium', 'Nickel', 'Aluminum', 'Magnesium', 'Sodium', 'Potassium'
+];
+
+const RARE_RESOURCES = [
+    'Gold', 'Silver', 'Platinum', 'Uranium', 'Thorium', 'Cobalt',
+    'Chromium', 'Tungsten', 'Mercury', 'Bismuth', 'Antimony'
+];
+
+const LEGENDARY_RESOURCES = [
+    'Promethium', 'Technetium', 'Astatine', 'Francium', 'Californium',
+    'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium'
+];
+
+const ALL_RESOURCES = [...COMMON_RESOURCES, ...RARE_RESOURCES, ...LEGENDARY_RESOURCES];
+
+// ===== LOCATION POOLS =====
+const SECTORS = [
+    'Orion', 'Cygnus', 'Sagittarius', 'Perseus', 'Carina', 'Outer',
+    'Core', 'Andromeda', 'Triangulum', 'Centaurus', 'Scutum', 'Norma'
+];
+
+const COLONY_NAMES = [
+    'New Hope', 'Prospect', 'Frontier', 'Eden', 'Aurora', 'Haven',
+    'Sanctuary', 'Oasis', 'Nexus', 'Prime', 'Alpha', 'Omega'
+];
+
+// ===== INITIALIZE EVENT SYSTEM =====
+async function initializeEventSystem() {
+    const events = await window.getAll('activeEvents') || [];
+    
+    const history = await window.getAll('eventHistory') || [];
+    
+    if (!localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS)) {
+        localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify([]));
+    }
+    
+    if (!localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS)) {
+        const settings = {
+            enabled: true,
+            frequency: 0.3,
+            maxActiveEvents: 5,
+            notifyPlayers: true,
+            severityWeights: {
+                [EVENT_SEVERITY.MINOR]: 0.5,
+                [EVENT_SEVERITY.MODERATE]: 0.3,
+                [EVENT_SEVERITY.MAJOR]: 0.15,
+                [EVENT_SEVERITY.EPIC]: 0.05
+            },
+            typeWeights: {
+                [EVENT_TYPES.BOOM]: 0.1,
+                [EVENT_TYPES.BUST]: 0.1,
+                [EVENT_TYPES.SHORTAGE]: 0.15,
+                [EVENT_TYPES.SURPLUS]: 0.15,
+                [EVENT_TYPES.DISCOVERY]: 0.1,
+                [EVENT_TYPES.DISASTER]: 0.05,
+                [EVENT_TYPES.FESTIVAL]: 0.1,
+                [EVENT_TYPES.MIGRATION]: 0.05,
+                [EVENT_TYPES.TECHNOLOGY]: 0.05,
+                [EVENT_TYPES.SPECULATION]: 0.1,
+                [EVENT_TYPES.POLICY]: 0.03,
+                [EVENT_TYPES.HOLIDAY]: 0.02
+            }
+        };
+        localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
+    }
+    
+    if (!localStorage.getItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK)) {
+        localStorage.setItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK, Date.now().toString());
+    }
+    
+    console.log('Economic event system initialized');
+}
+
+// ===== EVENT MANAGEMENT =====
+async function getActiveEvents() {
+    return await window.getAll('activeEvents') || [];
+}
+
+async function addEvent(event) {
+    const newEvent = {
+        id: 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        type: event.type,
+        severity: event.severity,
+        name: event.name,
+        description: event.description,
+        startTime: Date.now(),
+        startDate: new Date().toISOString(),
+        endTime: Date.now() + (event.duration * 24 * 60 * 60 * 1000),
+        duration: event.duration,
+        location: event.location || 'galaxy',
+        affectedSector: event.affectedSector || null,
+        affectedResource: event.affectedResource || null,
+        priceMultiplier: event.priceMultiplier || 1.0,
+        demandMultiplier: event.demandMultiplier || 1.0,
+        supplyMultiplier: event.supplyMultiplier || 1.0,
+        taxMultiplier: event.taxMultiplier || 1.0,
+        notificationsSent: false
+    };
+    
+    await window.setItem('activeEvents', newEvent);
+    await addToEventHistory({ ...newEvent, ended: false, addedAt: Date.now() });
+    
+    return newEvent;
+}
+
+async function removeEvent(eventId) {
+    const event = await window.getItem('activeEvents', eventId);
+    
+    if (event) {
+        await addToEventHistory({
+            ...event,
+            ended: true,
+            endedAt: Date.now(),
+            endedDate: new Date().toISOString()
+        });
+    }
+    
+    await window.deleteItem('activeEvents', eventId);
+    return await getActiveEvents();
+}
+
+// ===== EVENT HISTORY =====
+async function getEventHistory(limit = 100) {
+    const allHistory = await window.getAll('eventHistory') || [];
+    return allHistory.slice(-limit);
+}
+
+async function addToEventHistory(entry) {
+    const newEntry = {
+        ...entry,
+        historyId: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        recordedAt: Date.now()
+    };
+    
+    await window.setItem('eventHistory', newEntry);
+    
+    const allHistory = await window.getAll('eventHistory') || [];
+    if (allHistory.length > 1000) {
+        const toDelete = allHistory.slice(0, allHistory.length - 1000);
+        for (const entry of toDelete) {
+            await window.deleteItem('eventHistory', entry.historyId);
+        }
+    }
+    
+    return newEntry;
+}
+
+// ===== EVENT NOTIFICATIONS =====
+function getEventNotifications(playerId, unreadOnly = false) {
+    const notifications = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS);
+    const allNotes = notifications ? JSON.parse(notifications) : [];
+    
+    let playerNotes = allNotes.filter(n => n.playerId === playerId);
+    
+    if (unreadOnly) {
+        playerNotes = playerNotes.filter(n => !n.read);
+    }
+    
+    return playerNotes.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function addEventNotification(playerId, event, message) {
+    const notifications = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS);
+    const allNotes = notifications ? JSON.parse(notifications) : [];
+    
+    allNotes.push({
+        id: 'notify_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        playerId,
+        eventId: event.id,
+        eventName: event.name,
+        eventType: event.type,
+        severity: event.severity,
+        message,
+        read: false,
+        timestamp: Date.now(),
+        date: new Date().toISOString()
+    });
+    
+    localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify(allNotes));
+}
+
+// ===== EVENT GENERATION =====
+function getEventSettings() {
+    const settings = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS);
+    return settings ? JSON.parse(settings) : {
+        enabled: true,
+        frequency: 0.3,
+        maxActiveEvents: 5,
+        notifyPlayers: true,
+        severityWeights: {
+            [EVENT_SEVERITY.MINOR]: 0.5,
+            [EVENT_SEVERITY.MODERATE]: 0.3,
+            [EVENT_SEVERITY.MAJOR]: 0.15,
+            [EVENT_SEVERITY.EPIC]: 0.05
+        },
+        typeWeights: {
+            [EVENT_TYPES.BOOM]: 0.1,
+            [EVENT_TYPES.BUST]: 0.1,
+            [EVENT_TYPES.SHORTAGE]: 0.15,
+            [EVENT_TYPES.SURPLUS]: 0.15,
+            [EVENT_TYPES.DISCOVERY]: 0.1,
+            [EVENT_TYPES.DISASTER]: 0.05,
+            [EVENT_TYPES.FESTIVAL]: 0.1,
+            [EVENT_TYPES.MIGRATION]: 0.05,
+            [EVENT_TYPES.TECHNOLOGY]: 0.05,
+            [EVENT_TYPES.SPECULATION]: 0.1,
+            [EVENT_TYPES.POLICY]: 0.03,
+            [EVENT_TYPES.HOLIDAY]: 0.02
+        }
+    };
+}
+
+async function generateRandomEvent() {
+    const settings = getEventSettings();
+    if (!settings.enabled) return null;
+    
+    if (Math.random() > settings.frequency) return null;
+    
+    const activeEvents = await getActiveEvents();
+    if (activeEvents.length >= settings.maxActiveEvents) return null;
+    
+    const severity = selectWeightedItem(settings.severityWeights);
+    const type = selectWeightedItem(settings.typeWeights);
+    
+    let event = null;
+    
+    switch(type) {
+        case EVENT_TYPES.BOOM:
+            event = generateBoomEvent(severity);
+            break;
+        case EVENT_TYPES.BUST:
+            event = generateBustEvent(severity);
+            break;
+        case EVENT_TYPES.SHORTAGE:
+            event = generateShortageEvent(severity);
+            break;
+        case EVENT_TYPES.SURPLUS:
+            event = generateSurplusEvent(severity);
+            break;
+        case EVENT_TYPES.DISCOVERY:
+            event = generateDiscoveryEvent(severity);
+            break;
+        case EVENT_TYPES.DISASTER:
+            event = generateDisasterEvent(severity);
+            break;
+        case EVENT_TYPES.FESTIVAL:
+            event = generateFestivalEvent(severity);
+            break;
+        case EVENT_TYPES.MIGRATION:
+            event = generateMigrationEvent(severity);
+            break;
+        case EVENT_TYPES.TECHNOLOGY:
+            event = generateTechnologyEvent(severity);
+            break;
+        case EVENT_TYPES.SPECULATION:
+            event = generateSpeculationEvent(severity);
+            break;
+        case EVENT_TYPES.POLICY:
+            event = generatePolicyEvent(severity);
+            break;
+        case EVENT_TYPES.HOLIDAY:
+            event = generateHolidayEvent(severity);
+            break;
+    }
+    
+    if (event) {
+        const newEvent = await addEvent(event);
+        
+        if (settings.notifyPlayers) {
+            broadcastEventNotification(newEvent);
+        }
+        
+        addToAdjustmentLog({
+            type: 'EVENT_GENERATED',
+            eventId: newEvent.id,
+            eventName: newEvent.name,
+            severity: newEvent.severity,
+            timestamp: Date.now()
+        });
+        
+        return newEvent;
+    }
+    
+    return null;
+}
+
+function selectWeightedItem(weights) {
+    const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+    let rand = Math.random() * total;
+    
+    for (const [key, weight] of Object.entries(weights)) {
+        if (rand < weight) return key;
+        rand -= weight;
+    }
+    
+    return Object.keys(weights)[0];
+}
+
+function getRandomResource(rarity = 'any') {
+    if (rarity === 'common') return COMMON_RESOURCES[Math.floor(Math.random() * COMMON_RESOURCES.length)];
+    if (rarity === 'rare') return RARE_RESOURCES[Math.floor(Math.random() * RARE_RESOURCES.length)];
+    if (rarity === 'legendary') return LEGENDARY_RESOURCES[Math.floor(Math.random() * LEGENDARY_RESOURCES.length)];
+    return ALL_RESOURCES[Math.floor(Math.random() * ALL_RESOURCES.length)];
+}
+
+function getRandomSector() {
+    return SECTORS[Math.floor(Math.random() * SECTORS.length)];
+}
+
+function getRandomColonyName() {
+    return COLONY_NAMES[Math.floor(Math.random() * COLONY_NAMES.length)];
+}
+
+// ===== SPECIFIC EVENT GENERATORS =====
+function generateBoomEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: 'Local Economic Boom',
+        [EVENT_SEVERITY.MODERATE]: 'Regional Prosperity',
+        [EVENT_SEVERITY.MAJOR]: 'Galactic Economic Boom',
+        [EVENT_SEVERITY.EPIC]: 'Golden Age'
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `The ${sector} sector is experiencing increased economic activity. Prices are up ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MODERATE]: `A wave of prosperity sweeps through the ${sector} sector. All prices increased by ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Major economic boom across the ${sector} sector! Prices are up ${Math.round(priceEffect * 100)}% across all resources.`,
+        [EVENT_SEVERITY.EPIC]: `A GOLDEN AGE has dawned in the ${sector} sector! Unprecedented prosperity with prices increased by ${Math.round(priceEffect * 100)}%!`
+    };
+    
+    return {
+        type: EVENT_TYPES.BOOM,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        priceMultiplier: 1 + priceEffect,
+        demandMultiplier: 1.2,
+        supplyMultiplier: 0.9
+    };
+}
+
+function generateBustEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: 'Local Economic Downturn',
+        [EVENT_SEVERITY.MODERATE]: 'Regional Recession',
+        [EVENT_SEVERITY.MAJOR]: 'Galactic Depression',
+        [EVENT_SEVERITY.EPIC]: 'Economic Collapse'
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `The ${sector} sector is experiencing a mild downturn. Prices are down ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MODERATE]: `A recession hits the ${sector} sector. Prices dropped ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Economic depression in the ${sector} sector! Prices crashed ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.EPIC]: `The ${sector} sector faces economic collapse! Prices plummeted ${Math.round(priceEffect * 100)}%!`
+    };
+    
+    return {
+        type: EVENT_TYPES.BUST,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        priceMultiplier: 1 - priceEffect,
+        demandMultiplier: 0.8,
+        supplyMultiplier: 1.2
+    };
+}
+
+function generateShortageEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const resource = getRandomResource();
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `${resource} Shortage`,
+        [EVENT_SEVERITY.MODERATE]: `Severe ${resource} Shortage`,
+        [EVENT_SEVERITY.MAJOR]: `Critical ${resource} Crisis`,
+        [EVENT_SEVERITY.EPIC]: `${resource} Famine`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `${resource} is in short supply in the ${sector} sector. Prices increased ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MODERATE]: `Severe shortage of ${resource} in ${sector}! Prices up ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Critical ${resource} crisis in ${sector}! Prices skyrocketed ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.EPIC]: `${resource} famine in ${sector}! Prices increased ${Math.round(priceEffect * 100)}% - extreme scarcity!`
+    };
+    
+    return {
+        type: EVENT_TYPES.SHORTAGE,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        affectedResource: resource,
+        priceMultiplier: 1 + priceEffect,
+        demandMultiplier: 1.3,
+        supplyMultiplier: 0.5
+    };
+}
+
+function generateSurplusEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const resource = getRandomResource();
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `${resource} Surplus`,
+        [EVENT_SEVERITY.MODERATE]: `Major ${resource} Discovery`,
+        [EVENT_SEVERITY.MAJOR]: `${resource} Glut`,
+        [EVENT_SEVERITY.EPIC]: `${resource} Abundance`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `New ${resource} deposits found in ${sector}. Prices dropped ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MODERATE]: `Major ${resource} veins discovered in ${sector}! Prices down ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Massive ${resource} glut in ${sector}! Prices crashed ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.EPIC]: `${resource} abundance in ${sector}! Prices plummeted ${Math.round(priceEffect * 100)}% - everyone has it!`
+    };
+    
+    return {
+        type: EVENT_TYPES.SURPLUS,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        affectedResource: resource,
+        priceMultiplier: 1 - priceEffect,
+        demandMultiplier: 0.7,
+        supplyMultiplier: 1.5
+    };
+}
+
+function generateDiscoveryEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity) / 2;
+    const resource = getRandomResource('legendary');
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Minor ${resource} Discovery`,
+        [EVENT_SEVERITY.MODERATE]: `${resource} Vein Found`,
+        [EVENT_SEVERITY.MAJOR]: `Major ${resource} Deposit`,
+        [EVENT_SEVERITY.EPIC]: `Legendary ${resource} Discovery!`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `Small deposits of ${resource} found in ${sector}. Prices decreased slightly.`,
+        [EVENT_SEVERITY.MODERATE]: `New ${resource} vein discovered in ${sector}! Prices down ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Massive ${resource} deposit found in ${sector}! Prices dropped significantly.`,
+        [EVENT_SEVERITY.EPIC]: `LEGENDARY ${resource} discovery in ${sector}! The largest deposit ever found!`
+    };
+    
+    return {
+        type: EVENT_TYPES.DISCOVERY,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        affectedResource: resource,
+        priceMultiplier: 1 - priceEffect,
+        demandMultiplier: 1.1,
+        supplyMultiplier: 1.3
+    };
+}
+
+function generateDisasterEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const sector = getRandomSector();
+    const colony = getRandomColonyName();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Minor Disaster in ${colony}`,
+        [EVENT_SEVERITY.MODERATE]: `Disaster Strikes ${colony}`,
+        [EVENT_SEVERITY.MAJOR]: `Major Catastrophe in ${colony}`,
+        [EVENT_SEVERITY.EPIC]: `${colony} Destroyed!`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `A minor disaster affects ${colony} in ${sector}. Reconstruction costs increased.`,
+        [EVENT_SEVERITY.MODERATE]: `A disaster hits ${colony}! Building costs up ${Math.round(priceEffect * 100)}%.`,
+        [EVENT_SEVERITY.MAJOR]: `Major catastrophe in ${colony}! Reconstruction costs skyrocketed.`,
+        [EVENT_SEVERITY.EPIC]: `${colony} has been DESTROYED! Complete rebuilding required!`
+    };
+    
+    return {
+        type: EVENT_TYPES.DISASTER,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'colony',
+        affectedSector: sector,
+        affectedColony: colony,
+        priceMultiplier: 1 + priceEffect,
+        demandMultiplier: 1.5,
+        supplyMultiplier: 0.3
+    };
+}
+
+function generateFestivalEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Local Festival in ${sector}`,
+        [EVENT_SEVERITY.MODERATE]: `${sector} Sector Fair`,
+        [EVENT_SEVERITY.MAJOR]: `Galactic Festival`,
+        [EVENT_SEVERITY.EPIC]: `The Great Galactic Celebration`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `A small festival in ${sector} increases consumer spending.`,
+        [EVENT_SEVERITY.MODERATE]: `The ${sector} Sector Fair brings increased economic activity.`,
+        [EVENT_SEVERITY.MAJOR]: `A galactic festival! Spending increased across all sectors.`,
+        [EVENT_SEVERITY.EPIC]: `The Great Galactic Celebration! Unprecedented spending and joy!`
+    };
+    
+    return {
+        type: EVENT_TYPES.FESTIVAL,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: severity === EVENT_SEVERITY.MAJOR || severity === EVENT_SEVERITY.EPIC ? null : sector,
+        priceMultiplier: 1.1,
+        demandMultiplier: 1.3,
+        supplyMultiplier: 1.0,
+        taxMultiplier: 0.9
+    };
+}
+
+function generateMigrationEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const fromSector = getRandomSector();
+    let toSector;
+    do {
+        toSector = getRandomSector();
+    } while (toSector === fromSector);
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Minor Migration`,
+        [EVENT_SEVERITY.MODERATE]: `Population Movement`,
+        [EVENT_SEVERITY.MAJOR]: `Great Migration`,
+        [EVENT_SEVERITY.EPIC]: `Exodus`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `People moving from ${fromSector} to ${toSector}. Labor pool shifts.`,
+        [EVENT_SEVERITY.MODERATE]: `Significant population movement from ${fromSector} to ${toSector}.`,
+        [EVENT_SEVERITY.MAJOR]: `Great Migration from ${fromSector} to ${toSector}! Major labor shifts.`,
+        [EVENT_SEVERITY.EPIC]: `EXODUS from ${fromSector} to ${toSector}! Extreme population shift!`
+    };
+    
+    return {
+        type: EVENT_TYPES.MIGRATION,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'interstellar',
+        fromSector,
+        toSector,
+        laborShift: severity === EVENT_SEVERITY.MINOR ? 0.1 :
+                    severity === EVENT_SEVERITY.MODERATE ? 0.2 :
+                    severity === EVENT_SEVERITY.MAJOR ? 0.3 : 0.5
+    };
+}
+
+function generateTechnologyEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const sector = getRandomSector();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Minor Tech Breakthrough`,
+        [EVENT_SEVERITY.MODERATE]: `Significant Discovery`,
+        [EVENT_SEVERITY.MAJOR]: `Revolutionary Technology`,
+        [EVENT_SEVERITY.EPIC]: `Quantum Leap Forward`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `A minor technological breakthrough in ${sector} improves efficiency.`,
+        [EVENT_SEVERITY.MODERATE]: `Significant discovery in ${sector}! Production costs reduced.`,
+        [EVENT_SEVERITY.MAJOR]: `Revolutionary technology emerges in ${sector}! Major efficiency gains!`,
+        [EVENT_SEVERITY.EPIC]: `QUANTUM LEAP in technology! Production efficiency doubled!`
+    };
+    
+    return {
+        type: EVENT_TYPES.TECHNOLOGY,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'sector',
+        affectedSector: sector,
+        priceMultiplier: 0.9,
+        demandMultiplier: 1.1,
+        supplyMultiplier: 1.2
+    };
+}
+
+function generateSpeculationEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const priceEffect = getRandomPriceEffect(severity);
+    const resource = getRandomResource();
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `${resource} Speculation`,
+        [EVENT_SEVERITY.MODERATE]: `${resource} Market Frenzy`,
+        [EVENT_SEVERITY.MAJOR]: `${resource} Bubble`,
+        [EVENT_SEVERITY.EPIC]: `${resource} Mania`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `Traders are speculating on ${resource}. Prices volatile.`,
+        [EVENT_SEVERITY.MODERATE]: `Market frenzy around ${resource}! Prices fluctuating wildly.`,
+        [EVENT_SEVERITY.MAJOR]: `${resource} bubble forming! Extreme price swings expected.`,
+        [EVENT_SEVERITY.EPIC]: `${resource} MANIA! Prices going insane!`
+    };
+    
+    return {
+        type: EVENT_TYPES.SPECULATION,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'galaxy',
+        affectedResource: resource,
+        priceMultiplier: 1 + (priceEffect * (Math.random() > 0.5 ? 1 : -1)),
+        volatility: priceEffect * 2
+    };
+}
+
+function generatePolicyEvent(severity) {
+    const duration = getRandomDuration(severity);
+    const taxEffect = severity === EVENT_SEVERITY.MINOR ? 0.05 :
+                      severity === EVENT_SEVERITY.MODERATE ? 0.1 :
+                      severity === EVENT_SEVERITY.MAJOR ? 0.2 : 0.3;
+    
+    const increase = Math.random() > 0.5;
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `Minor Tax ${increase ? 'Increase' : 'Cut'}`,
+        [EVENT_SEVERITY.MODERATE]: `Tax ${increase ? 'Hike' : 'Reduction'}`,
+        [EVENT_SEVERITY.MAJOR]: `Major Tax ${increase ? 'Increases' : 'Cuts'}`,
+        [EVENT_SEVERITY.EPIC]: `Economic ${increase ? 'Reform' : 'Stimulus'}`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `Local government ${increase ? 'increases' : 'cuts'} taxes by ${Math.round(taxEffect * 100)}%.`,
+        [EVENT_SEVERITY.MODERATE]: `Regional tax ${increase ? 'hike' : 'reduction'} of ${Math.round(taxEffect * 100)}% implemented.`,
+        [EVENT_SEVERITY.MAJOR]: `Major tax ${increase ? 'increases' : 'cuts'} of ${Math.round(taxEffect * 100)}% across the galaxy!`,
+        [EVENT_SEVERITY.EPIC]: `Historic economic ${increase ? 'reform' : 'stimulus'}! Taxes ${increase ? 'raised' : 'lowered'} by ${Math.round(taxEffect * 100)}%!`
+    };
+    
+    return {
+        type: EVENT_TYPES.POLICY,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: 'galaxy',
+        taxMultiplier: increase ? 1 + taxEffect : 1 - taxEffect
+    };
+}
+
+function generateHolidayEvent(severity) {
+    const duration = getRandomDuration(severity);
+    
+    const holidays = [
+        'Founders Day', 'Unity Day', 'Harvest Festival', 'Starfall Celebration',
+        'New Year', 'Equinox', 'Solstice', 'Remembrance Day'
+    ];
+    const holiday = holidays[Math.floor(Math.random() * holidays.length)];
+    
+    const names = {
+        [EVENT_SEVERITY.MINOR]: `${holiday} (Local)`,
+        [EVENT_SEVERITY.MODERATE]: `${holiday} (Regional)`,
+        [EVENT_SEVERITY.MAJOR]: `${holiday} (Galactic)`,
+        [EVENT_SEVERITY.EPIC]: `The Great ${holiday}`
+    };
+    
+    const descriptions = {
+        [EVENT_SEVERITY.MINOR]: `A local holiday. Reduced economic activity.`,
+        [EVENT_SEVERITY.MODERATE]: `Regional holiday celebration. Markets slow.`,
+        [EVENT_SEVERITY.MAJOR]: `Galactic holiday! Most business suspended.`,
+        [EVENT_SEVERITY.EPIC]: `The greatest celebration in galactic history! Everything stops!`
+    };
+    
+    return {
+        type: EVENT_TYPES.HOLIDAY,
+        severity,
+        name: names[severity],
+        description: descriptions[severity],
+        duration,
+        location: severity === EVENT_SEVERITY.MINOR ? 'sector' : 
+                 severity === EVENT_SEVERITY.MODERATE ? 'region' : 'galaxy',
+        priceMultiplier: 0.95,
+        demandMultiplier: 0.7,
+        supplyMultiplier: 0.8,
+        activityMultiplier: 0.5
+    };
+}
 
 // ===== HELPER FUNCTIONS =====
-export function getElementRarity(elementName) {
-    return ELEMENT_RARITY[elementName] || 'common';
+function getRandomDuration(severity) {
+    const range = EVENT_DURATIONS[severity];
+    return Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
 }
 
-export function getBasePrice(elementName) {
-    return BASE_PRICES[elementName] || 100;
+function getRandomPriceEffect(severity) {
+    const range = PRICE_EFFECTS[severity];
+    return (Math.random() * (range.max - range.min) + range.min);
 }
 
-// Calculate mass-adjusted price
-export function getMassAdjustedPrice(elementName, basePrice) {
-    const mass = typeof getElementMass === 'function' ? 
-        getElementMass(elementName) : 100;
+// ===== EVENT PROCESSING =====
+async function checkAndExpireEvents() {
+    const events = await getActiveEvents();
+    const now = Date.now();
+    let expired = false;
     
-    // Heavier elements cost more to transport
-    const massFactor = 1 + (mass / 100) * MASS_PRICE_FACTOR;
-    return Math.round(basePrice * massFactor);
-}
-
-// ===== PRICE HISTORY MANAGEMENT (IndexedDB) =====
-export async function getPriceHistory(elementName) {
-    const allHistory = await getAll('priceHistory');
-    return allHistory.filter(h => h.elementName === elementName)
-                    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-export async function recordPrice(elementName, price) {
-    const history = await getPriceHistory(elementName);
-    
-    const today = new Date().toISOString().split('T')[0];
-    // Check if we already have an entry for today
-    const existingEntry = history.find(h => h.date === today);
-    
-    if (existingEntry) {
-        // Update existing entry
-        existingEntry.price = Math.round(price);
-        await setItem('priceHistory', existingEntry);
-    } else {
-        // Create new entry
-        const newEntry = {
-            id: `price_${elementName}_${today}`,
-            elementName: elementName,
-            date: today,
-            price: Math.round(price),
-            timestamp: Date.now()
-        };
-        await setItem('priceHistory', newEntry);
-    }
-    
-    // Clean up old entries (keep last 90 days)
-    const allEntries = await getAll('priceHistory');
-    const elementEntries = allEntries.filter(h => h.elementName === elementName)
-                                    .sort((a, b) => b.date.localeCompare(a.date));
-    
-    if (elementEntries.length > 90) {
-        const toDelete = elementEntries.slice(90);
-        for (const entry of toDelete) {
-            await deleteItem('priceHistory', entry.id);
-        }
-    }
-    
-    return await getPriceHistory(elementName);
-}
-
-export async function getPriceForDate(elementName, date) {
-    const history = await getPriceHistory(elementName);
-    const entry = history.find(h => h.date === date);
-    return entry ? entry.price : null;
-}
-
-export async function getLatestPrice(elementName) {
-    const history = await getPriceHistory(elementName);
-    if (history.length > 0) {
-        return history[history.length - 1].price;
-    }
-    // If no history, calculate from base price with mass adjustment
-    return getMassAdjustedPrice(elementName, getBasePrice(elementName));
-}
-
-// ===== TRADE HISTORY MANAGEMENT (IndexedDB) =====
-export async function getTradeHistory(elementName) {
-    const allTrades = await getAll('tradeHistory');
-    return allTrades.filter(t => t.elementName === elementName)
-                   .sort((a, b) => b.timestamp - a.timestamp);
-}
-
-export async function recordTrade(elementName, quantity, price) {
-    const mass = typeof getElementMass === 'function' ? 
-        getElementMass(elementName) : 100;
-    
-    const trade = {
-        id: 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        elementName: elementName,
-        quantity: quantity,
-        price: price,
-        totalValue: quantity * price,
-        totalMass: quantity * mass,
-        timestamp: Date.now(),
-        date: new Date().toISOString().split('T')[0]
-    };
-    
-    await setItem('tradeHistory', trade);
-    
-    // Clean up old trades (keep last 1000)
-    const allTrades = await getAll('tradeHistory');
-    if (allTrades.length > 1000) {
-        const sorted = allTrades.sort((a, b) => a.timestamp - b.timestamp);
-        const toDelete = sorted.slice(0, allTrades.length - 1000);
-        for (const trade of toDelete) {
-            await deleteItem('tradeHistory', trade.id);
-        }
-    }
-    
-    return trade;
-}
-
-export async function getRecentTrades(elementName, days = 7) {
-    const trades = await getTradeHistory(elementName);
-    const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    return trades.filter(t => t.timestamp > cutoff);
-}
-
-// ===== SUPPLY CALCULATION =====
-export async function calculateGlobalSupply(elementName) {
-    const collection = await getCollection();
-    return collection[elementName]?.count || 0;
-}
-
-export async function calculateSupplyFactor(elementName) {
-    const supply = await calculateGlobalSupply(elementName);
-    // More supply = lower price factor (0.5 to 1.5 range)
-    return Math.max(0.5, Math.min(1.5, 20 / (supply + 5)));
-}
-
-// ===== DEMAND CALCULATION =====
-export async function calculateDemandFactor(elementName) {
-    const recentTrades = await getRecentTrades(elementName, 3);
-    const tradeCount = recentTrades.length;
-    
-    // More trades = higher demand factor (0.8 to 1.8 range)
-    return Math.max(0.8, Math.min(1.8, 0.8 + (tradeCount * 0.1)));
-}
-
-// ===== TREND DETECTION =====
-export async function detectTrend(elementName) {
-    const history = await getPriceHistory(elementName);
-    if (history.length < 5) return TREND_TYPES.STABLE;
-    
-    // Get last 5 prices
-    const recent = history.slice(-5).map(h => h.price);
-    
-    // Calculate average change
-    let changes = 0;
-    for (let i = 1; i < recent.length; i++) {
-        changes += (recent[i] - recent[i-1]) / recent[i-1];
-    }
-    const avgChange = changes / (recent.length - 1);
-    
-    // Calculate volatility
-    const prices = history.slice(-10).map(h => h.price);
-    const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
-    const volatility = Math.sqrt(variance) / mean;
-    
-    if (volatility > 0.15) return TREND_TYPES.VOLATILE;
-    if (avgChange > 0.02) return TREND_TYPES.BULL;
-    if (avgChange < -0.02) return TREND_TYPES.BEAR;
-    return TREND_TYPES.STABLE;
-}
-
-// ===== PRICE CHANGE CALCULATION =====
-export async function calculatePriceChange(elementName, days = 7) {
-    const history = await getPriceHistory(elementName);
-    if (history.length < 2) return 0;
-    
-    const current = history[history.length - 1].price;
-    const pastIndex = Math.max(0, history.length - days - 1);
-    const past = history[pastIndex]?.price || current;
-    
-    return ((current - past) / past * 100).toFixed(1);
-}
-
-// ===== MARKET PRICE CALCULATION =====
-export async function calculateMarketPrice(elementName) {
-    const basePrice = getBasePrice(elementName);
-    const rarity = getElementRarity(elementName);
-    
-    // Get current market factors
-    const supplyFactor = await calculateSupplyFactor(elementName);
-    const demandFactor = await calculateDemandFactor(elementName);
-    
-    // Random volatility
-    const volatility = VOLATILITY[rarity];
-    const randomWalk = 1 + (Math.random() * volatility * 2 - volatility);
-    
-    // Trend influence
-    const trend = await detectTrend(elementName);
-    let trendFactor = 1.0;
-    if (trend === TREND_TYPES.BULL) trendFactor = 1.05;
-    if (trend === TREND_TYPES.BEAR) trendFactor = 0.95;
-    
-    // Calculate base market price
-    const marketPrice = basePrice * supplyFactor * demandFactor * randomWalk * trendFactor;
-    
-    // Apply mass adjustment
-    const massAdjustedPrice = getMassAdjustedPrice(elementName, marketPrice);
-    
-    return Math.round(massAdjustedPrice);
-}
-
-// ===== UPDATE ALL PRICES =====
-export async function updateDailyPrices() {
-    const lastUpdate = localStorage.getItem(MARKET_STORAGE_KEYS.LAST_UPDATE);
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Only update once per day
-    if (lastUpdate === today) {
-        console.log('Prices already updated today');
-        return false;
-    }
-    
-    console.log('Updating daily market prices...');
-    
-    // Update price for each element
-    for (const elementName of Object.keys(BASE_PRICES)) {
-        const newPrice = await calculateMarketPrice(elementName);
-        await recordPrice(elementName, newPrice);
-    }
-    
-    localStorage.setItem(MARKET_STORAGE_KEYS.LAST_UPDATE, today);
-    return true;
-}
-
-// ===== GET MARKET SUMMARY =====
-export async function getMarketSummary() {
-    const summary = {};
-    
-    for (const elementName of Object.keys(BASE_PRICES)) {
-        const currentPrice = await getLatestPrice(elementName);
-        const change7d = await calculatePriceChange(elementName, 7);
-        const change30d = await calculatePriceChange(elementName, 30);
-        const trend = await detectTrend(elementName);
-        const rarity = getElementRarity(elementName);
-        const mass = typeof getElementMass === 'function' ? 
-            getElementMass(elementName) : 100;
-        
-        summary[elementName] = {
-            currentPrice: currentPrice,
-            change7d: change7d,
-            change30d: change30d,
-            trend: trend,
-            rarity: rarity,
-            basePrice: BASE_PRICES[elementName],
-            mass: mass,
-            pricePerAMU: (currentPrice / mass).toFixed(2) // Price per atomic mass unit
-        };
-    }
-    
-    return summary;
-}
-
-// ===== GET TOP MOVERS =====
-export async function getTopMovers(limit = 5) {
-    const summary = await getMarketSummary();
-    const movers = Object.keys(summary).map(elementName => ({
-        name: elementName,
-        change: parseFloat(summary[elementName].change7d),
-        price: summary[elementName].currentPrice,
-        trend: summary[elementName].trend,
-        mass: summary[elementName].mass
-    }));
-    
-    // Sort by absolute change
-    movers.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-    
-    return {
-        gainers: movers.filter(m => m.change > 0).slice(0, limit),
-        losers: movers.filter(m => m.change < 0).slice(0, limit)
-    };
-}
-
-// ===== BUY/SELL FUNCTIONS =====
-export async function buyElement(elementName, quantity, pricePerUnit) {
-    const totalCost = quantity * pricePerUnit;
-    const credits = await getCredits();
-    const mass = typeof getElementMass === 'function' ? 
-        getElementMass(elementName) : 100;
-    const totalMass = quantity * mass;
-    
-    // Check if player has enough cargo space
-    const currentMass = typeof getTotalCargoMass === 'function' ? 
-        await getTotalCargoMass() : 0;
-    const cargoLimit = 1000; // Should come from player data
-    
-    if (currentMass + totalMass > cargoLimit) {
-        return { 
-            success: false, 
-            reason: 'insufficient_cargo_space',
-            requiredMass: totalMass,
-            availableMass: cargoLimit - currentMass
-        };
-    }
-    
-    if (credits < totalCost) {
-        return { success: false, reason: 'insufficient_credits', required: totalCost };
-    }
-    
-    // Spend credits
-    const spent = await spendCredits(totalCost);
-    if (!spent) {
-        return { success: false, reason: 'transaction_failed' };
-    }
-    
-    // Add to collection
-    await addElementToCollection(elementName, quantity);
-    
-    // Record trade
-    await recordTrade(elementName, quantity, pricePerUnit);
-    
-    return {
-        success: true,
-        quantity,
-        totalCost,
-        totalMass,
-        newCredits: credits - totalCost
-    };
-}
-
-export async function sellElement(elementName, quantity, pricePerUnit) {
-    const collection = await getCollection();
-    const mass = typeof getElementMass === 'function' ? 
-        getElementMass(elementName) : 100;
-    const totalMass = quantity * mass;
-    
-    if (!collection[elementName] || collection[elementName].count < quantity) {
-        return { 
-            success: false, 
-            reason: 'insufficient_elements', 
-            available: collection[elementName]?.count || 0 
-        };
-    }
-    
-    const totalEarnings = quantity * pricePerUnit;
-    
-    // Remove from collection
-    await removeElementFromCollection(elementName, quantity);
-    
-    // Add credits
-    await addCredits(totalEarnings);
-    
-    // Record trade
-    await recordTrade(elementName, -quantity, pricePerUnit); // Negative quantity for sell
-    
-    return {
-        success: true,
-        quantity,
-        totalEarnings,
-        totalMass,
-        newCredits: (await getCredits())
-    };
-}
-
-// ===== GET BEST VALUE BY MASS =====
-export async function getBestValueByMass() {
-    const summary = await getMarketSummary();
-    const elements = Object.keys(summary).map(name => ({
-        name: name,
-        pricePerAMU: parseFloat(summary[name].pricePerAMU),
-        currentPrice: summary[name].currentPrice,
-        mass: summary[name].mass,
-        rarity: summary[name].rarity
-    }));
-    
-    // Sort by price per AMU (highest value per unit mass)
-    elements.sort((a, b) => b.pricePerAMU - a.pricePerAMU);
-    
-    return elements.slice(0, 10);
-}
-
-// ===== PRICE ALERTS (keep in localStorage) =====
-const PRICE_ALERTS = {};
-
-export function setPriceAlert(elementName, targetPrice, type = 'above') {
-    if (!PRICE_ALERTS[elementName]) {
-        PRICE_ALERTS[elementName] = [];
-    }
-    
-    PRICE_ALERTS[elementName].push({
-        targetPrice: targetPrice,
-        type: type,
-        triggered: false
-    });
-    
-    // Store in localStorage for persistence
-    const alerts = JSON.parse(localStorage.getItem('voidfarer_price_alerts') || '{}');
-    if (!alerts[elementName]) alerts[elementName] = [];
-    alerts[elementName].push({
-        targetPrice,
-        type,
-        created: Date.now()
-    });
-    localStorage.setItem('voidfarer_price_alerts', JSON.stringify(alerts));
-}
-
-export async function checkPriceAlerts() {
-    const alerts = JSON.parse(localStorage.getItem('voidfarer_price_alerts') || '{}');
-    
-    for (const [elementName, elementAlerts] of Object.entries(alerts)) {
-        const currentPrice = await getLatestPrice(elementName);
-        
-        for (const alert of elementAlerts) {
-            if (alert.triggered) continue;
+    for (const event of events) {
+        if (event.endTime <= now) {
+            await removeEvent(event.id);
+            expired = true;
             
-            if (alert.type === 'above' && currentPrice >= alert.targetPrice) {
-                alert.triggered = true;
-                showPriceAlert(elementName, currentPrice, 'above');
-            } else if (alert.type === 'below' && currentPrice <= alert.targetPrice) {
-                alert.triggered = true;
-                showPriceAlert(elementName, currentPrice, 'below');
+            addToAdjustmentLog({
+                type: 'EVENT_EXPIRED',
+                eventId: event.id,
+                eventName: event.name,
+                timestamp: Date.now()
+            });
+        }
+    }
+    
+    return expired;
+}
+
+async function checkAndGenerateEvents() {
+    const settings = getEventSettings();
+    if (!settings.enabled) return [];
+    
+    const lastCheck = parseInt(localStorage.getItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK)) || 0;
+    const now = Date.now();
+    const hoursSinceLastCheck = (now - lastCheck) / (1000 * 60 * 60);
+    
+    const eventsGenerated = [];
+    
+    if (hoursSinceLastCheck >= 24) {
+        const daysPassed = Math.floor(hoursSinceLastCheck / 24);
+        
+        for (let i = 0; i < daysPassed; i++) {
+            const event = await generateRandomEvent();
+            if (event) eventsGenerated.push(event);
+        }
+        
+        localStorage.setItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK, now.toString());
+    }
+    
+    return eventsGenerated;
+}
+
+function broadcastEventNotification(event) {
+    console.log(`EVENT: ${event.name} - ${event.description}`);
+    addToEventHistory({ ...event, broadcasted: true, broadcastedAt: Date.now() });
+}
+
+async function getEventPriceMultiplier(resource, sector) {
+    const events = await getActiveEvents();
+    let multiplier = 1.0;
+    
+    events.forEach(event => {
+        if (event.priceMultiplier) {
+            if (!event.affectedSector) {
+                multiplier *= event.priceMultiplier;
+            } else if (event.affectedSector === sector) {
+                multiplier *= event.priceMultiplier;
+            } else if (event.affectedResource === resource) {
+                multiplier *= event.priceMultiplier;
             }
         }
-    }
+    });
     
-    localStorage.setItem('voidfarer_price_alerts', JSON.stringify(alerts));
+    return multiplier;
 }
 
-function showPriceAlert(elementName, price, type) {
-    const message = type === 'above' 
-        ? `${elementName} has risen above ${price}⭐!`
-        : `${elementName} has fallen below ${price}⭐!`;
+async function getEventDemandMultiplier(resource, sector) {
+    const events = await getActiveEvents();
+    let multiplier = 1.0;
     
-    // Use Telegram notification if available
-    if (window.Telegram?.WebApp?.showPopup) {
-        window.Telegram.WebApp.showPopup({
-            title: 'Price Alert',
-            message: message,
-            buttons: [{ type: 'ok' }]
-        });
-    } else {
-        alert(message);
-    }
+    events.forEach(event => {
+        if (event.demandMultiplier) {
+            if (!event.affectedSector || event.affectedSector === sector) {
+                multiplier *= event.demandMultiplier;
+            }
+            if (event.affectedResource === resource) {
+                multiplier *= event.demandMultiplier;
+            }
+        }
+    });
+    
+    return multiplier;
 }
 
-// ===== MARKET STATISTICS =====
-export async function getMarketStats() {
-    const allTrades = await getAll('tradeHistory');
-    const allPrices = await getAll('priceHistory');
+async function getEventSupplyMultiplier(resource, sector) {
+    const events = await getActiveEvents();
+    let multiplier = 1.0;
     
-    // Group by element
-    const stats = {};
+    events.forEach(event => {
+        if (event.supplyMultiplier) {
+            if (!event.affectedSector || event.affectedSector === sector) {
+                multiplier *= event.supplyMultiplier;
+            }
+            if (event.affectedResource === resource) {
+                multiplier *= event.supplyMultiplier;
+            }
+        }
+    });
     
-    for (const elementName of Object.keys(BASE_PRICES)) {
-        const elementTrades = allTrades.filter(t => t.elementName === elementName);
-        const elementPrices = allPrices.filter(p => p.elementName === elementName)
-                                       .sort((a, b) => a.date.localeCompare(b.date));
-        
-        const currentPrice = elementPrices.length > 0 ? 
-            elementPrices[elementPrices.length - 1].price : 
-            getMassAdjustedPrice(elementName, BASE_PRICES[elementName]);
-        
-        const prices = elementPrices.map(p => p.price);
-        const avgPrice = prices.length > 0 ? 
-            prices.reduce((a, b) => a + b, 0) / prices.length : 
-            BASE_PRICES[elementName];
-        
-        const volume = elementTrades.reduce((sum, t) => sum + Math.abs(t.quantity), 0);
-        const mass = typeof getElementMass === 'function' ? 
-            getElementMass(elementName) : 100;
-        const massVolume = elementTrades.reduce((sum, t) => sum + (t.totalMass || 0), 0);
-        const tradeCount = elementTrades.length;
-        
-        stats[elementName] = {
-            currentPrice,
-            averagePrice: Math.round(avgPrice),
-            volume,
-            massVolume: massVolume.toFixed(1),
-            tradeCount,
-            volatility: VOLATILITY[getElementRarity(elementName)],
-            basePrice: BASE_PRICES[elementName],
-            mass: mass,
-            pricePerAMU: (currentPrice / mass).toFixed(2)
-        };
-    }
-    
-    return stats;
+    return multiplier;
 }
 
-// Helper function for delete operations (used locally)
-async function deleteItem(storeName, key) {
+async function getEventTaxMultiplier() {
+    const events = await getActiveEvents();
+    let multiplier = 1.0;
+    
+    events.forEach(event => {
+        if (event.taxMultiplier) {
+            multiplier *= event.taxMultiplier;
+        }
+    });
+    
+    return multiplier;
+}
+
+// ===== EVENT SUMMARIES =====
+async function getActiveEventsSummary() {
+    const events = await getActiveEvents();
+    
+    return {
+        count: events.length,
+        byType: events.reduce((acc, e) => {
+            acc[e.type] = (acc[e.type] || 0) + 1;
+            return acc;
+        }, {}),
+        bySeverity: events.reduce((acc, e) => {
+            acc[e.severity] = (acc[e.severity] || 0) + 1;
+            return acc;
+        }, {}),
+        events: events.map(e => ({
+            id: e.id,
+            name: e.name,
+            type: e.type,
+            severity: e.severity,
+            daysRemaining: Math.ceil((e.endTime - Date.now()) / (24 * 60 * 60 * 1000))
+        }))
+    };
+}
+
+async function getEventStats() {
+    const history = await getEventHistory(1000);
+    
+    return {
+        totalEvents: history.length,
+        byType: history.reduce((acc, e) => {
+            acc[e.type] = (acc[e.type] || 0) + 1;
+            return acc;
+        }, {}),
+        bySeverity: history.reduce((acc, e) => {
+            acc[e.severity] = (acc[e.severity] || 0) + 1;
+            return acc;
+        }, {}),
+        averageDuration: history.reduce((sum, e) => sum + (e.duration || 0), 0) / history.length
+    };
+}
+
+// ===== DAILY EVENT MAINTENANCE =====
+async function runDailyEventMaintenance() {
+    console.log('Running daily event maintenance...');
+    
+    const expired = await checkAndExpireEvents();
+    const newEvents = await checkAndGenerateEvents();
+    
+    addToAdjustmentLog({
+        type: 'EVENT_MAINTENANCE',
+        expiredCount: expired ? 1 : 0,
+        newEventsCount: newEvents.length,
+        timestamp: Date.now()
+    });
+    
+    return { expired, newEvents };
+}
+
+// Helper function to add to adjustment log
+function addToAdjustmentLog(entry) {
     try {
-        const db = await getDb();
-        return await db.delete(storeName, key);
+        const log = localStorage.getItem('voidfarer_adjustment_log');
+        const allLogs = log ? JSON.parse(log) : [];
+        
+        allLogs.push({
+            ...entry,
+            timestamp: entry.timestamp || Date.now(),
+            date: new Date().toISOString()
+        });
+        
+        if (allLogs.length > 1000) {
+            allLogs.shift();
+        }
+        
+        localStorage.setItem('voidfarer_adjustment_log', JSON.stringify(allLogs));
     } catch (error) {
-        console.error(`Error deleting item from ${storeName}:`, error);
-        return false;
+        console.error('Error adding to adjustment log:', error);
     }
 }
 
-// Helper to get database instance
-async function getDb() {
-    return await window.getDb?.() || idb.openDB('VoidfarerDB', 1);
-}
-
-// ===== EXPORT =====
-export default {
-    BASE_PRICES,
-    ELEMENT_RARITY,
-    VOLATILITY,
-    TREND_TYPES,
-    MASS_PRICE_FACTOR,
-    getElementRarity,
-    getBasePrice,
-    getMassAdjustedPrice,
-    getPriceHistory,
-    recordPrice,
-    getLatestPrice,
-    recordTrade,
-    getRecentTrades,
-    calculateSupplyFactor,
-    calculateDemandFactor,
-    detectTrend,
-    calculatePriceChange,
-    calculateMarketPrice,
-    updateDailyPrices,
-    getMarketSummary,
-    getTopMovers,
-    getBestValueByMass,
-    buyElement,
-    sellElement,
-    setPriceAlert,
-    checkPriceAlerts,
-    getMarketStats
+// ===== EXPOSE TO WINDOW =====
+window.EVENT_TYPES = EVENT_TYPES;
+window.EVENT_SEVERITY = EVENT_SEVERITY;
+window.initializeEventSystem = initializeEventSystem;
+window.getActiveEvents = getActiveEvents;
+window.addEvent = addEvent;
+window.removeEvent = removeEvent;
+window.getEventHistory = getEventHistory;
+window.getEventNotifications = getEventNotifications;
+window.generateRandomEvent = generateRandomEvent;
+window.checkAndExpireEvents = checkAndExpireEvents;
+window.checkAndGenerateEvents = checkAndGenerateEvents;
+window.getEventPriceMultiplier = getEventPriceMultiplier;
+window.getEventDemandMultiplier = getEventDemandMultiplier;
+window.getEventSupplyMultiplier = getEventSupplyMultiplier;
+window.getEventTaxMultiplier = getEventTaxMultiplier;
+window.getActiveEventsSummary = getActiveEventsSummary;
+window.getEventStats = getEventStats;
+window.getEventSettings = getEventSettings;
+window.saveEventSettings = function(settings) {
+    localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
 };
+window.runDailyEventMaintenance = runDailyEventMaintenance;
