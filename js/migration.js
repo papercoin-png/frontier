@@ -1,7 +1,4 @@
 // js/migration.js - One-time migration from localStorage to IndexedDB
-// Run this once when the game loads to transfer existing player data
-
-import db from './db.js';
 
 // ===== MIGRATION STATUS =====
 let migrationInProgress = false;
@@ -37,8 +34,7 @@ async function migratePlayer() {
   if (playerData) {
     const player = safeJSONParse(playerData);
     if (player) {
-      // Ensure player has an ID for the object store
-      await db.setItem('player', { 
+      await window.setItem('player', { 
         id: 'main', 
         ...player,
         migratedAt: new Date().toISOString()
@@ -47,8 +43,7 @@ async function migratePlayer() {
       return true;
     }
   } else {
-    // Create default player if none exists
-    await db.setItem('player', {
+    await window.setItem('player', {
       id: 'main',
       name: 'Voidfarer',
       ship: 'Prospector',
@@ -77,7 +72,6 @@ async function migrateCollection() {
     let count = 0;
     
     for (const [elementName, elementInfo] of Object.entries(collection)) {
-      // Handle both old format (just count) and new format (object with metadata)
       let count_value = 1;
       let firstFound = null;
       
@@ -88,7 +82,7 @@ async function migrateCollection() {
         count_value = elementInfo;
       }
       
-      await db.addElementToCollection(elementName, count_value, {
+      await window.addElementToCollection(elementName, count_value, {
         firstFound: firstFound || new Date().toISOString()
       });
       count++;
@@ -109,11 +103,10 @@ async function migrateMissions() {
     const missions = safeJSONParse(missionsData, []);
     
     for (const mission of missions) {
-      // Ensure each mission has an ID
       if (!mission.id) {
         mission.id = 'mission_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await db.setItem('missions', mission);
+      await window.setItem('missions', mission);
     }
     
     logMigration(`Migrated ${missions.length} active missions`);
@@ -134,7 +127,7 @@ async function migrateCompletedMissions() {
       if (!mission.id) {
         mission.id = 'mission_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await db.setItem('completedMissions', mission);
+      await window.setItem('completedMissions', mission);
     }
     
     logMigration(`Migrated ${missions.length} completed missions`);
@@ -152,13 +145,11 @@ async function migrateRealEstate() {
     const realEstate = safeJSONParse(realEstateData, { properties: [] });
     
     for (const property of realEstate.properties || []) {
-      // Save property to properties store
-      await db.setItem('properties', property);
+      await window.setItem('properties', property);
       
-      // Save property items if they exist
       if (property.items) {
         for (const [elementName, itemData] of Object.entries(property.items)) {
-          await db.setItem('propertyItems', {
+          await window.setItem('propertyItems', {
             id: `item_${property.id}_${elementName}`,
             propertyId: property.id,
             elementName: elementName,
@@ -178,7 +169,6 @@ async function migrateRealEstate() {
 async function migrateTaxTransactions() {
   logMigration('Migrating tax transactions...');
   
-  // Try both possible keys
   const taxData = localStorage.getItem('voidfarer_tax_transactions') || 
                   localStorage.getItem('voidfarer_tax_history');
   
@@ -187,7 +177,7 @@ async function migrateTaxTransactions() {
     let count = 0;
     
     for (const tx of transactions) {
-      await db.addTaxTransaction(tx);
+      await window.addTaxTransaction(tx);
       count++;
     }
     
@@ -206,7 +196,7 @@ async function migrateDailyMetrics() {
     const metrics = safeJSONParse(metricsData, []);
     
     for (const metric of metrics) {
-      await db.setItem('dailyMetrics', metric);
+      await window.setItem('dailyMetrics', metric);
     }
     
     logMigration(`Migrated ${metrics.length} daily metrics`);
@@ -224,7 +214,7 @@ async function migrateHourlySnapshots() {
     const snapshots = safeJSONParse(snapshotsData, []);
     
     for (const snapshot of snapshots) {
-      await db.setItem('hourlySnapshots', snapshot);
+      await window.setItem('hourlySnapshots', snapshot);
     }
     
     logMigration(`Migrated ${snapshots.length} hourly snapshots`);
@@ -241,7 +231,7 @@ async function migrateTaxRates() {
   if (ratesData) {
     const rates = safeJSONParse(ratesData);
     if (rates) {
-      await db.setItem('taxRates', { id: 'current', ...rates });
+      await window.setItem('taxRates', { id: 'current', ...rates });
       logMigration('Tax rates migrated');
       return true;
     }
@@ -257,7 +247,7 @@ async function migrateCommunityFund() {
   if (fundData) {
     const fund = safeJSONParse(fundData);
     if (fund) {
-      await db.setItem('communityFund', { id: 'main', ...fund });
+      await window.setItem('communityFund', { id: 'main', ...fund });
       logMigration('Community fund migrated');
       return true;
     }
@@ -274,7 +264,7 @@ async function migrateActiveEvents() {
     const events = safeJSONParse(eventsData, []);
     
     for (const event of events) {
-      await db.setItem('activeEvents', event);
+      await window.setItem('activeEvents', event);
     }
     
     logMigration(`Migrated ${events.length} active events`);
@@ -292,7 +282,7 @@ async function migrateEventHistory() {
     const history = safeJSONParse(historyData, []);
     
     for (const entry of history) {
-      await db.setItem('eventHistory', entry);
+      await window.setItem('eventHistory', entry);
     }
     
     logMigration(`Migrated ${history.length} event history entries`);
@@ -313,7 +303,7 @@ async function migrateColonies() {
       if (!colony.id) {
         colony.id = 'colony_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await db.setItem('colonies', colony);
+      await window.setItem('colonies', colony);
     }
     
     logMigration(`Migrated ${colonies.length} colonies`);
@@ -334,7 +324,7 @@ async function migrateDiscoveredLocations() {
       if (!location.id) {
         location.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await db.setItem('discoveredLocations', location);
+      await window.setItem('discoveredLocations', location);
     }
     
     logMigration(`Migrated ${locations.length} discovered locations`);
@@ -352,9 +342,8 @@ async function migrateScanHistory() {
     const scans = safeJSONParse(scansData, []);
     
     for (const scan of scans) {
-      // Use timestamp as key if available
       const key = scan.timestamp || Date.now();
-      await db.setItem('scanHistory', { timestamp: key, ...scan });
+      await window.setItem('scanHistory', { timestamp: key, ...scan });
     }
     
     logMigration(`Migrated ${scans.length} scan history entries`);
@@ -375,7 +364,7 @@ async function migrateBookmarks() {
       if (!bookmark.id) {
         bookmark.id = 'bookmark_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       }
-      await db.setItem('bookmarks', bookmark);
+      await window.setItem('bookmarks', bookmark);
     }
     
     logMigration(`Migrated ${bookmarks.length} bookmarks`);
@@ -392,13 +381,12 @@ async function migrateShipUpgrades() {
   if (upgradesData) {
     const upgrades = safeJSONParse(upgradesData);
     if (upgrades) {
-      await db.setItem('shipUpgrades', { id: 'current', ...upgrades });
+      await window.setItem('shipUpgrades', { id: 'current', ...upgrades });
       logMigration('Ship upgrades migrated');
       return true;
     }
   } else {
-    // Create default upgrades
-    await db.setItem('shipUpgrades', {
+    await window.setItem('shipUpgrades', {
       id: 'current',
       engine: 1,
       shields: 1,
@@ -429,7 +417,7 @@ async function migrateSettings() {
   for (const key of settingsKeys) {
     const value = localStorage.getItem(key);
     if (value !== null) {
-      await db.setItem('settings', { key: key, value: value });
+      await window.setItem('settings', { key: key, value: value });
       migratedCount++;
     }
   }
@@ -444,15 +432,13 @@ async function migrateCredits() {
   
   const credits = localStorage.getItem('voidfarer_credits');
   if (credits) {
-    // Credits are stored in the player object, but also need to be accessible
-    // We'll store them in player and also as a separate setting for convenience
-    const player = await db.getItem('player', 'main');
+    const player = await window.getItem('player', 'main');
     if (player) {
       player.credits = parseInt(credits) || 5000;
-      await db.setItem('player', player);
+      await window.setItem('player', player);
     }
     
-    await db.setItem('settings', { key: 'credits', value: credits });
+    await window.setItem('settings', { key: 'credits', value: credits });
     logMigration(`Credits: ${credits}⭐`);
     return true;
   }
@@ -465,7 +451,7 @@ async function migrateShipFuel() {
   
   const fuel = localStorage.getItem('voidfarer_ship_fuel');
   if (fuel) {
-    await db.setItem('settings', { key: 'ship_fuel', value: fuel });
+    await window.setItem('settings', { key: 'ship_fuel', value: fuel });
     logMigration(`Ship fuel: ${fuel}%`);
     return true;
   }
@@ -478,7 +464,7 @@ async function migrateShipPower() {
   
   const power = localStorage.getItem('voidfarer_ship_power');
   if (power) {
-    await db.setItem('settings', { key: 'ship_power', value: power });
+    await window.setItem('settings', { key: 'ship_power', value: power });
     logMigration(`Ship power: ${power}%`);
     return true;
   }
@@ -515,23 +501,48 @@ async function migrateCurrentLocation() {
   }
   
   if (Object.keys(locationData).length > 0) {
-    await db.setItem('settings', { key: 'current_location', value: JSON.stringify(locationData) });
+    await window.setItem('settings', { key: 'current_location', value: JSON.stringify(locationData) });
     logMigration('Current location migrated');
     return true;
   }
   return false;
 }
 
+// ===== CHECK MIGRATION COMPLETE =====
+async function isMigrationComplete() {
+  try {
+    const flag = await window.getItem('migration', 'localStorage');
+    return flag ? flag.complete : false;
+  } catch (error) {
+    console.error('Error in isMigrationComplete:', error);
+    return false;
+  }
+}
+
+// ===== SET MIGRATION COMPLETE =====
+async function setMigrationComplete() {
+  try {
+    await window.setItem('migration', {
+      id: 'localStorage',
+      complete: true,
+      timestamp: Date.now(),
+      date: new Date().toISOString()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error in setMigrationComplete:', error);
+    return false;
+  }
+}
+
 // ===== MAIN MIGRATION FUNCTION =====
-export async function migrateFromLocalStorage(showProgress = true) {
-  // Prevent multiple migrations running at once
+async function migrateFromLocalStorage(showProgress = true) {
   if (migrationInProgress) {
     logMigration('Migration already in progress', 'warning');
     return { success: false, reason: 'ALREADY_RUNNING' };
   }
   
-  // Check if migration already completed
-  const completed = await db.isMigrationComplete();
+  const completed = await isMigrationComplete();
   if (completed) {
     logMigration('Migration already completed previously', 'info');
     return { success: true, reason: 'ALREADY_COMPLETED' };
@@ -568,7 +579,6 @@ export async function migrateFromLocalStorage(showProgress = true) {
   };
   
   try {
-    // Run migrations in order (critical data first)
     results.player = await migratePlayer();
     results.credits = await migrateCredits();
     results.shipFuel = await migrateShipFuel();
@@ -592,10 +602,8 @@ export async function migrateFromLocalStorage(showProgress = true) {
     results.settings = await migrateSettings();
     results.location = await migrateCurrentLocation();
     
-    // Mark migration as complete
-    await db.setMigrationComplete();
+    await setMigrationComplete();
     
-    // Log summary
     logMigration('✅ Migration completed successfully!');
     logMigration(`📊 Summary: ${results.collection} elements, ${results.missions} missions, ${results.realEstate} properties, ${results.taxTransactions} tax records`);
     
@@ -611,15 +619,15 @@ export async function migrateFromLocalStorage(showProgress = true) {
 }
 
 // ===== PROGRESS TRACKING =====
-export function getMigrationProgress() {
+function getMigrationProgress() {
   return {
     inProgress: migrationInProgress,
     log: migrationLog
   };
 }
 
-// ===== DRY RUN (for testing) =====
-export async function simulateMigration() {
+// ===== DRY RUN =====
+async function simulateMigration() {
   logMigration('🔍 Simulating migration (dry run)...');
   
   const keys = Object.keys(localStorage);
@@ -638,12 +646,11 @@ export async function simulateMigration() {
   };
 }
 
-// ===== ROLLBACK (for emergency) =====
-export async function rollbackMigration() {
+// ===== ROLLBACK =====
+async function rollbackMigration() {
   logMigration('⚠️ Rolling back migration...', 'warning');
   
   try {
-    // Clear all IndexedDB stores
     const stores = [
       'player', 'collection', 'missions', 'completedMissions',
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
@@ -653,7 +660,7 @@ export async function rollbackMigration() {
     ];
     
     for (const store of stores) {
-      await db.clearStore(store);
+      await window.clearStore(store);
     }
     
     logMigration('✅ Rollback complete. localStorage data remains intact.');
@@ -664,10 +671,13 @@ export async function rollbackMigration() {
   }
 }
 
-// Export default object with all functions
-export default {
-  migrateFromLocalStorage,
-  simulateMigration,
-  rollbackMigration,
-  getMigrationProgress
-};
+// ===== EXPOSE TO WINDOW =====
+window.migrationInProgress = migrationInProgress;
+window.migrationLog = migrationLog;
+window.logMigration = logMigration;
+window.migrateFromLocalStorage = migrateFromLocalStorage;
+window.simulateMigration = simulateMigration;
+window.rollbackMigration = rollbackMigration;
+window.getMigrationProgress = getMigrationProgress;
+window.isMigrationComplete = isMigrationComplete;
+window.setMigrationComplete = setMigrationComplete;
