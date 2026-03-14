@@ -266,11 +266,51 @@
             white-space: nowrap;
         }
         
+        /* Planet Info Preview (for surface) */
+        .planet-preview {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 20px;
+            color: white;
+            z-index: 25;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        
+        .planet-preview.visible {
+            display: flex;
+        }
+        
+        .planet-preview-icon {
+            font-size: 20px;
+        }
+        
+        .planet-preview-name {
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .planet-preview-type {
+            color: #a0c0ff;
+            font-size: 10px;
+        }
+        
         @supports (padding: max(0px)) {
             .journey-panel { top: max(20px, env(safe-area-inset-top)); }
             .stats-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); left: max(20px, env(safe-area-inset-left)); }
             .cycle-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); right: max(20px, env(safe-area-inset-right)); }
             .dest-info { bottom: max(10px, env(safe-area-inset-bottom)); }
+            .planet-preview { top: 120px; }
         }
     </style>
 </head>
@@ -299,6 +339,15 @@
                         <span class="point-icon" id="destIcon">🪐</span>
                         <span class="point-name" id="destName">Loading...</span>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Planet Preview (shows when destination is a planet) -->
+            <div class="planet-preview" id="planetPreview">
+                <span class="planet-preview-icon" id="previewIcon">🪐</span>
+                <div>
+                    <div><span class="planet-preview-name" id="previewName">Earth</span></div>
+                    <div><span class="planet-preview-type" id="previewType">Lush Planet</span></div>
                 </div>
             </div>
             
@@ -338,6 +387,7 @@
     <script src="js/warp-calculator.js"></script>
     <script src="js/db.js"></script>
     <script src="js/migration.js"></script>
+    <script src="js/planet-utils.js"></script>
 
     <script>
         // ===== CANVAS ELEMENTS =====
@@ -358,6 +408,10 @@
         const fuelCostSpan = document.getElementById('fuelCost');
         const progressPercent = document.getElementById('progressPercent');
         const destInfo = document.getElementById('destLocation');
+        const planetPreview = document.getElementById('planetPreview');
+        const previewIcon = document.getElementById('previewIcon');
+        const previewName = document.getElementById('previewName');
+        const previewType = document.getElementById('previewType');
 
         // ===== WARP STATE =====
         let warpData = {
@@ -426,9 +480,10 @@
                 if (savedData) {
                     warpData = JSON.parse(savedData);
                 } else {
+                    // Fallback demo data
                     warpData = {
                         destination: 'Pyros-3',
-                        destinationType: 'volcanic planet',
+                        destinationType: 'volcanic',
                         startLocation: 'Earth',
                         startLocationType: 'planet',
                         totalDistance: 16.3,
@@ -437,16 +492,18 @@
                         returnPage: 'surface.html',
                         destSector: 'C4',
                         destRegion: 'The Fringe',
-                        destStarSector: 'Tarantula',
+                        destStarSector: 'Tarantula Nebula',
                         destStar: 'Eta Carinae',
                         destPlanet: 'Pyros-3',
-                        destPlanetType: 'volcanic'
+                        destPlanetType: 'scorched',
+                        destPlanetResources: ['Iron', 'Sulfur', 'Gold', 'Uranium']
                     };
                 }
 
                 startName.textContent = warpData.startLocation || 'Unknown';
                 destName.textContent = warpData.destination || 'Unknown';
                 
+                // Set destination icon based on type
                 const destTypeStr = (warpData.destinationType || '').toLowerCase();
                 if (destTypeStr.includes('gas')) {
                     destIcon.textContent = '🌪️';
@@ -456,6 +513,12 @@
                     destIcon.textContent = '❄️';
                 } else if (destTypeStr.includes('scorched') || destTypeStr.includes('volcanic')) {
                     destIcon.textContent = '🔥';
+                } else if (destTypeStr.includes('oceanic')) {
+                    destIcon.textContent = '💧';
+                } else if (destTypeStr.includes('toxic')) {
+                    destIcon.textContent = '☣️';
+                } else if (destTypeStr.includes('asteroid')) {
+                    destIcon.textContent = '🪐';
                 } else {
                     destIcon.textContent = '🪐';
                 }
@@ -463,12 +526,48 @@
                 fuelCostSpan.textContent = warpData.fuelCost;
                 totalCyclesSpan.textContent = warpData.warpCycles;
                 
+                // Build destination path string
                 let destString = '';
-                if (warpData.destSector) destString += warpData.destRegion + ' › ';
+                if (warpData.destRegion) destString += warpData.destRegion + ' › ';
                 if (warpData.destStarSector) destString += warpData.destStarSector + ' › ';
                 if (warpData.destStar) destString += warpData.destStar + ' › ';
                 destString += warpData.destination;
                 destInfo.textContent = destString;
+
+                // Show planet preview if destination is a planet
+                if (warpData.destPlanet) {
+                    previewName.textContent = warpData.destPlanet;
+                    
+                    let typeDisplay = 'Unknown';
+                    if (warpData.destPlanetType) {
+                        typeDisplay = warpData.destPlanetType.charAt(0).toUpperCase() + warpData.destPlanetType.slice(1);
+                    }
+                    previewType.textContent = typeDisplay + ' Planet';
+                    
+                    // Set preview icon based on planet type
+                    const planetType = warpData.destPlanetType || '';
+                    if (planetType.includes('scorched') || planetType.includes('volcanic')) {
+                        previewIcon.textContent = '🔥';
+                    } else if (planetType.includes('frozen') || planetType.includes('ice')) {
+                        previewIcon.textContent = '❄️';
+                    } else if (planetType.includes('lush')) {
+                        previewIcon.textContent = '🌱';
+                    } else if (planetType.includes('barren')) {
+                        previewIcon.textContent = '🪨';
+                    } else if (planetType.includes('gas')) {
+                        previewIcon.textContent = '🌪️';
+                    } else if (planetType.includes('oceanic')) {
+                        previewIcon.textContent = '💧';
+                    } else if (planetType.includes('toxic')) {
+                        previewIcon.textContent = '☣️';
+                    } else if (planetType.includes('asteroid')) {
+                        previewIcon.textContent = '🪐';
+                    } else {
+                        previewIcon.textContent = '🪐';
+                    }
+                    
+                    planetPreview.classList.add('visible');
+                }
 
                 console.log('Warp data loaded:', warpData);
 
@@ -495,8 +594,6 @@
             
             const w = starfieldCanvas.width;
             const h = starfieldCanvas.height;
-            const centerX = w / 2;
-            const centerY = h / 2;
             
             stars.forEach(star => {
                 const pulse = Math.sin(Date.now() * star.pulseSpeed + star.pulsePhase) * 0.2 + 0.8;
@@ -795,34 +892,100 @@
 
         // ===== COMPLETE WARP =====
         function completeWarp() {
+            console.log('Warp complete! Updating location with planet data:', warpData);
+            
+            // Update galactic sector
             if (warpData.destSector) {
                 localStorage.setItem('voidfarer_current_sector', warpData.destSector);
-                localStorage.setItem('voidfarer_current_region', warpData.destRegion || warpData.destSector);
+            }
+            if (warpData.destRegion) {
+                localStorage.setItem('voidfarer_current_region', warpData.destRegion);
             }
             
+            // Update star sector
             if (warpData.destStarSector) {
-                localStorage.setItem('voidfarer_current_nebula', warpData.destStarSector);
+                localStorage.setItem('voidfarer_current_starSector', warpData.destStarSector);
                 localStorage.setItem('voidfarer_current_sector_name', warpData.destStarSector);
             }
             
+            // Update star
             if (warpData.destStar) {
                 localStorage.setItem('voidfarer_current_star', warpData.destStar);
             }
             
+            // Update planet data (most important for surface view)
             if (warpData.destPlanet) {
                 localStorage.setItem('voidfarer_current_planet', warpData.destPlanet);
                 localStorage.setItem('voidfarer_current_planet_name', warpData.destPlanet);
-                localStorage.setItem('voidfarer_current_planet_type', warpData.destPlanetType || warpData.destinationType);
                 
-                if (warpData.destPlanetResources) {
+                if (warpData.destPlanetType) {
+                    localStorage.setItem('voidfarer_current_planet_type', warpData.destPlanetType);
+                }
+                
+                if (warpData.destPlanetResources && warpData.destPlanetResources.length > 0) {
                     localStorage.setItem('voidfarer_current_planet_resources', 
                         JSON.stringify(warpData.destPlanetResources));
+                    console.log('Saved planet resources:', warpData.destPlanetResources);
+                } else {
+                    // Fallback resources based on planet type
+                    const fallbackResources = getFallbackResources(warpData.destPlanetType);
+                    localStorage.setItem('voidfarer_current_planet_resources', 
+                        JSON.stringify(fallbackResources));
+                    console.log('Saved fallback resources:', fallbackResources);
                 }
+                
+                // Set planet image based on type
+                setPlanetImage(warpData.destPlanetType);
             }
             
+            // Clear warp data
             localStorage.removeItem('voidfarer_warp_data');
             
+            // Navigate to return page
             window.location.href = warpData.returnPage || 'surface.html';
+        }
+
+        // ===== GET FALLBACK RESOURCES BY PLANET TYPE =====
+        function getFallbackResources(planetType) {
+            const fallbackPools = {
+                'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'volcanic': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium'],
+                'lush': ['Carbon', 'Oxygen', 'Hydrogen', 'Silicon'],
+                'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'ice': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'gas': ['Hydrogen', 'Helium', 'Methane', 'Ammonia'],
+                'oceanic': ['Hydrogen', 'Oxygen', 'Sodium', 'Chlorine'],
+                'toxic': ['Sulfur', 'Chlorine', 'Mercury', 'Arsenic'],
+                'asteroid': ['Iron', 'Nickel', 'Cobalt', 'Platinum']
+            };
+            
+            return fallbackPools[planetType] || ['Iron', 'Carbon', 'Silicon'];
+        }
+
+        // ===== SET PLANET IMAGE BASED ON TYPE =====
+        function setPlanetImage(planetType) {
+            let imageFile = 'earth-view.jpg';
+            
+            if (planetType.includes('scorched') || planetType.includes('volcanic')) {
+                imageFile = 'pyros-surface.jpg';
+            } else if (planetType.includes('frozen') || planetType.includes('ice')) {
+                imageFile = 'glacier-surface.jpg';
+            } else if (planetType.includes('lush')) {
+                imageFile = 'verdant-surface.jpg';
+            } else if (planetType.includes('barren')) {
+                imageFile = 'barren-surface.jpg';
+            } else if (planetType.includes('gas')) {
+                imageFile = 'gas-surface.jpg';
+            } else if (planetType.includes('oceanic')) {
+                imageFile = 'oceanic-surface.jpg';
+            } else if (planetType.includes('toxic')) {
+                imageFile = 'toxic-surface.jpg';
+            } else if (planetType.includes('asteroid')) {
+                imageFile = 'asteroid-field.jpg';
+            }
+            
+            localStorage.setItem('voidfarer_current_planet_image', imageFile);
         }
 
         // ===== INITIALIZE =====
