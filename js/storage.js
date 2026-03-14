@@ -324,6 +324,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 const planetName = locationData.planet || getCurrentPlanetName();
                 
                 try {
+                    // Call the db.js function directly
                     await window.saveElementLocation(elementName, planetName, { planet: planetName });
                     console.log(`📍 Journal entry: ${elementName} found on ${planetName}`);
                 } catch (locError) {
@@ -753,11 +754,13 @@ function getPlayerId() {
 }
 
 // ===== ELEMENT LOCATIONS HELPERS (SIMPLIFIED WRAPPERS) =====
-async function saveElementLocation(elementName, planetName, locationData = {}) {
+// Note: These are wrappers that call the actual implementations in db.js
+// They use different names to avoid recursive loops
+
+async function saveElementLocationWrapper(elementName, planetName, locationData = {}) {
     try {
-        // This function now lives in db.js, we provide a wrapper here
+        // Call the db.js function directly
         if (typeof window.saveElementLocation === 'function') {
-            // Pass only the essential data - planet name
             const planet = planetName || locationData.planet || getCurrentPlanetName();
             return await window.saveElementLocation(elementName, planet, { planet: planet });
         }
@@ -768,7 +771,7 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
     }
 }
 
-async function getElementLocations(elementName) {
+async function getElementLocationsWrapper(elementName) {
     try {
         if (typeof window.getElementLocations === 'function') {
             return await window.getElementLocations(elementName);
@@ -780,7 +783,7 @@ async function getElementLocations(elementName) {
     }
 }
 
-async function getPlayerLocations() {
+async function getPlayerLocationsWrapper() {
     try {
         if (typeof window.getPlayerLocations === 'function') {
             return await window.getPlayerLocations();
@@ -792,7 +795,7 @@ async function getPlayerLocations() {
     }
 }
 
-async function getUniquePlanetsForElement(elementName) {
+async function getUniquePlanetsForElementWrapper(elementName) {
     try {
         if (typeof window.getUniquePlanetsForElement === 'function') {
             return await window.getUniquePlanetsForElement(elementName);
@@ -868,8 +871,8 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Location helpers (simplified)
-window.saveElementLocation = saveElementLocation;
-window.getElementLocations = getElementLocations;
-window.getPlayerLocations = getPlayerLocations;
-window.getUniquePlanetsForElement = getUniquePlanetsForElement;
+// Location helpers (simplified) - using wrapper functions to avoid recursion
+window.saveElementLocation = saveElementLocationWrapper;
+window.getElementLocations = getElementLocationsWrapper;
+window.getPlayerLocations = getPlayerLocationsWrapper;
+window.getUniquePlanetsForElement = getUniquePlanetsForElementWrapper;
