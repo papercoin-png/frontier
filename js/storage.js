@@ -136,7 +136,7 @@ async function getRemainingCargoMass() {
     }
 }
 
-// ===== CURRENT PLANET HELPER =====
+// ===== CURRENT PLANET HELPERS =====
 function getCurrentPlanetName() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
 }
@@ -586,15 +586,6 @@ function getCurrentStar() {
 
 function getCurrentPlanet() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
-}
-
-function getCurrentPlanetType() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'lush';
-}
-
-function getCurrentPlanetResources() {
-    const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
-    return resources ? JSON.parse(resources) : ['Iron', 'Carbon', 'Silicon'];
 }
 
 function getCurrentPlanetImage() {
