@@ -1,4 +1,4 @@
-// js/db.js - IndexedDB service for Voidfarer
+// js/db.js - IndexedDB service for Voidfarer (Non-module version)
 // Using idb library for simpler Promise-based API with proper error handling
 
 const DB_NAME = 'VoidfarerDB';
@@ -168,7 +168,7 @@ function getDb() {
 // ===== GENERIC CRUD HELPERS =====
 
 // Get a single item by key
-export async function getItem(storeName, key) {
+async function getItem(storeName, key) {
   try {
     const db = await getDb();
     return await db.get(storeName, key);
@@ -179,7 +179,7 @@ export async function getItem(storeName, key) {
 }
 
 // Get all items from a store
-export async function getAll(storeName) {
+async function getAll(storeName) {
   try {
     const db = await getDb();
     return await db.getAll(storeName);
@@ -190,7 +190,7 @@ export async function getAll(storeName) {
 }
 
 // Get all items with an index (for filtered queries)
-export async function getAllFromIndex(storeName, indexName, key) {
+async function getAllFromIndex(storeName, indexName, key) {
   try {
     const db = await getDb();
     return await db.getAllFromIndex(storeName, indexName, key);
@@ -201,7 +201,7 @@ export async function getAllFromIndex(storeName, indexName, key) {
 }
 
 // Put an item (insert or update)
-export async function setItem(storeName, value) {
+async function setItem(storeName, value) {
   try {
     const db = await getDb();
     return await db.put(storeName, value);
@@ -212,7 +212,7 @@ export async function setItem(storeName, value) {
 }
 
 // Put multiple items in a transaction
-export async function setItems(storeName, values) {
+async function setItems(storeName, values) {
   try {
     const db = await getDb();
     const tx = db.transaction(storeName, 'readwrite');
@@ -231,7 +231,7 @@ export async function setItems(storeName, values) {
 }
 
 // Delete an item by key
-export async function deleteItem(storeName, key) {
+async function deleteItem(storeName, key) {
   try {
     const db = await getDb();
     return await db.delete(storeName, key);
@@ -242,7 +242,7 @@ export async function deleteItem(storeName, key) {
 }
 
 // Clear an entire store
-export async function clearStore(storeName) {
+async function clearStore(storeName) {
   try {
     const db = await getDb();
     return await db.clear(storeName);
@@ -253,7 +253,7 @@ export async function clearStore(storeName) {
 }
 
 // Count items in a store
-export async function countItems(storeName) {
+async function countItems(storeName) {
   try {
     const db = await getDb();
     return await db.count(storeName);
@@ -266,7 +266,7 @@ export async function countItems(storeName) {
 // ===== SPECIALIZED COLLECTION HELPERS =====
 
 // Get collection as object (matches your existing format)
-export async function getCollectionAsObject() {
+async function getCollectionAsObject() {
   try {
     const elements = await getAll('collection');
     const collection = {};
@@ -287,7 +287,7 @@ export async function getCollectionAsObject() {
 }
 
 // Add element to collection - RETURNS ACTUAL NEW COUNT
-export async function addElementToCollection(elementName, count = 1, elementData = {}) {
+async function addElementToCollection(elementName, count = 1, elementData = {}) {
   let tx;
   try {
     const db = await getDb();
@@ -322,7 +322,7 @@ export async function addElementToCollection(elementName, count = 1, elementData
 }
 
 // Remove element from collection
-export async function removeElementFromCollection(elementName, count = 1) {
+async function removeElementFromCollection(elementName, count = 1) {
   let tx;
   try {
     const db = await getDb();
@@ -362,7 +362,7 @@ export async function removeElementFromCollection(elementName, count = 1) {
 // ===== TAX TRANSACTION HELPERS =====
 
 // Add a tax transaction
-export async function addTaxTransaction(transaction) {
+async function addTaxTransaction(transaction) {
   try {
     const db = await getDb();
     
@@ -395,7 +395,7 @@ export async function addTaxTransaction(transaction) {
 }
 
 // Get transactions for a player
-export async function getPlayerTransactions(playerId, limit = 100) {
+async function getPlayerTransactions(playerId, limit = 100) {
   try {
     const transactions = await getAllFromIndex('taxTransactions', 'by-playerId', playerId);
     return transactions
@@ -410,17 +410,17 @@ export async function getPlayerTransactions(playerId, limit = 100) {
 // ===== PROPERTY HELPERS =====
 
 // Get all properties
-export async function getAllProperties() {
+async function getAllProperties() {
   return await getAll('properties');
 }
 
 // Get property by ID
-export async function getProperty(propertyId) {
+async function getProperty(propertyId) {
   return await getItem('properties', propertyId);
 }
 
 // Add a property
-export async function addProperty(propertyData) {
+async function addProperty(propertyData) {
   try {
     const newProperty = {
       id: 'prop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -442,7 +442,7 @@ export async function addProperty(propertyData) {
 }
 
 // Update property
-export async function updateProperty(propertyId, updates) {
+async function updateProperty(propertyId, updates) {
   try {
     const property = await getProperty(propertyId);
     if (!property) return null;
@@ -458,12 +458,12 @@ export async function updateProperty(propertyId, updates) {
 }
 
 // Get items for a property
-export async function getPropertyItems(propertyId) {
+async function getPropertyItems(propertyId) {
   return await getAllFromIndex('propertyItems', 'by-propertyId', propertyId);
 }
 
 // Add item to property
-export async function addItemToProperty(propertyId, elementName, quantity) {
+async function addItemToProperty(propertyId, elementName, quantity) {
   let tx;
   try {
     const db = await getDb();
@@ -516,7 +516,7 @@ export async function addItemToProperty(propertyId, elementName, quantity) {
 }
 
 // Remove item from property
-export async function removeItemFromProperty(propertyId, elementName, quantity) {
+async function removeItemFromProperty(propertyId, elementName, quantity) {
   let tx;
   try {
     const db = await getDb();
@@ -566,7 +566,7 @@ export async function removeItemFromProperty(propertyId, elementName, quantity) 
 }
 
 // ===== PRICE HISTORY HELPERS =====
-export async function addPriceHistory(elementName, price, date) {
+async function addPriceHistory(elementName, price, date) {
   try {
     const entry = {
       id: `price_${elementName}_${date}`,
@@ -584,7 +584,7 @@ export async function addPriceHistory(elementName, price, date) {
   }
 }
 
-export async function getPriceHistoryForElement(elementName) {
+async function getPriceHistoryForElement(elementName) {
   try {
     const db = await getDb();
     const entries = await db.getAllFromIndex('priceHistory', 'by-element', elementName);
@@ -596,7 +596,7 @@ export async function getPriceHistoryForElement(elementName) {
 }
 
 // ===== TRADE HISTORY HELPERS =====
-export async function addTradeHistory(trade) {
+async function addTradeHistory(trade) {
   try {
     await setItem('tradeHistory', trade);
     return trade;
@@ -606,7 +606,7 @@ export async function addTradeHistory(trade) {
   }
 }
 
-export async function getTradeHistoryForElement(elementName) {
+async function getTradeHistoryForElement(elementName) {
   try {
     const db = await getDb();
     const entries = await db.getAllFromIndex('tradeHistory', 'by-element', elementName);
@@ -620,7 +620,7 @@ export async function getTradeHistoryForElement(elementName) {
 // ===== MIGRATION HELPERS =====
 
 // Check if migration has been performed
-export async function isMigrationComplete() {
+async function isMigrationComplete() {
   try {
     const flag = await getItem('migration', 'localStorage');
     return flag ? flag.complete : false;
@@ -631,7 +631,7 @@ export async function isMigrationComplete() {
 }
 
 // Mark migration as complete
-export async function setMigrationComplete() {
+async function setMigrationComplete() {
   try {
     await setItem('migration', {
       id: 'localStorage',
@@ -649,7 +649,7 @@ export async function setMigrationComplete() {
 // ===== UTILITY FUNCTIONS =====
 
 // Clear all game data (for reset)
-export async function resetAllData() {
+async function resetAllData() {
   try {
     const stores = [
       'player', 'collection', 'missions', 'completedMissions',
@@ -680,7 +680,7 @@ export async function resetAllData() {
 }
 
 // Get database stats (for debugging)
-export async function getDatabaseStats() {
+async function getDatabaseStats() {
   try {
     const stores = [
       'player', 'collection', 'missions', 'completedMissions',
@@ -706,7 +706,7 @@ export async function getDatabaseStats() {
 }
 
 // ===== INITIALIZATION =====
-export async function initializeDatabase() {
+async function initializeDatabase() {
   try {
     await getDb();
     console.log('Database initialized successfully');
@@ -720,52 +720,32 @@ export async function initializeDatabase() {
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
 window.idb = idb;
 window.getDb = getDb;
-
-// Export a default object with all functions for easy importing
-export default {
-  // Core
-  getDb,
-  initializeDatabase,
-  
-  // CRUD
-  getItem,
-  getAll,
-  getAllFromIndex,
-  setItem,
-  setItems,
-  deleteItem,
-  clearStore,
-  countItems,
-  
-  // Collection
-  getCollectionAsObject,
-  addElementToCollection,
-  removeElementFromCollection,
-  
-  // Tax
-  addTaxTransaction,
-  getPlayerTransactions,
-  
-  // Property
-  getAllProperties,
-  getProperty,
-  addProperty,
-  updateProperty,
-  getPropertyItems,
-  addItemToProperty,
-  removeItemFromProperty,
-  
-  // Market
-  addPriceHistory,
-  getPriceHistoryForElement,
-  addTradeHistory,
-  getTradeHistoryForElement,
-  
-  // Migration
-  isMigrationComplete,
-  setMigrationComplete,
-  resetAllData,
-  
-  // Stats
-  getDatabaseStats
-};
+window.getItem = getItem;
+window.getAll = getAll;
+window.getAllFromIndex = getAllFromIndex;
+window.setItem = setItem;
+window.setItems = setItems;
+window.deleteItem = deleteItem;
+window.clearStore = clearStore;
+window.countItems = countItems;
+window.getCollectionAsObject = getCollectionAsObject;
+window.addElementToCollection = addElementToCollection;
+window.removeElementFromCollection = removeElementFromCollection;
+window.addTaxTransaction = addTaxTransaction;
+window.getPlayerTransactions = getPlayerTransactions;
+window.getAllProperties = getAllProperties;
+window.getProperty = getProperty;
+window.addProperty = addProperty;
+window.updateProperty = updateProperty;
+window.getPropertyItems = getPropertyItems;
+window.addItemToProperty = addItemToProperty;
+window.removeItemFromProperty = removeItemFromProperty;
+window.addPriceHistory = addPriceHistory;
+window.getPriceHistoryForElement = getPriceHistoryForElement;
+window.addTradeHistory = addTradeHistory;
+window.getTradeHistoryForElement = getTradeHistoryForElement;
+window.isMigrationComplete = isMigrationComplete;
+window.setMigrationComplete = setMigrationComplete;
+window.resetAllData = resetAllData;
+window.getDatabaseStats = getDatabaseStats;
+window.initializeDatabase = initializeDatabase;
