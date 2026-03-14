@@ -488,8 +488,25 @@
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-utils.js"></script>
+    <script type="module" src="js/planet-names.js"></script>
+    <script type="module" src="js/procedural-universe.js"></script>
 
     <script type="module">
+        import { 
+            UNIVERSE_SEED, 
+            seededRandom, 
+            seededRandomRange, 
+            seededRandomChoice, 
+            hashString,
+            getStarType,
+            generateStar as generateProceduralStar,
+            getGalaxyStatistics
+        } from './js/procedural-universe.js';
+        
+        import { generatePlanetName } from './js/planet-names.js';
+        import { generatePlanetResources, PLANET_TYPE_DATA } from './js/planet-utils.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -511,7 +528,6 @@
         const afterThisLegEl = document.getElementById('afterThisLeg');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        // This is the critical fix - all onclick handlers need these
         window.returnToSectors = returnToSectors;
         window.handleStarAction = handleStarAction;
         window.hideStarInfo = hideStarInfo;
@@ -527,89 +543,11 @@
         let selectedStar = null;
         let journeyDistance = 0;
         let cumulativeBefore = 0;
+        let currentSectorId = 'B2'; // Default to Orion Arm
         
         // ===== CHECK FOR PLOT MODE =====
         const urlParams = new URLSearchParams(window.location.search);
         const isPlotMode = urlParams.get('mode') === 'plot';
-
-        // ===== HASH FUNCTION =====
-        function hashString(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        }
-
-        // ===== SEEDED RANDOM =====
-        function seededRandom(seed, index) {
-            const x = Math.sin(seed * (index + 1)) * 10000;
-            return x - Math.floor(x);
-        }
-
-        function seededRandomRange(seed, index, min, max) {
-            return Math.floor(seededRandom(seed, index) * (max - min + 1)) + min;
-        }
-
-        function seededRandomChoice(seed, index, array) {
-            const choice = Math.floor(seededRandom(seed, index) * array.length);
-            return array[choice];
-        }
-
-        // ===== STAR TYPES =====
-        const starTypes = [
-            { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8, icon: '🟡' },
-            { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5, icon: '🔴' },
-            { type: 'blue', name: 'Blue Giant', prob: 0.10, color: '#6ba5ff', minPlanets: 5, maxPlanets: 12, icon: '🔵' },
-            { type: 'neutron', name: 'Neutron Star', prob: 0.03, color: '#ffffff', minPlanets: 0, maxPlanets: 0, icon: '💫' },
-            { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0, icon: '⚫' }
-        ];
-
-        function getStarType(seed, index) {
-            const rand = seededRandom(seed, index);
-            let cumulative = 0;
-            
-            for (const type of starTypes) {
-                cumulative += type.prob;
-                if (rand < cumulative) {
-                    return { ...type };
-                }
-            }
-            return { ...starTypes[0] };
-        }
-
-        // ===== NAME GENERATION =====
-        const namePrefixes = [
-            'Al', 'Bet', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
-            'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
-            'Phi', 'Chi', 'Psi', 'Omega', 'Alpha', 'Beta', 'Prox', 'Sol', 'Terra', 'Luna'
-        ];
-
-        const nameSuffixes = [
-            'Majoris', 'Minoris', 'Prime', 'Secundus', 'Tertius', 'A', 'B', 'C', 'D', 'E',
-            'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'I', 'II', 'III', 'IV', 'V',
-            'Centauri', 'Orionis', 'Cygnii', 'Andromedae', 'Cassiopeiae'
-        ];
-
-        function generateStarName(seed, index) {
-            const prefix = seededRandomChoice(seed, index * 3, namePrefixes) || 'Sol';
-            const suffix = seededRandomChoice(seed, index * 3 + 1, nameSuffixes) || 'Prime';
-            return prefix + ' ' + suffix;
-        }
-
-        // ===== WARP CALCULATION FUNCTIONS =====
-        function getWarpCyclesFromDistance(distance) {
-            if (distance <= 1.0) return 1;
-            if (distance <= 2.5) return 2;
-            if (distance <= 4.5) return 3;
-            if (distance <= 7.0) return 4;
-            return 5;
-        }
-
-        function getFuelCostFromDistance(distance) {
-            return Math.floor(distance * 4) + 5;
-        }
 
         // ===== LOAD JOURNEY DISTANCE =====
         function loadJourneyDistance() {
@@ -639,13 +577,70 @@
             return parseFloat((baseDistance + randomFactor).toFixed(1));
         }
 
+        // ===== GENERATE PLANETS FOR A STAR =====
+        function generatePlanetsForStar(starSeed, starType, starName, sectorId) {
+            const planets = [];
+            const planetCount = starType.maxPlanets > 0 ? 
+                seededRandomRange(starSeed, 100, starType.minPlanets, Math.min(starType.maxPlanets, 8)) : 0;
+            
+            for (let i = 0; i < planetCount; i++) {
+                const planetSeed = starSeed + i * 1000;
+                
+                // Determine planet type with weighted probabilities
+                const planetTypeRoll = seededRandom(planetSeed, 0);
+                let planetType = 'barren'; // default
+                
+                // Planet type probabilities
+                if (planetTypeRoll < 0.12) planetType = 'scorched';
+                else if (planetTypeRoll < 0.27) planetType = 'barren';
+                else if (planetTypeRoll < 0.37) planetType = 'lush';
+                else if (planetTypeRoll < 0.49) planetType = 'frozen';
+                else if (planetTypeRoll < 0.64) planetType = 'gas';
+                else if (planetTypeRoll < 0.74) planetType = 'oceanic';
+                else if (planetTypeRoll < 0.82) planetType = 'toxic';
+                else planetType = 'asteroid';
+                
+                const planetData = PLANET_TYPE_DATA[planetType];
+                
+                // Generate unique planet name
+                const planetName = generatePlanetName(planetSeed, i, sectorId, planetType);
+                
+                // Generate resources (max 4)
+                const resources = generatePlanetResources(planetSeed, planetType);
+                
+                planets.push({
+                    index: i,
+                    name: planetName,
+                    type: planetType,
+                    typeName: planetData.name,
+                    icon: planetData.icon,
+                    color: planetData.color,
+                    temp: planetData.temp,
+                    atmos: planetData.atmos,
+                    gravity: planetData.gravity,
+                    landable: planetData.landable,
+                    description: planetData.description,
+                    resources: resources,
+                    distanceFromStar: 0.5 + (i * 0.8),
+                    orbitRadius: 70 + i * 40,
+                    orbitSpeed: 0.002 - (i * 0.0002)
+                });
+            }
+            
+            return planets;
+        }
+
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
                 // Load data from storage
                 const star = typeof window.getCurrentStar === 'function' ? await window.getCurrentStar() : '';
-                const starSector = typeof window.getCurrentNebula === 'function' ? await window.getCurrentNebula() : 'Orion Molecular Cloud';
+                const starSector = typeof window.getCurrentStarSector === 'function' ? await window.getCurrentStarSector() : 'Orion Molecular Cloud';
                 const count = typeof window.getCurrentSectorStars === 'function' ? await window.getCurrentSectorStars() : 85;
+                
+                // Get current sector ID for planet naming
+                currentSectorId = typeof window.getCurrentSector === 'function' ? 
+                    await window.getCurrentSector() : localStorage.getItem('voidfarer_current_sector') || 'B2';
 
                 currentStarName = star || '';
                 clusterName = starSector || 'Orion Molecular Cloud';
@@ -684,15 +679,13 @@
                 const starSeed = clusterSeed + i * 1000;
                 const starType = getStarType(starSeed, i);
                 
-                let planetCount = 0;
-                if (starType.maxPlanets > 0) {
-                    planetCount = seededRandomRange(starSeed, i + 10, starType.minPlanets, starType.maxPlanets);
-                }
-                
-                // Generate star name first
-                const starName = generateStarName(starSeed, i + 20);
+                // Generate star name using procedural-universe
+                const starName = generateProceduralStar(starSeed, i).name;
                 const isCurrent = (starName === currentStarName);
                 const distance = generateStarDistance(i, isCurrent);
+                
+                // Generate planets for this star
+                const planets = generatePlanetsForStar(starSeed, starType, starName, currentSectorId);
                 
                 stars.push({
                     index: i,
@@ -701,9 +694,11 @@
                     typeKey: starType.type,
                     icon: starType.icon,
                     color: starType.color,
-                    planets: planetCount,
+                    planets: planets,
+                    planetCount: planets.length,
                     distance: distance,
-                    isCurrent: isCurrent
+                    isCurrent: isCurrent,
+                    seed: starSeed
                 });
             }
 
@@ -713,6 +708,8 @@
                 if (b.isCurrent) return 1;
                 return a.distance - b.distance;
             });
+            
+            console.log(`Generated ${stars.length} stars with planets`);
         }
 
         // ===== SHOW STAR INFO =====
@@ -721,7 +718,7 @@
             
             document.getElementById('starInfoName').textContent = star.name;
             document.getElementById('starInfoType').textContent = star.type;
-            document.getElementById('starInfoPlanets').textContent = star.planets + ' planets';
+            document.getElementById('starInfoPlanets').textContent = star.planetCount + ' planets';
             document.getElementById('starDistance').textContent = star.distance.toFixed(1);
             
             // Update cumulative info for plot mode
@@ -775,23 +772,33 @@
             loadingText.textContent = 'entering system...';
             
             try {
+                // Prepare system data with all planets and their resources
+                const systemData = {
+                    star: {
+                        name: selectedStar.name,
+                        type: selectedStar.type,
+                        typeKey: selectedStar.typeKey,
+                        color: selectedStar.color,
+                        icon: selectedStar.icon,
+                        index: selectedStar.index,
+                        seed: selectedStar.seed
+                    },
+                    planets: selectedStar.planets.map(p => ({
+                        ...p,
+                        // Ensure resources are included
+                        resources: p.resources || []
+                    })),
+                    clusterName: clusterName,
+                    sectorId: currentSectorId,
+                    timestamp: Date.now()
+                };
+                
+                // Save system data to localStorage
+                localStorage.setItem('voidfarer_system_data', JSON.stringify(systemData));
+                
                 // Add this star's distance to journey total
                 const newTotal = journeyDistance + selectedStar.distance;
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
-                
-                // Save star data
-                if (typeof window.setCurrentStar === 'function') {
-                    await window.setCurrentStar(
-                        selectedStar.name,
-                        selectedStar.type,
-                        selectedStar.index,
-                        selectedStar.planets + ' planets'
-                    );
-                } else {
-                    localStorage.setItem('voidfarer_current_star', selectedStar.name);
-                    localStorage.setItem('voidfarer_current_star_type', selectedStar.type);
-                    localStorage.setItem('voidfarer_current_star_index', selectedStar.index.toString());
-                }
                 
                 // Navigate to system view
                 setTimeout(() => {
@@ -813,6 +820,30 @@
             loadingText.textContent = 'adding star leg...';
             
             try {
+                // Prepare system data with all planets and their resources
+                const systemData = {
+                    star: {
+                        name: selectedStar.name,
+                        type: selectedStar.type,
+                        typeKey: selectedStar.typeKey,
+                        color: selectedStar.color,
+                        icon: selectedStar.icon,
+                        index: selectedStar.index,
+                        seed: selectedStar.seed
+                    },
+                    planets: selectedStar.planets.map(p => ({
+                        ...p,
+                        // Ensure resources are included
+                        resources: p.resources || []
+                    })),
+                    clusterName: clusterName,
+                    sectorId: currentSectorId,
+                    timestamp: Date.now()
+                };
+                
+                // Save system data to localStorage
+                localStorage.setItem('voidfarer_system_data', JSON.stringify(systemData));
+                
                 // Get current cumulative distance
                 const currentCumulative = parseFloat(localStorage.getItem('voidfarer_plot_cumulative_distance') || '0');
                 
@@ -874,13 +905,19 @@
                     distanceDisplay = `<div class="distance-badge">${star.distance.toFixed(1)} LY</div>`;
                 }
                 
+                // Get planet icons for preview
+                const planetIcons = star.planets.slice(0, 3).map(p => p.icon).join(' ');
+                
                 card.innerHTML = `
                     ${distanceDisplay}
                     <div class="star-icon" style="text-shadow: 0 0 20px ${star.color}">${star.icon}</div>
                     <div class="star-info">
                         <div class="star-name" style="color: ${star.color}">${star.name}</div>
                         <div class="star-type">${star.type}</div>
-                        <div class="star-details">⏺️ ${star.planets} planets</div>
+                        <div class="star-details">
+                            <span>⏺️ ${star.planetCount} planets</span>
+                            <span>${planetIcons}</span>
+                        </div>
                     </div>
                 `;
                 
