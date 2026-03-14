@@ -369,7 +369,7 @@ function getElementValue(elementName) {
     return values[elementName] || 100;
 }
 
-// Public wrapper function - adds element to collection and saves location
+// Public wrapper function - adds element to collection and saves location with full metadata
 async function addElementToCollection(elementName, count = 1, locationData = null) {
     try {
         const result = await _addElementToCollection(elementName, count);
@@ -385,13 +385,24 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
             // Save location data ONLY if it's from planetary mining
             // This preserves the journal for elements found on surfaces
             if (locationData && typeof window.saveElementLocation === 'function') {
-                // Extract just the planet name (simplified)
+                // Get planet name and type
                 const planetName = locationData.planet || getCurrentPlanetName();
+                const planetType = locationData.planetType || getCurrentPlanetType();
+                
+                // Create enhanced location data with all metadata
+                const enhancedLocationData = {
+                    planet: planetName,
+                    planetType: planetType,
+                    quantity: count,
+                    rarity: getElementRarity(elementName),
+                    value: getElementValue(elementName),
+                    timestamp: Date.now()
+                };
                 
                 try {
-                    // Call the db.js function directly
-                    await window.saveElementLocation(elementName, planetName, { planet: planetName });
-                    console.log(`📍 Journal entry: ${elementName} found on ${planetName}`);
+                    // Call the db.js function with full metadata
+                    await window.saveElementLocation(elementName, planetName, enhancedLocationData);
+                    console.log(`📍 Journal entry: ${count}x ${elementName} (${enhancedLocationData.rarity}) found on ${planetName}`);
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
                 }
