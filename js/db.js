@@ -154,6 +154,7 @@ function getDb() {
         }
         
         // ===== ELEMENT LOCATIONS STORE (for journal) =====
+        // Simplified: only stores planet name where element was found
         if (!db.objectStoreNames.contains('elementLocations')) {
           const store = db.createObjectStore('elementLocations', { keyPath: 'id' });
           store.createIndex('by-element', 'elementName');
@@ -667,7 +668,7 @@ async function resetAllData() {
       'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
       'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
       'bookmarks', 'shipUpgrades', 'settings', 'priceHistory', 'tradeHistory',
-      'elementLocations' // Add the new store
+      'elementLocations'
     ];
     
     const db = await getDb();
@@ -729,8 +730,8 @@ async function initializeDatabase() {
   }
 }
 
-// ===== ELEMENT LOCATIONS HELPERS =====
-// Save where an element was found
+// ===== ELEMENT LOCATIONS HELPERS (SIMPLIFIED) =====
+// Save where an element was found - only stores planet name
 async function saveElementLocation(elementName, planetName, locationData = {}) {
   try {
     const db = await getDb();
@@ -742,23 +743,22 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
       localStorage.setItem('voidfarer_player_id', playerId);
     }
     
-    const locationId = `loc_${elementName}_${planetName}_${Date.now()}`;
+    // Use provided planet name or try to get from locationData, with fallback
+    const finalPlanet = planetName || locationData.planet || 'Unknown';
+    
+    const locationId = `loc_${elementName}_${finalPlanet}_${Date.now()}`;
     
     const locationRecord = {
       id: locationId,
       elementName: elementName,
-      planet: planetName,
-      sector: locationData.sector || localStorage.getItem('voidfarer_current_sector') || 'B2',
-      region: locationData.region || localStorage.getItem('voidfarer_current_region') || 'Orion Arm',
-      star: locationData.star || localStorage.getItem('voidfarer_current_star') || 'Sol',
-      starSector: locationData.starSector || localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud',
+      planet: finalPlanet,
       playerId: playerId,
       discoveredAt: Date.now(),
       discoveredDate: new Date().toISOString()
     };
     
     await setItem('elementLocations', locationRecord);
-    console.log(`📍 Saved location: ${elementName} on ${planetName}`);
+    console.log(`📍 Saved location: ${elementName} on ${finalPlanet}`);
     return true;
   } catch (error) {
     console.error('Error saving element location:', error);
@@ -769,6 +769,7 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
 // Get all locations for a specific element
 async function getElementLocations(elementName) {
   try {
+    const db = await getDb();
     const allLocations = await getAll('elementLocations') || [];
     return allLocations
       .filter(loc => loc.elementName === elementName)
@@ -840,7 +841,7 @@ window.resetAllData = resetAllData;
 window.getDatabaseStats = getDatabaseStats;
 window.initializeDatabase = initializeDatabase;
 
-// New location helpers
+// New location helpers (simplified)
 window.saveElementLocation = saveElementLocation;
 window.getElementLocations = getElementLocations;
 window.getPlayerLocations = getPlayerLocations;
