@@ -385,7 +385,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
             
             // Save location data ONLY if it's from planetary mining
             // This preserves the journal for elements found on surfaces
-            if (locationData && typeof window._dbSaveElementLocation === 'function') {
+            if (locationData && typeof window.saveElementLocation === 'function') {
                 // Get planet name and type
                 const planetName = locationData.planet || getCurrentPlanetName();
                 const planetType = locationData.planetType || getCurrentPlanetType();
@@ -403,7 +403,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 
                 try {
                     // Call the db.js function with full metadata
-                    await window._dbSaveElementLocation(elementName, planetName, enhancedLocationData);
+                    await window.saveElementLocation(elementName, planetName, enhancedLocationData);
                     console.log(`📍 Journal entry: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
@@ -902,6 +902,12 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// NOTE: Planet status functions are now handled directly in db.js
-// We don't need to redefine them here to avoid recursion
-// The functions from db.js are already available on the window object
+// NOTE: Planet status functions are already exposed by db.js
+// We do NOT redefine them here to avoid recursion
+// The following functions are available directly from db.js:
+// - getPlanetStatus
+// - updatePlanetStatusFromLocations
+// - claimPlanet
+// - getClaimedPlanets
+// - getPlanetsByExploration
+// - getPlanetsByRarity
