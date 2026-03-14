@@ -154,14 +154,15 @@ function getDb() {
         }
         
         // ===== ELEMENT LOCATIONS STORE (for journal) =====
-        // Simplified: only stores planet name where element was found
+        // Enhanced: stores planet name, rarity, quantity, and timestamp
         if (!db.objectStoreNames.contains('elementLocations')) {
           const store = db.createObjectStore('elementLocations', { keyPath: 'id' });
           store.createIndex('by-element', 'elementName');
           store.createIndex('by-planet', 'planet');
           store.createIndex('by-player', 'playerId');
           store.createIndex('by-date', 'discoveredAt');
-          console.log('✅ Created elementLocations store');
+          store.createIndex('by-rarity', 'elementRarity');
+          console.log('✅ Created elementLocations store with enhanced indices');
         }
         
         // ===== MIGRATION FLAG =====
@@ -730,8 +731,43 @@ async function initializeDatabase() {
   }
 }
 
-// ===== ELEMENT LOCATIONS HELPERS (SIMPLIFIED) =====
-// Save where an element was found - only stores planet name
+// Helper function to get element rarity (simplified version)
+function getElementRarity(elementName) {
+  const rareElements = [
+    'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
+    'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
+    'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
+  ];
+  
+  if (rareElements.includes(elementName)) {
+    if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
+      return 'legendary';
+    }
+    if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
+      return 'very-rare';
+    }
+    return 'rare';
+  }
+  
+  const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
+  if (uncommonElements.includes(elementName)) {
+    return 'uncommon';
+  }
+  
+  return 'common';
+}
+
+// Helper function to get element value
+function getElementValue(elementName) {
+  const values = {
+    'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Uranium': 5000,
+    'Promethium': 25000, 'Carbon': 250, 'Iron': 250, 'Oxygen': 250
+  };
+  return values[elementName] || 100;
+}
+
+// ===== ELEMENT LOCATIONS HELPERS (ENHANCED) =====
+// Save where an element was found - stores planet name, rarity, quantity, and timestamp
 async function saveElementLocation(elementName, planetName, locationData = {}) {
   try {
     const db = await getDb();
@@ -743,22 +779,31 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
       localStorage.setItem('voidfarer_player_id', playerId);
     }
     
+    // Get element rarity and value
+    const rarity = getElementRarity(elementName);
+    const value = getElementValue(elementName);
+    
     // Use provided planet name or try to get from locationData, with fallback
     const finalPlanet = planetName || locationData.planet || 'Unknown';
+    const quantity = locationData.quantity || 1;
     
     const locationId = `loc_${elementName}_${finalPlanet}_${Date.now()}`;
     
     const locationRecord = {
       id: locationId,
       elementName: elementName,
+      elementRarity: rarity,
+      elementValue: value,
       planet: finalPlanet,
+      planetType: locationData.planetType || 'unknown',
       playerId: playerId,
+      quantity: quantity,
       discoveredAt: Date.now(),
       discoveredDate: new Date().toISOString()
     };
     
     await setItem('elementLocations', locationRecord);
-    console.log(`📍 Saved location: ${elementName} on ${finalPlanet}`);
+    console.log(`📍 Saved location: ${elementName} (${rarity}) on ${finalPlanet} (x${quantity})`);
     return true;
   } catch (error) {
     console.error('Error saving element location:', error);
@@ -769,7 +814,6 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
 // Get all locations for a specific element
 async function getElementLocations(elementName) {
   try {
-    const db = await getDb();
     const allLocations = await getAll('elementLocations') || [];
     return allLocations
       .filter(loc => loc.elementName === elementName)
@@ -808,6 +852,37 @@ async function getUniquePlanetsForElement(elementName) {
   }
 }
 
+// Get location statistics for an element
+async function getElementLocationStats(elementName) {
+  try {
+    const locations = await getElementLocations(elementName);
+    const stats = {
+      totalFinds: locations.length,
+      totalQuantity: locations.reduce((sum, loc) => sum + (loc.quantity || 1), 0),
+      firstDiscovery: locations.length > 0 ? locations[locations.length - 1].discoveredDate : null,
+      lastDiscovery: locations.length > 0 ? locations[0].discoveredDate : null,
+      planets: {}
+    };
+    
+    locations.forEach(loc => {
+      if (!stats.planets[loc.planet]) {
+        stats.planets[loc.planet] = {
+          count: 0,
+          quantity: 0,
+          lastFound: loc.discoveredDate
+        };
+      }
+      stats.planets[loc.planet].count++;
+      stats.planets[loc.planet].quantity += loc.quantity || 1;
+    });
+    
+    return stats;
+  } catch (error) {
+    console.error('Error getting element location stats:', error);
+    return null;
+  }
+}
+
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
 window.idb = idb;
 window.getDb = getDb;
@@ -841,8 +916,9 @@ window.resetAllData = resetAllData;
 window.getDatabaseStats = getDatabaseStats;
 window.initializeDatabase = initializeDatabase;
 
-// New location helpers (simplified)
+// Enhanced location helpers
 window.saveElementLocation = saveElementLocation;
 window.getElementLocations = getElementLocations;
 window.getPlayerLocations = getPlayerLocations;
 window.getUniquePlanetsForElement = getUniquePlanetsForElement;
+window.getElementLocationStats = getElementLocationStats;
