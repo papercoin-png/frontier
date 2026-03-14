@@ -2,7 +2,7 @@
 // Using idb library for simpler Promise-based API with proper error handling
 
 const DB_NAME = 'VoidfarerDB';
-const DB_VERSION = 2; // Increment version to trigger upgrade
+const DB_VERSION = 3; // Increment version to add planet status store
 
 let dbPromise = null;
 
@@ -165,6 +165,19 @@ function getDb() {
           console.log('✅ Created elementLocations store with enhanced indices');
         }
         
+        // ===== PLANET STATUS STORE (for exploration tracking) =====
+        // NEW: Tracks planet exploration status, highest rarity found, and claim status
+        if (!db.objectStoreNames.contains('planetStatus')) {
+          const store = db.createObjectStore('planetStatus', { keyPath: 'planetName' });
+          store.createIndex('by-explored', 'explored');
+          store.createIndex('by-highestRarity', 'highestRarity');
+          store.createIndex('by-fullyExplored', 'fullyExplored');
+          store.createIndex('by-claimed', 'claimed');
+          store.createIndex('by-sector', 'sector');
+          store.createIndex('by-star', 'star');
+          console.log('✅ Created planetStatus store for exploration tracking');
+        }
+        
         // ===== MIGRATION FLAG =====
         if (!db.objectStoreNames.contains('migration')) {
           db.createObjectStore('migration', { keyPath: 'id' });
@@ -209,6 +222,17 @@ async function getAllFromIndex(storeName, indexName, key) {
   } catch (error) {
     console.error(`Error getting from index ${indexName}:`, error);
     return [];
+  }
+}
+
+// Get a single item with an index
+async function getFromIndex(storeName, indexName, key) {
+  try {
+    const db = await getDb();
+    return await db.getFromIndex(storeName, indexName, key);
+  } catch (error) {
+    console.error(`Error getting from index ${indexName}:`, error);
+    return null;
   }
 }
 
@@ -669,7 +693,7 @@ async function resetAllData() {
       'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
       'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
       'bookmarks', 'shipUpgrades', 'settings', 'priceHistory', 'tradeHistory',
-      'elementLocations'
+      'elementLocations', 'planetStatus'
     ];
     
     const db = await getDb();
@@ -699,7 +723,7 @@ async function getDatabaseStats() {
       'player', 'collection', 'missions', 'completedMissions',
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
       'activeEvents', 'colonies', 'priceHistory', 'tradeHistory',
-      'elementLocations'
+      'elementLocations', 'planetStatus'
     ];
     
     const stats = {};
@@ -780,12 +804,13 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
     }
     
     // Get element rarity and value
-    const rarity = getElementRarity(elementName);
-    const value = getElementValue(elementName);
+    const rarity = locationData.rarity || getElementRarity(elementName);
+    const value = locationData.value || getElementValue(elementName);
     
     // Use provided planet name or try to get from locationData, with fallback
     const finalPlanet = planetName || locationData.planet || 'Unknown';
     const quantity = locationData.quantity || 1;
+    const planetType = locationData.planetType || 'unknown';
     
     const locationId = `loc_${elementName}_${finalPlanet}_${Date.now()}`;
     
@@ -795,7 +820,7 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
       elementRarity: rarity,
       elementValue: value,
       planet: finalPlanet,
-      planetType: locationData.planetType || 'unknown',
+      planetType: planetType,
       playerId: playerId,
       quantity: quantity,
       discoveredAt: Date.now(),
@@ -804,6 +829,10 @@ async function saveElementLocation(elementName, planetName, locationData = {}) {
     
     await setItem('elementLocations', locationRecord);
     console.log(`📍 Saved location: ${elementName} (${rarity}) on ${finalPlanet} (x${quantity})`);
+    
+    // After saving location, update planet status
+    await updatePlanetStatusFromLocations(finalPlanet);
+    
     return true;
   } catch (error) {
     console.error('Error saving element location:', error);
@@ -883,12 +912,196 @@ async function getElementLocationStats(elementName) {
   }
 }
 
+// ===== PLANET STATUS HELPERS (NEW) =====
+// Save planet status
+async function savePlanetStatus(planetName, statusData) {
+  try {
+    const statusRecord = {
+      planetName: planetName,
+      explored: statusData.explored || false,
+      highestRarity: statusData.highestRarity || null,
+      resourcesFound: statusData.resourcesFound || [],
+      resourceCount: statusData.resourceCount || 0,
+      fullyExplored: statusData.fullyExplored || false,
+      claimed: statusData.claimed || false,
+      sector: statusData.sector || null,
+      star: statusData.star || null,
+      lastUpdated: Date.now(),
+      lastUpdatedDate: new Date().toISOString()
+    };
+    
+    await setItem('planetStatus', statusRecord);
+    console.log(`🪐 Saved planet status: ${planetName} - ${statusData.highestRarity || 'unexplored'}`);
+    return true;
+  } catch (error) {
+    console.error('Error saving planet status:', error);
+    return false;
+  }
+}
+
+// Get planet status
+async function getPlanetStatus(planetName) {
+  try {
+    const status = await getItem('planetStatus', planetName);
+    return status || null;
+  } catch (error) {
+    console.error('Error getting planet status:', error);
+    return null;
+  }
+}
+
+// Update planet status based on location data
+async function updatePlanetStatusFromLocations(planetName) {
+  try {
+    // Get all locations for this planet
+    const allLocations = await getAll('elementLocations') || [];
+    const playerId = localStorage.getItem('voidfarer_player_id');
+    
+    const planetLocations = allLocations.filter(loc => 
+      loc.planet === planetName && loc.playerId === playerId
+    );
+    
+    if (planetLocations.length === 0) {
+      // No locations found, planet is unexplored
+      await savePlanetStatus(planetName, {
+        explored: false,
+        highestRarity: null,
+        resourcesFound: [],
+        resourceCount: 0,
+        fullyExplored: false,
+        claimed: false
+      });
+      return;
+    }
+    
+    // Get unique resources and rarities
+    const resourcesFound = [];
+    const raritiesFound = [];
+    
+    planetLocations.forEach(loc => {
+      if (!resourcesFound.includes(loc.elementName)) {
+        resourcesFound.push(loc.elementName);
+      }
+      if (!raritiesFound.includes(loc.elementRarity)) {
+        raritiesFound.push(loc.elementRarity);
+      }
+    });
+    
+    // Determine highest rarity
+    const rarityOrder = ['common', 'uncommon', 'rare', 'very-rare', 'legendary'];
+    let highestRarity = 'common';
+    let highestIndex = 0;
+    
+    raritiesFound.forEach(rarity => {
+      const index = rarityOrder.indexOf(rarity);
+      if (index > highestIndex) {
+        highestIndex = index;
+        highestRarity = rarity;
+      }
+    });
+    
+    // Check if fully explored (has 4 unique resources)
+    const fullyExplored = resourcesFound.length >= 4;
+    
+    // Get claim status
+    const currentStatus = await getPlanetStatus(planetName);
+    const claimed = currentStatus ? currentStatus.claimed : false;
+    
+    // Save updated status
+    await savePlanetStatus(planetName, {
+      explored: true,
+      highestRarity: highestRarity,
+      resourcesFound: resourcesFound,
+      resourceCount: resourcesFound.length,
+      fullyExplored: fullyExplored,
+      claimed: claimed
+    });
+    
+    return {
+      explored: true,
+      highestRarity,
+      resourcesFound,
+      resourceCount: resourcesFound.length,
+      fullyExplored,
+      claimed
+    };
+    
+  } catch (error) {
+    console.error(`Error updating planet status for ${planetName}:`, error);
+    return null;
+  }
+}
+
+// Claim a planet
+async function claimPlanet(planetName) {
+  try {
+    const status = await getPlanetStatus(planetName);
+    
+    if (!status) {
+      console.error(`Cannot claim planet ${planetName}: not found`);
+      return false;
+    }
+    
+    if (!status.fullyExplored) {
+      console.error(`Cannot claim planet ${planetName}: not fully explored`);
+      return false;
+    }
+    
+    status.claimed = true;
+    status.lastUpdated = Date.now();
+    status.lastUpdatedDate = new Date().toISOString();
+    
+    await setItem('planetStatus', status);
+    console.log(`🏆 Planet ${planetName} claimed!`);
+    
+    return true;
+    
+  } catch (error) {
+    console.error(`Error claiming planet ${planetName}:`, error);
+    return false;
+  }
+}
+
+// Get all claimed planets
+async function getClaimedPlanets() {
+  try {
+    const allStatuses = await getAll('planetStatus') || [];
+    return allStatuses.filter(status => status.claimed === true);
+  } catch (error) {
+    console.error('Error getting claimed planets:', error);
+    return [];
+  }
+}
+
+// Get planets by exploration status
+async function getPlanetsByExploration(explored = true) {
+  try {
+    const allStatuses = await getAll('planetStatus') || [];
+    return allStatuses.filter(status => status.explored === explored);
+  } catch (error) {
+    console.error('Error getting planets by exploration:', error);
+    return [];
+  }
+}
+
+// Get planets by rarity
+async function getPlanetsByRarity(rarity) {
+  try {
+    const allStatuses = await getAll('planetStatus') || [];
+    return allStatuses.filter(status => status.highestRarity === rarity);
+  } catch (error) {
+    console.error('Error getting planets by rarity:', error);
+    return [];
+  }
+}
+
 // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE FOR HTML =====
 window.idb = idb;
 window.getDb = getDb;
 window.getItem = getItem;
 window.getAll = getAll;
 window.getAllFromIndex = getAllFromIndex;
+window.getFromIndex = getFromIndex;
 window.setItem = setItem;
 window.setItems = setItems;
 window.deleteItem = deleteItem;
@@ -922,3 +1135,12 @@ window.getElementLocations = getElementLocations;
 window.getPlayerLocations = getPlayerLocations;
 window.getUniquePlanetsForElement = getUniquePlanetsForElement;
 window.getElementLocationStats = getElementLocationStats;
+
+// NEW: Planet status helpers
+window.savePlanetStatus = savePlanetStatus;
+window.getPlanetStatus = getPlanetStatus;
+window.updatePlanetStatusFromLocations = updatePlanetStatusFromLocations;
+window.claimPlanet = claimPlanet;
+window.getClaimedPlanets = getClaimedPlanets;
+window.getPlanetsByExploration = getPlanetsByExploration;
+window.getPlanetsByRarity = getPlanetsByRarity;
