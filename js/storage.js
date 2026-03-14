@@ -133,6 +133,11 @@ async function getRemainingCargoMass() {
     }
 }
 
+// ===== CURRENT PLANET HELPER (SIMPLIFIED) =====
+function getCurrentPlanetName() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
+}
+
 // ===== INITIALIZATION =====
 async function initializeStorage() {
     console.log('Initializing storage...');
@@ -294,7 +299,7 @@ async function _removeElementFromCollection(elementName, count = 1) {
     }
 }
 
-// Public wrapper functions
+// Public wrapper functions - SIMPLIFIED: only mines on planetary surfaces need location
 async function addElementToCollection(elementName, count = 1, locationData = null) {
     try {
         const result = await _addElementToCollection(elementName, count);
@@ -307,10 +312,15 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 await savePlayer(player);
             }
             
-            // Save location data if provided
+            // Save location data ONLY if it's from planetary mining
+            // This preserves the journal for elements found on surfaces
             if (locationData && typeof window.saveElementLocation === 'function') {
+                // Extract just the planet name (simplified)
+                const planetName = locationData.planet || getCurrentPlanetName();
+                
                 try {
-                    await window.saveElementLocation(elementName, locationData.planet, locationData);
+                    await window.saveElementLocation(elementName, planetName, { planet: planetName });
+                    console.log(`📍 Journal entry: ${elementName} found on ${planetName}`);
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
                 }
@@ -737,12 +747,14 @@ function getPlayerId() {
     return playerId;
 }
 
-// ===== ELEMENT LOCATIONS HELPERS =====
+// ===== ELEMENT LOCATIONS HELPERS (SIMPLIFIED WRAPPERS) =====
 async function saveElementLocation(elementName, planetName, locationData = {}) {
     try {
-        // This function now lives in db.js, but we provide a wrapper here
+        // This function now lives in db.js, we provide a wrapper here
         if (typeof window.saveElementLocation === 'function') {
-            return await window.saveElementLocation(elementName, planetName, locationData);
+            // Pass only the essential data - planet name
+            const planet = planetName || locationData.planet || getCurrentPlanetName();
+            return await window.saveElementLocation(elementName, planet, { planet: planet });
         }
         return false;
     } catch (error) {
@@ -795,6 +807,7 @@ window.ELEMENT_MASS = ELEMENT_MASS;
 window.getElementMass = getElementMass;
 window.getTotalCargoMass = getTotalCargoMass;
 window.getRemainingCargoMass = getRemainingCargoMass;
+window.getCurrentPlanetName = getCurrentPlanetName;
 window.initializeStorage = initializeStorage;
 window.getPlayer = getPlayer;
 window.savePlayer = savePlayer;
@@ -850,7 +863,7 @@ window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
 
-// Location helpers
+// Location helpers (simplified)
 window.saveElementLocation = saveElementLocation;
 window.getElementLocations = getElementLocations;
 window.getPlayerLocations = getPlayerLocations;
