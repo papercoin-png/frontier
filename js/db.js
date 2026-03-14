@@ -2,7 +2,7 @@
 // Using idb library for simpler Promise-based API with proper error handling
 
 const DB_NAME = 'VoidfarerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Increment version to trigger upgrade
 
 let dbPromise = null;
 
@@ -151,6 +151,16 @@ function getDb() {
           store.createIndex('by-element', 'elementName');
           store.createIndex('by-date', 'date');
           store.createIndex('by-timestamp', 'timestamp');
+        }
+        
+        // ===== ELEMENT LOCATIONS STORE (for journal) =====
+        if (!db.objectStoreNames.contains('elementLocations')) {
+          const store = db.createObjectStore('elementLocations', { keyPath: 'id' });
+          store.createIndex('by-element', 'elementName');
+          store.createIndex('by-planet', 'planet');
+          store.createIndex('by-player', 'playerId');
+          store.createIndex('by-date', 'discoveredAt');
+          console.log('✅ Created elementLocations store');
         }
         
         // ===== MIGRATION FLAG =====
@@ -656,7 +666,8 @@ async function resetAllData() {
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
       'hourlySnapshots', 'taxRates', 'communityFund', 'activeEvents',
       'eventHistory', 'colonies', 'discoveredLocations', 'scanHistory',
-      'bookmarks', 'shipUpgrades', 'settings', 'priceHistory', 'tradeHistory'
+      'bookmarks', 'shipUpgrades', 'settings', 'priceHistory', 'tradeHistory',
+      'elementLocations' // Add the new store
     ];
     
     const db = await getDb();
@@ -685,7 +696,8 @@ async function getDatabaseStats() {
     const stores = [
       'player', 'collection', 'missions', 'completedMissions',
       'properties', 'propertyItems', 'taxTransactions', 'dailyMetrics',
-      'activeEvents', 'colonies', 'priceHistory', 'tradeHistory'
+      'activeEvents', 'colonies', 'priceHistory', 'tradeHistory',
+      'elementLocations'
     ];
     
     const stats = {};
@@ -714,6 +726,84 @@ async function initializeDatabase() {
   } catch (error) {
     console.error('Failed to initialize database:', error);
     return false;
+  }
+}
+
+// ===== ELEMENT LOCATIONS HELPERS =====
+// Save where an element was found
+async function saveElementLocation(elementName, planetName, locationData = {}) {
+  try {
+    const db = await getDb();
+    
+    // Get player ID from localStorage
+    let playerId = localStorage.getItem('voidfarer_player_id');
+    if (!playerId) {
+      playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      localStorage.setItem('voidfarer_player_id', playerId);
+    }
+    
+    const locationId = `loc_${elementName}_${planetName}_${Date.now()}`;
+    
+    const locationRecord = {
+      id: locationId,
+      elementName: elementName,
+      planet: planetName,
+      sector: locationData.sector || localStorage.getItem('voidfarer_current_sector') || 'B2',
+      region: locationData.region || localStorage.getItem('voidfarer_current_region') || 'Orion Arm',
+      star: locationData.star || localStorage.getItem('voidfarer_current_star') || 'Sol',
+      starSector: locationData.starSector || localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud',
+      playerId: playerId,
+      discoveredAt: Date.now(),
+      discoveredDate: new Date().toISOString()
+    };
+    
+    await setItem('elementLocations', locationRecord);
+    console.log(`📍 Saved location: ${elementName} on ${planetName}`);
+    return true;
+  } catch (error) {
+    console.error('Error saving element location:', error);
+    return false;
+  }
+}
+
+// Get all locations for a specific element
+async function getElementLocations(elementName) {
+  try {
+    const allLocations = await getAll('elementLocations') || [];
+    return allLocations
+      .filter(loc => loc.elementName === elementName)
+      .sort((a, b) => b.discoveredAt - a.discoveredAt);
+  } catch (error) {
+    console.error('Error getting element locations:', error);
+    return [];
+  }
+}
+
+// Get all locations a player has discovered
+async function getPlayerLocations() {
+  try {
+    const playerId = localStorage.getItem('voidfarer_player_id');
+    if (!playerId) return [];
+    
+    const allLocations = await getAll('elementLocations') || [];
+    return allLocations
+      .filter(loc => loc.playerId === playerId)
+      .sort((a, b) => b.discoveredAt - a.discoveredAt);
+  } catch (error) {
+    console.error('Error getting player locations:', error);
+    return [];
+  }
+}
+
+// Get unique planets where an element was found
+async function getUniquePlanetsForElement(elementName) {
+  try {
+    const locations = await getElementLocations(elementName);
+    const uniquePlanets = [...new Set(locations.map(loc => loc.planet))];
+    return uniquePlanets;
+  } catch (error) {
+    console.error('Error getting unique planets:', error);
+    return [];
   }
 }
 
@@ -749,3 +839,9 @@ window.setMigrationComplete = setMigrationComplete;
 window.resetAllData = resetAllData;
 window.getDatabaseStats = getDatabaseStats;
 window.initializeDatabase = initializeDatabase;
+
+// New location helpers
+window.saveElementLocation = saveElementLocation;
+window.getElementLocations = getElementLocations;
+window.getPlayerLocations = getPlayerLocations;
+window.getUniquePlanetsForElement = getUniquePlanetsForElement;
