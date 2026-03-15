@@ -194,15 +194,12 @@ async function getCurrentInventory() {
         // Try to use the global getCollection function
         if (typeof window.getCollection === 'function') {
             const collection = await window.getCollection();
-            console.log('Raw collection from storage:', collection);
             return collection;
         }
         
         // Fallback to localStorage
         const saved = localStorage.getItem('voidfarer_collection');
-        const collection = saved ? JSON.parse(saved) : {};
-        console.log('Collection from localStorage:', collection);
-        return collection;
+        return saved ? JSON.parse(saved) : {};
     } catch (error) {
         console.error('Error getting inventory:', error);
         return {};
@@ -232,27 +229,22 @@ export async function craftItem(recipeId, count = 1) {
         
         // Get current inventory using the helper function
         const inventory = await getCurrentInventory();
-        console.log('Current inventory for crafting:', inventory);
         
         // Calculate total ingredients needed for the batch
         const totalIngredients = {};
         for (const [element, amount] of Object.entries(recipe.ingredients)) {
             totalIngredients[element] = amount * count;
         }
-        console.log('Ingredients needed:', totalIngredients);
         
         // Verify all ingredients available
         for (const [element, amount] of Object.entries(totalIngredients)) {
             let available = 0;
             
             if (inventory[element]) {
-                // Handle both formats
                 available = typeof inventory[element] === 'object' 
                     ? (inventory[element].count || 0) 
                     : inventory[element];
             }
-            
-            console.log(`Checking ${element}: need ${amount}, have ${available}`);
             
             if (available < amount) {
                 return { 
@@ -262,14 +254,11 @@ export async function craftItem(recipeId, count = 1) {
             }
         }
         
-        // Consume ingredients - use the remove function
+        // Consume ingredients using removeElementFromCollection
         for (const [element, amount] of Object.entries(totalIngredients)) {
-            console.log(`Removing ${amount}x ${element} from inventory...`);
-            
-            // Try to use the global remove function
             if (typeof window.removeElementFromCollection === 'function') {
                 const removeResult = await window.removeElementFromCollection(element, amount);
-                if (!removeResult.success) {
+                if (!removeResult || !removeResult.success) {
                     console.error(`Failed to remove ${element}:`, removeResult);
                     return { success: false, error: `Failed to remove ${element} from inventory` };
                 }
@@ -301,8 +290,6 @@ export async function craftItem(recipeId, count = 1) {
         // Update progress
         const newProgress = currentProgress + count;
         alchemyProgress[recipeId] = newProgress;
-        
-        // Save to localStorage
         localStorage.setItem('voidfarer_alchemy_progress', JSON.stringify(alchemyProgress));
         
         // Update total crafts count
@@ -312,8 +299,6 @@ export async function craftItem(recipeId, count = 1) {
         // Calculate new level
         const oldLevel = getLevelFromProgress(currentProgress);
         const newLevel = getLevelFromProgress(newProgress);
-        
-        console.log(`Crafting successful! New progress: ${newProgress}`);
         
         return {
             success: true,
@@ -332,8 +317,13 @@ export async function craftItem(recipeId, count = 1) {
 
 // Load alchemy progress from storage
 export function loadAlchemyProgress() {
-    const saved = localStorage.getItem('voidfarer_alchemy_progress');
-    return saved ? JSON.parse(saved) : {};
+    try {
+        const saved = localStorage.getItem('voidfarer_alchemy_progress');
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error loading alchemy progress:', error);
+        return {};
+    }
 }
 
 // Get all recipes with progress
@@ -382,3 +372,147 @@ export function getTotalCrafts() {
     const progress = loadAlchemyProgress();
     return Object.values(progress).reduce((sum, val) => sum + val, 0);
 }
+
+// Get recipe by ID
+export function getRecipeById(recipeId) {
+    for (const category of Object.values(ALCHEMY_RECIPES)) {
+        const found = category.find(r => r.id === recipeId);
+        if (found) return found;
+    }
+    return null;
+}
+
+// Calculate required materials for a given count
+export function calculateRequiredMaterials(recipeId, count = 1) {
+    const recipe = getRecipeById(recipeId);
+    if (!recipe) return null;
+    
+    const materials = {};
+    for (const [element, amount] of Object.entries(recipe.ingredients)) {
+        materials[element] = amount * count;
+    }
+    return materials;
+}
+
+// Check if player can craft a specific recipe multiple times
+export async function canCraftBatch(recipeId, count = 1) {
+    const recipe = getRecipeById(recipeId);
+    if (!recipe) return { success: false, error: 'Recipe not found' };
+    
+    const inventory = await getCurrentInventory();
+    const required = calculateRequiredMaterials(recipeId, count);
+    
+    for (const [element, amount] of Object.entries(required)) {
+        let available = 0;
+        if (inventory[element]) {
+            available = typeof inventory[element] === 'object' 
+                ? (inventory[element].count || 0) 
+                : inventory[element];
+        }
+        
+        if (available < amount) {
+            return { 
+                success: false, 
+                error: `Not enough ${element}. Need ${amount}, have ${available}`,
+                missing: element,
+                required: amount,
+                available: available
+            };
+        }
+    }
+    
+    return { success: true };
+}
+
+// Batch craft multiple items with progress tracking
+export async function batchCraft(recipeId, totalCount, onProgress = null) {
+    const results = {
+        success: 0,
+        failed: 0,
+        total: totalCount,
+        leveledUp: false,
+        newLevel: null
+    };
+    
+    // Check if we can craft the entire batch at once
+    const canCraft = await canCraftBatch(recipeId, totalCount);
+    if (!canCraft.success) {
+        return { success: false, error: canCraft.error };
+    }
+    
+    // Craft the entire batch
+    const result = await craftItem(recipeId, totalCount);
+    
+    if (result.success) {
+        results.success = totalCount;
+        results.leveledUp = result.leveledUp;
+        results.newLevel = result.newLevel;
+    } else {
+        results.failed = totalCount;
+    }
+    
+    return results;
+}
+
+// Get mastery level name for display
+export function getMasteryLevelName(progress) {
+    const level = getLevelFromProgress(progress);
+    return level.name;
+}
+
+// Get mastery multiplier
+export function getMasteryMultiplier(progress) {
+    const level = getLevelFromProgress(progress);
+    return level.multiplier;
+}
+
+// Calculate progress to next level
+export function getProgressToNextLevel(progress) {
+    for (let i = 0; i < LEVEL_THRESHOLDS.length - 1; i++) {
+        const current = LEVEL_THRESHOLDS[i];
+        const next = LEVEL_THRESHOLDS[i + 1];
+        
+        if (progress >= current.threshold && progress < next.threshold) {
+            const totalNeeded = next.threshold - current.threshold;
+            const currentProgress = progress - current.threshold;
+            return {
+                currentLevel: current.name,
+                nextLevel: next.name,
+                progress: currentProgress,
+                totalNeeded: totalNeeded,
+                percentage: (currentProgress / totalNeeded) * 100
+            };
+        }
+    }
+    
+    // At max level
+    const maxLevel = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+    return {
+        currentLevel: maxLevel.name,
+        nextLevel: null,
+        progress: 0,
+        totalNeeded: 0,
+        percentage: 100
+    };
+}
+
+// ===== EXPORT ALL FUNCTIONS =====
+export default {
+    ALCHEMY_RECIPES,
+    LEVEL_THRESHOLDS,
+    getLevelFromProgress,
+    hasIngredients,
+    getCurrentInventory,
+    craftItem,
+    loadAlchemyProgress,
+    getRecipesWithProgress,
+    isRecipeUnlocked,
+    getTotalCrafts,
+    getRecipeById,
+    calculateRequiredMaterials,
+    canCraftBatch,
+    batchCraft,
+    getMasteryLevelName,
+    getMasteryMultiplier,
+    getProgressToNextLevel
+};
