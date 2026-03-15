@@ -829,7 +829,8 @@
             getLevelFromProgress, 
             craftItem as alchemyCraft,
             getRecipesWithProgress,
-            hasIngredients 
+            hasIngredients,
+            getTotalCrafts
         } from './js/alchemy.js';
 
         // ===== TELEGRAM INITIALIZATION =====
@@ -1042,8 +1043,10 @@
         // ===== LOAD LOCATIONS FOR ELEMENT =====
         async function loadLocationsForElement(elementName) {
             try {
+                // Use the new getElementLocations function from storage.js
                 if (typeof window.getElementLocations === 'function') {
                     const locations = await window.getElementLocations(elementName);
+                    console.log(`Loaded ${locations.length} locations for ${elementName}:`, locations);
                     return locations || [];
                 }
                 return [];
@@ -1169,6 +1172,12 @@
             } else {
                 expandedElement = elementName;
                 
+                // Show loading indicator
+                const loadingMsg = document.createElement('div');
+                loadingMsg.className = 'loading-locations';
+                loadingMsg.style.cssText = 'color: #a0c0ff; padding: 10px; text-align: center;';
+                loadingMsg.textContent = 'Loading location data...';
+                
                 // Load locations for this element if not cached
                 if (!locationsCache[elementName]) {
                     locationsCache[elementName] = await loadLocationsForElement(elementName);
@@ -1228,34 +1237,40 @@
                     // Build locations HTML
                     let locationsHtml = '';
                     if (elementLocations.length > 0) {
-                        const planetCounts = {};
+                        // Group by planet to show unique locations with counts
+                        const planetMap = new Map();
                         elementLocations.forEach(loc => {
                             const planet = loc.planet || 'Unknown';
-                            planetCounts[planet] = (planetCounts[planet] || 0) + 1;
+                            if (!planetMap.has(planet)) {
+                                planetMap.set(planet, {
+                                    count: 0,
+                                    firstDate: loc.discoveredDate || loc.timestamp,
+                                    planetType: loc.planetType || 'unknown',
+                                    locations: []
+                                });
+                            }
+                            const planetData = planetMap.get(planet);
+                            planetData.count++;
+                            planetData.locations.push(loc);
                         });
                         
-                        Object.entries(planetCounts).forEach(([planet, count]) => {
-                            const location = elementLocations.find(l => l.planet === planet);
-                            const date = location?.discoveredDate;
-                            const displayDate = date ? new Date(date).toLocaleDateString() : 'Unknown';
+                        // Convert to array and sort by count (most frequent first)
+                        const sortedPlanets = Array.from(planetMap.entries())
+                            .sort((a, b) => b[1].count - a[1].count);
+                        
+                        sortedPlanets.forEach(([planet, data]) => {
+                            // Get the most recent date for display
+                            const dates = data.locations.map(l => l.discoveredDate || l.timestamp).sort();
+                            const latestDate = dates[dates.length - 1];
+                            const displayDate = latestDate ? new Date(latestDate).toLocaleDateString() : 'Unknown';
                             
-                            let planetType = 'unknown';
-                            if (location?.planetType) {
-                                planetType = location.planetType;
-                            } else {
-                                if (planet.toLowerCase().includes('pyros')) planetType = 'scorched';
-                                else if (planet.toLowerCase().includes('verdant')) planetType = 'lush';
-                                else if (planet.toLowerCase().includes('glacier')) planetType = 'frozen';
-                                else if (planet.toLowerCase().includes('earth')) planetType = 'lush';
-                            }
-                            
-                            const typeIcon = getPlanetTypeIcon(planetType);
+                            const typeIcon = getPlanetTypeIcon(data.planetType);
                             
                             locationsHtml += `
-                                <div class="location-item" onclick="window.showWarpModal('${planet}', '${planetType}')">
+                                <div class="location-item" onclick="window.showWarpModal('${planet}', '${data.planetType}')">
                                     <div>
                                         <div class="location-planet">${typeIcon} ${planet}</div>
-                                        <div class="location-date">Found: ${displayDate} • ${count} time${count !== 1 ? 's' : ''}</div>
+                                        <div class="location-date">Found: ${data.count} time${data.count !== 1 ? 's' : ''} • Last: ${displayDate}</div>
                                     </div>
                                     <div class="warp-hint">Warp →</div>
                                 </div>
@@ -1352,7 +1367,7 @@
         }
 
         // ===== OPEN ALCHEMY ITEM DETAIL =====
-        function openAlchemyItem(recipeId) {
+        async function openAlchemyItem(recipeId) {
             // Find recipe
             let recipe = null;
             for (const category of Object.values(ALCHEMY_RECIPES)) {
@@ -1373,22 +1388,37 @@
             const progress = alchemyProgress[recipeId] || 0;
             const level = getLevelFromProgress(progress);
             
-            // Get inventory to check available ingredients
-            const inventory = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+            // Get inventory to check available ingredients - use the proper function
+            let inventory = {};
+            if (typeof window.getCollection === 'function') {
+                inventory = await window.getCollection();
+            } else {
+                const saved = localStorage.getItem('voidfarer_collection');
+                inventory = saved ? JSON.parse(saved) : {};
+            }
+            
+            console.log('Current inventory for crafting:', inventory);
             
             // Check ingredient availability
             let ingredientsHtml = '';
             let canCraft = true;
             
             for (const [element, amount] of Object.entries(recipe.ingredients)) {
-                const have = inventory[element] || 0;
-                const enough = have >= amount;
+                // Handle different inventory formats
+                let available = 0;
+                if (inventory[element]) {
+                    available = typeof inventory[element] === 'object' 
+                        ? (inventory[element].count || 0) 
+                        : inventory[element];
+                }
+                
+                const enough = available >= amount;
                 if (!enough) canCraft = false;
                 
                 ingredientsHtml += `
                     <div style="display: flex; justify-content: space-between; margin: 5px 0; color: ${enough ? '#4affaa' : '#ff6b6b'}">
                         <span>${element}</span>
-                        <span>${have} / ${amount}</span>
+                        <span>${available} / ${amount}</span>
                     </div>
                 `;
             }
@@ -1457,8 +1487,8 @@
         }
 
         // ===== CRAFT ITEM =====
-        function craftItem(recipeId, count) {
-            const result = alchemyCraft(recipeId, count);
+        async function craftItem(recipeId, count) {
+            const result = await alchemyCraft(recipeId, count);
             
             if (result.success) {
                 // Show success notification
@@ -1553,7 +1583,7 @@
             currentWarpTarget = null;
         }
 
-        // ===== CONFIRM WARP =====
+        // ===== CONFIRM WARP - FIXED to go to SURFACE not back to journal =====
         function confirmWarp() {
             if (!currentWarpTarget) return;
             
@@ -1576,7 +1606,19 @@
                 const fuelText = cyclesText.split('•')[1].trim();
                 const fuel = parseInt(fuelText.replace('⭐', ''));
                 
-                // Prepare warp data
+                // CRITICAL: Save the destination planet so surface.html can load it
+                // We're overriding the current planet with the destination
+                localStorage.setItem('voidfarer_warp_destination_planet', currentWarpTarget.planet);
+                localStorage.setItem('voidfarer_warp_destination_planet_type', currentWarpTarget.planetType);
+                
+                // Also save current location to return later if needed
+                localStorage.setItem('voidfarer_warp_origin_planet', currentPlanet);
+                localStorage.setItem('voidfarer_warp_origin_star', currentStar);
+                localStorage.setItem('voidfarer_warp_origin_starSector', currentStarSector);
+                localStorage.setItem('voidfarer_warp_origin_region', currentRegion);
+                localStorage.setItem('voidfarer_warp_origin_sector', currentSector);
+                
+                // Prepare warp data with return page = surface.html
                 const warpData = {
                     destination: currentWarpTarget.planet,
                     destinationType: currentWarpTarget.planetType,
@@ -1585,19 +1627,20 @@
                     totalDistance: distance,
                     warpCycles: cycles,
                     fuelCost: fuel,
-                    returnPage: 'journal.html',
+                    returnPage: 'surface.html',  // CRITICAL: Go to surface, not journal
                     
                     destPlanet: currentWarpTarget.planet,
                     destPlanetType: currentWarpTarget.planetType,
                     
-                    destSector: currentSector,
-                    destRegion: currentRegion,
+                    destSector: currentSector,  // Note: We're keeping sector info the same
+                    destRegion: currentRegion,  // This assumes the planet is in same region
                     destStarSector: currentStarSector,
                     destStar: currentStar
                 };
                 
                 localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
                 
+                // Navigate to warp
                 setTimeout(() => {
                     window.location.href = 'warp.html';
                 }, 500);
