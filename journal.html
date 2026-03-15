@@ -123,6 +123,42 @@
             letter-spacing: 2px;
         }
         
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            padding: 5px;
+            border: 1px solid #6a8ac0;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 12px 5px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #a0c0ff;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .tab-btn.active {
+            background: #6a8ac0;
+            color: #ffffff;
+            box-shadow: 0 0 15px #3a5a8a;
+        }
+        
+        .tab-btn:active {
+            transform: scale(0.95);
+        }
+        
         /* Stats Bar */
         .stats-bar {
             background: rgba(30, 45, 70, 0.6);
@@ -161,7 +197,7 @@
             letter-spacing: 1px;
         }
         
-        /* Filter Bar */
+        /* Filter Bar (for Discoveries tab) */
         .filter-bar {
             display: flex;
             gap: 6px;
@@ -193,7 +229,105 @@
             transform: scale(0.95);
         }
         
-        /* Rarity group headers */
+        /* Alchemy Categories */
+        .alchemy-category {
+            margin-bottom: 25px;
+        }
+        
+        .category-header {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            border-radius: 40px 10px 40px 10px;
+            background: rgba(30, 45, 70, 0.8);
+            border-left: 4px solid #4affaa;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .alchemy-item {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .alchemy-item:active {
+            transform: scale(0.99);
+            background: rgba(60, 90, 140, 0.7);
+        }
+        
+        .alchemy-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .alchemy-icon {
+            font-size: 24px;
+            min-width: 40px;
+            text-align: center;
+            color: #4affaa;
+        }
+        
+        .alchemy-info {
+            flex: 1;
+        }
+        
+        .alchemy-name {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        
+        .alchemy-formula {
+            font-size: 12px;
+            color: #a0c0ff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .alchemy-progress {
+            min-width: 100px;
+        }
+        
+        .progress-bar {
+            width: 100px;
+            height: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            font-size: 10px;
+            color: #ffd966;
+            text-align: right;
+        }
+        
+        .alchemy-level {
+            font-size: 11px;
+            color: #4affaa;
+            text-align: right;
+        }
+        
+        /* Rarity group headers (for Discoveries) */
         .rarity-group {
             margin-bottom: 20px;
         }
@@ -232,7 +366,7 @@
             color: #ffd700;
         }
         
-        /* Elements Grid */
+        /* Elements Grid (for Discoveries) */
         .elements-grid {
             display: flex;
             flex-direction: column;
@@ -571,6 +705,14 @@
             flex: 0 1 auto;
         }
         
+        /* Craft Notification Animation */
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -592,11 +734,17 @@
             <!-- Header -->
             <div class="journal-header">
                 <div class="journal-title">Journal</div>
-                <div class="journal-subtitle">✦ discovered elements ✦</div>
+                <div class="journal-subtitle">✦ knowledge archive ✦</div>
             </div>
             
-            <!-- Stats Bar -->
-            <div class="stats-bar">
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <button class="tab-btn active" id="discoveriesTab" onclick="window.switchTab('discoveries')">📖 DISCOVERIES</button>
+                <button class="tab-btn" id="alchemyTab" onclick="window.switchTab('alchemy')">⚗️ ALCHEMY</button>
+            </div>
+            
+            <!-- Stats Bar (visible in both tabs) -->
+            <div class="stats-bar" id="statsBar">
                 <div class="collection-stats">
                     <div class="stat-item">
                         <div class="stat-value" id="totalElements">0</div>
@@ -613,8 +761,8 @@
                 </div>
             </div>
             
-            <!-- Filter Bar -->
-            <div class="filter-bar">
+            <!-- Filter Bar (Discoveries only) -->
+            <div class="filter-bar" id="filterBar">
                 <span class="filter-btn active" onclick="window.filterElements('all')">ALL</span>
                 <span class="filter-btn" onclick="window.filterElements('common')">COMMON</span>
                 <span class="filter-btn" onclick="window.filterElements('uncommon')">UNCOMMON</span>
@@ -623,8 +771,8 @@
                 <span class="filter-btn" onclick="window.filterElements('legendary')">LEGENDARY</span>
             </div>
             
-            <!-- Elements Container - will be filled by JS -->
-            <div id="elementsContainer"></div>
+            <!-- Content Container - switches between Discoveries and Alchemy -->
+            <div id="contentContainer"></div>
             
             <!-- Back button -->
             <button class="back-button" onclick="window.returnToBridge()">
@@ -672,9 +820,17 @@
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/migration.js"></script>
     <script type="module" src="js/planet-utils.js"></script>
+    <script type="module" src="js/alchemy.js"></script>
 
     <script type="module">
         import { PLANET_TYPE_DATA } from './js/planet-utils.js';
+        import { 
+            ALCHEMY_RECIPES, 
+            getLevelFromProgress, 
+            craftItem as alchemyCraft,
+            getRecipesWithProgress,
+            hasIngredients 
+        } from './js/alchemy.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -686,8 +842,11 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const elementsContainer = document.getElementById('elementsContainer');
+        const contentContainer = document.getElementById('contentContainer');
         const warpModal = document.getElementById('warpModal');
+        const filterBar = document.getElementById('filterBar');
+        const discoveriesTab = document.getElementById('discoveriesTab');
+        const alchemyTab = document.getElementById('alchemyTab');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.filterElements = filterElements;
@@ -696,12 +855,22 @@
         window.closeWarpModal = closeWarpModal;
         window.confirmWarp = confirmWarp;
         window.returnToBridge = returnToBridge;
+        window.switchTab = switchTab;
+        window.openAlchemyItem = openAlchemyItem;
+        window.closeCraftModal = closeCraftModal;
+        window.craftItem = craftItem;
+        
+        // Expose alchemy data globally
+        window.ALCHEMY_RECIPES = ALCHEMY_RECIPES;
+        window.getLevelFromProgress = getLevelFromProgress;
+        window.getRecipesWithProgress = getRecipesWithProgress;
 
         // ===== STATE =====
         let allElements = [];
         let filteredElements = [];
         let currentFilter = 'all';
         let expandedElement = null;
+        let currentTab = 'discoveries';
         
         // Current warp target
         let currentWarpTarget = null;
@@ -926,13 +1095,47 @@
                 document.getElementById('uniqueElements').textContent = allElements.length;
                 document.getElementById('totalMass').textContent = Math.round(totalMass);
                 
-                // Apply filters
-                applyFilters();
+                // Initialize alchemy progress if needed
+                if (!localStorage.getItem('voidfarer_alchemy_progress')) {
+                    localStorage.setItem('voidfarer_alchemy_progress', '{}');
+                }
+                
+                // Render current tab
+                renderCurrentTab();
                 
             } catch (error) {
                 console.error('Error loading journal:', error);
-                elementsContainer.innerHTML = '<div class="empty-state">Error loading journal</div>';
+                contentContainer.innerHTML = '<div class="empty-state">Error loading journal</div>';
             }
+        }
+
+        // ===== RENDER CURRENT TAB =====
+        function renderCurrentTab() {
+            if (currentTab === 'discoveries') {
+                renderDiscoveries();
+            } else {
+                renderAlchemy();
+            }
+        }
+
+        // ===== SWITCH TAB =====
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            if (tab === 'discoveries') {
+                discoveriesTab.classList.add('active');
+                alchemyTab.classList.remove('active');
+                filterBar.style.display = 'flex';
+            } else {
+                discoveriesTab.classList.remove('active');
+                alchemyTab.classList.add('active');
+                filterBar.style.display = 'none';
+            }
+            
+            renderCurrentTab();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
         // ===== APPLY FILTERS =====
@@ -943,7 +1146,7 @@
                 filteredElements = allElements.filter(element => element.rarity === currentFilter);
             }
             
-            renderElements();
+            renderDiscoveries();
         }
 
         // ===== FILTER ELEMENTS =====
@@ -962,7 +1165,7 @@
         async function toggleExpand(elementName) {
             if (expandedElement === elementName) {
                 expandedElement = null;
-                renderElements();
+                renderDiscoveries();
             } else {
                 expandedElement = elementName;
                 
@@ -971,109 +1174,15 @@
                     locationsCache[elementName] = await loadLocationsForElement(elementName);
                 }
                 
-                renderElements();
+                renderDiscoveries();
             }
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ===== SHOW WARP MODAL =====
-        function showWarpModal(planet, planetType = 'unknown') {
-            currentWarpTarget = {
-                planet: planet,
-                planetType: planetType
-            };
-            
-            // Calculate approximate distance (simplified for demo)
-            const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
-            const distance = (currentSector === 'B2') ? 2.3 : 4.6;
-            const cycles = Math.min(5, Math.ceil(distance / 1.5));
-            const fuel = Math.floor(distance * 4) + 5;
-            
-            document.getElementById('modalPlanet').textContent = planet;
-            
-            // Set planet type display
-            let typeDisplay = 'Unknown';
-            if (planetType && planetType !== 'unknown') {
-                typeDisplay = planetType.charAt(0).toUpperCase() + planetType.slice(1) + ' Planet';
-            }
-            document.getElementById('modalPlanetType').textContent = typeDisplay;
-            
-            document.getElementById('modalDistance').textContent = distance.toFixed(1) + ' LY';
-            document.getElementById('modalCycles').textContent = cycles + ' cycles • ' + fuel + '⭐';
-            
-            warpModal.classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-
-        // ===== CLOSE WARP MODAL =====
-        function closeWarpModal() {
-            warpModal.classList.remove('active');
-            currentWarpTarget = null;
-        }
-
-        // ===== CONFIRM WARP =====
-        function confirmWarp() {
-            if (!currentWarpTarget) return;
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'plotting course...';
-            
-            try {
-                // Get current location
-                const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
-                const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
-                const currentStarSector = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
-                const currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
-                const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
-                
-                // Parse distance from modal
-                const distanceText = document.getElementById('modalDistance').textContent;
-                const distance = parseFloat(distanceText);
-                const cyclesText = document.getElementById('modalCycles').textContent;
-                const cycles = parseInt(cyclesText.split(' ')[0]);
-                const fuelText = cyclesText.split('•')[1].trim();
-                const fuel = parseInt(fuelText.replace('⭐', ''));
-                
-                // Prepare warp data
-                const warpData = {
-                    destination: currentWarpTarget.planet,
-                    destinationType: currentWarpTarget.planetType,
-                    startLocation: currentPlanet,
-                    startLocationType: 'planet',
-                    totalDistance: distance,
-                    warpCycles: cycles,
-                    fuelCost: fuel,
-                    returnPage: 'journal.html',
-                    
-                    destPlanet: currentWarpTarget.planet,
-                    destPlanetType: currentWarpTarget.planetType,
-                    
-                    destSector: currentSector,
-                    destRegion: currentRegion,
-                    destStarSector: currentStarSector,
-                    destStar: currentStar
-                };
-                
-                localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
-                
-                setTimeout(() => {
-                    window.location.href = 'warp.html';
-                }, 500);
-                
-            } catch (error) {
-                console.error('Warp error:', error);
-                loadingOverlay.classList.remove('active');
-                alert('Failed to plot course');
-            }
-            
-            closeWarpModal();
-        }
-
-        // ===== RENDER ELEMENTS BY RARITY =====
-        function renderElements() {
+        // ===== RENDER DISCOVERIES TAB =====
+        function renderDiscoveries() {
             if (filteredElements.length === 0) {
-                elementsContainer.innerHTML = '<div class="empty-state">No elements found in your journal</div>';
+                contentContainer.innerHTML = '<div class="empty-state">No elements discovered yet</div>';
                 return;
             }
             
@@ -1188,7 +1297,318 @@
                 html += `</div></div>`;
             });
             
-            elementsContainer.innerHTML = html;
+            contentContainer.innerHTML = html;
+        }
+
+        // ===== RENDER ALCHEMY TAB =====
+        function renderAlchemy() {
+            // Get recipes with progress
+            const recipesWithProgress = getRecipesWithProgress();
+            
+            if (Object.keys(recipesWithProgress).length === 0) {
+                contentContainer.innerHTML = '<div class="empty-state">Alchemy recipes loading...</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            for (const [category, items] of Object.entries(recipesWithProgress)) {
+                // Check if any items in this category are unlocked
+                const hasUnlocked = items.some(item => item.unlocked);
+                if (!hasUnlocked) continue;
+                
+                html += `<div class="alchemy-category">`;
+                html += `<div class="category-header">✦ ${category} ✦</div>`;
+                
+                items.forEach(item => {
+                    if (!item.unlocked) return; // Skip locked items
+                    
+                    const percentComplete = Math.min(100, Math.round((item.progress / item.target) * 100));
+                    
+                    html += `
+                        <div class="alchemy-item" onclick="window.openAlchemyItem('${item.id}')">
+                            <div class="alchemy-header">
+                                <div class="alchemy-icon">${item.icon}</div>
+                                <div class="alchemy-info">
+                                    <div class="alchemy-name">${item.name}</div>
+                                    <div class="alchemy-formula">${item.formula}</div>
+                                </div>
+                                <div class="alchemy-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${percentComplete}%"></div>
+                                    </div>
+                                    <div class="progress-text">${item.progress}/${item.target}</div>
+                                    <div class="alchemy-level" style="color: ${item.progress > 0 ? '#4affaa' : '#a0c0ff'}">${item.level}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+            }
+            
+            contentContainer.innerHTML = html || '<div class="empty-state">No alchemy recipes unlocked yet</div>';
+        }
+
+        // ===== OPEN ALCHEMY ITEM DETAIL =====
+        function openAlchemyItem(recipeId) {
+            // Find recipe
+            let recipe = null;
+            for (const category of Object.values(ALCHEMY_RECIPES)) {
+                const found = category.find(r => r.id === recipeId);
+                if (found) {
+                    recipe = found;
+                    break;
+                }
+            }
+            
+            if (!recipe) {
+                alert('Recipe not found');
+                return;
+            }
+            
+            // Get current progress
+            const alchemyProgress = JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}');
+            const progress = alchemyProgress[recipeId] || 0;
+            const level = getLevelFromProgress(progress);
+            
+            // Get inventory to check available ingredients
+            const inventory = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+            
+            // Check ingredient availability
+            let ingredientsHtml = '';
+            let canCraft = true;
+            
+            for (const [element, amount] of Object.entries(recipe.ingredients)) {
+                const have = inventory[element] || 0;
+                const enough = have >= amount;
+                if (!enough) canCraft = false;
+                
+                ingredientsHtml += `
+                    <div style="display: flex; justify-content: space-between; margin: 5px 0; color: ${enough ? '#4affaa' : '#ff6b6b'}">
+                        <span>${element}</span>
+                        <span>${have} / ${amount}</span>
+                    </div>
+                `;
+            }
+            
+            const percentComplete = Math.min(100, Math.round((progress / recipe.target) * 100));
+            
+            // Craft modal HTML
+            const modalHtml = `
+                <div class="modal-overlay active" id="craftModal" style="z-index: 300;">
+                    <div class="modal-content" style="width: 300px;">
+                        <div class="modal-title">⚗️ ${recipe.name}</div>
+                        <div class="alchemy-icon" style="font-size: 48px; text-align: center; margin: 10px;">${recipe.icon}</div>
+                        
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 16px; padding: 15px; margin: 15px 0;">
+                            <div style="color: #a0c0ff; margin-bottom: 10px;">Formula:</div>
+                            <div style="font-family: 'Courier New', monospace; color: #ffd966; text-align: center; font-size: 16px;">
+                                ${recipe.formula}
+                            </div>
+                        </div>
+                        
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 16px; padding: 15px; margin: 15px 0;">
+                            <div style="color: #a0c0ff; margin-bottom: 10px;">Current Knowledge:</div>
+                            <div class="progress-bar" style="margin-bottom: 5px; width: 100%;">
+                                <div class="progress-fill" style="width: ${percentComplete}%"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #ffd966;">${progress}/${recipe.target}</span>
+                                <span style="color: #4affaa;">${level.name} (${level.multiplier}x)</span>
+                            </div>
+                        </div>
+                        
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 16px; padding: 15px; margin: 15px 0;">
+                            <div style="color: #a0c0ff; margin-bottom: 10px;">Required Materials:</div>
+                            ${ingredientsHtml}
+                        </div>
+                        
+                        <div class="modal-buttons" style="flex-direction: column; gap: 10px;">
+                            <button class="modal-btn warp" onclick="window.craftItem('${recipeId}', 1)" ${!canCraft ? 'disabled style="opacity:0.5;"' : ''}>
+                                CRAFT 1
+                            </button>
+                            <button class="modal-btn warp" onclick="window.craftItem('${recipeId}', 10)" ${!canCraft ? 'disabled style="opacity:0.5;"' : ''}>
+                                CRAFT 10
+                            </button>
+                            <button class="modal-btn" onclick="window.closeCraftModal()">
+                                CLOSE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove any existing craft modal
+            const existing = document.getElementById('craftModal');
+            if (existing) existing.remove();
+            
+            // Add new modal
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE CRAFT MODAL =====
+        function closeCraftModal() {
+            const modal = document.getElementById('craftModal');
+            if (modal) modal.remove();
+        }
+
+        // ===== CRAFT ITEM =====
+        function craftItem(recipeId, count) {
+            const result = alchemyCraft(recipeId, count);
+            
+            if (result.success) {
+                // Show success notification
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(74, 255, 170, 0.2);
+                    border: 2px solid #4affaa;
+                    border-radius: 60px 20px 60px 20px;
+                    padding: 20px 40px;
+                    color: #4affaa;
+                    font-family: 'Exo 2', sans-serif;
+                    font-size: 18px;
+                    text-align: center;
+                    z-index: 1000;
+                    backdrop-filter: blur(10px);
+                    animation: fadeInOut 2s forwards;
+                `;
+                
+                // Find recipe name
+                let recipeName = recipeId;
+                for (const category of Object.values(ALCHEMY_RECIPES)) {
+                    const found = category.find(r => r.id === recipeId);
+                    if (found) {
+                        recipeName = found.name;
+                        break;
+                    }
+                }
+                
+                notification.innerHTML = `
+                    ✦ Crafted ${count} ${recipeName} ✦<br>
+                    <span style="font-size: 14px;">+${count} understanding</span>
+                `;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.remove();
+                    // Refresh the alchemy view
+                    closeCraftModal();
+                    renderAlchemy();
+                    
+                    // Also update stats (elements were consumed)
+                    loadJournalData();
+                }, 2000);
+                
+                if (result.leveledUp) {
+                    setTimeout(() => {
+                        alert(`✦ LEVEL UP! ✦\nYou are now a ${result.newLevel}!`);
+                    }, 500);
+                }
+            } else {
+                alert(`Crafting failed: ${result.error}`);
+            }
+        }
+
+        // ===== SHOW WARP MODAL =====
+        function showWarpModal(planet, planetType = 'unknown') {
+            currentWarpTarget = {
+                planet: planet,
+                planetType: planetType
+            };
+            
+            // Calculate approximate distance (simplified for demo)
+            const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+            const distance = (currentSector === 'B2') ? 2.3 : 4.6;
+            const cycles = Math.min(5, Math.ceil(distance / 1.5));
+            const fuel = Math.floor(distance * 4) + 5;
+            
+            document.getElementById('modalPlanet').textContent = planet;
+            
+            // Set planet type display
+            let typeDisplay = 'Unknown';
+            if (planetType && planetType !== 'unknown') {
+                typeDisplay = planetType.charAt(0).toUpperCase() + planetType.slice(1) + ' Planet';
+            }
+            document.getElementById('modalPlanetType').textContent = typeDisplay;
+            
+            document.getElementById('modalDistance').textContent = distance.toFixed(1) + ' LY';
+            document.getElementById('modalCycles').textContent = cycles + ' cycles • ' + fuel + '⭐';
+            
+            warpModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE WARP MODAL =====
+        function closeWarpModal() {
+            warpModal.classList.remove('active');
+            currentWarpTarget = null;
+        }
+
+        // ===== CONFIRM WARP =====
+        function confirmWarp() {
+            if (!currentWarpTarget) return;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'plotting course...';
+            
+            try {
+                // Get current location
+                const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                const currentStar = localStorage.getItem('voidfarer_current_star') || 'Sol';
+                const currentStarSector = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
+                const currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
+                const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
+                
+                // Parse distance from modal
+                const distanceText = document.getElementById('modalDistance').textContent;
+                const distance = parseFloat(distanceText);
+                const cyclesText = document.getElementById('modalCycles').textContent;
+                const cycles = parseInt(cyclesText.split(' ')[0]);
+                const fuelText = cyclesText.split('•')[1].trim();
+                const fuel = parseInt(fuelText.replace('⭐', ''));
+                
+                // Prepare warp data
+                const warpData = {
+                    destination: currentWarpTarget.planet,
+                    destinationType: currentWarpTarget.planetType,
+                    startLocation: currentPlanet,
+                    startLocationType: 'planet',
+                    totalDistance: distance,
+                    warpCycles: cycles,
+                    fuelCost: fuel,
+                    returnPage: 'journal.html',
+                    
+                    destPlanet: currentWarpTarget.planet,
+                    destPlanetType: currentWarpTarget.planetType,
+                    
+                    destSector: currentSector,
+                    destRegion: currentRegion,
+                    destStarSector: currentStarSector,
+                    destStar: currentStar
+                };
+                
+                localStorage.setItem('voidfarer_warp_data', JSON.stringify(warpData));
+                
+                setTimeout(() => {
+                    window.location.href = 'warp.html';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Warp error:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to plot course');
+            }
+            
+            closeWarpModal();
         }
 
         // ===== RETURN TO BRIDGE =====
