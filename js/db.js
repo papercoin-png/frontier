@@ -1144,3 +1144,13 @@ window.claimPlanet = claimPlanet;
 window.getClaimedPlanets = getClaimedPlanets;
 window.getPlanetsByExploration = getPlanetsByExploration;
 window.getPlanetsByRarity = getPlanetsByRarity;
+
+// ===== PREFIXED EXPORTS TO AVOID RECURSION =====
+// These are for storage.js to call directly without going through window
+window.dbGetCollectionAsObject = getCollectionAsObject;
+window.dbAddElementToCollection = addElementToCollection;
+window.dbRemoveElementFromCollection = removeElementFromCollection;
+window.dbGetElementLocations = getElementLocations;
+window.dbSaveElementLocation = saveElementLocation;
+window.dbGetAll = getAll;
+window.dbSetItem = setItem;
