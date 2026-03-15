@@ -748,8 +748,8 @@
             
             <!-- Location Bar -->
             <div class="location-bar">
-                <span id="locationText">📍 Earth Central • Sol</span>
-                <span class="coordinates" id="sectorText">Sector B2</span>
+                <span id="locationText">📍 Earth Central • Sol System</span>
+                <span class="coordinates" id="sectorText">Orion Arm • Sector B2</span>
             </div>
             
             <!-- Economic Alert Banner (dynamic) -->
@@ -918,8 +918,134 @@
         let currentCollection = {};
         let currentCredits = 0;
 
+        // ===== COMPLETE ELEMENT DATABASE (matches storage.js) =====
+        const ELEMENT_DATABASE = {
+            // Common elements (base value: 100⭐)
+            'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
+            'Helium': { icon: '🎈', rarity: 'common', value: 100 },
+            'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
+            'Beryllium': { icon: '💎', rarity: 'common', value: 100 },
+            'Boron': { icon: '🧪', rarity: 'common', value: 100 },
+            'Carbon': { icon: '⚫', rarity: 'uncommon', value: 250 },
+            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', value: 250 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
+            'Fluorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
+            'Neon': { icon: '💡', rarity: 'uncommon', value: 250 },
+            'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
+            'Magnesium': { icon: '✨', rarity: 'common', value: 100 },
+            'Aluminum': { icon: '🥫', rarity: 'common', value: 100 },
+            'Silicon': { icon: '💻', rarity: 'common', value: 100 },
+            'Phosphorus': { icon: '🔥', rarity: 'uncommon', value: 250 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
+            'Chlorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
+            'Argon': { icon: '💨', rarity: 'uncommon', value: 250 },
+            'Potassium': { icon: '🍌', rarity: 'common', value: 100 },
+            'Calcium': { icon: '🥛', rarity: 'common', value: 100 },
+            'Scandium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Vanadium': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Chromium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Manganese': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
+            'Cobalt': { icon: '🔵', rarity: 'rare', value: 1000 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
+            'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
+            'Zinc': { icon: '⚪', rarity: 'rare', value: 1000 },
+            'Gallium': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Germanium': { icon: '💻', rarity: 'rare', value: 1000 },
+            'Arsenic': { icon: '☠️', rarity: 'rare', value: 1000 },
+            'Selenium': { icon: '🟡', rarity: 'rare', value: 1000 },
+            'Bromine': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Krypton': { icon: '💨', rarity: 'rare', value: 1000 },
+            'Rubidium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Strontium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Yttrium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Zirconium': { icon: '💎', rarity: 'rare', value: 1000 },
+            'Niobium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Molybdenum': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Technetium': { icon: '☢️', rarity: 'rare', value: 1000 },
+            'Ruthenium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Rhodium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Palladium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
+            'Cadmium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Indium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Tin': { icon: '🥫', rarity: 'rare', value: 1000 },
+            'Antimony': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Tellurium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Iodine': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Xenon': { icon: '💨', rarity: 'rare', value: 1000 },
+            'Cesium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Barium': { icon: '⚖️', rarity: 'rare', value: 1000 },
+            'Lanthanum': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Cerium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Praseodymium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Neodymium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
+            'Samarium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Europium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Gadolinium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Terbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Dysprosium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Holmium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Erbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Thulium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Ytterbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Lutetium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Hafnium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Tantalum': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Tungsten': { icon: '💡', rarity: 'rare', value: 1000 },
+            'Rhenium': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Osmium': { icon: '⚫', rarity: 'rare', value: 1000 },
+            'Iridium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
+            'Mercury': { icon: '💧', rarity: 'rare', value: 1000 },
+            'Thallium': { icon: '☠️', rarity: 'rare', value: 1000 },
+            'Lead': { icon: '⚖️', rarity: 'rare', value: 1000 },
+            'Bismuth': { icon: '🌈', rarity: 'rare', value: 1000 },
+            
+            // Very Rare elements (5000⭐)
+            'Polonium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Astatine': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Radon': { icon: '💨', rarity: 'very-rare', value: 5000 },
+            'Francium': { icon: '✨', rarity: 'very-rare', value: 5000 },
+            'Radium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Actinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Thorium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Protactinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Uranium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            
+            // Legendary elements (25000⭐)
+            'Neptunium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Plutonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Americium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Curium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Berkelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Californium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Einsteinium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Fermium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Mendelevium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Nobelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Lawrencium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Rutherfordium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Dubnium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Seaborgium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Bohrium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Hassium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Meitnerium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Darmstadtium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Roentgenium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Copernicium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Nihonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Flerovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Moscovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Livermorium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Tennessine': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Oganesson': { icon: '☢️', rarity: 'legendary', value: 25000 }
+        };
+
         // ===== CLEANUP ON LOAD =====
-        // Clear any lingering planet data that might have been set during warp
         function cleanupHubData() {
             console.log('Earth Hub: Cleaning up any lingering planet data');
             
@@ -928,13 +1054,9 @@
             localStorage.removeItem('voidfarer_warp_destination_planet_type');
             localStorage.removeItem('voidfarer_warp_origin_planet');
             
-            // Don't remove current_planet entirely - just ensure it's set to Earth
-            const currentPlanet = localStorage.getItem('voidfarer_current_planet');
-            if (currentPlanet && currentPlanet !== 'Earth') {
-                console.log('Resetting current planet to Earth');
-                localStorage.setItem('voidfarer_current_planet', 'Earth');
-                localStorage.setItem('voidfarer_current_planet_type', 'lush');
-            }
+            // Ensure current planet is Earth
+            localStorage.setItem('voidfarer_current_planet', 'Earth');
+            localStorage.setItem('voidfarer_current_planet_type', 'lush');
             
             // Ensure sector info is correct for Earth
             localStorage.setItem('voidfarer_current_sector', 'B2');
@@ -983,12 +1105,6 @@
                     collection = await window.getCollection();
                 }
 
-                // For Earth Hub, always show Earth/Sol/B2
-                const planet = 'Earth';
-                const star = 'Sol';
-                const sector = 'B2';
-                const starSector = 'Orion Molecular Cloud';
-
                 let events = [];
                 if (typeof window.getActiveEvents === 'function') {
                     events = await window.getActiveEvents();
@@ -1007,7 +1123,6 @@
 
                 // Update UI
                 updateHeader(credits, collection);
-                updateLocation(planet, star, sector, starSector);
                 renderMarket(collection);
                 updateTaxSummary(rates);
                 updateEventAlerts(events);
@@ -1026,12 +1141,6 @@
             const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
             const uniqueItems = Object.keys(collection).length;
             document.getElementById('cargoDisplay').textContent = `Items: ${totalItems} (${uniqueItems} types)`;
-        }
-
-        // ===== UPDATE LOCATION =====
-        function updateLocation(planet, star, sector, starSector) {
-            document.getElementById('locationText').textContent = `📍 Earth Central • Sol System`;
-            document.getElementById('sectorText').textContent = `Orion Arm • Sector B2`;
         }
 
         // ===== UPDATE TAX SUMMARY =====
@@ -1074,35 +1183,8 @@
                 legendary: { name: 'Legendary', elements: [], totalCount: 0, totalValue: 0 }
             };
             
-            const elementDatabase = {
-                'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
-                'Helium': { icon: '🎈', rarity: 'common', value: 100 },
-                'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
-                'Beryllium': { icon: '💎', rarity: 'common', value: 100 },
-                'Boron': { icon: '🧪', rarity: 'common', value: 100 },
-                'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
-                'Magnesium': { icon: '✨', rarity: 'common', value: 100 },
-                'Aluminum': { icon: '🥫', rarity: 'common', value: 100 },
-                'Silicon': { icon: '💻', rarity: 'common', value: 100 },
-                'Potassium': { icon: '🍌', rarity: 'common', value: 100 },
-                'Calcium': { icon: '🥛', rarity: 'common', value: 100 },
-                'Carbon': { icon: '⚫', rarity: 'uncommon', value: 250 },
-                'Nitrogen': { icon: '🌬️', rarity: 'uncommon', value: 250 },
-                'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
-                'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
-                'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
-                'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
-                'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
-                'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
-                'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
-                'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
-                'Uranium': { icon: '🟣', rarity: 'very-rare', value: 5000 },
-                'Thorium': { icon: '🔮', rarity: 'very-rare', value: 5000 },
-                'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 }
-            };
-            
             Object.keys(collection).forEach(elementName => {
-                const elementData = elementDatabase[elementName] || { 
+                const elementData = ELEMENT_DATABASE[elementName] || { 
                     icon: '🔹', 
                     rarity: 'common', 
                     value: 100 
@@ -1175,6 +1257,9 @@
                 // Group Items
                 const itemsDiv = document.createElement('div');
                 itemsDiv.className = `group-items ${expandedGroup === rarity ? 'show' : ''}`;
+                
+                // Sort elements by name
+                group.elements.sort((a, b) => a.name.localeCompare(b.name));
                 
                 group.elements.forEach(element => {
                     const halfQuantity = Math.floor(element.count / 2);
@@ -1430,10 +1515,7 @@
                 // Use simulated data for demo
                 const labels = [];
                 const data = [];
-                const basePrice = element === 'Gold' ? 1000 : 
-                                 element === 'Silver' ? 1000 :
-                                 element === 'Platinum' ? 1000 :
-                                 element === 'Uranium' ? 5000 : 25000;
+                const basePrice = ELEMENT_DATABASE[element]?.value || 1000;
                 
                 for (let i = 0; i < days; i++) {
                     const date = new Date();
