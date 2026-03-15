@@ -432,7 +432,8 @@
             destStar: null,
             destPlanet: null,
             destPlanetType: null,
-            destPlanetResources: null
+            destPlanetResources: null,
+            isHubReturn: false // Flag to identify hub returns
         };
         
         let currentCycle = 1;
@@ -482,6 +483,11 @@
                 const savedData = localStorage.getItem('voidfarer_warp_data');
                 if (savedData) {
                     warpData = JSON.parse(savedData);
+                    
+                    // Ensure isHubReturn flag exists
+                    if (warpData.isHubReturn === undefined) {
+                        warpData.isHubReturn = false;
+                    }
                 } else {
                     // Fallback demo data
                     warpData = {
@@ -499,7 +505,8 @@
                         destStar: 'Eta Carinae',
                         destPlanet: 'Pyros-3',
                         destPlanetType: 'scorched',
-                        destPlanetResources: ['Iron', 'Sulfur', 'Gold', 'Uranium']
+                        destPlanetResources: ['Iron', 'Sulfur', 'Gold', 'Uranium'],
+                        isHubReturn: false
                     };
                 }
 
@@ -537,8 +544,8 @@
                 destString += warpData.destination;
                 destInfo.textContent = destString;
 
-                // Show planet preview if destination is a planet
-                if (warpData.destPlanet) {
+                // Show planet preview ONLY if this is a planet destination and NOT a hub return
+                if (warpData.destPlanet && !warpData.isHubReturn) {
                     previewName.textContent = warpData.destPlanet;
                     
                     let typeDisplay = 'Unknown';
@@ -572,6 +579,8 @@
                     }
                     
                     planetPreview.classList.add('visible');
+                } else {
+                    planetPreview.classList.remove('visible');
                 }
 
                 console.log('Warp data loaded:', warpData);
@@ -897,9 +906,10 @@
 
         // ===== COMPLETE WARP =====
         function completeWarp() {
-            console.log('Warp complete! Updating location with planet data:', warpData);
+            console.log('Warp complete! Destination:', warpData.destination);
+            console.log('Is hub return:', warpData.isHubReturn);
             
-            // Update galactic sector
+            // Update galactic sector (always update these)
             if (warpData.destSector) {
                 localStorage.setItem('voidfarer_current_sector', warpData.destSector);
             }
@@ -907,19 +917,22 @@
                 localStorage.setItem('voidfarer_current_region', warpData.destRegion);
             }
             
-            // Update star sector
+            // Update star sector (always update these)
             if (warpData.destStarSector) {
                 localStorage.setItem('voidfarer_current_starSector', warpData.destStarSector);
                 localStorage.setItem('voidfarer_current_sector_name', warpData.destStarSector);
             }
             
-            // Update star
+            // Update star (always update these)
             if (warpData.destStar) {
                 localStorage.setItem('voidfarer_current_star', warpData.destStar);
             }
             
-            // Update planet data (most important for surface view)
-            if (warpData.destPlanet) {
+            // CRITICAL: Only set planet data if this is NOT a hub return
+            // This prevents Earth Hub from getting planet data
+            if (!warpData.isHubReturn && warpData.destPlanet) {
+                console.log('Setting planet data for surface landing:', warpData.destPlanet);
+                
                 localStorage.setItem('voidfarer_current_planet', warpData.destPlanet);
                 localStorage.setItem('voidfarer_current_planet_name', warpData.destPlanet);
                 
@@ -941,13 +954,25 @@
                 
                 // Set planet image based on type
                 setPlanetImage(warpData.destPlanetType);
+            } else if (warpData.isHubReturn) {
+                console.log('Hub return detected - clearing any planet data');
+                // Clear any existing planet data to ensure clean state for hub
+                localStorage.removeItem('voidfarer_current_planet');
+                localStorage.removeItem('voidfarer_current_planet_name');
+                localStorage.removeItem('voidfarer_current_planet_type');
+                localStorage.removeItem('voidfarer_current_planet_resources');
+                localStorage.removeItem('voidfarer_current_planet_image');
+                localStorage.removeItem('voidfarer_warp_destination_planet');
+                localStorage.removeItem('voidfarer_warp_destination_planet_type');
             }
             
             // Clear warp data
             localStorage.removeItem('voidfarer_warp_data');
             
             // Navigate to return page
-            window.location.href = warpData.returnPage || 'surface.html';
+            const destinationPage = warpData.returnPage || 'surface.html';
+            console.log('Navigating to:', destinationPage);
+            window.location.href = destinationPage;
         }
 
         // ===== GET FALLBACK RESOURCES BY PLANET TYPE =====
