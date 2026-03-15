@@ -404,6 +404,44 @@
             transform: scale(0.96);
         }
         
+        /* Labor Pool Banner */
+        .labor-banner {
+            background: rgba(255, 170, 74, 0.15);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        
+        .labor-banner:active {
+            background: rgba(255, 170, 74, 0.3);
+            transform: scale(0.99);
+        }
+        
+        .labor-icon {
+            font-size: 24px;
+        }
+        
+        .labor-content {
+            flex: 1;
+        }
+        
+        .labor-title {
+            color: #ffaa4a;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .labor-message {
+            color: #ffffff;
+            font-size: 12px;
+        }
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -442,6 +480,16 @@
                 </div>
             </div>
             
+            <!-- Labor Pool Banner -->
+            <div class="labor-banner" onclick="window.navigateTo('labor-exchange.html')">
+                <div class="labor-icon">💰</div>
+                <div class="labor-content">
+                    <div class="labor-title">Labor Pool Earnings</div>
+                    <div class="labor-message" id="laborMessage">You have <span id="laborEarnings">0</span>⭐ unclaimed</div>
+                </div>
+                <div class="labor-icon">→</div>
+            </div>
+            
             <!-- Window with Planet View -->
             <div class="window-frame">
                 <div class="window-view">
@@ -473,6 +521,16 @@
                     <div class="action-label">JOURNAL</div>
                     <div class="action-desc">Discovered elements</div>
                 </div>
+                <div class="action-card" onclick="window.goToAlchemyLab()">
+                    <div class="action-icon">⚗️</div>
+                    <div class="action-label">ALCHEMY LAB</div>
+                    <div class="action-desc">Craft and donate</div>
+                </div>
+                <div class="action-card" onclick="window.goToUniversity()">
+                    <div class="action-icon">🎓</div>
+                    <div class="action-label">UNIVERSITY</div>
+                    <div class="action-desc">View mastery</div>
+                </div>
             </div>
             
             <!-- Ship Status Card -->
@@ -496,7 +554,7 @@
                     </div>
                     <div class="status-item">
                         <div class="status-label">LIMIT</div>
-                        <div class="status-value" id="cargoLimit">1000</div>
+                        <div class="status-value" id="cargoLimit">5000</div>
                         <span class="status-unit">AMU</span>
                     </div>
                 </div>
@@ -550,15 +608,19 @@
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
+        const laborEarningsSpan = document.getElementById('laborEarnings');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.goToSurface = goToSurface;
         window.goToCargo = goToCargo;
         window.goToGalaxyMap = goToGalaxyMap;
         window.goToJournal = goToJournal;
+        window.goToAlchemyLab = goToAlchemyLab;
+        window.goToUniversity = goToUniversity;
         window.warpHome = warpHome;
         window.quickRefuel = quickRefuel;
         window.quickRepair = quickRepair;
+        window.navigateTo = navigateTo;
 
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
@@ -608,8 +670,39 @@
                 document.getElementById('cargoValue').textContent = cargoMass.toFixed(1);
                 document.getElementById('cargoLimit').textContent = CARGO_MASS_LIMIT;
                 
+                // Get labor earnings
+                await loadLaborEarnings();
+                
             } catch (error) {
                 console.error('Error loading ship data:', error);
+            }
+        }
+
+        // ===== LOAD LABOR EARNINGS =====
+        async function loadLaborEarnings() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                let earnings = 0;
+                
+                if (typeof window.getPlayerLaborEarnings === 'function') {
+                    earnings = await window.getPlayerLaborEarnings(playerId);
+                } else {
+                    const earningsData = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
+                    earnings = earningsData[playerId] || 0;
+                }
+                
+                laborEarningsSpan.textContent = earnings.toLocaleString();
+                
+                // Update labor message based on earnings
+                const laborMessage = document.querySelector('.labor-message');
+                if (earnings > 0) {
+                    laborMessage.innerHTML = `You have <span id="laborEarnings">${earnings.toLocaleString()}</span>⭐ unclaimed`;
+                } else {
+                    laborMessage.textContent = 'No unclaimed earnings';
+                }
+                
+            } catch (error) {
+                console.error('Error loading labor earnings:', error);
             }
         }
 
@@ -691,6 +784,18 @@
             }
             
             window.location.href = 'surface.html';
+        }
+
+        // ===== GO TO ALCHEMY LAB =====
+        function goToAlchemyLab() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'alchemy-lab.html';
+        }
+
+        // ===== GO TO UNIVERSITY =====
+        function goToUniversity() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'university.html';
         }
 
         // ===== WARP HOME (now goes to Earth Hub) =====
@@ -780,6 +885,16 @@
         function goToJournal() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'journal.html';
+        }
+
+        function navigateTo(screen) {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = screen;
+            }, 300);
         }
 
         // ===== QUICK ACTIONS =====
@@ -886,6 +1001,11 @@
                 // Load all data
                 await loadShipData();
                 loadCurrentLocation();
+                
+                // Refresh labor earnings every 30 seconds
+                setInterval(async () => {
+                    await loadLaborEarnings();
+                }, 30000);
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
