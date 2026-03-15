@@ -1,1 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Hub Inventory</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Add idb library for IndexedDB -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .hub-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a9a8a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a9a8a;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .hub-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .hub-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #c0e0ff;
+            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        
+        .hub-subtitle {
+            color: #a0d0c0;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .hub-capacity {
+            font-size: 14px;
+            color: #a0d0c0;
+            text-align: right;
+        }
+        
+        /* Location Banner */
+        .location-banner {
+            background: rgba(30, 60, 70, 0.8);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 10px 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .location-icon {
+            font-size: 20px;
+        }
+        
+        .location-text {
+            color: #ffffff;
+            flex: 1;
+        }
+        
+        .location-highlight {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        /* Capacity Card */
+        .capacity-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .capacity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .capacity-label {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .capacity-numbers {
+            color: #ffd966;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .capacity-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #4a9a8a;
+        }
+        
+        .capacity-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4a9a8a, #7ac0b0);
+            transition: width 0.3s;
+        }
+        
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .stat-card {
+            background: rgba(30, 60, 70, 0.5);
+            border: 2px solid #4a9a8a;
+            border-radius: 30% 10% 30% 10%;
+            padding: 12px 5px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .stat-label {
+            color: #a0d0c0;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+        
+        /* Property Filter */
+        .property-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .property-filter-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 60, 70, 0.7);
+            border: 2px solid #4a9a8a;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        
+        .property-filter-btn.active {
+            background: #4a9a8a;
+            color: #ffffff;
+            border-color: #7ac0b0;
+            box-shadow: 0 0 15px #2a5a5a;
+        }
+        
+        .property-filter-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .filter-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 60, 70, 0.7);
+            border: 2px solid #4a9a8a;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .filter-btn.active {
+            background: #4a9a8a;
+            color: #ffffff;
+            border-color: #7ac0b0;
+            box-shadow: 0 0 15px #2a5a5a;
+        }
+        
+        .filter-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Search Box */
+        .search-container {
+            margin-bottom: 15px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 14px 20px;
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            color: #ffffff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            outline: none;
+        }
+        
+        .search-input::placeholder {
+            color: #a0d0c0;
+            opacity: 0.6;
+        }
+        
+        /* Sort Bar */
+        .sort-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        
+        .sort-select {
+            background: rgba(30, 60, 70, 0.7);
+            border: 2px solid #4a9a8a;
+            color: #ffffff;
+            padding: 8px 15px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .sort-select option {
+            background: #0a2a3a;
+        }
+        
+        /* Items Grid */
+        .items-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        
+        .item-card {
+            background: rgba(30, 60, 70, 0.6);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 12px 40px 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.1s;
+            position: relative;
+        }
+        
+        .item-icon {
+            font-size: 36px;
+            min-width: 50px;
+            text-align: center;
+            filter: drop-shadow(0 0 10px #4a9a8a);
+        }
+        
+        .item-info {
+            flex: 1;
+        }
+        
+        .item-name {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .item-details {
+            display: flex;
+            gap: 15px;
+            color: #a0d0c0;
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+        
+        .item-quantity {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .item-mass {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .item-value {
+            color: #ffaa4a;
+        }
+        
+        .item-property {
+            color: #a0c0ff;
+            font-size: 11px;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        
+        /* Item Actions */
+        .item-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        
+        .action-btn {
+            padding: 8px 12px;
+            border-radius: 30px 8px 30px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+            border: 2px solid;
+        }
+        
+        .sell-btn {
+            background: rgba(255, 170, 74, 0.2);
+            border-color: #ffaa4a;
+            color: #ffd966;
+        }
+        
+        .sell-btn:active {
+            background: #ffaa4a;
+            color: #0a2a3a;
+            transform: scale(0.95);
+        }
+        
+        .transfer-btn {
+            background: rgba(74, 255, 170, 0.2);
+            border-color: #4affaa;
+            color: #b0ffd0;
+        }
+        
+        .transfer-btn:active {
+            background: #4affaa;
+            color: #0a2a3a;
+            transform: scale(0.95);
+        }
+        
+        .transfer-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            border-color: #6a8ac0;
+            background: rgba(106, 138, 192, 0.1);
+            color: #6a8ac0;
+        }
+        
+        /* Transfer Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(20, 30, 50, 0.95);
+            backdrop-filter: blur(15px);
+            border: 3px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 25px;
+            width: 280px;
+            text-align: center;
+            color: #ffffff;
+            box-shadow: 0 0 30px #4affaa;
+        }
+        
+        .modal-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #b0ffd0;
+        }
+        
+        .modal-item-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+        
+        .modal-current {
+            color: #a0c0ff;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .modal-quantity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .qty-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(74, 154, 138, 0.3);
+            border: 2px solid #4a9a8a;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.9);
+        }
+        
+        .qty-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #transferQuantity {
+            width: 70px;
+            height: 50px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #4a9a8a;
+            border-radius: 30px 8px 30px 8px;
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .transfer-mass-info {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .transfer-mass {
+            color: #4affaa;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .warning-text {
+            color: #ffaa4a;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            background: rgba(74, 154, 138, 0.3);
+            border: 2px solid #4a9a8a;
+            color: #ffffff;
+            padding: 14px;
+            border-radius: 40px 10px 40px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+        }
+        
+        .modal-btn:active {
+            background: #4a9a8a;
+            transform: scale(0.95);
+        }
+        
+        .modal-btn.transfer-confirm {
+            background: rgba(74, 255, 170, 0.2);
+            border-color: #4affaa;
+            color: #b0ffd0;
+        }
+        
+        .modal-btn.transfer-confirm:active {
+            background: #4affaa;
+            color: #0a2a3a;
+        }
+        
+        .modal-btn.sell-confirm {
+            background: rgba(255, 170, 74, 0.2);
+            border-color: #ffaa4a;
+            color: #ffd966;
+        }
+        
+        .modal-btn.sell-confirm:active {
+            background: #ffaa4a;
+            color: #0a2a3a;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 60, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a9a8a;
+            font-style: italic;
+        }
+        
+        /* Scroll Hint */
+        .scroll-hint {
+            text-align: center;
+            color: #a0c0ff;
+            font-size: 14px;
+            margin: 20px 0 80px;
+            font-style: italic;
+            font-family: 'Exo 2', sans-serif;
+            animation: fade-in-out 2s infinite;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes fade-in-out {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        
+        /* Back button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+            pointer-events: auto;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Rarity colors */
+        .rarity-common { color: #ffffff; }
+        .rarity-uncommon { color: #b0ffb0; }
+        .rarity-rare { color: #b0b0ff; }
+        .rarity-very-rare { color: #e0b0ff; }
+        .rarity-legendary { color: #ffd700; }
 
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="hub-view" id="hubView">
+            <!-- Header -->
+            <div class="hub-header">
+                <div class="hub-title">Hub Inventory</div>
+                <div class="hub-subtitle">✦ Earth-based storage ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="hub-capacity" id="hubCapacityDisplay">
+                    Used: --/-- AMU
+                </div>
+            </div>
+            
+            <!-- Location Banner -->
+            <div class="location-banner" id="locationBanner">
+                <span class="location-icon" id="locationIcon">🌍</span>
+                <span class="location-text" id="locationText">Current Location: <span id="currentLocation" class="location-highlight">Earth</span></span>
+            </div>
+            
+            <!-- Capacity Card -->
+            <div class="capacity-card">
+                <div class="capacity-header">
+                    <span class="capacity-label">Hub Storage</span>
+                    <span class="capacity-numbers" id="capacityText">-- / -- AMU</span>
+                </div>
+                <div class="capacity-bar-bg">
+                    <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalItems">0</div>
+                    <div class="stat-label">ITEMS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uniqueItems">0</div>
+                    <div class="stat-label">UNIQUE</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalValue">0</div>
+                    <div class="stat-label">VALUE</div>
+                </div>
+            </div>
+            
+            <!-- Property Filter -->
+            <div class="property-filter" id="propertyFilter">
+                <!-- Filled by JavaScript -->
+            </div>
+            
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <span class="filter-btn active" onclick="window.filterItems('all')">All</span>
+                <span class="filter-btn" onclick="window.filterItems('common')">Common</span>
+                <span class="filter-btn" onclick="window.filterItems('uncommon')">Uncommon</span>
+                <span class="filter-btn" onclick="window.filterItems('rare')">Rare</span>
+                <span class="filter-btn" onclick="window.filterItems('very-rare')">Very Rare</span>
+                <span class="filter-btn" onclick="window.filterItems('legendary')">Legendary</span>
+            </div>
+            
+            <!-- Search Box -->
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search hub items..." oninput="window.searchItems()">
+            </div>
+            
+            <!-- Sort Bar -->
+            <div class="sort-bar">
+                <select class="sort-select" id="sortSelect" onchange="window.sortItems()">
+                    <option value="name">Sort by Name</option>
+                    <option value="count">Sort by Quantity</option>
+                    <option value="mass">Sort by Mass</option>
+                    <option value="value">Sort by Value</option>
+                    <option value="rarity">Sort by Rarity</option>
+                    <option value="property">Sort by Property</option>
+                </select>
+            </div>
+            
+            <!-- Items Grid -->
+            <div class="items-grid" id="itemsGrid">
+                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading hub inventory...</div>
+            </div>
+            
+            <!-- Scroll Hint -->
+            <div class="scroll-hint">▼ scroll down to return to Earth Hub ▼</div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+        </div>
+        
+        <!-- Transfer to Ship Modal -->
+        <div class="modal-overlay" id="transferModal">
+            <div class="modal-content">
+                <div class="modal-title">🚀 TRANSFER TO SHIP</div>
+                <div class="modal-item-name" id="transferItemName">Item</div>
+                <div class="modal-current" id="transferCurrentCount">Current: 0</div>
+                
+                <div class="modal-quantity">
+                    <button class="qty-btn" id="transferDecrementBtn" onclick="window.transferDecrementQty()">−</button>
+                    <input type="number" id="transferQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="transferIncrementBtn" onclick="window.transferIncrementQty()">+</button>
+                </div>
+                
+                <div class="transfer-mass-info">
+                    Transfer mass: <span class="transfer-mass" id="transferMass">0</span> AMU<br>
+                    Ship available: <span class="transfer-mass" id="shipAvailable">0</span> AMU
+                </div>
+                
+                <div class="warning-text" id="transferWarning"></div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn transfer-confirm" onclick="window.confirmTransfer()">🚀 TRANSFER</button>
+                    <button class="modal-btn" onclick="window.closeTransferModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sell Modal -->
+        <div class="modal-overlay" id="sellModal">
+            <div class="modal-content">
+                <div class="modal-title">💰 SELL ITEMS</div>
+                <div class="modal-item-name" id="sellItemName">Item</div>
+                <div class="modal-current" id="sellCurrentCount">Current: 0</div>
+                
+                <div class="modal-quantity">
+                    <button class="qty-btn" id="sellDecrementBtn" onclick="window.sellDecrementQty()">−</button>
+                    <input type="number" id="sellQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="sellIncrementBtn" onclick="window.sellIncrementQty()">+</button>
+                </div>
+                
+                <div class="transfer-mass-info">
+                    Sell price: <span class="transfer-mass" id="sellPrice">0</span>⭐<br>
+                    Total value: <span class="transfer-mass" id="sellTotal">0</span>⭐
+                </div>
+                
+                <div class="warning-text" id="sellWarning"></div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn sell-confirm" onclick="window.confirmSell()">💰 SELL</button>
+                    <button class="modal-btn" onclick="window.closeSellModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">processing...</div>
+        </div>
+        
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
+    </div>
+
+    <!-- Load JavaScript files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToEarthHub = returnToEarthHub;
+        window.filterItems = filterItems;
+        window.searchItems = searchItems;
+        window.sortItems = sortItems;
+        window.filterByProperty = filterByProperty;
+        window.showTransferModal = showTransferModal;
+        window.closeTransferModal = closeTransferModal;
+        window.transferIncrementQty = transferIncrementQty;
+        window.transferDecrementQty = transferDecrementQty;
+        window.confirmTransfer = confirmTransfer;
+        window.showSellModal = showSellModal;
+        window.closeSellModal = closeSellModal;
+        window.sellIncrementQty = sellIncrementQty;
+        window.sellDecrementQty = sellDecrementQty;
+        window.confirmSell = confirmSell;
+
+        // ===== STATE =====
+        let hubItems = [];
+        let filteredItems = [];
+        let properties = [];
+        let currentPropertyFilter = 'all';
+        let currentRarityFilter = 'all';
+        let searchTerm = '';
+        let sortBy = 'name';
+        let canTransfer = true; // At Earth Hub, can always transfer
+        let currentShipAvailable = 5000;
+        
+        // Transfer modal state
+        let currentTransferItem = null;
+        let currentTransferMax = 1;
+        let currentTransferMassPerUnit = 0;
+        let currentTransferValuePerUnit = 0;
+        
+        // Sell modal state
+        let currentSellItem = null;
+        let currentSellMax = 1;
+        let currentSellPricePerUnit = 0;
+
+        // ===== ELEMENT DATABASE =====
+        const ELEMENT_DATABASE = {
+            // Common elements (base value: 100⭐)
+            'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
+            'Helium': { icon: '🎈', rarity: 'common', value: 100 },
+            'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
+            'Beryllium': { icon: '💎', rarity: 'common', value: 100 },
+            'Boron': { icon: '🧪', rarity: 'common', value: 100 },
+            'Carbon': { icon: '⚫', rarity: 'uncommon', value: 250 },
+            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', value: 250 },
+            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
+            'Fluorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
+            'Neon': { icon: '💡', rarity: 'uncommon', value: 250 },
+            'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
+            'Magnesium': { icon: '✨', rarity: 'common', value: 100 },
+            'Aluminum': { icon: '🥫', rarity: 'common', value: 100 },
+            'Silicon': { icon: '💻', rarity: 'common', value: 100 },
+            'Phosphorus': { icon: '🔥', rarity: 'uncommon', value: 250 },
+            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
+            'Chlorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
+            'Argon': { icon: '💨', rarity: 'uncommon', value: 250 },
+            'Potassium': { icon: '🍌', rarity: 'common', value: 100 },
+            'Calcium': { icon: '🥛', rarity: 'common', value: 100 },
+            'Scandium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Vanadium': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Chromium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Manganese': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
+            'Cobalt': { icon: '🔵', rarity: 'rare', value: 1000 },
+            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
+            'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
+            'Zinc': { icon: '⚪', rarity: 'rare', value: 1000 },
+            'Gallium': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Germanium': { icon: '💻', rarity: 'rare', value: 1000 },
+            'Arsenic': { icon: '☠️', rarity: 'rare', value: 1000 },
+            'Selenium': { icon: '🟡', rarity: 'rare', value: 1000 },
+            'Bromine': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Krypton': { icon: '💨', rarity: 'rare', value: 1000 },
+            'Rubidium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Strontium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Yttrium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Zirconium': { icon: '💎', rarity: 'rare', value: 1000 },
+            'Niobium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Molybdenum': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Technetium': { icon: '☢️', rarity: 'rare', value: 1000 },
+            'Ruthenium': { icon: '🔷', rarity: 'rare', value: 1000 },
+            'Rhodium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Palladium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
+            'Cadmium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Indium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Tin': { icon: '🥫', rarity: 'rare', value: 1000 },
+            'Antimony': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Tellurium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Iodine': { icon: '🧪', rarity: 'rare', value: 1000 },
+            'Xenon': { icon: '💨', rarity: 'rare', value: 1000 },
+            'Cesium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Barium': { icon: '⚖️', rarity: 'rare', value: 1000 },
+            'Lanthanum': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Cerium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Praseodymium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Neodymium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
+            'Samarium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Europium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Gadolinium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Terbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Dysprosium': { icon: '🧲', rarity: 'rare', value: 1000 },
+            'Holmium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Erbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Thulium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Ytterbium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Lutetium': { icon: '✨', rarity: 'rare', value: 1000 },
+            'Hafnium': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Tantalum': { icon: '🔩', rarity: 'rare', value: 1000 },
+            'Tungsten': { icon: '💡', rarity: 'rare', value: 1000 },
+            'Rhenium': { icon: '⚙️', rarity: 'rare', value: 1000 },
+            'Osmium': { icon: '⚫', rarity: 'rare', value: 1000 },
+            'Iridium': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
+            'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
+            'Mercury': { icon: '💧', rarity: 'rare', value: 1000 },
+            'Thallium': { icon: '☠️', rarity: 'rare', value: 1000 },
+            'Lead': { icon: '⚖️', rarity: 'rare', value: 1000 },
+            'Bismuth': { icon: '🌈', rarity: 'rare', value: 1000 },
+            
+            // Very Rare elements (5000⭐)
+            'Polonium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Astatine': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Radon': { icon: '💨', rarity: 'very-rare', value: 5000 },
+            'Francium': { icon: '✨', rarity: 'very-rare', value: 5000 },
+            'Radium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Actinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Thorium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Protactinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            'Uranium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
+            
+            // Legendary elements (25000⭐)
+            'Neptunium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Plutonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Americium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Curium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Berkelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Californium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Einsteinium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Fermium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Mendelevium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Nobelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Lawrencium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Rutherfordium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Dubnium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Seaborgium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Bohrium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Hassium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Meitnerium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Darmstadtium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Roentgenium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Copernicium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Nihonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Flerovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Moscovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Livermorium': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Tennessine': { icon: '☢️', rarity: 'legendary', value: 25000 },
+            'Oganesson': { icon: '☢️', rarity: 'legendary', value: 25000 }
+        };
+
+        // ===== RARITY COLORS =====
+        const rarityColors = {
+            'common': '#ffffff',
+            'uncommon': '#b0ffb0',
+            'rare': '#b0b0ff',
+            'very-rare': '#e0b0ff',
+            'legendary': '#ffd700'
+        };
+
+        // ===== GET ELEMENT MASS =====
+        function getElementMass(elementName) {
+            if (typeof window.getElementMass === 'function') {
+                return window.getElementMass(elementName);
+            }
+            return 100.0;
+        }
+
+        // ===== GET ELEMENT ICON =====
+        function getElementIcon(elementName) {
+            return ELEMENT_DATABASE[elementName]?.icon || '🔹';
+        }
+
+        // ===== GET ELEMENT RARITY =====
+        function getElementRarity(elementName) {
+            return ELEMENT_DATABASE[elementName]?.rarity || 'common';
+        }
+
+        // ===== GET ELEMENT VALUE =====
+        function getElementValue(elementName) {
+            return ELEMENT_DATABASE[elementName]?.value || 100;
+        }
+
+        // ===== LOAD HUB DATA =====
+        async function loadHubData() {
+            try {
+                console.log('Loading hub inventory...');
+                
+                // Get credits
+                let credits = 5000;
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
+                }
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                
+                // Get hub inventory
+                let hubInventory = {};
+                if (typeof window.getHubInventory === 'function') {
+                    hubInventory = await window.getHubInventory();
+                }
+                
+                // Get hub storage stats
+                let hubMax = 0;
+                let hubUsed = 0;
+                if (typeof window.getHubStorageMax === 'function') {
+                    hubMax = await window.getHubStorageMax();
+                }
+                if (typeof window.getHubStorageUsed === 'function') {
+                    hubUsed = await window.getHubStorageUsed();
+                }
+                
+                // Get ship available space
+                if (typeof window.getRemainingShipStorage === 'function') {
+                    currentShipAvailable = await window.getRemainingShipStorage();
+                }
+                
+                // Get real estate properties
+                if (typeof window.getRealEstate === 'function') {
+                    const estateData = await window.getRealEstate();
+                    properties = estateData.properties || [];
+                }
+                
+                // Update capacity display
+                document.getElementById('hubCapacityDisplay').textContent = `Used: ${hubUsed.toFixed(1)}/${hubMax} AMU`;
+                document.getElementById('capacityText').textContent = `${hubUsed.toFixed(1)} / ${hubMax} AMU`;
+                const capacityPercent = hubMax > 0 ? (hubUsed / hubMax) * 100 : 0;
+                document.getElementById('capacityBar').style.width = Math.min(100, capacityPercent) + '%';
+                
+                // Convert hub inventory to array
+                hubItems = [];
+                let totalItems = 0;
+                let totalValue = 0;
+                
+                for (const [name, data] of Object.entries(hubInventory)) {
+                    const count = data.count || 1;
+                    const massPerUnit = getElementMass(name);
+                    const totalMass = count * massPerUnit;
+                    const valuePerUnit = getElementValue(name);
+                    const totalItemValue = count * valuePerUnit;
+                    
+                    totalItems += count;
+                    totalValue += totalItemValue;
+                    
+                    // For now, assign to first property (in future, track per property)
+                    const propertyId = data.propertyId || (properties.length > 0 ? properties[0].id : 'unknown');
+                    const propertyName = properties.find(p => p.id === propertyId)?.name || 'Earth Hub';
+                    
+                    hubItems.push({
+                        name: name,
+                        count: count,
+                        massPerUnit: massPerUnit,
+                        totalMass: totalMass,
+                        valuePerUnit: valuePerUnit,
+                        totalValue: totalItemValue,
+                        icon: getElementIcon(name),
+                        rarity: getElementRarity(name),
+                        propertyId: propertyId,
+                        propertyName: propertyName
+                    });
+                }
+                
+                // Update stats
+                document.getElementById('totalItems').textContent = totalItems;
+                document.getElementById('uniqueItems').textContent = hubItems.length;
+                document.getElementById('totalValue').textContent = totalValue.toLocaleString();
+                
+                // Render property filter
+                renderPropertyFilter();
+                
+                // Apply filters and render
+                applyFilters();
+                
+            } catch (error) {
+                console.error('Error loading hub data:', error);
+                document.getElementById('itemsGrid').innerHTML = '<div class="empty-state">Error loading inventory</div>';
+            }
+        }
+
+        // ===== RENDER PROPERTY FILTER =====
+        function renderPropertyFilter() {
+            const filterEl = document.getElementById('propertyFilter');
+            
+            let html = '<span class="property-filter-btn active" onclick="window.filterByProperty(\'all\')">🏢 All Properties</span>';
+            
+            properties.forEach(prop => {
+                const propType = prop.type === 'storage_locker' ? '🔐' : 
+                                prop.type === 'small_warehouse' ? '🏢' :
+                                prop.type === 'commercial_depot' ? '🏭' : '🛰️';
+                html += `<span class="property-filter-btn" onclick="window.filterByProperty('${prop.id}')">${propType} ${prop.name}</span>`;
+            });
+            
+            filterEl.innerHTML = html;
+        }
+
+        // ===== APPLY FILTERS AND RENDER =====
+        function applyFilters() {
+            // Apply property filter
+            let filtered = hubItems.filter(item => {
+                if (currentPropertyFilter !== 'all' && item.propertyId !== currentPropertyFilter) return false;
+                if (currentRarityFilter !== 'all' && item.rarity !== currentRarityFilter) return false;
+                if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                return true;
+            });
+            
+            filteredItems = filtered;
+            
+            // Apply sorting
+            sortItemsList();
+        }
+
+        // ===== SORT ITEMS LIST =====
+        function sortItemsList() {
+            switch(sortBy) {
+                case 'name':
+                    filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'count':
+                    filteredItems.sort((a, b) => b.count - a.count);
+                    break;
+                case 'mass':
+                    filteredItems.sort((a, b) => b.totalMass - a.totalMass);
+                    break;
+                case 'value':
+                    filteredItems.sort((a, b) => b.totalValue - a.totalValue);
+                    break;
+                case 'rarity':
+                    const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
+                    filteredItems.sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0));
+                    break;
+                case 'property':
+                    filteredItems.sort((a, b) => a.propertyName.localeCompare(b.propertyName));
+                    break;
+            }
+            
+            renderItems();
+        }
+
+        // ===== RENDER ITEMS =====
+        function renderItems() {
+            const grid = document.getElementById('itemsGrid');
+            
+            if (filteredItems.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No items found in hub storage</div>';
+                return;
+            }
+            
+            let html = '';
+            filteredItems.forEach(item => {
+                const rarityColor = rarityColors[item.rarity] || '#ffffff';
+                
+                html += `
+                    <div class="item-card">
+                        <div class="item-icon">${item.icon}</div>
+                        <div class="item-info">
+                            <div class="item-name" style="color: ${rarityColor}">${item.name}</div>
+                            <div class="item-details">
+                                <span class="item-quantity">Qty: ${item.count}</span>
+                                <span class="item-mass">Mass: ${item.totalMass.toFixed(1)} AMU</span>
+                                <span class="item-value">Value: ${item.totalValue.toLocaleString()}⭐</span>
+                            </div>
+                            <div class="item-property">📍 ${item.propertyName}</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="action-btn transfer-btn" onclick="window.showTransferModal('${item.name}', ${item.count}, ${item.massPerUnit}, ${item.valuePerUnit})">🚀 SHIP</button>
+                            <button class="action-btn sell-btn" onclick="window.showSellModal('${item.name}', ${item.count}, ${item.valuePerUnit})">💰 SELL</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        // ===== FILTER ITEMS BY RARITY =====
+        function filterItems(rarity) {
+            currentRarityFilter = rarity;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            applyFilters();
+        }
+
+        // ===== FILTER BY PROPERTY =====
+        function filterByProperty(propertyId) {
+            currentPropertyFilter = propertyId;
+            
+            document.querySelectorAll('.property-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            applyFilters();
+        }
+
+        // ===== SEARCH ITEMS =====
+        function searchItems() {
+            searchTerm = document.getElementById('searchInput').value;
+            applyFilters();
+        }
+
+        // ===== SORT ITEMS =====
+        function sortItems() {
+            sortBy = document.getElementById('sortSelect').value;
+            sortItemsList();
+        }
+
+        // ===== TRANSFER MODAL FUNCTIONS =====
+        function showTransferModal(itemName, currentCount, massPerUnit, valuePerUnit) {
+            if (currentShipAvailable < massPerUnit) {
+                alert('Not enough ship cargo space!');
+                return;
+            }
+            
+            currentTransferItem = itemName;
+            currentTransferMax = currentCount;
+            currentTransferMassPerUnit = massPerUnit;
+            currentTransferValuePerUnit = valuePerUnit;
+            
+            document.getElementById('transferItemName').textContent = itemName;
+            document.getElementById('transferCurrentCount').textContent = `Current: ${currentCount}`;
+            document.getElementById('transferQuantity').value = 1;
+            document.getElementById('transferMass').textContent = massPerUnit.toFixed(1);
+            document.getElementById('shipAvailable').textContent = currentShipAvailable.toFixed(1);
+            document.getElementById('transferWarning').textContent = '';
+            
+            document.getElementById('transferDecrementBtn').disabled = true;
+            document.getElementById('transferIncrementBtn').disabled = (currentCount <= 1 || massPerUnit > currentShipAvailable);
+            
+            document.getElementById('transferModal').classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferModal').classList.remove('active');
+            currentTransferItem = null;
+        }
+
+        function transferIncrementQty() {
+            let current = parseInt(document.getElementById('transferQuantity').value);
+            if (current < currentTransferMax) {
+                current++;
+                document.getElementById('transferQuantity').value = current;
+                const massToTransfer = current * currentTransferMassPerUnit;
+                document.getElementById('transferMass').textContent = massToTransfer.toFixed(1);
+                
+                document.getElementById('transferDecrementBtn').disabled = (current <= 1);
+                document.getElementById('transferIncrementBtn').disabled = (current >= currentTransferMax || massToTransfer >= currentShipAvailable);
+                
+                if (massToTransfer > currentShipAvailable * 0.9) {
+                    document.getElementById('transferWarning').textContent = '⚠️ Approaching ship cargo limit';
+                } else {
+                    document.getElementById('transferWarning').textContent = '';
+                }
+            }
+        }
+
+        function transferDecrementQty() {
+            let current = parseInt(document.getElementById('transferQuantity').value);
+            if (current > 1) {
+                current--;
+                document.getElementById('transferQuantity').value = current;
+                const massToTransfer = current * currentTransferMassPerUnit;
+                document.getElementById('transferMass').textContent = massToTransfer.toFixed(1);
+                
+                document.getElementById('transferDecrementBtn').disabled = (current <= 1);
+                document.getElementById('transferIncrementBtn').disabled = (current >= currentTransferMax || massToTransfer >= currentShipAvailable);
+                document.getElementById('transferWarning').textContent = '';
+            }
+        }
+
+        async function confirmTransfer() {
+            if (!currentTransferItem) return;
+            
+            const quantity = parseInt(document.getElementById('transferQuantity').value);
+            const massToTransfer = quantity * currentTransferMassPerUnit;
+            
+            if (massToTransfer > currentShipAvailable) {
+                document.getElementById('transferWarning').textContent = 'Not enough ship cargo space!';
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'transferring to ship...';
+            
+            try {
+                // Use transfer function from storage.js
+                if (typeof window.transferHubToShip === 'function') {
+                    const result = await window.transferHubToShip(currentTransferItem, quantity);
+                    
+                    if (result.success) {
+                        closeTransferModal();
+                        await loadHubData();
+                        
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        alert(`✅ Transferred ${quantity}x ${currentTransferItem} to ship`);
+                    } else {
+                        document.getElementById('transferWarning').textContent = result.reason || 'Transfer failed';
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                    }
+                } else {
+                    // Manual transfer if function not available
+                    const removeResult = await window.removeElementFromHub(currentTransferItem, quantity);
+                    
+                    if (!removeResult.success) {
+                        throw new Error(removeResult.reason || 'Failed to remove from hub');
+                    }
+                    
+                    const addResult = await window.addElementToCollection(currentTransferItem, quantity);
+                    
+                    if (!addResult.success) {
+                        await window.addElementToHub(currentTransferItem, quantity);
+                        throw new Error(addResult.reason || 'Failed to add to ship');
+                    }
+                    
+                    closeTransferModal();
+                    await loadHubData();
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`✅ Transferred ${quantity}x ${currentTransferItem} to ship`);
+                }
+                
+            } catch (error) {
+                console.error('Transfer error:', error);
+                document.getElementById('transferWarning').textContent = error.message || 'Error transferring';
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== SELL MODAL FUNCTIONS =====
+        function showSellModal(itemName, currentCount, pricePerUnit) {
+            currentSellItem = itemName;
+            currentSellMax = currentCount;
+            currentSellPricePerUnit = pricePerUnit;
+            
+            document.getElementById('sellItemName').textContent = itemName;
+            document.getElementById('sellCurrentCount').textContent = `Current: ${currentCount}`;
+            document.getElementById('sellQuantity').value = 1;
+            document.getElementById('sellPrice').textContent = pricePerUnit.toLocaleString();
+            document.getElementById('sellTotal').textContent = pricePerUnit.toLocaleString();
+            document.getElementById('sellWarning').textContent = '';
+            
+            document.getElementById('sellDecrementBtn').disabled = true;
+            document.getElementById('sellIncrementBtn').disabled = (currentCount <= 1);
+            
+            document.getElementById('sellModal').classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function closeSellModal() {
+            document.getElementById('sellModal').classList.remove('active');
+            currentSellItem = null;
+        }
+
+        function sellIncrementQty() {
+            let current = parseInt(document.getElementById('sellQuantity').value);
+            if (current < currentSellMax) {
+                current++;
+                document.getElementById('sellQuantity').value = current;
+                document.getElementById('sellTotal').textContent = (current * currentSellPricePerUnit).toLocaleString();
+                
+                document.getElementById('sellDecrementBtn').disabled = (current <= 1);
+                document.getElementById('sellIncrementBtn').disabled = (current >= currentSellMax);
+            }
+        }
+
+        function sellDecrementQty() {
+            let current = parseInt(document.getElementById('sellQuantity').value);
+            if (current > 1) {
+                current--;
+                document.getElementById('sellQuantity').value = current;
+                document.getElementById('sellTotal').textContent = (current * currentSellPricePerUnit).toLocaleString();
+                
+                document.getElementById('sellDecrementBtn').disabled = (current <= 1);
+                document.getElementById('sellIncrementBtn').disabled = (current >= currentSellMax);
+            }
+        }
+
+        async function confirmSell() {
+            if (!currentSellItem) return;
+            
+            const quantity = parseInt(document.getElementById('sellQuantity').value);
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'selling...';
+            
+            try {
+                // Use sell function from storage.js
+                if (typeof window.safeSellHubElement === 'function') {
+                    const result = await window.safeSellHubElement(currentSellItem, quantity, currentSellPricePerUnit);
+                    
+                    if (result.success) {
+                        closeSellModal();
+                        await loadHubData();
+                        
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        alert(`✅ Sold ${quantity}x ${currentSellItem} for ${result.earnings}⭐`);
+                    } else {
+                        document.getElementById('sellWarning').textContent = result.reason || 'Sale failed';
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                    }
+                } else {
+                    document.getElementById('sellWarning').textContent = 'Sell function not available';
+                }
+                
+            } catch (error) {
+                console.error('Sell error:', error);
+                document.getElementById('sellWarning').textContent = 'Error selling';
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== NAVIGATION =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading hub inventory...';
+                
+                await loadHubData();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading data';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
