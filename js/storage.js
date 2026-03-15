@@ -61,7 +61,11 @@ const STORAGE_KEYS = {
     COMMUNITY_FUND: 'voidfarer_community_fund',
     ACTIVE_EVENTS: 'voidfarer_active_events',
     EVENT_HISTORY: 'voidfarer_event_history',
-    CLAIMED_PLANETS: 'voidfarer_claimed_planets'
+    CLAIMED_PLANETS: 'voidfarer_claimed_planets',
+    // ALCHEMY KEYS
+    ALCHEMY_PROGRESS: 'voidfarer_alchemy_progress',
+    ALCHEMY_RECIPES_UNLOCKED: 'voidfarer_alchemy_recipes_unlocked',
+    ALCHEMY_TOTAL_CRAFTS: 'voidfarer_alchemy_total_crafts'
 };
 
 // ===== ELEMENT MASS DATABASE =====
@@ -151,6 +155,92 @@ function getCurrentPlanetResources() {
     return resources ? JSON.parse(resources) : [];
 }
 
+// ===== ALCHEMY PROGRESS FUNCTIONS =====
+function getAlchemyProgress() {
+    try {
+        const progress = localStorage.getItem(STORAGE_KEYS.ALCHEMY_PROGRESS);
+        return progress ? JSON.parse(progress) : {};
+    } catch (error) {
+        console.error('Error getting alchemy progress:', error);
+        return {};
+    }
+}
+
+function saveAlchemyProgress(progress) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.ALCHEMY_PROGRESS, JSON.stringify(progress));
+        
+        // Update total crafts count
+        const totalCrafts = Object.values(progress).reduce((sum, count) => sum + count, 0);
+        localStorage.setItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS, totalCrafts.toString());
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving alchemy progress:', error);
+        return false;
+    }
+}
+
+function addAlchemyProgress(recipeId, count = 1) {
+    try {
+        const progress = getAlchemyProgress();
+        progress[recipeId] = (progress[recipeId] || 0) + count;
+        return saveAlchemyProgress(progress);
+    } catch (error) {
+        console.error('Error adding alchemy progress:', error);
+        return false;
+    }
+}
+
+function getAlchemyTotalCrafts() {
+    try {
+        return parseInt(localStorage.getItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS)) || 0;
+    } catch (error) {
+        console.error('Error getting alchemy total crafts:', error);
+        return 0;
+    }
+}
+
+function getRecipeProgress(recipeId) {
+    try {
+        const progress = getAlchemyProgress();
+        return progress[recipeId] || 0;
+    } catch (error) {
+        console.error('Error getting recipe progress:', error);
+        return 0;
+    }
+}
+
+// ===== RECIPE UNLOCK FUNCTIONS =====
+function getUnlockedRecipes() {
+    try {
+        const unlocked = localStorage.getItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED);
+        return unlocked ? JSON.parse(unlocked) : [];
+    } catch (error) {
+        console.error('Error getting unlocked recipes:', error);
+        return [];
+    }
+}
+
+function unlockRecipe(recipeId) {
+    try {
+        const unlocked = getUnlockedRecipes();
+        if (!unlocked.includes(recipeId)) {
+            unlocked.push(recipeId);
+            localStorage.setItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED, JSON.stringify(unlocked));
+        }
+        return true;
+    } catch (error) {
+        console.error('Error unlocking recipe:', error);
+        return false;
+    }
+}
+
+function isRecipeUnlocked(recipeId) {
+    const unlocked = getUnlockedRecipes();
+    return unlocked.includes(recipeId);
+}
+
 // ===== INITIALIZATION =====
 async function initializeStorage() {
     console.log('Initializing storage...');
@@ -180,6 +270,19 @@ async function initializeStorage() {
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) {
         localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
+    }
+    
+    // Initialize alchemy storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_PROGRESS)) {
+        localStorage.setItem(STORAGE_KEYS.ALCHEMY_PROGRESS, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED)) {
+        // Unlock basic recipes by default
+        const defaultUnlocked = ['water', 'methane', 'ammonia', 'hydrogen_peroxide'];
+        localStorage.setItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED, JSON.stringify(defaultUnlocked));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS)) {
+        localStorage.setItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS, '0');
     }
     
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
@@ -225,7 +328,10 @@ async function createDefaultPlayer(name = 'Voidfarer') {
             totalDistanceTraveled: 0,
             totalWarps: 0,
             credits: 5000,
-            cargoMassLimit: getCargoMassLimit()
+            cargoMassLimit: getCargoMassLimit(),
+            // Add alchemy stats to player
+            alchemyTotalCrafts: 0,
+            alchemyMasteredRecipes: 0
         };
         await savePlayer(player);
         console.log('Created default player');
@@ -814,6 +920,11 @@ async function resetGame() {
     ];
     locationKeys.forEach(key => localStorage.removeItem(key));
     
+    // Clear alchemy data
+    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_PROGRESS);
+    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED);
+    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS);
+    
     setHapticsEnabled(settings.haptics);
     setAutoGatherEnabled(settings.autoGather);
     setOrbitSpeed(settings.orbitSpeed);
@@ -901,6 +1012,16 @@ window.saveShipUpgrades = saveShipUpgrades;
 window.saveTimestamp = saveTimestamp;
 window.resetGame = resetGame;
 window.getPlayerId = getPlayerId;
+
+// ===== ALCHEMY FUNCTIONS =====
+window.getAlchemyProgress = getAlchemyProgress;
+window.saveAlchemyProgress = saveAlchemyProgress;
+window.addAlchemyProgress = addAlchemyProgress;
+window.getAlchemyTotalCrafts = getAlchemyTotalCrafts;
+window.getRecipeProgress = getRecipeProgress;
+window.getUnlockedRecipes = getUnlockedRecipes;
+window.unlockRecipe = unlockRecipe;
+window.isRecipeUnlocked = isRecipeUnlocked;
 
 // NOTE: Planet status functions are already exposed by db.js
 // We do NOT redefine them here to avoid recursion
