@@ -725,7 +725,7 @@
 <body>
     <div class="phone-frame">
         <div class="surface-view" id="surfaceView">
-            <img src="assets/images/earth-view.jpg" class="planet-canvas" id="planetImage" alt="Planet surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+            <img src="https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg" class="planet-canvas" id="planetImage" alt="Planet surface">
             <div class="star-overlay"></div>
             
             <div class="content">
@@ -855,8 +855,6 @@
         };
 
         // ===== PITY COUNTER SYSTEM =====
-        let pityCounters = {}; // Track attempts per resource
-        
         const PITY_CONFIG = {
             'common': { threshold: 2 },    // 65% chance → guarantee after 2 failures
             'uncommon': { threshold: 3 },   // 45% chance → guarantee after 3 failures
@@ -864,55 +862,6 @@
             'very-rare': { threshold: 9 },  // 12% chance → guarantee after 9 failures
             'legendary': { threshold: 25 }  // 4% chance → guarantee after 25 failures
         };
-
-        // ===== EXPLORATION TRACKING =====
-        let exploredElements = {}; // Track which elements have been found
-        let totalElements = 4; // Default, will update from planet data
-
-        function initializeExplorationTracking() {
-            totalElements = currentPlanet.resources.length;
-            currentPlanet.resources.forEach(resource => {
-                if (!exploredElements[resource]) {
-                    exploredElements[resource] = false;
-                }
-            });
-            console.log('Exploration tracking initialized:', exploredElements);
-        }
-
-        function checkElementExplored(resource) {
-            return exploredElements[resource] || false;
-        }
-
-        function markElementExplored(resource) {
-            if (!exploredElements[resource]) {
-                exploredElements[resource] = true;
-                updateExploredCount();
-                renderResourceToggles(); // Re-render to show checkmarks
-                checkAllElementsExplored();
-            }
-        }
-
-        function updateExploredCount() {
-            const explored = Object.values(exploredElements).filter(v => v).length;
-            const exploredProgress = document.getElementById('exploredProgress');
-            if (exploredProgress) {
-                exploredProgress.textContent = `${explored}/${totalElements}`;
-            }
-            return explored;
-        }
-
-        function checkAllElementsExplored() {
-            const explored = Object.values(exploredElements).filter(v => v).length;
-            if (explored === totalElements && totalElements > 0) {
-                // All elements explored - show claim button
-                claimBtn.classList.add('visible');
-                claimBtn.disabled = false;
-                claimBtn.textContent = '✨ CLAIM PLANET';
-                
-                // Show success message
-                showSuccessToast('✨ All elements discovered! Planet ready to claim.');
-            }
-        }
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -935,6 +884,27 @@
         const notificationQuantity = document.getElementById('notificationQuantity');
         const notificationRarity = document.getElementById('notificationRarity');
         const notificationPity = document.getElementById('notificationPity');
+
+        // ===== STATE =====
+        let currentPlanet = {
+            name: 'Earth',
+            type: 'lush',
+            typeName: 'Lush',
+            resources: []
+        };
+        
+        let resourceStates = {};
+        let resourceChances = {};
+        let isExtracting = true;
+        let extractionTimer = null;
+        let pityCounters = {}; // Track attempts per resource
+        let exploredElements = {}; // Track which elements have been found
+        let totalElements = 4; // Default, will update from planet data
+        
+        // Cache for cargo mass
+        let cachedCargoMass = 0;
+        let lastMassUpdate = 0;
+        const MASS_UPDATE_INTERVAL = 2000;
 
         // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
@@ -1006,25 +976,65 @@
         window.returnToSystem = returnToSystem;
         window.claimCurrentPlanet = claimCurrentPlanet;
 
-        // ===== STATE =====
-        let currentPlanet = {
-            name: 'Earth',
-            type: 'lush',
-            typeName: 'Lush',
-            resources: []
-        };
-        
-        let resourceStates = {};
-        let resourceChances = {};
-        let isExtracting = true;
-        let extractionTimer = null;
-        
-        // Cache for cargo mass
-        let cachedCargoMass = 0;
-        let lastMassUpdate = 0;
-        const MASS_UPDATE_INTERVAL = 2000;
+        // ===== EXPLORATION TRACKING FUNCTIONS =====
+        function initializeExplorationTracking() {
+            totalElements = currentPlanet.resources.length;
+            currentPlanet.resources.forEach(resource => {
+                if (!exploredElements[resource]) {
+                    exploredElements[resource] = false;
+                }
+            });
+            console.log('Exploration tracking initialized:', exploredElements);
+        }
 
-        // ===== CONSISTENT RARITY MAPPING (matches storage.js and db.js) =====
+        function checkElementExplored(resource) {
+            return exploredElements[resource] || false;
+        }
+
+        function markElementExplored(resource) {
+            if (!exploredElements[resource]) {
+                exploredElements[resource] = true;
+                updateExploredCount();
+                renderResourceToggles(); // Re-render to show checkmarks
+                checkAllElementsExplored();
+            }
+        }
+
+        function updateExploredCount() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            const exploredProgress = document.getElementById('exploredProgress');
+            if (exploredProgress) {
+                exploredProgress.textContent = `${explored}/${totalElements}`;
+            }
+            return explored;
+        }
+
+        function checkAllElementsExplored() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            if (explored === totalElements && totalElements > 0) {
+                // All elements explored - show claim button
+                claimBtn.classList.add('visible');
+                claimBtn.disabled = false;
+                claimBtn.textContent = '✨ CLAIM PLANET';
+                
+                // Show success message
+                showSuccessToast('✨ All elements discovered! Planet ready to claim.');
+            }
+        }
+
+        // ===== PITY COUNTER FUNCTIONS =====
+        function initializePityCounters() {
+            currentPlanet.resources.forEach(resource => {
+                const rarity = getElementRarity(resource);
+                pityCounters[resource] = {
+                    attempts: 0,
+                    threshold: PITY_CONFIG[rarity].threshold
+                };
+            });
+            console.log('Pity counters initialized:', pityCounters);
+        }
+
+        // ===== CONSISTENT RARITY MAPPING =====
         function getElementRarity(elementName) {
             const rareElements = [
                 'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
@@ -1105,32 +1115,7 @@
             'Promethium': { symbol: 'Pm' },
             'Technetium': { symbol: 'Tc' },
             'Astatine': { symbol: 'At' },
-            'Francium': { symbol: 'Fr' },
-            'Neptunium': { symbol: 'Np' },
-            'Americium': { symbol: 'Am' },
-            'Curium': { symbol: 'Cm' },
-            'Berkelium': { symbol: 'Bk' },
-            'Californium': { symbol: 'Cf' },
-            'Einsteinium': { symbol: 'Es' },
-            'Fermium': { symbol: 'Fm' },
-            'Mendelevium': { symbol: 'Md' },
-            'Nobelium': { symbol: 'No' },
-            'Lawrencium': { symbol: 'Lr' },
-            'Rutherfordium': { symbol: 'Rf' },
-            'Dubnium': { symbol: 'Db' },
-            'Seaborgium': { symbol: 'Sg' },
-            'Bohrium': { symbol: 'Bh' },
-            'Hassium': { symbol: 'Hs' },
-            'Meitnerium': { symbol: 'Mt' },
-            'Darmstadtium': { symbol: 'Ds' },
-            'Roentgenium': { symbol: 'Rg' },
-            'Copernicium': { symbol: 'Cn' },
-            'Nihonium': { symbol: 'Nh' },
-            'Flerovium': { symbol: 'Fl' },
-            'Moscovium': { symbol: 'Mc' },
-            'Livermorium': { symbol: 'Lv' },
-            'Tennessine': { symbol: 'Ts' },
-            'Oganesson': { symbol: 'Og' }
+            'Francium': { symbol: 'Fr' }
         };
 
         function getElementSymbol(resource) {
@@ -1267,36 +1252,13 @@
                     planetResources = planetResources.slice(0, 4);
                 }
                 
-                // Determine image based on planet type
-                let imageFile = 'earth-view.jpg';
-                if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
-                    imageFile = 'pyros-surface.jpg';
-                } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
-                    imageFile = 'glacier-surface.jpg';
-                } else if (planetTypeStr.includes('lush')) {
-                    imageFile = 'verdant-surface.jpg';
-                } else if (planetTypeStr.includes('barren')) {
-                    imageFile = 'barren-surface.jpg';
-                } else if (planetTypeStr.includes('gas')) {
-                    imageFile = 'gas-surface.jpg';
-                } else if (planetTypeStr.includes('oceanic')) {
-                    imageFile = 'oceanic-surface.jpg';
-                } else if (planetTypeStr.includes('toxic')) {
-                    imageFile = 'toxic-surface.jpg';
-                } else if (planetTypeStr.includes('asteroid')) {
-                    imageFile = 'asteroid-field.jpg';
-                }
-                
-                // Set image with fallback
-                planetImage.src = 'assets/images/' + imageFile;
-                planetImage.onerror = function() {
-                    this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
-                };
+                // Set planet type display name
+                let typeDisplay = planetTypeStr.charAt(0).toUpperCase() + planetTypeStr.slice(1);
                 
                 currentPlanet = {
                     name: planetNameStr,
                     type: planetTypeStr,
-                    typeName: planetTypeStr.charAt(0).toUpperCase() + planetTypeStr.slice(1),
+                    typeName: typeDisplay,
                     resources: planetResources
                 };
                 
