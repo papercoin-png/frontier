@@ -364,29 +364,7 @@ async function getCollection() {
 // Internal function to add element to collection (no recursion)
 async function _addElementToCollection(elementName, count = 1) {
     try {
-        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
-        const tx = db.transaction('collection', 'readwrite');
-        const store = tx.objectStore('collection');
-        
-        let element = await store.get(elementName);
-        
-        if (!element) {
-            element = {
-                name: elementName,
-                count: count,
-                firstFound: new Date().toISOString(),
-                rarity: getElementRarity(elementName),
-                value: getElementValue(elementName)
-            };
-        } else {
-            element.count = (element.count || 1) + count;
-        }
-        
-        await store.put(element);
-        await tx.done;
-        
-        return { success: true, count: element.count };
-        
+        return await window.addElementToCollection(elementName, count);
     } catch (error) {
         console.error('Error in _addElementToCollection:', error);
         return { success: false, error: error.message };
@@ -396,33 +374,7 @@ async function _addElementToCollection(elementName, count = 1) {
 // Internal function to remove element from collection
 async function _removeElementFromCollection(elementName, count = 1) {
     try {
-        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
-        const tx = db.transaction('collection', 'readwrite');
-        const store = tx.objectStore('collection');
-        
-        const element = await store.get(elementName);
-        if (!element) {
-            await tx.done;
-            return { success: false, reason: 'not_found' };
-        }
-        
-        const currentCount = element.count || 1;
-        if (currentCount < count) {
-            await tx.done;
-            return { success: false, reason: 'insufficient', available: currentCount };
-        }
-        
-        element.count = currentCount - count;
-        
-        if (element.count <= 0) {
-            await store.delete(elementName);
-        } else {
-            await store.put(element);
-        }
-        
-        await tx.done;
-        return { success: true, newCount: element.count > 0 ? element.count : 0 };
-        
+        return await window.removeElementFromCollection(elementName, count);
     } catch (error) {
         console.error('Error in _removeElementFromCollection:', error);
         return { success: false, error: error.message };
@@ -490,7 +442,8 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
     try {
         console.log(`Adding ${count}x ${elementName} to collection...`, locationData ? 'with location data' : 'no location data');
         
-        const result = await _addElementToCollection(elementName, count);
+        // First add to collection using db.js function
+        const result = await window.addElementToCollection(elementName, count, {});
         
         if (result && result.success) {
             // Update player stats
@@ -500,9 +453,9 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 await savePlayer(player);
             }
             
-            // CRITICAL FIX: ALWAYS save location data if provided
+            // CRITICAL: ALWAYS save location data if provided (for planetary discoveries)
             // This ensures journal entries are created for every discovery
-            if (locationData) {
+            if (locationData && locationData.fromPlanet === true) {
                 // Get planet name and type - with proper fallbacks
                 const planetName = locationData.planet || getCurrentPlanetName();
                 const planetType = locationData.planetType || getCurrentPlanetType();
@@ -526,20 +479,19 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                     if (typeof window.saveElementLocation === 'function') {
                         await window.saveElementLocation(elementName, planetName, enhancedLocationData);
                         console.log(`✅ Journal entry saved: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
+                        
+                        // Also update planet status
+                        if (typeof window.updatePlanetStatusFromLocations === 'function') {
+                            await window.updatePlanetStatusFromLocations(planetName);
+                        }
                     } else {
                         console.warn('saveElementLocation function not available');
-                        
-                        // Fallback: Save to localStorage directly
-                        const locationsKey = `voidfarer_locations_${elementName}`;
-                        const existing = JSON.parse(localStorage.getItem(locationsKey) || '[]');
-                        existing.push(enhancedLocationData);
-                        localStorage.setItem(locationsKey, JSON.stringify(existing));
                     }
                 } catch (locError) {
                     console.error('Failed to save location:', locError);
                 }
             } else {
-                console.log(`No location data provided for ${elementName} - this is normal for alchemy crafts`);
+                console.log(`No planetary location data for ${elementName} - this is normal for alchemy crafts or market purchases`);
             }
             
             return { success: true, newCount: result.count };
@@ -554,7 +506,7 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
 // Remove element from collection (public wrapper)
 async function removeElementFromCollection(elementName, count = 1) {
     console.log(`Removing ${count}x ${elementName} from collection...`);
-    return await _removeElementFromCollection(elementName, count);
+    return await window.removeElementFromCollection(elementName, count);
 }
 
 // ===== SAFE SELL ELEMENT =====
@@ -576,7 +528,7 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
         }
         
         // Remove from collection using internal function
-        const removeResult = await _removeElementFromCollection(elementName, quantity);
+        const removeResult = await removeElementFromCollection(elementName, quantity);
         
         if (!removeResult.success) {
             return removeResult;
@@ -603,15 +555,10 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
 // Get all locations for a specific element
 async function getElementLocations(elementName) {
     try {
-        // Try using db.js first
         if (typeof window.getElementLocations === 'function') {
             return await window.getElementLocations(elementName);
         }
-        
-        // Fallback to localStorage
-        const locationsKey = `voidfarer_locations_${elementName}`;
-        const locations = localStorage.getItem(locationsKey);
-        return locations ? JSON.parse(locations) : [];
+        return [];
     } catch (error) {
         console.error(`Error getting locations for ${elementName}:`, error);
         return [];
@@ -624,23 +571,7 @@ async function getAllPlayerLocations() {
         if (typeof window.getPlayerLocations === 'function') {
             return await window.getPlayerLocations();
         }
-        
-        // Fallback: Scan localStorage for all location keys
-        const allLocations = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('voidfarer_locations_')) {
-                const elementName = key.replace('voidfarer_locations_', '');
-                const locations = JSON.parse(localStorage.getItem(key) || '[]');
-                locations.forEach(loc => {
-                    allLocations.push({
-                        element: elementName,
-                        ...loc
-                    });
-                });
-            }
-        }
-        return allLocations;
+        return [];
     } catch (error) {
         console.error('Error getting all player locations:', error);
         return [];
