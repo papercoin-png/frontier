@@ -444,7 +444,7 @@
             <div style="color: white; text-align: center; padding: 50px;">Loading stars...</div>
         </div>
         
-        <button class="back-btn" onclick="returnToSectors()">← STAR SECTORS</button>
+        <button class="back-btn" onclick="window.returnToSectors()">← STAR SECTORS</button>
         
         <!-- Star Info Panel -->
         <div class="star-info-panel" id="starInfoPanel">
@@ -538,6 +538,8 @@
         let stars = [];
         let currentStarName = '';
         let clusterName = 'Unknown Cluster';
+        let clusterType = '';
+        let clusterStars = 0;
         let starCount = 50;
         let selectedStar = null;
         let journeyDistance = 0;
@@ -660,20 +662,38 @@
                 
                 // First check if we're in plot mode with a selected star sector
                 let targetCluster = null;
+                let targetClusterType = null;
+                let targetClusterStars = null;
                 
                 if (isPlotMode) {
-                    // Get the destination star sector from plot data
+                    // Get the destination star sector from plot data (saved in star-sectors.html)
                     targetCluster = localStorage.getItem('voidfarer_plot_nebula');
-                    console.log('Plot mode target cluster:', targetCluster);
+                    targetClusterType = localStorage.getItem('voidfarer_plot_nebula_type');
+                    targetClusterStars = localStorage.getItem('voidfarer_plot_nebula_stars');
+                    
+                    console.log('Plot mode target cluster:', { 
+                        name: targetCluster, 
+                        type: targetClusterType, 
+                        stars: targetClusterStars 
+                    });
                 }
                 
-                // If no plot target, check for current location
+                // If no plot target, check for current location from normal navigation
                 if (!targetCluster) {
+                    // Try to get from navigation functions
                     if (typeof window.getCurrentStarSector === 'function') {
                         targetCluster = await window.getCurrentStarSector();
-                    } else {
-                        targetCluster = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
+                        targetClusterType = await window.getCurrentStarSectorType?.() || '';
+                        targetClusterStars = await window.getCurrentStarSectorStars?.() || '';
                     }
+                    
+                    // Fallback to localStorage
+                    if (!targetCluster) {
+                        targetCluster = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
+                        targetClusterType = localStorage.getItem('voidfarer_current_sector_type') || 'Star-forming';
+                        targetClusterStars = localStorage.getItem('voidfarer_current_sector_stars') || '85';
+                    }
+                    
                     console.log('Using current cluster:', targetCluster);
                 }
                 
@@ -684,8 +704,10 @@
                     currentStarName = localStorage.getItem('voidfarer_current_star') || '';
                 }
                 
-                // Load star count
-                if (typeof window.getCurrentSectorStars === 'function') {
+                // Get star count - use the one from the star sector if available
+                if (targetClusterStars) {
+                    starCount = parseInt(targetClusterStars) || 85;
+                } else if (typeof window.getCurrentSectorStars === 'function') {
                     starCount = await window.getCurrentSectorStars() || 85;
                 } else {
                     starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
@@ -699,6 +721,8 @@
                 }
 
                 clusterName = targetCluster || 'Orion Molecular Cloud';
+                clusterType = targetClusterType || 'Star-forming';
+                clusterStars = starCount;
 
                 // Update UI
                 document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
@@ -718,8 +742,9 @@
 
                 console.log('Cluster data loaded:', {
                     cluster: clusterName,
+                    type: clusterType,
+                    stars: clusterStars,
                     currentStar: currentStarName,
-                    starCount: starCount,
                     sectorId: currentSectorId
                 });
 
@@ -737,7 +762,10 @@
         function generateStars() {
             stars = [];
             
+            // Use cluster name to create a unique seed - this ensures different clusters have different stars
             const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 100000;
+            
+            console.log(`Generating stars for cluster: ${clusterName} with seed: ${clusterSeed}`);
             
             for (let i = 0; i < starCount; i++) {
                 const starSeed = clusterSeed + i * 1000;
@@ -779,7 +807,8 @@
                 return a.distance - b.distance;
             });
             
-            console.log(`Generated ${stars.length} stars with planets`);
+            console.log(`Generated ${stars.length} stars for cluster ${clusterName}`);
+            console.log('First star:', stars[0]?.name);
         }
 
         // ===== SHOW STAR INFO =====
