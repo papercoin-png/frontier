@@ -152,10 +152,15 @@
             font-size: 22px;
         }
         
-        .cargo-value {
+        .hub-storage {
             font-size: 14px;
             color: #a0d0c0;
             text-align: right;
+        }
+        
+        .hub-storage span {
+            color: #4affaa;
+            font-weight: 600;
         }
         
         /* Location Bar */
@@ -736,13 +741,13 @@
                 <div class="earth-subtitle">✦ home port ✦</div>
             </div>
             
-            <!-- Stats Bar -->
+            <!-- Stats Bar - UPDATED to show Hub Storage instead of Cargo -->
             <div class="stats-bar" id="statsBar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
-                <div class="cargo-value" id="cargoDisplay">
-                    Cargo: --/--
+                <div class="hub-storage" id="hubStorageDisplay">
+                    Hub Storage: <span id="hubUsed">--</span>/<span id="hubMax">--</span> AMU
                 </div>
             </div>
             
@@ -846,16 +851,16 @@
                     <div class="hub-desc">Return to your ship</div>
                 </div>
                 
-                <div class="hub-card" onclick="window.navigateTo('cargo.html')">
+                <div class="hub-card" onclick="window.navigateTo('hub-inventory.html')">
                     <div class="hub-icon">📦</div>
-                    <div class="hub-label">Cargo Hold</div>
-                    <div class="hub-desc">Manage inventory</div>
+                    <div class="hub-label">Hub Storage</div>
+                    <div class="hub-desc">Earth-based inventory</div>
                 </div>
                 
                 <div class="hub-card" onclick="window.navigateTo('real-estate.html')">
                     <div class="hub-icon">🏢</div>
                     <div class="hub-label">Real Estate</div>
-                    <div class="hub-desc">Buy & manage storage</div>
+                    <div class="hub-desc">Expand hub storage</div>
                 </div>
                 
                 <div class="hub-card" onclick="window.navigateTo('economy-dashboard.html')">
@@ -898,6 +903,13 @@
             tg.expand();
         }
 
+        // ===== STORAGE KEYS =====
+        const STORAGE_KEYS = {
+            HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
+            HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
+            HUB_INVENTORY: 'voidfarer_hub_inventory'
+        };
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -917,6 +929,8 @@
         let priceChart = null;
         let currentCollection = {};
         let currentCredits = 0;
+        let currentHubMax = 0;
+        let currentHubUsed = 0;
 
         // ===== COMPLETE ELEMENT DATABASE (matches storage.js) =====
         const ELEMENT_DATABASE = {
@@ -1084,6 +1098,45 @@
             navigateTo('index.html');
         }
 
+        // ===== LOAD HUB STORAGE DATA =====
+        async function loadHubStorage() {
+            try {
+                // Get hub storage max from real estate purchases
+                let hubMax = 0;
+                if (typeof window.getRealEstate === 'function') {
+                    const estateData = await window.getRealEstate();
+                    const properties = estateData.properties || [];
+                    hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
+                } else {
+                    // Fallback to localStorage
+                    hubMax = parseInt(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX) || '0');
+                }
+                
+                // Get hub storage used (items stored at Earth Hub)
+                let hubUsed = 0;
+                if (typeof window.getHubInventory === 'function') {
+                    const inventory = await window.getHubInventory();
+                    hubUsed = inventory.totalMass || 0;
+                } else {
+                    hubUsed = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
+                }
+                
+                currentHubMax = hubMax;
+                currentHubUsed = hubUsed;
+                
+                // Update display
+                document.getElementById('hubUsed').textContent = hubUsed.toFixed(1);
+                document.getElementById('hubMax').textContent = hubMax;
+                
+                return { hubMax, hubUsed };
+            } catch (error) {
+                console.error('Error loading hub storage:', error);
+                document.getElementById('hubUsed').textContent = '0';
+                document.getElementById('hubMax').textContent = '0';
+                return { hubMax: 0, hubUsed: 0 };
+            }
+        }
+
         // ===== LOAD ALL DATA =====
         async function loadAllData() {
             try {
@@ -1094,15 +1147,21 @@
                     await window.updateDailyPrices();
                 }
 
-                // Load all data
+                // Load credits
                 let credits = 5000;
                 if (typeof window.getCredits === 'function') {
                     credits = await window.getCredits();
                 }
 
+                // Load hub storage
+                await loadHubStorage();
+
+                // Load collection (this should be HUB inventory, not ship cargo)
                 let collection = {};
-                if (typeof window.getCollection === 'function') {
-                    collection = await window.getCollection();
+                if (typeof window.getHubInventory === 'function') {
+                    collection = await window.getHubInventory();
+                } else {
+                    collection = JSON.parse(localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY) || '{}');
                 }
 
                 let events = [];
@@ -1140,7 +1199,8 @@
             
             const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
             const uniqueItems = Object.keys(collection).length;
-            document.getElementById('cargoDisplay').textContent = `Items: ${totalItems} (${uniqueItems} types)`;
+            
+            // Hub storage already displayed separately via loadHubStorage()
         }
 
         // ===== UPDATE TAX SUMMARY =====
@@ -1344,12 +1404,12 @@
             try {
                 let result;
                 
-                // Use the proper storage function
-                if (typeof window.safeSellElement === 'function') {
-                    result = await window.safeSellElement(elementName, quantity, price);
+                // Use hub-specific sell function
+                if (typeof window.safeSellHubElement === 'function') {
+                    result = await window.safeSellHubElement(elementName, quantity, price);
                     console.log('Sale result:', result);
                 } else {
-                    console.error('safeSellElement not available');
+                    console.error('safeSellHubElement not available');
                     result = { success: false, reason: 'function not available' };
                 }
                 
@@ -1403,8 +1463,8 @@
                     }
                     
                     if (sellQuantity > 0) {
-                        if (typeof window.safeSellElement === 'function') {
-                            const result = await window.safeSellElement(element.name, sellQuantity, element.marketPrice);
+                        if (typeof window.safeSellHubElement === 'function') {
+                            const result = await window.safeSellHubElement(element.name, sellQuantity, element.marketPrice);
                             if (result.success) {
                                 totalEarnings += result.earnings;
                             }
@@ -1458,8 +1518,8 @@
                     if (remaining <= 0) break;
                     
                     if (amount === 'all') {
-                        if (typeof window.safeSellElement === 'function') {
-                            const result = await window.safeSellElement(element.name, element.count, element.marketPrice);
+                        if (typeof window.safeSellHubElement === 'function') {
+                            const result = await window.safeSellHubElement(element.name, element.count, element.marketPrice);
                             if (result.success) {
                                 totalEarned += result.earnings;
                             }
@@ -1468,8 +1528,8 @@
                         const maxCanSell = Math.floor(remaining / element.marketPrice);
                         const sellQuantity = Math.min(maxCanSell, element.count);
                         
-                        if (sellQuantity > 0 && typeof window.safeSellElement === 'function') {
-                            const result = await window.safeSellElement(element.name, sellQuantity, element.marketPrice);
+                        if (sellQuantity > 0 && typeof window.safeSellHubElement === 'function') {
+                            const result = await window.safeSellHubElement(element.name, sellQuantity, element.marketPrice);
                             if (result.success) {
                                 totalEarned += result.earnings;
                                 remaining -= result.earnings;
@@ -1606,6 +1666,17 @@
                 // Initialize database if needed
                 if (typeof window.initializeDatabase === 'function') {
                     await window.initializeDatabase();
+                }
+
+                // Ensure hub storage keys exist
+                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
+                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
+                }
+                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED)) {
+                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, '0');
+                }
+                if (!localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY)) {
+                    localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, '{}');
                 }
 
                 // Load all data
