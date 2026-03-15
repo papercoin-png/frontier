@@ -88,10 +88,15 @@ const STORAGE_KEYS = {
     LABOR_POOL_DISTRIBUTED: 'voidfarer_labor_pool_distributed',
     LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
     PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
-    // PRODUCT OWNERSHIP KEYS (NEW)
+    // PRODUCT OWNERSHIP KEYS
     PLAYER_PRODUCTS: 'voidfarer_player_products',
     PRODUCT_TRANSACTIONS: 'voidfarer_product_transactions',
-    ACTIVE_PRODUCTS: 'voidfarer_active_products'
+    ACTIVE_PRODUCTS: 'voidfarer_active_products',
+    // MARKETPLACE KEYS
+    MARKET_PRICES: 'voidfarer_market_prices',
+    MARKET_HISTORY: 'voidfarer_market_history',
+    MARKET_VOLUME: 'voidfarer_market_volume',
+    MARKET_ORDERS: 'voidfarer_market_orders'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
@@ -622,98 +627,205 @@ function playerOwnsProduct(playerId, productId) {
     }
 }
 
+// ===== MARKETPLACE FUNCTIONS =====
+
 /**
- * Get player's active products (equipped/active)
- * @param {string} playerId - Player ID
- * @returns {Array} Active products
+ * Buy element from market and add to hub storage
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to buy
+ * @param {number} pricePerUnit - Price per unit
+ * @returns {Promise<Object>} Result object
  */
-function getActiveProducts(playerId) {
+async function buyHubElement(elementName, quantity, pricePerUnit) {
     try {
-        const active = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS) || '{}');
-        return active[playerId] || [];
+        console.log(`Buying ${quantity}x ${elementName} from market...`);
+        
+        const totalCost = quantity * pricePerUnit;
+        
+        // Check credits
+        const credits = await getCredits();
+        if (credits < totalCost) {
+            return { success: false, reason: 'insufficient_credits', required: totalCost, available: credits };
+        }
+        
+        // Check hub space
+        const remainingHub = await getRemainingHubStorage();
+        const massToAdd = quantity * getElementMass(elementName);
+        if (massToAdd > remainingHub) {
+            return { success: false, reason: 'insufficient_hub_space', remaining: remainingHub, required: massToAdd };
+        }
+        
+        // Spend credits
+        const spent = await spendCredits(totalCost);
+        if (!spent) {
+            return { success: false, reason: 'spend_failed' };
+        }
+        
+        // Add to hub
+        const addResult = await addElementToHub(elementName, quantity);
+        if (!addResult.success) {
+            // Rollback credits
+            await addCredits(totalCost);
+            return addResult;
+        }
+        
+        // Record transaction in market history
+        recordMarketTransaction('buy', elementName, quantity, pricePerUnit, totalCost);
+        
+        return { 
+            success: true, 
+            quantity: quantity,
+            elementName: elementName,
+            totalCost: totalCost,
+            newBalance: credits - totalCost
+        };
+        
     } catch (error) {
-        console.error('Error getting active products:', error);
-        return [];
+        console.error('Error in buyHubElement:', error);
+        return { success: false, reason: 'error', error: error.message };
     }
 }
 
 /**
- * Set product active status
- * @param {string} playerId - Player ID
- * @param {string} purchaseId - Purchase ID
- * @param {boolean} active - Active status
- * @returns {boolean} Success status
+ * Sell element from hub storage to market
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to sell
+ * @param {number} pricePerUnit - Price per unit
+ * @returns {Promise<Object>} Result object
  */
-function setProductActive(playerId, purchaseId, active) {
+async function sellHubElement(elementName, quantity, pricePerUnit) {
     try {
-        const activeProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS) || '{}');
+        console.log(`Selling ${quantity}x ${elementName} to market...`);
         
-        if (!activeProducts[playerId]) {
-            activeProducts[playerId] = [];
+        const totalEarnings = quantity * pricePerUnit;
+        
+        // Check hub inventory
+        const hubInventory = await getHubInventory();
+        if (!hubInventory[elementName]) {
+            return { success: false, reason: 'not_found' };
         }
         
-        if (active) {
-            if (!activeProducts[playerId].includes(purchaseId)) {
-                activeProducts[playerId].push(purchaseId);
-            }
-        } else {
-            activeProducts[playerId] = activeProducts[playerId].filter(id => id !== purchaseId);
+        const availableCount = hubInventory[elementName].count || 0;
+        if (availableCount < quantity) {
+            return { success: false, reason: 'insufficient', available: availableCount };
         }
         
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_PRODUCTS, JSON.stringify(activeProducts));
-        return true;
+        // Remove from hub
+        const removeResult = await removeElementFromHub(elementName, quantity);
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add credits
+        const newCredits = await addCredits(totalEarnings);
+        
+        // Record transaction in market history
+        recordMarketTransaction('sell', elementName, quantity, pricePerUnit, totalEarnings);
+        
+        return { 
+            success: true, 
+            quantity: quantity,
+            elementName: elementName,
+            totalEarnings: totalEarnings,
+            newCredits: newCredits
+        };
+        
     } catch (error) {
-        console.error('Error setting product active status:', error);
-        return false;
+        console.error('Error in sellHubElement:', error);
+        return { success: false, reason: 'error', error: error.message };
     }
 }
 
 /**
- * Record product transaction
- * @param {Object} transaction - Transaction data
- * @returns {boolean} Success status
+ * Record market transaction for history
+ * @param {string} type - 'buy' or 'sell'
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity traded
+ * @param {number} price - Price per unit
+ * @param {number} total - Total value
  */
-function recordProductTransaction(transaction) {
+function recordMarketTransaction(type, elementName, quantity, price, total) {
     try {
-        const transactions = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS) || '[]');
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY) || '[]');
         
-        transactions.push({
-            ...transaction,
+        history.push({
+            type: type,
+            element: elementName,
+            quantity: quantity,
+            price: price,
+            total: total,
             timestamp: Date.now(),
             date: new Date().toISOString()
         });
         
         // Keep last 1000 transactions
-        if (transactions.length > 1000) {
-            transactions.shift();
+        if (history.length > 1000) {
+            history.shift();
         }
         
-        localStorage.setItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS, JSON.stringify(transactions));
-        return true;
+        localStorage.setItem(STORAGE_KEYS.MARKET_HISTORY, JSON.stringify(history));
+        
+        // Update volume
+        updateMarketVolume(elementName, quantity);
+        
     } catch (error) {
-        console.error('Error recording product transaction:', error);
-        return false;
+        console.error('Error recording market transaction:', error);
     }
 }
 
 /**
- * Get product transaction history
- * @param {string} playerId - Optional player ID filter
- * @param {number} limit - Max number of entries
- * @returns {Array} Transaction history
+ * Update market volume for an element
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity traded
  */
-function getProductTransactions(playerId = null, limit = 50) {
+function updateMarketVolume(elementName, quantity) {
     try {
-        const transactions = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS) || '[]');
+        const volume = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME) || '{}');
         
-        let filtered = transactions;
-        if (playerId) {
-            filtered = transactions.filter(t => t.playerId === playerId);
+        const today = new Date().toISOString().split('T')[0];
+        if (!volume[elementName]) {
+            volume[elementName] = {};
         }
+        volume[elementName][today] = (volume[elementName][today] || 0) + quantity;
         
-        return filtered.slice(-limit).reverse();
+        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
+        
     } catch (error) {
-        console.error('Error getting product transactions:', error);
+        console.error('Error updating market volume:', error);
+    }
+}
+
+/**
+ * Get market price for an element (simulated - in production would come from market engine)
+ * @param {string} elementName - Element name
+ * @returns {number} Current price
+ */
+function getMarketPrice(elementName) {
+    try {
+        const prices = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_PRICES) || '{}');
+        return prices[elementName]?.current || 100;
+    } catch (error) {
+        console.error('Error getting market price:', error);
+        return 100;
+    }
+}
+
+/**
+ * Get market history for an element
+ * @param {string} elementName - Element name
+ * @param {number} days - Number of days of history
+ * @returns {Array} Price history
+ */
+function getMarketHistory(elementName, days = 30) {
+    try {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY) || '[]');
+        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+        
+        return history
+            .filter(h => h.element === elementName && h.timestamp >= cutoff)
+            .sort((a, b) => a.timestamp - b.timestamp);
+    } catch (error) {
+        console.error('Error getting market history:', error);
         return [];
     }
 }
@@ -888,6 +1000,20 @@ async function initializeStorage() {
     }
     if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS)) {
         localStorage.setItem(STORAGE_KEYS.ACTIVE_PRODUCTS, '{}');
+    }
+    
+    // Initialize marketplace storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.MARKET_PRICES)) {
+        localStorage.setItem(STORAGE_KEYS.MARKET_PRICES, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY)) {
+        localStorage.setItem(STORAGE_KEYS.MARKET_HISTORY, '[]');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME)) {
+        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.MARKET_ORDERS)) {
+        localStorage.setItem(STORAGE_KEYS.MARKET_ORDERS, '{}');
     }
     
     // Initialize hub storage if not present
@@ -1251,6 +1377,19 @@ async function safeSellHubElement(elementName, quantity, pricePerUnit) {
     }
 }
 
+// ===== NEW MARKET BUY FUNCTION =====
+async function safeBuyHubElement(elementName, quantity, pricePerUnit) {
+    try {
+        console.log('safeBuyHubElement called:', elementName, quantity, pricePerUnit);
+        
+        return await buyHubElement(elementName, quantity, pricePerUnit);
+        
+    } catch (error) {
+        console.error('Error in safeBuyHubElement:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
+}
+
 // Helper to get element rarity
 function getElementRarity(elementName) {
     // All elements are common by default
@@ -1342,7 +1481,7 @@ function getElementValue(elementName) {
     return values[elementName] || 100;
 }
 
-// ===== SAFE SELL ELEMENT =====
+// ===== SAFE SELL ELEMENT (SHIP CARGO) =====
 async function safeSellElement(elementName, quantity, pricePerUnit) {
     try {
         console.log('safeSellElement called:', elementName, quantity, pricePerUnit);
@@ -1827,6 +1966,12 @@ async function resetGame() {
     localStorage.removeItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_PRODUCTS);
     
+    // Clear marketplace data
+    localStorage.removeItem(STORAGE_KEYS.MARKET_PRICES);
+    localStorage.removeItem(STORAGE_KEYS.MARKET_HISTORY);
+    localStorage.removeItem(STORAGE_KEYS.MARKET_VOLUME);
+    localStorage.removeItem(STORAGE_KEYS.MARKET_ORDERS);
+    
     // Clear hub storage
     localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_MAX);
     localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_USED);
@@ -1870,6 +2015,11 @@ window.getHubInventory = getHubInventory;
 window.addElementToHub = addElementToHub;
 window.removeElementFromHub = removeElementFromHub;
 window.safeSellHubElement = safeSellHubElement;
+window.safeBuyHubElement = safeBuyHubElement;
+window.buyHubElement = buyHubElement;
+window.sellHubElement = sellHubElement;
+window.getMarketPrice = getMarketPrice;
+window.getMarketHistory = getMarketHistory;
 window.getShipStorageMax = getShipStorageMax;
 window.getShipStorageUsed = getShipStorageUsed;
 window.getRemainingShipStorage = getRemainingShipStorage;
@@ -1962,10 +2112,13 @@ window.getPlayerProducts = getPlayerProducts;
 window.addPlayerProduct = addPlayerProduct;
 window.removePlayerProduct = removePlayerProduct;
 window.playerOwnsProduct = playerOwnsProduct;
-window.getActiveProducts = getActiveProducts;
-window.setProductActive = setProductActive;
-window.recordProductTransaction = recordProductTransaction;
-window.getProductTransactions = getProductTransactions;
+
+// ===== MARKETPLACE FUNCTIONS =====
+window.buyHubElement = buyHubElement;
+window.sellHubElement = sellHubElement;
+window.safeBuyHubElement = safeBuyHubElement;
+window.getMarketPrice = getMarketPrice;
+window.getMarketHistory = getMarketHistory;
 
 // NOTE: Planet status functions are already exposed by db.js
 // We do NOT redefine them here to avoid recursion
