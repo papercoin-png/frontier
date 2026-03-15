@@ -664,13 +664,13 @@
         .toast.success {
             border-color: #4affaa;
             color: #4affaa;
-            animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; /* 3s total (0.3s slide + 2.7s display) */
+            animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; /* 3s total */
         }
         
         .toast.fail {
             border-color: #ff6b6b;
             color: #ff6b6b;
-            animation: slideIn 0.3s forwards, fadeOut 0.3s 1.7s forwards; /* 2s total (0.3s slide + 1.7s display) */
+            animation: slideIn 0.3s forwards, fadeOut 0.3s 1.7s forwards; /* 2s total */
         }
         
         .toast.fail .pity-count {
@@ -998,8 +998,13 @@
                     notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
                     notificationPity.textContent = '';
-                } else {
+                } else if (result.reason === 'no_resources') {
                     notificationResource.textContent = 'No Resources';
+                    notificationQuantity.textContent = 'Select resources to extract';
+                    notificationRarity.textContent = '';
+                    notificationPity.textContent = '';
+                } else {
+                    notificationResource.textContent = 'Extraction Failed';
                     notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
                     notificationPity.textContent = '';
@@ -1026,7 +1031,7 @@
             `;
             toastContainer.appendChild(toast);
             
-            // Success toast shows for 3 seconds (animation handles this)
+            // Success toast shows for 3 seconds
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
@@ -1050,7 +1055,7 @@
             `;
             toastContainer.appendChild(toast);
             
-            // Failure toast shows for 2 seconds (animation handles this)
+            // Failure toast shows for 2 seconds
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
@@ -1511,7 +1516,7 @@
                         extractionTimer = null;
                     }
                     
-                    // Show failure toast
+                    // Show failure toast for cargo full
                     showFailToast('Cargo full!');
                     
                     // Show failure notification for cargo full
@@ -1527,7 +1532,7 @@
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
                     
-                    // Show failure toast
+                    // Show failure toast for no resources
                     showFailToast('No resources selected');
                     
                     // Show failure notification for no resources
@@ -1583,9 +1588,6 @@
                     wasPity = true;
                     success = true;
                     console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts - FORCED SUCCESS`);
-                    
-                    // Show pity trigger toast
-                    showFailToast(`⚡ Pity triggered!`, pityCounters[resource].attempts, pityCounters[resource].threshold);
                 } else {
                     // Normal random roll
                     let roll = Math.random() * 100;
@@ -1618,67 +1620,104 @@
                     if (wasPity) {
                         quantity = Math.max(1, Math.floor(quantity * 1.5));
                     }
-                }
-                
-                if (quantity === 0) {
-                    return;
-                }
-                
-                const totalMass = massPerUnit * quantity;
-                
-                if (currentMass + totalMass <= cargoLimit) {
-                    if (typeof window.addElementToCollection !== 'function') {
-                        console.warn('window.addElementToCollection not available');
-                        return;
-                    }
                     
-                    const avgQuantity = Math.floor(config.massTarget / massPerUnit);
-                    const isRichFind = quantity > avgQuantity * 1.5;
+                    const totalMass = massPerUnit * quantity;
                     
-                    // ===== ENHANCED LOCATION DATA =====
-                    const locationData = {
-                        planet: currentPlanet.name,
-                        planetType: currentPlanet.type,
-                        quantity: quantity,
-                        rarity: rarity,
-                        timestamp: Date.now()
-                    };
-                    
-                    const result = await window.addElementToCollection(resource, quantity, locationData);
-                    
-                    if (result && result.success) {
-                        cachedCargoMass = currentMass + totalMass;
-                        lastMassUpdate = Date.now();
-                        await updateCargoDisplay();
+                    if (currentMass + totalMass <= cargoLimit) {
+                        if (typeof window.addElementToCollection !== 'function') {
+                            console.warn('window.addElementToCollection not available');
+                            
+                            // Show failure toast for missing function
+                            showFailToast('Storage error');
+                            
+                            showExtractionNotification({
+                                success: false,
+                                resource: resource,
+                                reason: 'storage_error'
+                            });
+                            return;
+                        }
                         
-                        // Mark element as explored
-                        markElementExplored(resource);
+                        const avgQuantity = Math.floor(config.massTarget / massPerUnit);
+                        const isRichFind = quantity > avgQuantity * 1.5;
                         
-                        // Show success toast
-                        let message = `+${quantity} ${resource}`;
-                        if (isRichFind) message += ' (Rich Find!)';
-                        if (wasPity) message += ' (Pity!)';
-                        showSuccessToast(message);
-                        
-                        // Show success notification
-                        showExtractionNotification({
-                            success: true,
-                            resource: resource,
+                        // ===== ENHANCED LOCATION DATA =====
+                        const locationData = {
+                            planet: currentPlanet.name,
+                            planetType: currentPlanet.type,
                             quantity: quantity,
-                            mass: totalMass,
-                            wasPity: wasPity,
-                            isRichFind: isRichFind
-                        });
+                            rarity: rarity,
+                            timestamp: Date.now()
+                        };
                         
-                        // Update claim button status after new discovery
-                        await updateClaimButton();
+                        const result = await window.addElementToCollection(resource, quantity, locationData);
+                        
+                        if (result && result.success) {
+                            cachedCargoMass = currentMass + totalMass;
+                            lastMassUpdate = Date.now();
+                            await updateCargoDisplay();
+                            
+                            // Mark element as explored
+                            markElementExplored(resource);
+                            
+                            // Show success toast
+                            let message = `+${quantity} ${resource}`;
+                            if (isRichFind) message += ' (Rich Find!)';
+                            if (wasPity) message += ' (Pity!)';
+                            showSuccessToast(message);
+                            
+                            // Show success notification
+                            showExtractionNotification({
+                                success: true,
+                                resource: resource,
+                                quantity: quantity,
+                                mass: totalMass,
+                                wasPity: wasPity,
+                                isRichFind: isRichFind
+                            });
+                            
+                            // Update claim button status after new discovery
+                            await updateClaimButton();
+                        } else {
+                            // Failed to add to collection
+                            showFailToast('Extraction failed');
+                            
+                            showExtractionNotification({
+                                success: false,
+                                resource: resource,
+                                reason: 'storage_error'
+                            });
+                        }
+                    } else {
+                        // Cargo would overflow
+                        showFailToast('Cargo full');
+                        
+                        showExtractionNotification({
+                            success: false,
+                            resource: resource,
+                            reason: 'cargo_overflow'
+                        });
                     }
+                } else {
+                    // Failed extraction - show failure toast with pity count
+                    const pityAttempts = pityCounters[resource].attempts;
+                    const pityThreshold = pityCounters[resource].threshold;
+                    
+                    showFailToast(`${resource} failed`, pityAttempts, pityThreshold);
+                    
+                    showExtractionNotification({
+                        success: false,
+                        resource: resource,
+                        pityCount: pityAttempts,
+                        pityThreshold: pityThreshold,
+                        reason: 'failed_roll'
+                    });
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
                 
-                // Show failure toast
-                showFailToast('Extraction failed');
+                // Show failure toast for error
+                showFailToast('Extraction error');
                 
                 // Show failure notification for error
                 showExtractionNotification({
