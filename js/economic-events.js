@@ -1,4 +1,6 @@
 // js/economic-events.js - Dynamic economic events system for Voidfarer
+// Includes labor pool distribution events
+
 (function() {
     // ===== EVENT TYPES =====
     const EVENT_TYPES = {
@@ -13,7 +15,16 @@
         TECHNOLOGY: 'technology',
         SPECULATION: 'speculation',
         POLICY: 'policy',
-        HOLIDAY: 'holiday'
+        HOLIDAY: 'holiday',
+        // Labor Pool Events
+        LABOR_SHORTAGE: 'labor_shortage',
+        LABOR_SURPLUS: 'labor_surplus',
+        SKILL_BOOM: 'skill_boom',
+        BRAIN_DRAIN: 'brain_drain',
+        GUILD_FORMATION: 'guild_formation',
+        LABOR_STRIKE: 'labor_strike',
+        MASTER_APPRENTICE: 'master_apprentice',
+        KNOWLEDGE_SHARING: 'knowledge_sharing'
     };
 
     // ===== EVENT SEVERITY =====
@@ -40,11 +51,21 @@
         [EVENT_SEVERITY.EPIC]: { min: -0.8, max: 0.8 }
     };
 
+    // ===== LABOR POOL EFFECTS =====
+    const LABOR_EFFECTS = {
+        [EVENT_SEVERITY.MINOR]: { min: 0.05, max: 0.15 },
+        [EVENT_SEVERITY.MODERATE]: { min: 0.15, max: 0.3 },
+        [EVENT_SEVERITY.MAJOR]: { min: 0.3, max: 0.5 },
+        [EVENT_SEVERITY.EPIC]: { min: 0.5, max: 0.8 }
+    };
+
     // ===== STORAGE KEYS (for localStorage settings) =====
     const EVENT_STORAGE_KEYS = {
         EVENT_NOTIFICATIONS: 'voidfarer_event_notifications',
         EVENT_SETTINGS: 'voidfarer_event_settings',
-        LAST_EVENT_CHECK: 'voidfarer_last_event_check'
+        LAST_EVENT_CHECK: 'voidfarer_last_event_check',
+        LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
+        LABOR_DISTRIBUTIONS: 'voidfarer_labor_distributions'
     };
 
     // ===== RESOURCE POOLS =====
@@ -64,6 +85,45 @@
     ];
 
     const ALL_RESOURCES = [...COMMON_RESOURCES, ...RARE_RESOURCES, ...LEGENDARY_RESOURCES];
+
+    // ===== SKILL CATEGORIES (for labor events) =====
+    const SKILL_CATEGORIES = [
+        'Basic Compounds',
+        'Acids & Bases',
+        'Salts & Minerals',
+        'Hydrocarbons',
+        'Alcohols',
+        'Organic Acids',
+        'Esters',
+        'Ethers',
+        'Amines',
+        'Monomers',
+        'Polymers',
+        'Engineering Plastics',
+        'Basic Alloys',
+        'Stainless Steels',
+        'Tool Steels',
+        'Aluminum Alloys',
+        'Titanium Alloys',
+        'Superalloys',
+        'Refractory Alloys',
+        'Fibers',
+        'Matrix Materials',
+        'Composites',
+        'Advanced Composites',
+        'Silicon Processing',
+        'Doping',
+        'Dielectrics',
+        'Devices',
+        'Integrated Circuits',
+        'Energy Storage',
+        'Energy Generation',
+        'Nanomaterials',
+        'Smart Materials',
+        'Antimatter',
+        'Superheavy Elements',
+        'Exotic Materials'
+    ];
 
     // ===== LOCATION POOLS =====
     const SECTORS = [
@@ -102,21 +162,40 @@
                     [EVENT_SEVERITY.EPIC]: 0.05
                 },
                 typeWeights: {
-                    [EVENT_TYPES.BOOM]: 0.1,
-                    [EVENT_TYPES.BUST]: 0.1,
-                    [EVENT_TYPES.SHORTAGE]: 0.15,
-                    [EVENT_TYPES.SURPLUS]: 0.15,
-                    [EVENT_TYPES.DISCOVERY]: 0.1,
-                    [EVENT_TYPES.DISASTER]: 0.05,
-                    [EVENT_TYPES.FESTIVAL]: 0.1,
-                    [EVENT_TYPES.MIGRATION]: 0.05,
+                    [EVENT_TYPES.BOOM]: 0.08,
+                    [EVENT_TYPES.BUST]: 0.08,
+                    [EVENT_TYPES.SHORTAGE]: 0.1,
+                    [EVENT_TYPES.SURPLUS]: 0.1,
+                    [EVENT_TYPES.DISCOVERY]: 0.08,
+                    [EVENT_TYPES.DISASTER]: 0.04,
+                    [EVENT_TYPES.FESTIVAL]: 0.06,
+                    [EVENT_TYPES.MIGRATION]: 0.04,
                     [EVENT_TYPES.TECHNOLOGY]: 0.05,
-                    [EVENT_TYPES.SPECULATION]: 0.1,
+                    [EVENT_TYPES.SPECULATION]: 0.06,
                     [EVENT_TYPES.POLICY]: 0.03,
-                    [EVENT_TYPES.HOLIDAY]: 0.02
+                    [EVENT_TYPES.HOLIDAY]: 0.02,
+                    // Labor pool events
+                    [EVENT_TYPES.LABOR_SHORTAGE]: 0.06,
+                    [EVENT_TYPES.LABOR_SURPLUS]: 0.06,
+                    [EVENT_TYPES.SKILL_BOOM]: 0.04,
+                    [EVENT_TYPES.BRAIN_DRAIN]: 0.03,
+                    [EVENT_TYPES.GUILD_FORMATION]: 0.03,
+                    [EVENT_TYPES.LABOR_STRIKE]: 0.02,
+                    [EVENT_TYPES.MASTER_APPRENTICE]: 0.04,
+                    [EVENT_TYPES.KNOWLEDGE_SHARING]: 0.04
                 }
             };
             localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS, JSON.stringify(settings));
+        }
+        
+        // Initialize labor pool history
+        if (!localStorage.getItem(EVENT_STORAGE_KEYS.LABOR_POOL_HISTORY)) {
+            localStorage.setItem(EVENT_STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify([]));
+        }
+        
+        // Initialize labor distributions
+        if (!localStorage.getItem(EVENT_STORAGE_KEYS.LABOR_DISTRIBUTIONS)) {
+            localStorage.setItem(EVENT_STORAGE_KEYS.LABOR_DISTRIBUTIONS, JSON.stringify([]));
         }
         
         // Set last event check
@@ -124,7 +203,7 @@
             localStorage.setItem(EVENT_STORAGE_KEYS.LAST_EVENT_CHECK, Date.now().toString());
         }
         
-        console.log('Economic event system initialized');
+        console.log('Economic event system initialized with labor pool events');
     }
 
     // ===== EVENT MANAGEMENT (IndexedDB) =====
@@ -146,10 +225,13 @@
             location: event.location || 'galaxy',
             affectedSector: event.affectedSector || null,
             affectedResource: event.affectedResource || null,
+            affectedSkill: event.affectedSkill || null,
             priceMultiplier: event.priceMultiplier || 1.0,
             demandMultiplier: event.demandMultiplier || 1.0,
             supplyMultiplier: event.supplyMultiplier || 1.0,
             taxMultiplier: event.taxMultiplier || 1.0,
+            laborMultiplier: event.laborMultiplier || 1.0,
+            skillMultiplier: event.skillMultiplier || 1.0,
             notificationsSent: false
         };
         
@@ -235,6 +317,30 @@
         localStorage.setItem(EVENT_STORAGE_KEYS.EVENT_NOTIFICATIONS, JSON.stringify(allNotes));
     }
 
+    // ===== LABOR POOL HISTORY =====
+    function addLaborPoolEvent(event) {
+        const history = localStorage.getItem(EVENT_STORAGE_KEYS.LABOR_POOL_HISTORY);
+        const allEvents = history ? JSON.parse(history) : [];
+        
+        allEvents.push({
+            ...event,
+            timestamp: Date.now(),
+            date: new Date().toISOString()
+        });
+        
+        if (allEvents.length > 100) {
+            allEvents.shift();
+        }
+        
+        localStorage.setItem(EVENT_STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(allEvents));
+    }
+
+    function getLaborPoolHistory(limit = 20) {
+        const history = localStorage.getItem(EVENT_STORAGE_KEYS.LABOR_POOL_HISTORY);
+        const allEvents = history ? JSON.parse(history) : [];
+        return allEvents.slice(-limit).reverse();
+    }
+
     // ===== EVENT GENERATION =====
     function getEventSettings() {
         const settings = localStorage.getItem(EVENT_STORAGE_KEYS.EVENT_SETTINGS);
@@ -250,18 +356,26 @@
                 [EVENT_SEVERITY.EPIC]: 0.05
             },
             typeWeights: {
-                [EVENT_TYPES.BOOM]: 0.1,
-                [EVENT_TYPES.BUST]: 0.1,
-                [EVENT_TYPES.SHORTAGE]: 0.15,
-                [EVENT_TYPES.SURPLUS]: 0.15,
-                [EVENT_TYPES.DISCOVERY]: 0.1,
-                [EVENT_TYPES.DISASTER]: 0.05,
-                [EVENT_TYPES.FESTIVAL]: 0.1,
-                [EVENT_TYPES.MIGRATION]: 0.05,
+                [EVENT_TYPES.BOOM]: 0.08,
+                [EVENT_TYPES.BUST]: 0.08,
+                [EVENT_TYPES.SHORTAGE]: 0.1,
+                [EVENT_TYPES.SURPLUS]: 0.1,
+                [EVENT_TYPES.DISCOVERY]: 0.08,
+                [EVENT_TYPES.DISASTER]: 0.04,
+                [EVENT_TYPES.FESTIVAL]: 0.06,
+                [EVENT_TYPES.MIGRATION]: 0.04,
                 [EVENT_TYPES.TECHNOLOGY]: 0.05,
-                [EVENT_TYPES.SPECULATION]: 0.1,
+                [EVENT_TYPES.SPECULATION]: 0.06,
                 [EVENT_TYPES.POLICY]: 0.03,
-                [EVENT_TYPES.HOLIDAY]: 0.02
+                [EVENT_TYPES.HOLIDAY]: 0.02,
+                [EVENT_TYPES.LABOR_SHORTAGE]: 0.06,
+                [EVENT_TYPES.LABOR_SURPLUS]: 0.06,
+                [EVENT_TYPES.SKILL_BOOM]: 0.04,
+                [EVENT_TYPES.BRAIN_DRAIN]: 0.03,
+                [EVENT_TYPES.GUILD_FORMATION]: 0.03,
+                [EVENT_TYPES.LABOR_STRIKE]: 0.02,
+                [EVENT_TYPES.MASTER_APPRENTICE]: 0.04,
+                [EVENT_TYPES.KNOWLEDGE_SHARING]: 0.04
             }
         };
     }
@@ -317,6 +431,30 @@
             case EVENT_TYPES.HOLIDAY:
                 event = generateHolidayEvent(severity);
                 break;
+            case EVENT_TYPES.LABOR_SHORTAGE:
+                event = generateLaborShortageEvent(severity);
+                break;
+            case EVENT_TYPES.LABOR_SURPLUS:
+                event = generateLaborSurplusEvent(severity);
+                break;
+            case EVENT_TYPES.SKILL_BOOM:
+                event = generateSkillBoomEvent(severity);
+                break;
+            case EVENT_TYPES.BRAIN_DRAIN:
+                event = generateBrainDrainEvent(severity);
+                break;
+            case EVENT_TYPES.GUILD_FORMATION:
+                event = generateGuildFormationEvent(severity);
+                break;
+            case EVENT_TYPES.LABOR_STRIKE:
+                event = generateLaborStrikeEvent(severity);
+                break;
+            case EVENT_TYPES.MASTER_APPRENTICE:
+                event = generateMasterApprenticeEvent(severity);
+                break;
+            case EVENT_TYPES.KNOWLEDGE_SHARING:
+                event = generateKnowledgeSharingEvent(severity);
+                break;
         }
         
         if (event) {
@@ -359,6 +497,10 @@
         return ALL_RESOURCES[Math.floor(Math.random() * ALL_RESOURCES.length)];
     }
 
+    function getRandomSkill() {
+        return SKILL_CATEGORIES[Math.floor(Math.random() * SKILL_CATEGORIES.length)];
+    }
+
     function getRandomSector() {
         return SECTORS[Math.floor(Math.random() * SECTORS.length)];
     }
@@ -367,7 +509,282 @@
         return COLONY_NAMES[Math.floor(Math.random() * COLONY_NAMES.length)];
     }
 
-    // ===== SPECIFIC EVENT GENERATORS =====
+    // ===== LABOR POOL EVENT GENERATORS =====
+
+    function generateLaborShortageEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity);
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `Minor ${skill} Labor Shortage`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} Worker Shortage`,
+            [EVENT_SEVERITY.MAJOR]: `Critical ${skill} Labor Crisis`,
+            [EVENT_SEVERITY.EPIC]: `Complete ${skill} Labor Collapse`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `A shortage of ${skill} workers in ${sector} has increased labor costs by ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} workers are scarce in ${sector}! Labor costs up ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MAJOR]: `Critical shortage of ${skill} labor in ${sector}! Costs increased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.EPIC]: `Complete collapse of ${skill} labor pool in ${sector}! Costs skyrocketed ${Math.round(laborEffect * 100)}%!`
+        };
+        
+        return {
+            type: EVENT_TYPES.LABOR_SHORTAGE,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            laborMultiplier: 1 + laborEffect,
+            skillMultiplier: 1.0
+        };
+    }
+
+    function generateLaborSurplusEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity);
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `${skill} Labor Surplus`,
+            [EVENT_SEVERITY.MODERATE]: `Abundant ${skill} Workers`,
+            [EVENT_SEVERITY.MAJOR]: `${skill} Labor Glut`,
+            [EVENT_SEVERITY.EPIC]: `Flood of ${skill} Workers`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `An surplus of ${skill} workers in ${sector} has reduced labor costs by ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} workers are abundant in ${sector}! Costs down ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MAJOR]: `Massive surplus of ${skill} labor in ${sector}! Costs decreased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.EPIC]: `Flood of ${skill} workers into ${sector}! Costs plummeted ${Math.round(laborEffect * 100)}%!`
+        };
+        
+        return {
+            type: EVENT_TYPES.LABOR_SURPLUS,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            laborMultiplier: 1 - laborEffect,
+            skillMultiplier: 1.0
+        };
+    }
+
+    function generateSkillBoomEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity) / 2;
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `${skill} Renaissance`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} Golden Age`,
+            [EVENT_SEVERITY.MAJOR]: `${skill} Revolution`,
+            [EVENT_SEVERITY.EPIC]: `${skill} Enlightenment`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `A renaissance in ${skill} has increased mastery gains by ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MODERATE]: `Golden age of ${skill}! Mastery gains increased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MAJOR]: `Revolution in ${skill} techniques! Mastery gains up ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.EPIC]: `The ${skill} Enlightenment! Mastery gains increased ${Math.round(laborEffect * 100)}%!`
+        };
+        
+        return {
+            type: EVENT_TYPES.SKILL_BOOM,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            laborMultiplier: 1.0,
+            skillMultiplier: 1 + laborEffect
+        };
+    }
+
+    function generateBrainDrainEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity);
+        const fromSector = getRandomSector();
+        let toSector;
+        do {
+            toSector = getRandomSector();
+        } while (toSector === fromSector);
+        const skill = getRandomSkill();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `Minor ${skill} Brain Drain`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} Talent Exodus`,
+            [EVENT_SEVERITY.MAJOR]: `Major ${skill} Brain Drain`,
+            [EVENT_SEVERITY.EPIC]: `${skill} Brain Drain Catastrophe`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `${skill} workers are leaving ${fromSector} for ${toSector}. Labor costs shifting.`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} talent exodus from ${fromSector} to ${toSector}! Major labor shifts.`,
+            [EVENT_SEVERITY.MAJOR]: `Major brain drain of ${skill} workers from ${fromSector} to ${toSector}!`,
+            [EVENT_SEVERITY.EPIC]: `Catastrophic brain drain! ${skill} workers fleeing ${fromSector} to ${toSector}!`
+        };
+        
+        return {
+            type: EVENT_TYPES.BRAIN_DRAIN,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'interstellar',
+            fromSector,
+            toSector,
+            affectedSkill: skill,
+            laborShift: laborEffect
+        };
+    }
+
+    function generateGuildFormationEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity) / 2;
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        const guildName = `${skill} ${['Guild', 'Society', 'Order', 'Council', 'Alliance'][Math.floor(Math.random() * 5)]}`;
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `${guildName} Formed`,
+            [EVENT_SEVERITY.MODERATE]: `${guildName} Established`,
+            [EVENT_SEVERITY.MAJOR]: `${guildName} Dominance`,
+            [EVENT_SEVERITY.EPIC]: `${guildName} Ascendancy`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `A new ${guildName} has formed in ${sector}. ${skill} workers gain +${Math.round(laborEffect * 100)}% labor share.`,
+            [EVENT_SEVERITY.MODERATE]: `The ${guildName} has been established! ${skill} workers gain +${Math.round(laborEffect * 100)}% labor share.`,
+            [EVENT_SEVERITY.MAJOR]: `The ${guildName} now dominates ${skill} in ${sector}! Labor share increased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.EPIC]: `The ${guildName} has achieved ascendancy! ${skill} workers gain +${Math.round(laborEffect * 100)}% labor share!`
+        };
+        
+        return {
+            type: EVENT_TYPES.GUILD_FORMATION,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            laborMultiplier: 1 + laborEffect,
+            guildName
+        };
+    }
+
+    function generateLaborStrikeEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity);
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `${skill} Work Stoppage`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} Strike`,
+            [EVENT_SEVERITY.MAJOR]: `General ${skill} Strike`,
+            [EVENT_SEVERITY.EPIC]: `${skill} Labor Uprising`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `${skill} workers in ${sector} have stopped work. Production halted.`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} strike in ${sector}! No production until resolved.`,
+            [EVENT_SEVERITY.MAJOR]: `General strike of all ${skill} workers in ${sector}! Complete production halt.`,
+            [EVENT_SEVERITY.EPIC]: `${skill} labor uprising in ${sector}! Revolution in the workplace!`
+        };
+        
+        return {
+            type: EVENT_TYPES.LABOR_STRIKE,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            laborMultiplier: 0,
+            supplyMultiplier: 0.1
+        };
+    }
+
+    function generateMasterApprenticeEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity) / 2;
+        const skill = getRandomSkill();
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `${skill} Mentorship Program`,
+            [EVENT_SEVERITY.MODERATE]: `${skill} Master-Apprentice Tradition`,
+            [EVENT_SEVERITY.MAJOR]: `Great ${skill} Teaching`,
+            [EVENT_SEVERITY.EPIC]: `${skill} Wisdom Transmission`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `Masters are taking on apprentices in ${skill}. Skill gain increased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MODERATE]: `The master-apprentice tradition flourishes! ${skill} gain increased ${Math.round(laborEffect * 100)}%.`,
+            [EVENT_SEVERITY.MAJOR]: `Great teaching in ${skill}! All crafts grant +${Math.round(laborEffect * 100)}% skill.`,
+            [EVENT_SEVERITY.EPIC]: `Ancient wisdom of ${skill} is being passed down! Skill gain doubled!`
+        };
+        
+        return {
+            type: EVENT_TYPES.MASTER_APPRENTICE,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            affectedSkill: skill,
+            skillMultiplier: 1 + laborEffect * 2
+        };
+    }
+
+    function generateKnowledgeSharingEvent(severity) {
+        const duration = getRandomDuration(severity);
+        const laborEffect = getRandomLaborEffect(severity);
+        const sector = getRandomSector();
+        
+        const names = {
+            [EVENT_SEVERITY.MINOR]: `Knowledge Exchange`,
+            [EVENT_SEVERITY.MODERATE]: `Interdisciplinary Conference`,
+            [EVENT_SEVERITY.MAJOR]: `Great Knowledge Sharing`,
+            [EVENT_SEVERITY.EPIC]: `Universal Knowledge Access`
+        };
+        
+        const descriptions = {
+            [EVENT_SEVERITY.MINOR]: `Scientists are sharing knowledge in ${sector}. All skill gains increased.`,
+            [EVENT_SEVERITY.MODERATE]: `Interdisciplinary conference in ${sector}! Cross-pollination of ideas.`,
+            [EVENT_SEVERITY.MAJOR]: `Great knowledge sharing event! All skills gain bonus progress.`,
+            [EVENT_SEVERITY.EPIC]: `Universal knowledge access achieved! All crafts grant double skill!`
+        };
+        
+        return {
+            type: EVENT_TYPES.KNOWLEDGE_SHARING,
+            severity,
+            name: names[severity],
+            description: descriptions[severity],
+            duration,
+            location: 'sector',
+            affectedSector: sector,
+            skillMultiplier: 1 + laborEffect
+        };
+    }
+
+    // ===== ORIGINAL EVENT GENERATORS =====
     function generateBoomEvent(severity) {
         const duration = getRandomDuration(severity);
         const priceEffect = getRandomPriceEffect(severity);
@@ -790,6 +1207,11 @@
         return (Math.random() * (range.max - range.min) + range.min);
     }
 
+    function getRandomLaborEffect(severity) {
+        const range = LABOR_EFFECTS[severity];
+        return (Math.random() * (range.max - range.min) + range.min);
+    }
+
     // ===== EVENT PROCESSING =====
     async function checkAndExpireEvents() {
         const events = await getActiveEvents();
@@ -910,6 +1332,42 @@
         return multiplier;
     }
 
+    async function getEventLaborMultiplier(skill, sector) {
+        const events = await getActiveEvents();
+        let multiplier = 1.0;
+        
+        events.forEach(event => {
+            if (event.laborMultiplier) {
+                if (!event.affectedSector || event.affectedSector === sector) {
+                    multiplier *= event.laborMultiplier;
+                }
+                if (event.affectedSkill === skill) {
+                    multiplier *= event.laborMultiplier;
+                }
+            }
+        });
+        
+        return multiplier;
+    }
+
+    async function getEventSkillMultiplier(skill, sector) {
+        const events = await getActiveEvents();
+        let multiplier = 1.0;
+        
+        events.forEach(event => {
+            if (event.skillMultiplier) {
+                if (!event.affectedSector || event.affectedSector === sector) {
+                    multiplier *= event.skillMultiplier;
+                }
+                if (event.affectedSkill === skill) {
+                    multiplier *= event.skillMultiplier;
+                }
+            }
+        });
+        
+        return multiplier;
+    }
+
     // ===== EVENT SUMMARIES =====
     async function getActiveEventsSummary() {
         const events = await getActiveEvents();
@@ -948,6 +1406,28 @@
                 return acc;
             }, {}),
             averageDuration: history.reduce((sum, e) => sum + (e.duration || 0), 0) / history.length
+        };
+    }
+
+    // ===== LABOR POOL EVENT APPLICATION =====
+    async function applyLaborPoolEvents() {
+        const events = await getActiveEvents();
+        let totalLaborMultiplier = 1.0;
+        let totalSkillMultiplier = 1.0;
+        
+        events.forEach(event => {
+            if (event.laborMultiplier) {
+                totalLaborMultiplier *= event.laborMultiplier;
+            }
+            if (event.skillMultiplier) {
+                totalSkillMultiplier *= event.skillMultiplier;
+            }
+        });
+        
+        return {
+            laborMultiplier: totalLaborMultiplier,
+            skillMultiplier: totalSkillMultiplier,
+            events: events.filter(e => e.laborMultiplier || e.skillMultiplier)
         };
     }
 
@@ -1010,7 +1490,12 @@
     window.getEventDemandMultiplier = getEventDemandMultiplier;
     window.getEventSupplyMultiplier = getEventSupplyMultiplier;
     window.getEventTaxMultiplier = getEventTaxMultiplier;
+    window.getEventLaborMultiplier = getEventLaborMultiplier;
+    window.getEventSkillMultiplier = getEventSkillMultiplier;
     window.getActiveEventsSummary = getActiveEventsSummary;
     window.getEventStats = getEventStats;
+    window.applyLaborPoolEvents = applyLaborPoolEvents;
+    window.getLaborPoolHistory = getLaborPoolHistory;
+    window.addLaborPoolEvent = addLaborPoolEvent;
     window.runDailyEventMaintenance = runDailyEventMaintenance;
 })();
