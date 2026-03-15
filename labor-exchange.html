@@ -1,1 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Labor Exchange</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .labor-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #ffaa4a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #ffaa4a;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .labor-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .labor-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #ffaa4a, 0 0 40px #aa5a2a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .labor-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .location {
+            font-size: 14px;
+            color: #a0d0c0;
+            text-align: right;
+        }
+        
+        .location span {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        /* Labor Pool Card */
+        .pool-card {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(255, 170, 74, 0.3);
+        }
+        
+        .pool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .pool-title {
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .pool-title span {
+            font-size: 28px;
+        }
+        
+        .pool-amount {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .pool-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .pool-stat-item {
+            text-align: center;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+        }
+        
+        .pool-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4affaa;
+        }
+        
+        .pool-stat-label {
+            font-size: 11px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        .pool-footer {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 170, 74, 0.3);
+            padding-top: 10px;
+        }
+        
+        /* Your Earnings Card */
+        .earnings-card {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(74, 255, 170, 0.3);
+        }
+        
+        .earnings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .earnings-title {
+            font-size: 20px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .earnings-title span {
+            font-size: 28px;
+        }
+        
+        .earnings-amount {
+            font-size: 32px;
+            font-weight: 700;
+            color: #4affaa;
+        }
+        
+        .earnings-detail {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .earnings-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            color: #a0c0ff;
+        }
+        
+        .earnings-row span:last-child {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .claim-btn {
+            width: 100%;
+            background: rgba(74, 255, 170, 0.2);
+            border: 2px solid #4affaa;
+            color: #4affaa;
+            padding: 18px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            margin-top: 10px;
+        }
+        
+        .claim-btn:active {
+            background: #4affaa;
+            color: #0a2a3a;
+            transform: scale(0.96);
+        }
+        
+        .claim-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Skill Multipliers */
+        .multipliers-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .multipliers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: #ffffff;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            border-bottom: 1px solid #6a8ac0;
+            padding-bottom: 8px;
+        }
+        
+        .multipliers-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .multipliers-title span {
+            font-size: 24px;
+        }
+        
+        .multipliers-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .multiplier-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid rgba(106, 138, 192, 0.3);
+        }
+        
+        .multiplier-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .multiplier-icon {
+            font-size: 20px;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .multiplier-name {
+            color: #ffffff;
+            font-size: 14px;
+        }
+        
+        .multiplier-value {
+            color: #4affaa;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        /* History Card */
+        .history-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: #ffffff;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            border-bottom: 1px solid #ffaa4a;
+            padding-bottom: 8px;
+        }
+        
+        .history-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .history-title span {
+            font-size: 24px;
+        }
+        
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 170, 74, 0.2);
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-info {
+            flex: 1;
+        }
+        
+        .history-event {
+            color: #ffaa4a;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .history-date {
+            color: #a0c0ff;
+            font-size: 11px;
+        }
+        
+        .history-amount {
+            color: #ffd966;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .empty-history {
+            text-align: center;
+            padding: 20px;
+            color: #a0b0c0;
+            font-style: italic;
+        }
+        
+        /* Info Card */
+        .info-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .info-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .info-text {
+            color: #a0d0c0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .info-highlight {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="labor-view" id="laborView">
+            <!-- Header -->
+            <div class="labor-header">
+                <div class="labor-title">Labor Exchange</div>
+                <div class="labor-subtitle">✦ skilled workers unite ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="location" id="locationDisplay">
+                    <span id="currentPlanet">Earth Hub</span>
+                </div>
+            </div>
+            
+            <!-- Global Labor Pool Card -->
+            <div class="pool-card">
+                <div class="pool-header">
+                    <div class="pool-title">
+                        <span>💰</span> Global Labor Pool
+                    </div>
+                    <div class="pool-amount" id="poolAmount">0⭐</div>
+                </div>
+                <div class="pool-stats">
+                    <div class="pool-stat-item">
+                        <div class="pool-stat-value" id="distributedToday">0</div>
+                        <div class="pool-stat-label">DISTRIBUTED TODAY</div>
+                    </div>
+                    <div class="pool-stat-item">
+                        <div class="pool-stat-value" id="activeWorkers">0</div>
+                        <div class="pool-stat-label">ACTIVE WORKERS</div>
+                    </div>
+                </div>
+                <div class="pool-footer">
+                    <span id="lastDistribution">Last distribution: Never</span>
+                    <span>Next: <span id="nextDistribution">~1h</span></span>
+                </div>
+            </div>
+            
+            <!-- Your Earnings Card -->
+            <div class="earnings-card">
+                <div class="earnings-header">
+                    <div class="earnings-title">
+                        <span>🏆</span> Your Earnings
+                    </div>
+                    <div class="earnings-amount" id="earningsAmount">0⭐</div>
+                </div>
+                <div class="earnings-detail">
+                    <div class="earnings-row">
+                        <span>Labor Multiplier:</span>
+                        <span id="laborMultiplier">1.0x</span>
+                    </div>
+                    <div class="earnings-row">
+                        <span>Total Earned (All Time):</span>
+                        <span id="totalEarned">0⭐</span>
+                    </div>
+                    <div class="earnings-row">
+                        <span>Skill Categories:</span>
+                        <span id="skillCategories">0</span>
+                    </div>
+                </div>
+                <button class="claim-btn" id="claimBtn" onclick="window.claimEarnings()">💰 CLAIM ALL</button>
+            </div>
+            
+            <!-- Your Skill Multipliers -->
+            <div class="multipliers-card">
+                <div class="multipliers-header">
+                    <div class="multipliers-title">
+                        <span>⚡</span> Your Skill Multipliers
+                    </div>
+                </div>
+                <div class="multipliers-grid" id="multipliersGrid">
+                    <!-- Filled by JavaScript -->
+                    <div class="empty-state" style="padding: 15px;">Loading skill data...</div>
+                </div>
+            </div>
+            
+            <!-- Distribution History -->
+            <div class="history-card">
+                <div class="history-header">
+                    <div class="history-title">
+                        <span>📜</span> Distribution History
+                    </div>
+                </div>
+                <div class="history-list" id="historyList">
+                    <!-- Filled by JavaScript -->
+                    <div class="empty-history">No distribution history yet</div>
+                </div>
+            </div>
+            
+            <!-- How It Works -->
+            <div class="info-card">
+                <div class="info-title">
+                    <span>ℹ️</span> How It Works
+                </div>
+                <div class="info-text">
+                    <p>When players purchase ships, equipment, or infrastructure, <span class="info-highlight">50% of the cost</span> goes to the labor pool.</p>
+                    <p style="margin-top: 8px;">This pool is distributed to skilled players based on their mastery:</p>
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li>Transcendent: 50x share</li>
+                        <li>Mythic: 35x share</li>
+                        <li>Legendary: 20x share</li>
+                        <li>Master: 5x share</li>
+                        <li>...and so on</li>
+                    </ul>
+                    <p style="margin-top: 8px;">Every item you craft and donate increases your skill multiplier!</p>
+                </div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading labor exchange...</div>
+            </div>
+            
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
+        </div>
+    </div>
 
+    <!-- Scripts -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/alchemy.js"></script>
+    <script type="module" src="js/skill-tree.js"></script>
+    <script type="module" src="js/labor-pool.js"></script>
+    <script type="module" src="js/skill-multipliers.js"></script>
+
+    <script type="module">
+        import { getLevelFromProgress } from './js/alchemy.js';
+        import { SKILL_TREE, getCategoryProgress, calculateLaborMultiplier } from './js/skill-tree.js';
+        import { LABOR_POOL, getPlayerSkillWeights } from './js/labor-pool.js';
+        import { SKILL_MULTIPLIERS, getCategoryMultiplier } from './js/skill-multipliers.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToEarthHub = returnToEarthHub;
+        window.claimEarnings = claimEarnings;
+
+        // ===== STATE =====
+        let playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        let currentCredits = 0;
+        let currentLaborPool = 0;
+        let currentEarnings = 0;
+        let currentMultiplier = 1.0;
+        let alchemyProgress = {};
+        let categoryMultipliers = {};
+
+        // ===== LOAD LABOR DATA =====
+        async function loadLaborData() {
+            try {
+                loadingText.textContent = 'loading labor data...';
+                
+                // Get player ID
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                
+                // Get credits
+                if (typeof window.getCredits === 'function') {
+                    currentCredits = await window.getCredits();
+                } else {
+                    currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                }
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${currentCredits.toLocaleString()}`;
+                
+                // Get labor pool total
+                if (typeof window.getLaborPoolTotal === 'function') {
+                    currentLaborPool = await window.getLaborPoolTotal();
+                } else {
+                    currentLaborPool = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
+                }
+                document.getElementById('poolAmount').textContent = currentLaborPool.toLocaleString() + '⭐';
+                
+                // Get player's labor earnings
+                if (typeof window.getPlayerLaborEarnings === 'function') {
+                    currentEarnings = await window.getPlayerLaborEarnings(playerId);
+                } else {
+                    const earnings = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
+                    currentEarnings = earnings[playerId] || 0;
+                }
+                document.getElementById('earningsAmount').textContent = currentEarnings.toLocaleString() + '⭐';
+                
+                // Get alchemy progress
+                if (typeof window.getAlchemyProgress === 'function') {
+                    alchemyProgress = await window.getAlchemyProgress();
+                } else {
+                    alchemyProgress = JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}');
+                }
+                
+                // Calculate labor multiplier
+                if (typeof calculateLaborMultiplier === 'function') {
+                    currentMultiplier = calculateLaborMultiplier(alchemyProgress);
+                } else {
+                    currentMultiplier = 1.0;
+                }
+                document.getElementById('laborMultiplier').textContent = currentMultiplier.toFixed(1) + 'x';
+                
+                // Get total earned (all time)
+                const totalEarned = localStorage.getItem('voidfarer_labor_total_earned') || '0';
+                document.getElementById('totalEarned').textContent = parseInt(totalEarned).toLocaleString() + '⭐';
+                
+                // Get active workers (simulated)
+                const activeWorkers = Math.floor(Math.random() * 100) + 50;
+                document.getElementById('activeWorkers').textContent = activeWorkers;
+                
+                // Get distributed today (simulated)
+                const distributedToday = Math.floor(Math.random() * 50000) + 10000;
+                document.getElementById('distributedToday').textContent = distributedToday.toLocaleString() + '⭐';
+                
+                // Get last distribution
+                const lastDist = localStorage.getItem('voidfarer_last_distribution');
+                if (lastDist) {
+                    const date = new Date(parseInt(lastDist));
+                    document.getElementById('lastDistribution').textContent = `Last: ${date.toLocaleTimeString()}`;
+                }
+                
+                // Load skill multipliers
+                await loadSkillMultipliers();
+                
+                // Load distribution history
+                await loadDistributionHistory();
+                
+            } catch (error) {
+                console.error('Error loading labor data:', error);
+            }
+        }
+
+        // ===== LOAD SKILL MULTIPLIERS =====
+        async function loadSkillMultipliers() {
+            try {
+                // Get skill multipliers from labor-pool.js or calculate
+                let skillWeights = {};
+                if (typeof getPlayerSkillWeights === 'function') {
+                    skillWeights = await getPlayerSkillWeights(playerId);
+                } else {
+                    // Calculate from alchemy progress
+                    const totalCrafts = Object.values(alchemyProgress).reduce((sum, val) => sum + val, 0);
+                    const level = getLevelFromProgress(totalCrafts);
+                    skillWeights = {
+                        'Basic Compounds': level.multiplier * 1.0,
+                        'Acids & Bases': level.multiplier * 1.2,
+                        'Salts & Minerals': level.multiplier * 1.3,
+                        'Hydrocarbons': level.multiplier * 1.4,
+                        'Alcohols': level.multiplier * 1.5,
+                        'Polymers': level.multiplier * 1.8,
+                        'Basic Alloys': level.multiplier * 2.0,
+                        'Composites': level.multiplier * 2.5,
+                        'Semiconductors': level.multiplier * 3.0,
+                        'Nanomaterials': level.multiplier * 4.0,
+                        'Exotic Matter': level.multiplier * 5.0
+                    };
+                }
+                
+                // Count skill categories with progress
+                const skillCount = Object.keys(skillWeights).length;
+                document.getElementById('skillCategories').textContent = skillCount;
+                
+                // Render multipliers grid
+                let html = '';
+                let count = 0;
+                
+                // Sort by multiplier (highest first)
+                const sortedSkills = Object.entries(skillWeights)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5); // Show top 5
+                
+                if (sortedSkills.length === 0) {
+                    html = '<div class="empty-state" style="padding: 15px;">No skills yet. Start crafting!</div>';
+                } else {
+                    sortedSkills.forEach(([skill, multiplier]) => {
+                        count++;
+                        const icon = getSkillIcon(skill);
+                        html += `
+                            <div class="multiplier-row">
+                                <div class="multiplier-info">
+                                    <span class="multiplier-icon">${icon}</span>
+                                    <span class="multiplier-name">${skill}</span>
+                                </div>
+                                <span class="multiplier-value">${multiplier.toFixed(1)}x</span>
+                            </div>
+                        `;
+                    });
+                    
+                    if (Object.keys(skillWeights).length > 5) {
+                        html += `
+                            <div style="text-align: center; padding: 8px; color: #a0c0ff; font-size: 11px;">
+                                +${Object.keys(skillWeights).length - 5} more skills
+                            </div>
+                        `;
+                    }
+                }
+                
+                document.getElementById('multipliersGrid').innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading skill multipliers:', error);
+                document.getElementById('multipliersGrid').innerHTML = '<div class="empty-state" style="padding: 15px;">Error loading skills</div>';
+            }
+        }
+
+        // ===== LOAD DISTRIBUTION HISTORY =====
+        async function loadDistributionHistory() {
+            try {
+                let history = [];
+                if (typeof window.getLaborPoolHistory === 'function') {
+                    history = await window.getLaborPoolHistory(20);
+                } else {
+                    const stored = localStorage.getItem('voidfarer_labor_pool_history');
+                    history = stored ? JSON.parse(stored) : [];
+                }
+                
+                const historyList = document.getElementById('historyList');
+                
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div class="empty-history">No distribution history yet</div>';
+                    return;
+                }
+                
+                let html = '';
+                history.slice(0, 10).forEach(item => {
+                    const date = new Date(item.timestamp || Date.now());
+                    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    
+                    if (item.type === 'distribution') {
+                        html += `
+                            <div class="history-item">
+                                <div class="history-info">
+                                    <div class="history-event">Pool Distribution</div>
+                                    <div class="history-date">${timeStr} • ${item.recipients || '?'} workers</div>
+                                </div>
+                                <div class="history-amount">${item.amount.toLocaleString()}⭐</div>
+                            </div>
+                        `;
+                    } else if (item.type === 'addition') {
+                        html += `
+                            <div class="history-item">
+                                <div class="history-info">
+                                    <div class="history-event">Pool Addition</div>
+                                    <div class="history-date">${timeStr}</div>
+                                </div>
+                                <div class="history-amount">+${item.amount.toLocaleString()}⭐</div>
+                            </div>
+                        `;
+                    } else if (item.eventName) {
+                        html += `
+                            <div class="history-item">
+                                <div class="history-info">
+                                    <div class="history-event">${item.eventName}</div>
+                                    <div class="history-date">${timeStr}</div>
+                                </div>
+                                <div class="history-amount">${item.amount ? item.amount.toLocaleString() + '⭐' : ''}</div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                historyList.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading distribution history:', error);
+            }
+        }
+
+        // ===== CLAIM EARNINGS =====
+        async function claimEarnings() {
+            if (currentEarnings <= 0) {
+                alert('No earnings to claim!');
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'claiming earnings...';
+            
+            try {
+                let claimed = 0;
+                
+                if (typeof window.claimLaborEarnings === 'function') {
+                    claimed = await window.claimLaborEarnings(playerId);
+                } else {
+                    // Manual claim
+                    const earnings = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
+                    claimed = earnings[playerId] || 0;
+                    
+                    if (claimed > 0) {
+                        // Add to credits
+                        const currentCredits = await window.getCredits();
+                        await window.saveCredits(currentCredits + claimed);
+                        
+                        // Clear earnings
+                        delete earnings[playerId];
+                        localStorage.setItem('voidfarer_player_labor_earnings', JSON.stringify(earnings));
+                        
+                        // Update total earned
+                        const totalEarned = parseInt(localStorage.getItem('voidfarer_labor_total_earned') || '0') + claimed;
+                        localStorage.setItem('voidfarer_labor_total_earned', totalEarned.toString());
+                    }
+                }
+                
+                if (claimed > 0) {
+                    // Reload data
+                    await loadLaborData();
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`✅ Claimed ${claimed.toLocaleString()}⭐ from labor pool!`);
+                } else {
+                    alert('No earnings to claim');
+                }
+                
+            } catch (error) {
+                console.error('Error claiming earnings:', error);
+                alert('Error claiming earnings');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== GET SKILL ICON =====
+        function getSkillIcon(skill) {
+            const icons = {
+                'Basic Compounds': '💧',
+                'Acids & Bases': '🧪',
+                'Salts & Minerals': '🧂',
+                'Hydrocarbons': '🔥',
+                'Alcohols': '🍶',
+                'Organic Acids': '🍋',
+                'Esters': '🍏',
+                'Ethers': '😷',
+                'Amines': '🐟',
+                'Monomers': '🔗',
+                'Polymers': '🧴',
+                'Engineering Plastics': '🔧',
+                'Basic Alloys': '⚙️',
+                'Stainless Steels': '🥄',
+                'Tool Steels': '🔪',
+                'Aluminum Alloys': '✈️',
+                'Titanium Alloys': '🚀',
+                'Superalloys': '🔥',
+                'Refractory Alloys': '⛏️',
+                'Fibers': '🧵',
+                'Matrix Materials': '🧴',
+                'Composites': '🛡️',
+                'Advanced Composites': '🚗',
+                'Silicon Processing': '💎',
+                'Doping': '🔵',
+                'Dielectrics': '🔲',
+                'Devices': '💻',
+                'Integrated Circuits': '🧠',
+                'Energy Storage': '🔋',
+                'Energy Generation': '☀️',
+                'Nanomaterials': '⬛',
+                'Smart Materials': '🔄',
+                'Antimatter': '✨',
+                'Superheavy Elements': '☢️',
+                'Exotic Materials': '🏆'
+            };
+            return icons[skill] || '⚡';
+        }
+
+        // ===== RETURN TO EARTH HUB =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'connecting to labor exchange...';
+                
+                await loadLaborData();
+                
+                // Set up auto-refresh every 30 seconds
+                setInterval(async () => {
+                    await loadLaborData();
+                }, 30000);
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading data';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
