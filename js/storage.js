@@ -76,39 +76,58 @@ const STORAGE_KEYS = {
     WARP_ORIGIN_SECTOR: 'voidfarer_warp_origin_sector'
 };
 
-// ===== ELEMENT MASS DATABASE =====
+// ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
 const ELEMENT_MASS = {
-    // Common
-    'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
-    'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
-    'Silicon': 28.09, 'Potassium': 39.10, 'Calcium': 40.08,
-    'Scandium': 44.96, 'Titanium': 47.87, 'Vanadium': 50.94, 'Chromium': 52.00,
-    'Manganese': 54.94, 'Iron': 55.85, 'Cobalt': 58.93, 'Nickel': 58.69,
-    'Copper': 63.55, 'Zinc': 65.38, 'Gallium': 69.72, 'Germanium': 72.63,
-    'Arsenic': 74.92, 'Selenium': 78.97, 'Bromine': 79.90, 'Krypton': 83.80,
+    // Period 1 (Common)
+    'Hydrogen': 1.008, 'Helium': 4.003,
+    
+    // Period 2 (Common)
+    'Lithium': 6.94, 'Beryllium': 9.012, 'Boron': 10.81, 'Carbon': 12.011, 
+    'Nitrogen': 14.007, 'Oxygen': 16.00, 'Fluorine': 19.00, 'Neon': 20.18,
+    
+    // Period 3 (Common)
+    'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98, 'Silicon': 28.09,
+    'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45, 'Argon': 39.95,
+    
+    // Period 4 (Common - Transition Metals)
+    'Potassium': 39.10, 'Calcium': 40.08, 'Scandium': 44.96, 'Titanium': 47.87,
+    'Vanadium': 50.94, 'Chromium': 52.00, 'Manganese': 54.94, 'Iron': 55.85,
+    'Cobalt': 58.93, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
+    'Gallium': 69.72, 'Germanium': 72.63, 'Arsenic': 74.92, 'Selenium': 78.97,
+    'Bromine': 79.90, 'Krypton': 83.80,
+    
+    // Period 5 (Common - Transition Metals)
     'Rubidium': 85.47, 'Strontium': 87.62, 'Yttrium': 88.91, 'Zirconium': 91.22,
     'Niobium': 92.91, 'Molybdenum': 95.95, 'Technetium': 98.0, 'Ruthenium': 101.1,
     'Rhodium': 102.9, 'Palladium': 106.4, 'Silver': 107.9, 'Cadmium': 112.4,
     'Indium': 114.8, 'Tin': 118.7, 'Antimony': 121.8, 'Tellurium': 127.6,
-    'Iodine': 126.9, 'Xenon': 131.3, 'Cesium': 132.9, 'Barium': 137.3,
+    'Iodine': 126.9, 'Xenon': 131.3,
+    
+    // Period 6 (Common - includes Lanthanides)
+    'Cesium': 132.9, 'Barium': 137.3,
+    // Lanthanides (Rare Earths)
     'Lanthanum': 138.9, 'Cerium': 140.1, 'Praseodymium': 140.9, 'Neodymium': 144.2,
     'Promethium': 145.0, 'Samarium': 150.4, 'Europium': 152.0, 'Gadolinium': 157.3,
     'Terbium': 158.9, 'Dysprosium': 162.5, 'Holmium': 164.9, 'Erbium': 167.3,
-    'Thulium': 168.9, 'Ytterbium': 173.0, 'Lutetium': 175.0, 'Hafnium': 178.5,
-    'Tantalum': 180.9, 'Tungsten': 183.8, 'Rhenium': 186.2, 'Osmium': 190.2,
-    'Iridium': 192.2, 'Platinum': 195.1, 'Gold': 197.0, 'Mercury': 200.6,
-    'Thallium': 204.4, 'Lead': 207.2, 'Bismuth': 209.0,
+    'Thulium': 168.9, 'Ytterbium': 173.0, 'Lutetium': 175.0,
+    // Transition Metals
+    'Hafnium': 178.5, 'Tantalum': 180.9, 'Tungsten': 183.8, 'Rhenium': 186.2,
+    'Osmium': 190.2, 'Iridium': 192.2, 'Platinum': 195.1, 'Gold': 197.0,
+    'Mercury': 200.6, 'Thallium': 204.4, 'Lead': 207.2, 'Bismuth': 209.0,
     
+    // Period 7 (Very Rare to Legendary)
     // Very Rare
     'Polonium': 209.0, 'Astatine': 210.0, 'Radon': 222.0, 'Francium': 223.0,
     'Radium': 226.0, 'Actinium': 227.0, 'Thorium': 232.0, 'Protactinium': 231.0,
-    'Uranium': 238.0, 'Neptunium': 237.0, 'Plutonium': 244.0, 'Americium': 243.0,
-    'Curium': 247.0, 'Berkelium': 247.0, 'Californium': 251.0, 'Einsteinium': 252.0,
-    'Fermium': 257.0, 'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0,
-    'Rutherfordium': 267.0, 'Dubnium': 268.0, 'Seaborgium': 269.0, 'Bohrium': 270.0,
-    'Hassium': 277.0, 'Meitnerium': 278.0, 'Darmstadtium': 281.0, 'Roentgenium': 282.0,
-    'Copernicium': 285.0, 'Nihonium': 286.0, 'Flerovium': 289.0, 'Moscovium': 290.0,
-    'Livermorium': 293.0, 'Tennessine': 294.0, 'Oganesson': 294.0
+    'Uranium': 238.0,
+    // Legendary (Transuranic)
+    'Neptunium': 237.0, 'Plutonium': 244.0, 'Americium': 243.0, 'Curium': 247.0,
+    'Berkelium': 247.0, 'Californium': 251.0, 'Einsteinium': 252.0, 'Fermium': 257.0,
+    'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0, 'Rutherfordium': 267.0,
+    'Dubnium': 268.0, 'Seaborgium': 269.0, 'Bohrium': 270.0, 'Hassium': 277.0,
+    'Meitnerium': 278.0, 'Darmstadtium': 281.0, 'Roentgenium': 282.0, 'Copernicium': 285.0,
+    'Nihonium': 286.0, 'Flerovium': 289.0, 'Moscovium': 290.0, 'Livermorium': 293.0,
+    'Tennessine': 294.0, 'Oganesson': 294.0
 };
 
 const DEFAULT_MASS = 100.0;
@@ -475,55 +494,90 @@ async function removeElementFromCollection(elementName, count = 1) {
 
 // Helper to get element rarity
 function getElementRarity(elementName) {
-    const rareElements = [
-        'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
-        'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
-        'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
+    // All elements are common by default
+    let rarity = 'common';
+    
+    // Very Rare elements (mostly synthetic, radioactive)
+    const veryRareElements = [
+        'Polonium', 'Astatine', 'Radon', 'Francium', 'Radium', 'Actinium',
+        'Thorium', 'Protactinium', 'Uranium'
     ];
     
-    if (rareElements.includes(elementName)) {
-        if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
-            return 'legendary';
-        }
-        if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
-            return 'very-rare';
-        }
-        return 'rare';
+    // Legendary elements (transuranic, super-heavy)
+    const legendaryElements = [
+        'Neptunium', 'Plutonium', 'Americium', 'Curium', 'Berkelium', 'Californium',
+        'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium',
+        'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium',
+        'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium',
+        'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'
+    ];
+    
+    // Rare elements (precious metals, rare earths)
+    const rareElements = [
+        'Scandium', 'Titanium', 'Vanadium', 'Chromium', 'Manganese', 'Cobalt', 'Nickel',
+        'Copper', 'Zinc', 'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine',
+        'Krypton', 'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium',
+        'Molybdenum', 'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver',
+        'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon',
+        'Cesium', 'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium',
+        'Promethium', 'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium',
+        'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium', 'Hafnium',
+        'Tantalum', 'Tungsten', 'Rhenium', 'Osmium', 'Iridium', 'Platinum',
+        'Gold', 'Mercury', 'Thallium', 'Lead', 'Bismuth'
+    ];
+    
+    if (legendaryElements.includes(elementName)) {
+        rarity = 'legendary';
+    } else if (veryRareElements.includes(elementName)) {
+        rarity = 'very-rare';
+    } else if (rareElements.includes(elementName)) {
+        rarity = 'rare';
     }
     
-    const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
-    if (uncommonElements.includes(elementName)) {
-        return 'uncommon';
-    }
-    
-    return 'common';
+    return rarity;
 }
 
 // Helper to get element value
 function getElementValue(elementName) {
     const values = {
-        // Common - 100
+        // Common - 100 (basic elements)
         'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
-        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
-        'Scandium': 100, 'Vanadium': 100, 'Manganese': 100,
+        'Boron': 100, 'Carbon': 100, 'Nitrogen': 100, 'Oxygen': 100,
+        'Fluorine': 100, 'Neon': 100, 'Sodium': 100, 'Magnesium': 100,
+        'Aluminum': 100, 'Silicon': 100, 'Phosphorus': 100, 'Sulfur': 100,
+        'Chlorine': 100, 'Argon': 100, 'Potassium': 100, 'Calcium': 100,
         
-        // Uncommon - 250
-        'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
-        'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
-        'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
+        // Rare - 1000 (transition metals, valuable)
+        'Scandium': 1000, 'Titanium': 1000, 'Vanadium': 1000, 'Chromium': 1000,
+        'Manganese': 1000, 'Iron': 1000, 'Cobalt': 1000, 'Nickel': 1000,
+        'Copper': 1000, 'Zinc': 1000, 'Gallium': 1000, 'Germanium': 1000,
+        'Arsenic': 1000, 'Selenium': 1000, 'Bromine': 1000, 'Krypton': 1000,
+        'Rubidium': 1000, 'Strontium': 1000, 'Yttrium': 1000, 'Zirconium': 1000,
+        'Niobium': 1000, 'Molybdenum': 1000, 'Technetium': 1000, 'Ruthenium': 1000,
+        'Rhodium': 1000, 'Palladium': 1000, 'Silver': 1000, 'Cadmium': 1000,
+        'Indium': 1000, 'Tin': 1000, 'Antimony': 1000, 'Tellurium': 1000,
+        'Iodine': 1000, 'Xenon': 1000, 'Cesium': 1000, 'Barium': 1000,
+        'Lanthanum': 1000, 'Cerium': 1000, 'Praseodymium': 1000, 'Neodymium': 1000,
+        'Promethium': 1000, 'Samarium': 1000, 'Europium': 1000, 'Gadolinium': 1000,
+        'Terbium': 1000, 'Dysprosium': 1000, 'Holmium': 1000, 'Erbium': 1000,
+        'Thulium': 1000, 'Ytterbium': 1000, 'Lutetium': 1000, 'Hafnium': 1000,
+        'Tantalum': 1000, 'Tungsten': 1000, 'Rhenium': 1000, 'Osmium': 1000,
+        'Iridium': 1000, 'Platinum': 1000, 'Gold': 1000, 'Mercury': 1000,
+        'Thallium': 1000, 'Lead': 1000, 'Bismuth': 1000,
         
-        // Rare - 1000
-        'Copper': 1000, 'Zinc': 1000, 'Silver': 1000, 'Gold': 1000,
-        'Platinum': 1000, 'Titanium': 1000, 'Cobalt': 1000, 'Chromium': 1000,
-        'Tin': 1000, 'Mercury': 1000,
+        // Very Rare - 5000 (radioactive, difficult to obtain)
+        'Polonium': 5000, 'Astatine': 5000, 'Radon': 5000, 'Francium': 5000,
+        'Radium': 5000, 'Actinium': 5000, 'Thorium': 5000, 'Protactinium': 5000,
+        'Uranium': 5000,
         
-        // Very Rare - 5000
-        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
-        'Radium': 5000, 'Polonium': 5000,
-        
-        // Legendary - 25000
-        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
+        // Legendary - 25000 (super-heavy, synthetic, extremely rare)
+        'Neptunium': 25000, 'Plutonium': 25000, 'Americium': 25000, 'Curium': 25000,
+        'Berkelium': 25000, 'Californium': 25000, 'Einsteinium': 25000, 'Fermium': 25000,
+        'Mendelevium': 25000, 'Nobelium': 25000, 'Lawrencium': 25000, 'Rutherfordium': 25000,
+        'Dubnium': 25000, 'Seaborgium': 25000, 'Bohrium': 25000, 'Hassium': 25000,
+        'Meitnerium': 25000, 'Darmstadtium': 25000, 'Roentgenium': 25000, 'Copernicium': 25000,
+        'Nihonium': 25000, 'Flerovium': 25000, 'Moscovium': 25000, 'Livermorium': 25000,
+        'Tennessine': 25000, 'Oganesson': 25000
     };
     
     return values[elementName] || 100;
