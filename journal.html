@@ -6,7 +6,6 @@
     <title>Voidfarer - Journal</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -141,6 +140,8 @@
         .collection-stats {
             display: flex;
             gap: 15px;
+            width: 100%;
+            justify-content: space-around;
         }
         
         .stat-item {
@@ -163,16 +164,16 @@
         /* Filter Bar */
         .filter-bar {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             margin-bottom: 15px;
             flex-wrap: wrap;
             justify-content: center;
         }
         
         .filter-btn {
-            padding: 8px 14px;
+            padding: 8px 12px;
             border-radius: 40px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             background: rgba(30, 45, 70, 0.7);
             border: 2px solid #6a8ac0;
@@ -192,59 +193,50 @@
             transform: scale(0.95);
         }
         
-        /* Search Box */
-        .search-container {
-            margin-bottom: 15px;
+        /* Rarity group headers */
+        .rarity-group {
+            margin-bottom: 20px;
         }
         
-        .search-input {
-            width: 100%;
-            padding: 14px 20px;
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 60px 20px 60px 20px;
-            color: #ffffff;
+        .rarity-header {
             font-family: 'Exo 2', sans-serif;
-            font-size: 15px;
-            outline: none;
-        }
-        
-        .search-input::placeholder {
-            color: #a0c0ff;
-            opacity: 0.6;
-        }
-        
-        /* Sort Bar */
-        .sort-bar {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 15px;
-        }
-        
-        .sort-select {
-            background: rgba(30, 45, 70, 0.7);
-            border: 2px solid #6a8ac0;
-            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
             padding: 8px 15px;
+            margin-bottom: 10px;
             border-radius: 40px 10px 40px 10px;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 13px;
-            outline: none;
-            width: 100%;
-            max-width: 200px;
+            background: rgba(30, 45, 70, 0.8);
+            border-left: 4px solid;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         
-        .sort-select option {
-            background: #0a1a2a;
+        .rarity-header.common { 
+            border-left-color: #ffffff; 
+            color: #ffffff;
+        }
+        .rarity-header.uncommon { 
+            border-left-color: #b0ffb0; 
+            color: #b0ffb0;
+        }
+        .rarity-header.rare { 
+            border-left-color: #b0b0ff; 
+            color: #b0b0ff;
+        }
+        .rarity-header.very-rare { 
+            border-left-color: #e0b0ff; 
+            color: #e0b0ff;
+        }
+        .rarity-header.legendary { 
+            border-left-color: #ffd700; 
+            color: #ffd700;
         }
         
         /* Elements Grid */
         .elements-grid {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-bottom: 25px;
+            gap: 10px;
         }
         
         .element-card {
@@ -327,7 +319,7 @@
             transform: rotate(90deg);
         }
         
-        /* Expanded Locations - SIMPLIFIED: only shows planet names */
+        /* Expanded Locations */
         .locations-section {
             display: none;
             margin-top: 15px;
@@ -623,35 +615,16 @@
             
             <!-- Filter Bar -->
             <div class="filter-bar">
-                <span class="filter-btn active" onclick="window.filterElements('all')">All</span>
-                <span class="filter-btn" onclick="window.filterElements('common')">Common</span>
-                <span class="filter-btn" onclick="window.filterElements('uncommon')">Uncommon</span>
-                <span class="filter-btn" onclick="window.filterElements('rare')">Rare</span>
-                <span class="filter-btn" onclick="window.filterElements('very-rare')">Very Rare</span>
-                <span class="filter-btn" onclick="window.filterElements('legendary')">Legendary</span>
+                <span class="filter-btn active" onclick="window.filterElements('all')">ALL</span>
+                <span class="filter-btn" onclick="window.filterElements('common')">COMMON</span>
+                <span class="filter-btn" onclick="window.filterElements('uncommon')">UNCOMMON</span>
+                <span class="filter-btn" onclick="window.filterElements('rare')">RARE</span>
+                <span class="filter-btn" onclick="window.filterElements('very-rare')">VERY RARE</span>
+                <span class="filter-btn" onclick="window.filterElements('legendary')">LEGENDARY</span>
             </div>
             
-            <!-- Search Box -->
-            <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search elements..." oninput="window.searchElements()">
-            </div>
-            
-            <!-- Sort Bar -->
-            <div class="sort-bar">
-                <select class="sort-select" id="sortSelect" onchange="window.sortElements()">
-                    <option value="name">Sort by Name</option>
-                    <option value="count">Sort by Quantity</option>
-                    <option value="rarity">Sort by Rarity</option>
-                    <option value="firstFound">Sort by Discovery</option>
-                    <option value="mass">Sort by Mass</option>
-                </select>
-            </div>
-            
-            <!-- Elements Grid -->
-            <div class="elements-grid" id="elementsGrid">
-                <!-- Filled by JavaScript -->
-                <div class="empty-state">Loading journal...</div>
-            </div>
+            <!-- Elements Container - will be filled by JS -->
+            <div id="elementsContainer"></div>
             
             <!-- Back button -->
             <button class="back-button" onclick="window.returnToBridge()">
@@ -693,7 +666,7 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <!-- Scripts -->
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
@@ -708,20 +681,16 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a1a2a');
-            tg.setBackgroundColor('#0a1a2a');
         }
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const elementsGrid = document.getElementById('elementsGrid');
+        const elementsContainer = document.getElementById('elementsContainer');
         const warpModal = document.getElementById('warpModal');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.filterElements = filterElements;
-        window.searchElements = searchElements;
-        window.sortElements = sortElements;
         window.toggleExpand = toggleExpand;
         window.showWarpModal = showWarpModal;
         window.closeWarpModal = closeWarpModal;
@@ -732,8 +701,6 @@
         let allElements = [];
         let filteredElements = [];
         let currentFilter = 'all';
-        let searchTerm = '';
-        let sortBy = 'name';
         let expandedElement = null;
         
         // Current warp target
@@ -750,21 +717,31 @@
             'Lithium': { symbol: 'Li', rarity: 'common', mass: 6.94 },
             'Beryllium': { symbol: 'Be', rarity: 'common', mass: 9.012 },
             'Boron': { symbol: 'B', rarity: 'common', mass: 10.81 },
+            'Carbon': { symbol: 'C', rarity: 'uncommon', mass: 12.01 },
+            'Nitrogen': { symbol: 'N', rarity: 'uncommon', mass: 14.01 },
+            'Oxygen': { symbol: 'O', rarity: 'uncommon', mass: 16.00 },
+            'Fluorine': { symbol: 'F', rarity: 'uncommon', mass: 19.00 },
+            'Neon': { symbol: 'Ne', rarity: 'uncommon', mass: 20.18 },
             'Sodium': { symbol: 'Na', rarity: 'common', mass: 22.99 },
             'Magnesium': { symbol: 'Mg', rarity: 'common', mass: 24.31 },
             'Aluminum': { symbol: 'Al', rarity: 'common', mass: 26.98 },
             'Silicon': { symbol: 'Si', rarity: 'common', mass: 28.09 },
+            'Phosphorus': { symbol: 'P', rarity: 'uncommon', mass: 30.97 },
+            'Sulfur': { symbol: 'S', rarity: 'uncommon', mass: 32.06 },
+            'Chlorine': { symbol: 'Cl', rarity: 'uncommon', mass: 35.45 },
+            'Argon': { symbol: 'Ar', rarity: 'uncommon', mass: 39.95 },
             'Potassium': { symbol: 'K', rarity: 'common', mass: 39.10 },
             'Calcium': { symbol: 'Ca', rarity: 'common', mass: 40.08 },
             'Scandium': { symbol: 'Sc', rarity: 'common', mass: 44.96 },
-            'Titanium': { symbol: 'Ti', rarity: 'common', mass: 47.87 },
+            'Titanium': { symbol: 'Ti', rarity: 'rare', mass: 47.87 },
             'Vanadium': { symbol: 'V', rarity: 'common', mass: 50.94 },
             'Chromium': { symbol: 'Cr', rarity: 'common', mass: 52.00 },
             'Manganese': { symbol: 'Mn', rarity: 'common', mass: 54.94 },
+            'Iron': { symbol: 'Fe', rarity: 'uncommon', mass: 55.85 },
             'Cobalt': { symbol: 'Co', rarity: 'common', mass: 58.93 },
             'Nickel': { symbol: 'Ni', rarity: 'common', mass: 58.69 },
-            'Copper': { symbol: 'Cu', rarity: 'common', mass: 63.55 },
-            'Zinc': { symbol: 'Zn', rarity: 'common', mass: 65.38 },
+            'Copper': { symbol: 'Cu', rarity: 'rare', mass: 63.55 },
+            'Zinc': { symbol: 'Zn', rarity: 'rare', mass: 65.38 },
             'Gallium': { symbol: 'Ga', rarity: 'common', mass: 69.72 },
             'Germanium': { symbol: 'Ge', rarity: 'common', mass: 72.63 },
             'Arsenic': { symbol: 'As', rarity: 'common', mass: 74.92 },
@@ -780,10 +757,10 @@
             'Ruthenium': { symbol: 'Ru', rarity: 'common', mass: 101.1 },
             'Rhodium': { symbol: 'Rh', rarity: 'common', mass: 102.9 },
             'Palladium': { symbol: 'Pd', rarity: 'common', mass: 106.4 },
-            'Silver': { symbol: 'Ag', rarity: 'common', mass: 107.9 },
+            'Silver': { symbol: 'Ag', rarity: 'rare', mass: 107.9 },
             'Cadmium': { symbol: 'Cd', rarity: 'common', mass: 112.4 },
             'Indium': { symbol: 'In', rarity: 'common', mass: 114.8 },
-            'Tin': { symbol: 'Sn', rarity: 'common', mass: 118.7 },
+            'Tin': { symbol: 'Sn', rarity: 'rare', mass: 118.7 },
             'Antimony': { symbol: 'Sb', rarity: 'common', mass: 121.8 },
             'Tellurium': { symbol: 'Te', rarity: 'common', mass: 127.6 },
             'Iodine': { symbol: 'I', rarity: 'common', mass: 126.9 },
@@ -810,11 +787,11 @@
             'Rhenium': { symbol: 'Re', rarity: 'common', mass: 186.2 },
             'Osmium': { symbol: 'Os', rarity: 'common', mass: 190.2 },
             'Iridium': { symbol: 'Ir', rarity: 'common', mass: 192.2 },
-            'Platinum': { symbol: 'Pt', rarity: 'common', mass: 195.1 },
-            'Gold': { symbol: 'Au', rarity: 'common', mass: 197.0 },
-            'Mercury': { symbol: 'Hg', rarity: 'common', mass: 200.6 },
+            'Platinum': { symbol: 'Pt', rarity: 'rare', mass: 195.1 },
+            'Gold': { symbol: 'Au', rarity: 'rare', mass: 197.0 },
+            'Mercury': { symbol: 'Hg', rarity: 'rare', mass: 200.6 },
             'Thallium': { symbol: 'Tl', rarity: 'common', mass: 204.4 },
-            'Lead': { symbol: 'Pb', rarity: 'common', mass: 207.2 },
+            'Lead': { symbol: 'Pb', rarity: 'rare', mass: 207.2 },
             'Bismuth': { symbol: 'Bi', rarity: 'common', mass: 209.0 },
             
             // Very Rare
@@ -944,9 +921,6 @@
                     });
                 }
                 
-                // Sort by name default
-                allElements.sort((a, b) => a.name.localeCompare(b.name));
-                
                 // Update stats
                 document.getElementById('totalElements').textContent = totalCount;
                 document.getElementById('uniqueElements').textContent = allElements.length;
@@ -957,19 +931,19 @@
                 
             } catch (error) {
                 console.error('Error loading journal:', error);
-                elementsGrid.innerHTML = '<div class="empty-state">Error loading journal</div>';
+                elementsContainer.innerHTML = '<div class="empty-state">Error loading journal</div>';
             }
         }
 
         // ===== APPLY FILTERS =====
         function applyFilters() {
-            filteredElements = allElements.filter(element => {
-                if (currentFilter !== 'all' && element.rarity !== currentFilter) return false;
-                if (searchTerm && !element.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                return true;
-            });
+            if (currentFilter === 'all') {
+                filteredElements = [...allElements];
+            } else {
+                filteredElements = allElements.filter(element => element.rarity === currentFilter);
+            }
             
-            sortElements(false); // false = don't re-trigger filter
+            renderElements();
         }
 
         // ===== FILTER ELEMENTS =====
@@ -982,40 +956,6 @@
             event.target.classList.add('active');
             
             applyFilters();
-        }
-
-        // ===== SEARCH ELEMENTS =====
-        function searchElements() {
-            searchTerm = document.getElementById('searchInput').value;
-            applyFilters();
-        }
-
-        // ===== SORT ELEMENTS =====
-        function sortElements(updateFromSelect = true) {
-            if (updateFromSelect) {
-                sortBy = document.getElementById('sortSelect').value;
-            }
-            
-            switch(sortBy) {
-                case 'name':
-                    filteredElements.sort((a, b) => a.name.localeCompare(b.name));
-                    break;
-                case 'count':
-                    filteredElements.sort((a, b) => b.count - a.count);
-                    break;
-                case 'rarity':
-                    const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
-                    filteredElements.sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0));
-                    break;
-                case 'firstFound':
-                    filteredElements.sort((a, b) => new Date(b.firstFound) - new Date(a.firstFound));
-                    break;
-                case 'mass':
-                    filteredElements.sort((a, b) => b.totalMass - a.totalMass);
-                    break;
-            }
-            
-            renderElements();
         }
 
         // ===== TOGGLE ELEMENT EXPAND =====
@@ -1095,7 +1035,7 @@
                 const fuelText = cyclesText.split('•')[1].trim();
                 const fuel = parseInt(fuelText.replace('⭐', ''));
                 
-                // Prepare warp data - navigation system will handle the full path
+                // Prepare warp data
                 const warpData = {
                     destination: currentWarpTarget.planet,
                     destinationType: currentWarpTarget.planetType,
@@ -1104,13 +1044,11 @@
                     totalDistance: distance,
                     warpCycles: cycles,
                     fuelCost: fuel,
-                    returnPage: 'surface.html',
+                    returnPage: 'journal.html',
                     
-                    // Store destination info
                     destPlanet: currentWarpTarget.planet,
                     destPlanetType: currentWarpTarget.planetType,
                     
-                    // Preserve current location context (warp will update these)
                     destSector: currentSector,
                     destRegion: currentRegion,
                     destStarSector: currentStarSector,
@@ -1132,96 +1070,125 @@
             closeWarpModal();
         }
 
-        // ===== RENDER ELEMENTS =====
+        // ===== RENDER ELEMENTS BY RARITY =====
         function renderElements() {
             if (filteredElements.length === 0) {
-                elementsGrid.innerHTML = '<div class="empty-state">No elements found in your journal</div>';
+                elementsContainer.innerHTML = '<div class="empty-state">No elements found in your journal</div>';
                 return;
             }
             
-            let html = '';
+            // Group by rarity
+            const rarityOrder = ['legendary', 'very-rare', 'rare', 'uncommon', 'common'];
+            const grouped = {};
+            
             filteredElements.forEach(element => {
-                const rarityClass = getRarityClass(element.name);
-                const isExpanded = expandedElement === element.name;
-                const firstFoundDate = new Date(element.firstFound).toLocaleDateString();
-                
-                // Generate location items from cache
-                let locationsHtml = '';
-                const elementLocations = locationsCache[element.name] || [];
-                
-                if (elementLocations.length > 0) {
-                    // Group by planet to show unique locations with counts
-                    const planetCounts = {};
-                    elementLocations.forEach(loc => {
-                        const planet = loc.planet || 'Unknown';
-                        planetCounts[planet] = (planetCounts[planet] || 0) + 1;
-                    });
-                    
-                    Object.entries(planetCounts).forEach(([planet, count]) => {
-                        // Find a location record for this planet to get date
-                        const location = elementLocations.find(l => l.planet === planet);
-                        const date = location?.discoveredDate;
-                        const displayDate = date ? new Date(date).toLocaleDateString() : 'Unknown';
-                        
-                        // Try to determine planet type from location data (if available)
-                        let planetType = 'unknown';
-                        if (location?.planetType) {
-                            planetType = location.planetType;
-                        } else {
-                            // Try to infer from planet name (simple heuristic)
-                            if (planet.toLowerCase().includes('pyros')) planetType = 'scorched';
-                            else if (planet.toLowerCase().includes('verdant')) planetType = 'lush';
-                            else if (planet.toLowerCase().includes('glacier')) planetType = 'frozen';
-                            else if (planet.toLowerCase().includes('aether')) planetType = 'gas';
-                            else if (planet.toLowerCase().includes('earth')) planetType = 'lush';
-                        }
-                        
-                        const typeIcon = getPlanetTypeIcon(planetType);
-                        
-                        locationsHtml += `
-                            <div class="location-item" onclick="window.showWarpModal('${planet}', '${planetType}')">
-                                <div>
-                                    <div class="location-planet">${typeIcon} ${planet}</div>
-                                    <div class="location-date">Found: ${displayDate} • ${count} time${count !== 1 ? 's' : ''}</div>
-                                </div>
-                                <div class="warp-hint">Warp →</div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    locationsHtml = `
-                        <div style="color: #a0c0ff; padding: 10px; text-align: center; font-style: italic;">
-                            No location data available
-                        </div>
-                    `;
+                if (!grouped[element.rarity]) {
+                    grouped[element.rarity] = [];
                 }
-                
-                html += `
-                    <div class="element-card ${rarityClass}">
-                        <div class="element-main-row" onclick="window.toggleExpand('${element.name}')">
-                            <div class="element-symbol">${element.symbol}</div>
-                            <div class="element-info">
-                                <div class="element-name-row">
-                                    <span class="element-name">${element.name}</span>
-                                    <span class="element-count">${element.count}</span>
-                                </div>
-                                <div class="element-details">
-                                    <span class="element-mass">⚖️ ${element.totalMass.toFixed(1)} AMU</span>
-                                    <span class="element-first-found">📅 ${firstFoundDate}</span>
-                                </div>
-                            </div>
-                            <div class="expand-icon ${isExpanded ? 'expanded' : ''}">▶</div>
-                        </div>
-                        
-                        <div class="locations-section ${isExpanded ? 'show' : ''}">
-                            <div class="locations-title">📍 Found on these planets:</div>
-                            ${locationsHtml}
-                        </div>
-                    </div>
-                `;
+                grouped[element.rarity].push(element);
             });
             
-            elementsGrid.innerHTML = html;
+            // Sort elements within each group
+            Object.keys(grouped).forEach(rarity => {
+                grouped[rarity].sort((a, b) => a.name.localeCompare(b.name));
+            });
+            
+            // Build HTML
+            let html = '';
+            
+            rarityOrder.forEach(rarity => {
+                const elements = grouped[rarity];
+                if (!elements || elements.length === 0) return;
+                
+                // Rarity header
+                const rarityDisplay = rarity.charAt(0).toUpperCase() + rarity.slice(1);
+                html += `
+                    <div class="rarity-group">
+                        <div class="rarity-header ${rarity}">✦ ${rarityDisplay} ✦</div>
+                        <div class="elements-grid">
+                `;
+                
+                // Element cards
+                elements.forEach(element => {
+                    const isExpanded = expandedElement === element.name;
+                    const firstFoundDate = new Date(element.firstFound).toLocaleDateString();
+                    
+                    // Get locations from cache
+                    const elementLocations = locationsCache[element.name] || [];
+                    
+                    // Build locations HTML
+                    let locationsHtml = '';
+                    if (elementLocations.length > 0) {
+                        const planetCounts = {};
+                        elementLocations.forEach(loc => {
+                            const planet = loc.planet || 'Unknown';
+                            planetCounts[planet] = (planetCounts[planet] || 0) + 1;
+                        });
+                        
+                        Object.entries(planetCounts).forEach(([planet, count]) => {
+                            const location = elementLocations.find(l => l.planet === planet);
+                            const date = location?.discoveredDate;
+                            const displayDate = date ? new Date(date).toLocaleDateString() : 'Unknown';
+                            
+                            let planetType = 'unknown';
+                            if (location?.planetType) {
+                                planetType = location.planetType;
+                            } else {
+                                if (planet.toLowerCase().includes('pyros')) planetType = 'scorched';
+                                else if (planet.toLowerCase().includes('verdant')) planetType = 'lush';
+                                else if (planet.toLowerCase().includes('glacier')) planetType = 'frozen';
+                                else if (planet.toLowerCase().includes('earth')) planetType = 'lush';
+                            }
+                            
+                            const typeIcon = getPlanetTypeIcon(planetType);
+                            
+                            locationsHtml += `
+                                <div class="location-item" onclick="window.showWarpModal('${planet}', '${planetType}')">
+                                    <div>
+                                        <div class="location-planet">${typeIcon} ${planet}</div>
+                                        <div class="location-date">Found: ${displayDate} • ${count} time${count !== 1 ? 's' : ''}</div>
+                                    </div>
+                                    <div class="warp-hint">Warp →</div>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        locationsHtml = `
+                            <div style="color: #a0c0ff; padding: 10px; text-align: center; font-style: italic;">
+                                No location data available
+                            </div>
+                        `;
+                    }
+                    
+                    html += `
+                        <div class="element-card ${getRarityClass(element.name)}">
+                            <div class="element-main-row" onclick="window.toggleExpand('${element.name}')">
+                                <div class="element-symbol">${element.symbol}</div>
+                                <div class="element-info">
+                                    <div class="element-name-row">
+                                        <span class="element-name">${element.name}</span>
+                                        <span class="element-count">${element.count}</span>
+                                    </div>
+                                    <div class="element-details">
+                                        <span class="element-mass">⚖️ ${element.totalMass.toFixed(1)} AMU</span>
+                                        <span class="element-first-found">📅 ${firstFoundDate}</span>
+                                    </div>
+                                </div>
+                                <div class="expand-icon ${isExpanded ? 'expanded' : ''}">▶</div>
+                            </div>
+                            
+                            <div class="locations-section ${isExpanded ? 'show' : ''}">
+                                <div class="locations-title">📍 Found on these planets:</div>
+                                ${locationsHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div></div>`;
+            });
+            
+            elementsContainer.innerHTML = html;
         }
 
         // ===== RETURN TO BRIDGE =====
