@@ -124,6 +124,47 @@
             letter-spacing: 2px;
         }
         
+        /* Location Banner */
+        .location-banner {
+            background: rgba(30, 45, 70, 0.8);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 10px 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .location-icon {
+            font-size: 20px;
+        }
+        
+        .location-text {
+            color: #ffffff;
+            flex: 1;
+        }
+        
+        .location-highlight {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .transfer-allowed {
+            background: rgba(74, 255, 170, 0.15);
+            border-color: #4affaa;
+        }
+        
+        .transfer-not-allowed {
+            background: rgba(255, 100, 100, 0.15);
+            border-color: #ff6b6b;
+        }
+        
+        .transfer-not-allowed .location-highlight {
+            color: #ff6b6b;
+        }
+        
         /* Stats Bar */
         .stats-bar {
             background: rgba(30, 45, 70, 0.6);
@@ -376,12 +417,11 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         
-        .eject-btn {
-            background: rgba(255, 100, 100, 0.2);
-            border: 2px solid #ff6b6b;
-            color: #ffb0b0;
+        .action-btn {
             padding: 8px 12px;
             border-radius: 30px 8px 30px 8px;
             font-size: 12px;
@@ -390,12 +430,40 @@
             font-family: 'Exo 2', sans-serif;
             font-weight: 600;
             min-width: 60px;
+            text-align: center;
+            border: 2px solid;
+        }
+        
+        .eject-btn {
+            background: rgba(255, 100, 100, 0.2);
+            border-color: #ff6b6b;
+            color: #ffb0b0;
         }
         
         .eject-btn:active {
             background: #ff6b6b;
             color: white;
             transform: scale(0.95);
+        }
+        
+        .transfer-btn {
+            background: rgba(74, 255, 170, 0.2);
+            border-color: #4affaa;
+            color: #b0ffd0;
+        }
+        
+        .transfer-btn:active {
+            background: #4affaa;
+            color: #0a1a2a;
+            transform: scale(0.95);
+        }
+        
+        .transfer-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            border-color: #6a8ac0;
+            background: rgba(106, 138, 192, 0.1);
+            color: #6a8ac0;
         }
         
         /* Eject Modal */
@@ -554,6 +622,41 @@
             color: white;
         }
         
+        /* Transfer Modal */
+        .modal-content.transfer {
+            border-color: #4affaa;
+            box-shadow: 0 0 30px #4affaa;
+        }
+        
+        .modal-title.transfer {
+            color: #b0ffd0;
+        }
+        
+        .transfer-max-info {
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .transfer-max {
+            color: #4affaa;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .modal-btn.transfer-confirm {
+            background: rgba(74, 255, 170, 0.2);
+            border-color: #4affaa;
+            color: #b0ffd0;
+        }
+        
+        .modal-btn.transfer-confirm:active {
+            background: #4affaa;
+            color: #0a1a2a;
+        }
+        
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -676,6 +779,12 @@
                 <div class="cargo-subtitle">✦ mass-based storage ✦</div>
             </div>
             
+            <!-- Location Banner - Shows if transfers are allowed -->
+            <div class="location-banner" id="locationBanner">
+                <span class="location-icon" id="locationIcon">🚀</span>
+                <span class="location-text" id="locationText">Current Location: <span id="currentLocation" class="location-highlight">Loading...</span></span>
+            </div>
+            
             <!-- Stats Bar -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
@@ -785,6 +894,33 @@
             </div>
         </div>
         
+        <!-- Transfer to Hub Confirmation Modal -->
+        <div class="modal-overlay" id="transferModal">
+            <div class="modal-content transfer">
+                <div class="modal-title transfer">🏢 TRANSFER TO HUB</div>
+                <div class="modal-item-name" id="transferItemName">Item</div>
+                <div class="modal-current" id="transferCurrentCount">Current: 0</div>
+                
+                <div class="eject-quantity">
+                    <button class="qty-btn" id="transferDecrementBtn" onclick="window.transferDecrementQty()">−</button>
+                    <input type="number" id="transferQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="transferIncrementBtn" onclick="window.transferIncrementQty()">+</button>
+                </div>
+                
+                <div class="transfer-max-info">
+                    Transfer mass: <span class="transfer-max" id="transferMass">0</span> AMU<br>
+                    Hub available: <span class="transfer-max" id="hubAvailable">0</span> AMU
+                </div>
+                
+                <div class="warning-text" id="transferWarning"></div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn transfer-confirm" onclick="window.confirmTransfer()">🏢 TRANSFER</button>
+                    <button class="modal-btn" onclick="window.closeTransferModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
@@ -811,7 +947,7 @@
         }
 
         // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 5000; // Match storage.js
+        const CARGO_MASS_LIMIT = 5000; // Fixed ship capacity
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -828,6 +964,17 @@
         const ejectWarning = document.getElementById('ejectWarning');
         const decrementBtn = document.getElementById('decrementBtn');
         const incrementBtn = document.getElementById('incrementBtn');
+        
+        // Transfer modal elements
+        const transferModal = document.getElementById('transferModal');
+        const transferItemName = document.getElementById('transferItemName');
+        const transferCurrentCount = document.getElementById('transferCurrentCount');
+        const transferQuantity = document.getElementById('transferQuantity');
+        const transferMass = document.getElementById('transferMass');
+        const transferWarning = document.getElementById('transferWarning');
+        const hubAvailable = document.getElementById('hubAvailable');
+        const transferDecrementBtn = document.getElementById('transferDecrementBtn');
+        const transferIncrementBtn = document.getElementById('transferIncrementBtn');
 
         // Make functions available globally for onclick handlers
         window.filterCargo = filterCargo;
@@ -838,6 +985,11 @@
         window.incrementQty = incrementQty;
         window.decrementQty = decrementQty;
         window.confirmEject = confirmEject;
+        window.showTransferModal = showTransferModal;
+        window.closeTransferModal = closeTransferModal;
+        window.transferIncrementQty = transferIncrementQty;
+        window.transferDecrementQty = transferDecrementQty;
+        window.confirmTransfer = confirmTransfer;
         window.returnToShipBridge = returnToShipBridge;
 
         // ===== STATE =====
@@ -846,11 +998,19 @@
         let currentFilter = 'all';
         let searchTerm = '';
         let sortBy = 'name';
+        let currentPlanet = 'Earth';
+        let canTransfer = false; // Only true when at Earth
         
         // Current item being ejected
         let currentEjectItem = null;
         let currentEjectMax = 1;
         let currentEjectMassPerUnit = 0;
+        
+        // Current item being transferred
+        let currentTransferItem = null;
+        let currentTransferMax = 1;
+        let currentTransferMassPerUnit = 0;
+        let currentHubAvailable = 0;
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
@@ -1058,10 +1218,37 @@
             return 'common';
         }
 
+        // ===== CHECK CURRENT LOCATION =====
+        function checkLocation() {
+            currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+            canTransfer = (currentPlanet === 'Earth');
+            
+            const locationIcon = document.getElementById('locationIcon');
+            const locationText = document.getElementById('locationText');
+            const locationBanner = document.getElementById('locationBanner');
+            
+            if (canTransfer) {
+                locationIcon.textContent = '🌍';
+                locationBanner.classList.add('transfer-allowed');
+                locationBanner.classList.remove('transfer-not-allowed');
+                document.getElementById('currentLocation').textContent = 'EARTH • Transfer Available';
+            } else {
+                locationIcon.textContent = '🚀';
+                locationBanner.classList.add('transfer-not-allowed');
+                locationBanner.classList.remove('transfer-allowed');
+                document.getElementById('currentLocation').textContent = currentPlanet + ' • Cannot Transfer';
+            }
+            
+            return canTransfer;
+        }
+
         // ===== LOAD CARGO DATA =====
         async function loadCargoData() {
             try {
                 console.log('Loading cargo data...');
+                
+                // Check location
+                checkLocation();
                 
                 // Get credits
                 let credits = 5000;
@@ -1075,6 +1262,13 @@
                 if (typeof window.getCollection === 'function') {
                     collection = await window.getCollection();
                     console.log('Got collection:', collection);
+                }
+                
+                // Get hub available space (for transfer info)
+                if (typeof window.getRemainingHubStorage === 'function') {
+                    currentHubAvailable = await window.getRemainingHubStorage();
+                } else {
+                    currentHubAvailable = 0;
                 }
                 
                 // Update credits display
@@ -1191,6 +1385,10 @@
             filteredItems.forEach(item => {
                 const rarityColor = rarityColors[item.rarity] || '#ffffff';
                 
+                // Determine button classes based on location
+                const transferBtnClass = canTransfer ? 'transfer-btn' : 'transfer-btn disabled';
+                const transferBtnText = canTransfer ? '🏢 HUB' : '🏢 HUB';
+                
                 html += `
                     <div class="cargo-item">
                         <div class="item-icon">${item.icon}</div>
@@ -1203,7 +1401,8 @@
                             </div>
                         </div>
                         <div class="item-actions">
-                            <button class="eject-btn" onclick="window.showEjectModal('${item.name}', ${item.count}, ${item.massPerUnit})">🗑️ EJECT</button>
+                            <button class="action-btn ${transferBtnClass}" onclick="window.showTransferModal('${item.name}', ${item.count}, ${item.massPerUnit})" ${!canTransfer ? 'disabled' : ''}>${transferBtnText}</button>
+                            <button class="action-btn eject-btn" onclick="window.showEjectModal('${item.name}', ${item.count}, ${item.massPerUnit})">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -1326,6 +1525,132 @@
             } catch (error) {
                 console.error('Eject error:', error);
                 ejectWarning.textContent = 'Error ejecting cargo';
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== SHOW TRANSFER MODAL =====
+        function showTransferModal(itemName, currentCount, massPerUnit) {
+            if (!canTransfer) {
+                alert('You can only transfer items to Earth Hub when at Earth!');
+                return;
+            }
+            
+            currentTransferItem = itemName;
+            currentTransferMax = currentCount;
+            currentTransferMassPerUnit = massPerUnit;
+            
+            transferItemName.textContent = itemName;
+            transferCurrentCount.textContent = `Current: ${currentCount}`;
+            transferQuantity.value = 1;
+            transferMass.textContent = massPerUnit.toFixed(1);
+            hubAvailable.textContent = currentHubAvailable.toFixed(1);
+            transferWarning.textContent = '';
+            
+            // Enable/disable buttons
+            transferDecrementBtn.disabled = true;
+            transferIncrementBtn.disabled = (currentCount <= 1 || massPerUnit > currentHubAvailable);
+            
+            transferModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE TRANSFER MODAL =====
+        function closeTransferModal() {
+            transferModal.classList.remove('active');
+            currentTransferItem = null;
+        }
+
+        // ===== TRANSFER INCREMENT QUANTITY =====
+        function transferIncrementQty() {
+            let current = parseInt(transferQuantity.value);
+            if (current < currentTransferMax) {
+                current++;
+                transferQuantity.value = current;
+                const massToTransfer = current * currentTransferMassPerUnit;
+                transferMass.textContent = massToTransfer.toFixed(1);
+                
+                // Update button states
+                transferDecrementBtn.disabled = (current <= 1);
+                transferIncrementBtn.disabled = (current >= currentTransferMax || massToTransfer >= currentHubAvailable);
+                
+                // Show warning if near limit
+                if (massToTransfer > currentHubAvailable * 0.9) {
+                    transferWarning.textContent = '⚠️ Approaching hub storage limit';
+                } else {
+                    transferWarning.textContent = '';
+                }
+            }
+        }
+
+        // ===== TRANSFER DECREMENT QUANTITY =====
+        function transferDecrementQty() {
+            let current = parseInt(transferQuantity.value);
+            if (current > 1) {
+                current--;
+                transferQuantity.value = current;
+                const massToTransfer = current * currentTransferMassPerUnit;
+                transferMass.textContent = massToTransfer.toFixed(1);
+                
+                // Update button states
+                transferDecrementBtn.disabled = (current <= 1);
+                transferIncrementBtn.disabled = (current >= currentTransferMax || massToTransfer >= currentHubAvailable);
+                transferWarning.textContent = '';
+            }
+        }
+
+        // ===== CONFIRM TRANSFER =====
+        async function confirmTransfer() {
+            if (!currentTransferItem) return;
+            if (!canTransfer) {
+                alert('You can only transfer items to Earth Hub when at Earth!');
+                closeTransferModal();
+                return;
+            }
+            
+            const quantity = parseInt(transferQuantity.value);
+            const massToTransfer = quantity * currentTransferMassPerUnit;
+            
+            if (massToTransfer > currentHubAvailable) {
+                transferWarning.textContent = 'Not enough hub storage space!';
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'transferring to hub...';
+            
+            try {
+                // Remove from ship cargo
+                const removeResult = await window.removeElementFromCollection(currentTransferItem, quantity);
+                
+                if (!removeResult.success) {
+                    throw new Error(removeResult.reason || 'Failed to remove from ship');
+                }
+                
+                // Add to hub storage
+                const addResult = await window.addElementToHub(currentTransferItem, quantity);
+                
+                if (!addResult.success) {
+                    // Rollback: add back to ship
+                    await window.addElementToCollection(currentTransferItem, quantity);
+                    throw new Error(addResult.reason || 'Failed to add to hub');
+                }
+                
+                // Close modal
+                closeTransferModal();
+                
+                // Reload cargo data
+                await loadCargoData();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                alert(`✅ Transferred ${quantity}x ${currentTransferItem} to Earth Hub`);
+                
+            } catch (error) {
+                console.error('Transfer error:', error);
+                transferWarning.textContent = error.message || 'Error transferring cargo';
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
             }
             
             loadingOverlay.classList.remove('active');
