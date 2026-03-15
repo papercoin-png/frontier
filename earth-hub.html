@@ -742,14 +742,14 @@
                     <span>⭐</span> --
                 </div>
                 <div class="cargo-value" id="cargoDisplay">
-                    Cargo: --/100
+                    Cargo: --/--
                 </div>
             </div>
             
             <!-- Location Bar -->
             <div class="location-bar">
-                <span id="locationText">📍 Loading...</span>
-                <span class="coordinates" id="sectorText">---</span>
+                <span id="locationText">📍 Earth Central • Sol</span>
+                <span class="coordinates" id="sectorText">Sector B2</span>
             </div>
             
             <!-- Economic Alert Banner (dynamic) -->
@@ -896,7 +896,6 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            // Remove unsupported methods
         }
 
         // ===== DOM ELEMENTS =====
@@ -918,6 +917,31 @@
         let priceChart = null;
         let currentCollection = {};
         let currentCredits = 0;
+
+        // ===== CLEANUP ON LOAD =====
+        // Clear any lingering planet data that might have been set during warp
+        function cleanupHubData() {
+            console.log('Earth Hub: Cleaning up any lingering planet data');
+            
+            // Remove any planet-specific data that might interfere with hub display
+            localStorage.removeItem('voidfarer_warp_destination_planet');
+            localStorage.removeItem('voidfarer_warp_destination_planet_type');
+            localStorage.removeItem('voidfarer_warp_origin_planet');
+            
+            // Don't remove current_planet entirely - just ensure it's set to Earth
+            const currentPlanet = localStorage.getItem('voidfarer_current_planet');
+            if (currentPlanet && currentPlanet !== 'Earth') {
+                console.log('Resetting current planet to Earth');
+                localStorage.setItem('voidfarer_current_planet', 'Earth');
+                localStorage.setItem('voidfarer_current_planet_type', 'lush');
+            }
+            
+            // Ensure sector info is correct for Earth
+            localStorage.setItem('voidfarer_current_sector', 'B2');
+            localStorage.setItem('voidfarer_current_region', 'Orion Arm');
+            localStorage.setItem('voidfarer_current_starSector', 'Orion Molecular Cloud');
+            localStorage.setItem('voidfarer_current_star', 'Sol');
+        }
 
         // ===== NAVIGATION FUNCTIONS =====
         function navigateTo(screen) {
@@ -959,25 +983,11 @@
                     collection = await window.getCollection();
                 }
 
-                let planet = 'Earth';
-                if (typeof window.getCurrentPlanet === 'function') {
-                    planet = await window.getCurrentPlanet();
-                }
-
-                let star = 'Sol';
-                if (typeof window.getCurrentStar === 'function') {
-                    star = await window.getCurrentStar();
-                }
-
-                let sector = 'B2';
-                if (typeof window.getCurrentSector === 'function') {
-                    sector = await window.getCurrentSector();
-                }
-
-                let starSector = 'Orion Nebula';
-                if (typeof window.getCurrentStarSector === 'function') {
-                    starSector = await window.getCurrentStarSector();
-                }
+                // For Earth Hub, always show Earth/Sol/B2
+                const planet = 'Earth';
+                const star = 'Sol';
+                const sector = 'B2';
+                const starSector = 'Orion Molecular Cloud';
 
                 let events = [];
                 if (typeof window.getActiveEvents === 'function') {
@@ -1014,13 +1024,14 @@
             document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
             
             const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
-            document.getElementById('cargoDisplay').textContent = `Cargo: ${totalItems}/100`;
+            const uniqueItems = Object.keys(collection).length;
+            document.getElementById('cargoDisplay').textContent = `Items: ${totalItems} (${uniqueItems} types)`;
         }
 
         // ===== UPDATE LOCATION =====
         function updateLocation(planet, star, sector, starSector) {
-            document.getElementById('locationText').textContent = `📍 ${planet || 'Earth'} • ${star || 'Sol'}`;
-            document.getElementById('sectorText').textContent = `Sector ${sector || 'B2'}`;
+            document.getElementById('locationText').textContent = `📍 Earth Central • Sol System`;
+            document.getElementById('sectorText').textContent = `Orion Arm • Sector B2`;
         }
 
         // ===== UPDATE TAX SUMMARY =====
@@ -1506,6 +1517,9 @@
                 // Show loading
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'connecting to Earth Hub...';
+
+                // Clean up any lingering planet data
+                cleanupHubData();
 
                 // Initialize database if needed
                 if (typeof window.initializeDatabase === 'function') {
