@@ -654,6 +654,47 @@
             return planets;
         }
 
+        // ===== GENERATE UNIQUE STAR NAME BASED ON CLUSTER =====
+        function generateStarName(clusterSeed, index) {
+            // Use cluster seed + index to create a unique hash for this star
+            const starHash = clusterSeed + index * 7919; // Use a prime multiplier
+            
+            // Star name components that vary by cluster
+            const prefixes = [
+                'ALPHA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA', 'ETA', 'THETA',
+                'IOTA', 'KAPPA', 'LAMBDA', 'MU', 'NU', 'XI', 'OMICRON', 'PI',
+                'RHO', 'SIGMA', 'TAU', 'UPSILON', 'PHI', 'CHI', 'PSI', 'OMEGA'
+            ];
+            
+            const suffixes = [
+                'PRIME', 'SECUNDUS', 'TERTIUS', 'QUARTUS', 'QUINTUS',
+                'MAJOR', 'MINOR', 'AUSTRALIS', 'BOREALIS', 'ORIENTALIS',
+                'OCCIDENTALIS', 'INFERIOR', 'SUPERIOR', 'MEDIA'
+            ];
+            
+            // Use the cluster name to influence the naming
+            const clusterHash = hashString(clusterName);
+            
+            // Combine hashes to make names unique per cluster
+            const combinedHash = (starHash + clusterHash) % 1000000;
+            
+            // Select prefix and suffix based on combined hash
+            const prefixIndex = Math.floor(seededRandom(combinedHash, 0) * prefixes.length);
+            const suffixIndex = Math.floor(seededRandom(combinedHash, 1) * suffixes.length);
+            const numberPart = Math.floor(seededRandom(combinedHash, 2) * 100) + 1;
+            
+            // Occasionally use a different naming convention
+            const namingStyle = Math.floor(seededRandom(combinedHash, 3) * 3);
+            
+            if (namingStyle === 0) {
+                return `${prefixes[prefixIndex]} ${suffixes[suffixIndex]}`;
+            } else if (namingStyle === 1) {
+                return `${clusterName} ${prefixes[prefixIndex]}`;
+            } else {
+                return `${prefixes[prefixIndex]}-${numberPart}`;
+            }
+        }
+
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
@@ -771,8 +812,8 @@
                 const starSeed = clusterSeed + i * 1000;
                 const starType = getStarType(starSeed, i);
                 
-                // Generate star name using procedural-universe
-                const starName = generateProceduralStar(starSeed, i).name;
+                // Generate unique star name based on cluster
+                const starName = generateStarName(clusterSeed, i);
                 const isCurrent = (starName === currentStarName);
                 const distance = generateStarDistance(i, isCurrent);
                 
@@ -809,6 +850,7 @@
             
             console.log(`Generated ${stars.length} stars for cluster ${clusterName}`);
             console.log('First star:', stars[0]?.name);
+            console.log('Last star:', stars[stars.length-1]?.name);
         }
 
         // ===== SHOW STAR INFO =====
