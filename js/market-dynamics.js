@@ -1,7 +1,7 @@
-// js/market-dynamics.js - Dynamic market pricing and product listings for Voidfarer
-// Handles price fluctuations, supply/demand, and product availability
+// js/market-dynamics.js - Dynamic market pricing and element trading for Voidfarer
+// Handles price fluctuations, supply/demand, and market history for all 118 elements
 
-import { PRODUCT_CATALOG, getProductById, getProductsByCategory } from './product-catalog.js';
+import { ELEMENT_DATABASE, getElementById, getElementsByRarity } from './element-prices.js';
 
 // ===== MARKET CONFIGURATION =====
 
@@ -10,11 +10,14 @@ const MARKET_CONFIG = {
     EVENT_VOLATILITY: 0.15, // 15% additional volatility during events
     TREND_STRENGTH: 0.7, // How strongly trends persist
     UPDATE_INTERVAL: 3600000, // 1 hour in milliseconds
-    MAX_PRICE_HISTORY: 30, // Keep 30 days of history
+    MAX_PRICE_HISTORY: 90, // Keep 90 days of history
     MIN_PRICE_MULTIPLIER: 0.3, // Minimum price (30% of base)
     MAX_PRICE_MULTIPLIER: 3.0, // Maximum price (300% of base)
     DEFAULT_TRANSACTION_FEE: 0.02, // 2% transaction fee
     MARKET_HOURS: 24, // Market open 24/7
+    SUPPLY_DEMAND_FACTOR: 0.1, // How much supply/demand affects price
+    VOLUME_DECAY: 0.95, // Daily volume decay factor
+    SPREAD_PERCENT: 0.02 // 2% bid-ask spread
 };
 
 // ===== STORAGE KEYS =====
@@ -24,56 +27,68 @@ const STORAGE_KEYS = {
     CURRENT_PRICES: 'voidfarer_current_prices',
     MARKET_TRENDS: 'voidfarer_market_trends',
     LAST_UPDATE: 'voidfarer_market_last_update',
-    PLAYER_PRODUCTS: 'voidfarer_player_products',
-    MARKET_LISTINGS: 'voidfarer_market_listings',
-    TRANSACTION_HISTORY: 'voidfarer_transaction_history'
+    MARKET_VOLUME: 'voidfarer_market_volume',
+    SUPPLY_INDEX: 'voidfarer_supply_index',
+    DEMAND_INDEX: 'voidfarer_demand_index',
+    PRICE_ALERTS: 'voidfarer_price_alerts'
 };
 
-// ===== PRICE MANAGEMENT =====
+// ===== INITIALIZATION =====
 
 /**
- * Initialize market data
+ * Initialize market data for all elements
  */
 export function initializeMarket() {
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_PRICES)) {
         const initialPrices = {};
+        const initialTrends = {};
         
-        // Initialize prices for all products
-        for (const product of Object.values(PRODUCT_CATALOG)) {
-            initialPrices[product.id] = {
-                current: product.basePrice,
-                base: product.basePrice,
+        // Initialize prices for all 118 elements
+        for (const [elementName, element] of Object.entries(ELEMENT_DATABASE)) {
+            const basePrice = element.basePrice || element.value || 100;
+            
+            initialPrices[elementName] = {
+                current: basePrice,
+                base: basePrice,
+                bid: Math.floor(basePrice * (1 - MARKET_CONFIG.SPREAD_PERCENT / 2)),
+                ask: Math.ceil(basePrice * (1 + MARKET_CONFIG.SPREAD_PERCENT / 2)),
                 trend: 0,
-                volatility: MARKET_CONFIG.BASE_VOLATILITY,
-                lastUpdated: Date.now()
+                volatility: element.volatility || MARKET_CONFIG.BASE_VOLATILITY,
+                lastUpdated: Date.now(),
+                volume24h: 0,
+                priceChange24h: 0,
+                priceChangePercent: 0
+            };
+            
+            initialTrends[elementName] = {
+                shortTerm: 0,
+                mediumTerm: 0,
+                longTerm: 0,
+                strength: 0
             };
         }
         
         localStorage.setItem(STORAGE_KEYS.CURRENT_PRICES, JSON.stringify(initialPrices));
         localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify({}));
-        localStorage.setItem(STORAGE_KEYS.MARKET_TRENDS, JSON.stringify({}));
+        localStorage.setItem(STORAGE_KEYS.MARKET_TRENDS, JSON.stringify(initialTrends));
+        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify({}));
+        localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify({}));
+        localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify({}));
         localStorage.setItem(STORAGE_KEYS.LAST_UPDATE, Date.now().toString());
     }
     
-    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS)) {
-        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify({}));
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.TRANSACTION_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.TRANSACTION_HISTORY, JSON.stringify([]));
-    }
-    
-    console.log('Market system initialized');
+    console.log('Market system initialized with 118 elements');
 }
 
 /**
- * Update prices based on market dynamics
+ * Update prices based on market dynamics and events
  * @param {Array} activeEvents - Active economic events
  * @returns {Object} Updated prices
  */
 export function updatePrices(activeEvents = []) {
     const prices = getCurrentPrices();
     const trends = getMarketTrends();
+    const volume = getMarketVolume();
     const now = Date.now();
     const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_UPDATE)) || now;
     const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60);
@@ -83,22 +98,36 @@ export function updatePrices(activeEvents = []) {
     // Calculate event effects
     const eventEffects = calculateEventEffects(activeEvents);
     
-    // Update each product's price
-    for (const [productId, priceData] of Object.entries(prices)) {
-        const product = getProductById(productId);
-        if (!product) continue;
+    // Update each element's price
+    for (const [elementName, priceData] of Object.entries(prices)) {
+        const element = ELEMENT_DATABASE[elementName];
+        if (!element) continue;
         
         // Get current trend
-        let trend = trends[productId] || 0;
+        let trend = trends[elementName] || { shortTerm: 0, mediumTerm: 0, longTerm: 0, strength: 0 };
+        
+        // Calculate supply/demand effect
+        const supplyIndex = getSupplyIndex(elementName);
+        const demandIndex = getDemandIndex(elementName);
+        const supplyDemandFactor = (demandIndex - supplyIndex) * MARKET_CONFIG.SUPPLY_DEMAND_FACTOR;
         
         // Apply random walk
         const randomFactor = (Math.random() - 0.5) * 2 * priceData.volatility;
         
+        // Apply volume trend
+        const volume24h = getVolumeLast24h(elementName);
+        const volumeTrend = volume24h > 0 ? Math.log10(volume24h) * 0.01 : 0;
+        
         // Apply event effects
-        const eventMultiplier = eventEffects[product.category] || 1.0;
+        const eventMultiplier = eventEffects[element.rarity] || 1.0;
         
         // Calculate new price
-        let newPrice = priceData.current * (1 + trend * MARKET_CONFIG.TREND_STRENGTH + randomFactor) * eventMultiplier;
+        let newPrice = priceData.current * (
+            1 + trend.shortTerm * MARKET_CONFIG.TREND_STRENGTH + 
+            randomFactor + 
+            supplyDemandFactor + 
+            volumeTrend
+        ) * eventMultiplier;
         
         // Ensure price stays within bounds
         newPrice = Math.max(
@@ -106,18 +135,38 @@ export function updatePrices(activeEvents = []) {
             Math.min(priceData.base * MARKET_CONFIG.MAX_PRICE_MULTIPLIER, newPrice)
         );
         
-        // Update trend (mean reversion)
-        trend = trend * 0.9 + (newPrice - priceData.base) / priceData.base * 0.1;
+        // Calculate price change
+        const priceChange = newPrice - priceData.current;
+        const priceChangePercent = (priceChange / priceData.current) * 100;
+        
+        // Update bid/ask spread
+        const bid = Math.floor(newPrice * (1 - MARKET_CONFIG.SPREAD_PERCENT / 2));
+        const ask = Math.ceil(newPrice * (1 + MARKET_CONFIG.SPREAD_PERCENT / 2));
+        
+        // Update trends
+        trend.shortTerm = trend.shortTerm * 0.7 + priceChangePercent * 0.3;
+        trend.mediumTerm = trend.mediumTerm * 0.9 + priceChangePercent * 0.1;
+        trend.longTerm = trend.longTerm * 0.95 + priceChangePercent * 0.05;
+        trend.strength = Math.abs(trend.shortTerm) / 10;
         
         // Store updated data
         priceData.current = newPrice;
-        priceData.trend = trend;
+        priceData.bid = bid;
+        priceData.ask = ask;
+        priceData.trend = trend.shortTerm;
         priceData.lastUpdated = now;
-        trends[productId] = trend;
+        priceData.priceChange24h = priceChange;
+        priceData.priceChangePercent = priceChangePercent;
+        priceData.volume24h = volume24h;
+        
+        trends[elementName] = trend;
         
         // Add to price history
-        addToPriceHistory(productId, newPrice, now);
+        addToPriceHistory(elementName, newPrice, volume24h, now);
     }
+    
+    // Decay old volume data
+    decayVolumeData();
     
     localStorage.setItem(STORAGE_KEYS.CURRENT_PRICES, JSON.stringify(prices));
     localStorage.setItem(STORAGE_KEYS.MARKET_TRENDS, JSON.stringify(trends));
@@ -129,19 +178,19 @@ export function updatePrices(activeEvents = []) {
 /**
  * Calculate event effects on prices
  * @param {Array} events - Active economic events
- * @returns {Object} Category multipliers
+ * @returns {Object} Rarity multipliers
  */
 function calculateEventEffects(events) {
     const effects = {};
     
     for (const event of events) {
         if (event.priceMultiplier) {
-            if (event.affectedCategory) {
-                effects[event.affectedCategory] = (effects[event.affectedCategory] || 1.0) * event.priceMultiplier;
+            if (event.affectedRarity) {
+                effects[event.affectedRarity] = (effects[event.affectedRarity] || 1.0) * event.priceMultiplier;
             } else {
-                // Apply to all categories
-                for (const category of ['Ships', 'Equipment', 'Infrastructure', 'Ship Upgrades']) {
-                    effects[category] = (effects[category] || 1.0) * event.priceMultiplier;
+                // Apply to all rarities
+                for (const rarity of ['common', 'uncommon', 'rare', 'very-rare', 'legendary']) {
+                    effects[rarity] = (effects[rarity] || 1.0) * event.priceMultiplier;
                 }
             }
         }
@@ -149,6 +198,8 @@ function calculateEventEffects(events) {
     
     return effects;
 }
+
+// ===== PRICE MANAGEMENT =====
 
 /**
  * Get current market prices
@@ -160,66 +211,94 @@ export function getCurrentPrices() {
 }
 
 /**
- * Get price for a specific product
- * @param {string} productId - Product ID
- * @returns {number} Current price
+ * Get price for a specific element
+ * @param {string} elementName - Element name
+ * @returns {Object} Price data { current, bid, ask, base }
  */
-export function getProductPrice(productId) {
+export function getElementPrice(elementName) {
     const prices = getCurrentPrices();
-    return prices[productId]?.current || PRODUCT_CATALOG[productId]?.basePrice || 0;
+    return prices[elementName] || {
+        current: 100,
+        bid: 99,
+        ask: 101,
+        base: 100,
+        trend: 0
+    };
 }
 
 /**
- * Get price multiplier for a product (current/base)
- * @param {string} productId - Product ID
+ * Get bid price (price you can sell at)
+ * @param {string} elementName - Element name
+ * @returns {number} Bid price
+ */
+export function getBidPrice(elementName) {
+    const price = getElementPrice(elementName);
+    return price.bid || Math.floor(price.current * 0.99);
+}
+
+/**
+ * Get ask price (price you can buy at)
+ * @param {string} elementName - Element name
+ * @returns {number} Ask price
+ */
+export function getAskPrice(elementName) {
+    const price = getElementPrice(elementName);
+    return price.ask || Math.ceil(price.current * 1.01);
+}
+
+/**
+ * Get price multiplier (current/base)
+ * @param {string} elementName - Element name
  * @returns {number} Price multiplier
  */
-export function getPriceMultiplier(productId) {
-    const prices = getCurrentPrices();
-    const priceData = prices[productId];
-    if (!priceData) return 1.0;
-    return priceData.current / priceData.base;
+export function getPriceMultiplier(elementName) {
+    const price = getElementPrice(elementName);
+    return price.current / price.base;
 }
 
 /**
  * Add price to history
- * @param {string} productId - Product ID
+ * @param {string} elementName - Element name
  * @param {number} price - Price
+ * @param {number} volume - Trading volume
  * @param {number} timestamp - Timestamp
  */
-function addToPriceHistory(productId, price, timestamp) {
+function addToPriceHistory(elementName, price, volume, timestamp) {
     const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
     
-    if (!history[productId]) {
-        history[productId] = [];
+    if (!history[elementName]) {
+        history[elementName] = [];
     }
     
-    history[productId].push({
+    history[elementName].push({
         price: Math.round(price),
+        bid: Math.floor(price * 0.99),
+        ask: Math.ceil(price * 1.01),
+        volume: volume,
         timestamp: timestamp,
         date: new Date(timestamp).toISOString()
     });
     
     // Keep only last MAX_PRICE_HISTORY entries
-    if (history[productId].length > MARKET_CONFIG.MAX_PRICE_HISTORY) {
-        history[productId].shift();
+    if (history[elementName].length > MARKET_CONFIG.MAX_PRICE_HISTORY) {
+        history[elementName].shift();
     }
     
     localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
 }
 
 /**
- * Get price history for a product
- * @param {string} productId - Product ID
+ * Get price history for an element
+ * @param {string} elementName - Element name
  * @param {number} days - Number of days of history
  * @returns {Array} Price history
  */
-export function getPriceHistory(productId, days = 7) {
+export function getPriceHistory(elementName, days = 30) {
     const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
-    const productHistory = history[productId] || [];
+    const elementHistory = history[elementName] || [];
     
     const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    return productHistory.filter(h => h.timestamp >= cutoff);
+    return elementHistory.filter(h => h.timestamp >= cutoff);
 }
 
 /**
@@ -231,223 +310,318 @@ export function getMarketTrends() {
     return trends ? JSON.parse(trends) : {};
 }
 
-// ===== PRODUCT LISTINGS =====
+// ===== VOLUME TRACKING =====
 
 /**
- * Get available products for sale
- * @param {string} category - Optional category filter
- * @returns {Array} Available products with current prices
+ * Get market volume data
+ * @returns {Object} Volume data
  */
-export function getAvailableProducts(category = null) {
-    const products = [];
-    const prices = getCurrentPrices();
-    
-    for (const [id, product] of Object.entries(PRODUCT_CATALOG)) {
-        if (category && product.category !== category) continue;
-        
-        const priceData = prices[id] || {
-            current: product.basePrice,
-            base: product.basePrice
-        };
-        
-        products.push({
-            ...product,
-            currentPrice: Math.round(priceData.current),
-            priceMultiplier: priceData.current / product.basePrice,
-            inStock: true // All products are always available (could add scarcity later)
-        });
-    }
-    
-    return products;
+export function getMarketVolume() {
+    const volume = localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME);
+    return volume ? JSON.parse(volume) : {};
 }
 
 /**
- * Get products by category with current prices
- * @param {string} category - Product category
- * @returns {Array} Products in category
+ * Record a trade
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity traded
+ * @param {string} type - 'buy' or 'sell'
  */
-export function getProductsByCategoryWithPrices(category) {
-    const products = getProductsByCategory(category);
+export function recordTrade(elementName, quantity, type) {
+    const volume = getMarketVolume();
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!volume[elementName]) {
+        volume[elementName] = {};
+    }
+    
+    if (!volume[elementName][today]) {
+        volume[elementName][today] = { buy: 0, sell: 0, total: 0 };
+    }
+    
+    volume[elementName][today][type] += quantity;
+    volume[elementName][today].total += quantity;
+    
+    localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
+    
+    // Update supply/demand indices
+    updateSupplyDemand(elementName, quantity, type);
+}
+
+/**
+ * Get volume for last 24 hours
+ * @param {string} elementName - Element name
+ * @returns {number} Total volume
+ */
+export function getVolumeLast24h(elementName) {
+    const volume = getMarketVolume();
+    if (!volume[elementName]) return 0;
+    
+    const now = Date.now();
+    const oneDayAgo = now - (24 * 60 * 60 * 1000);
+    let total = 0;
+    
+    for (const [date, data] of Object.entries(volume[elementName])) {
+        const dateTime = new Date(date).getTime();
+        if (dateTime >= oneDayAgo) {
+            total += data.total || 0;
+        }
+    }
+    
+    return total;
+}
+
+/**
+ * Decay old volume data
+ */
+function decayVolumeData() {
+    const volume = getMarketVolume();
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    
+    for (const elementName of Object.keys(volume)) {
+        for (const date of Object.keys(volume[elementName])) {
+            const dateTime = new Date(date).getTime();
+            if (dateTime < thirtyDaysAgo) {
+                delete volume[elementName][date];
+            }
+        }
+        
+        if (Object.keys(volume[elementName]).length === 0) {
+            delete volume[elementName];
+        }
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
+}
+
+// ===== SUPPLY/DEMAND INDICES =====
+
+/**
+ * Update supply/demand indices
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity traded
+ * @param {string} type - 'buy' or 'sell'
+ */
+function updateSupplyDemand(elementName, quantity, type) {
+    const supply = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX) || '{}');
+    const demand = JSON.parse(localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX) || '{}');
+    
+    if (type === 'buy') {
+        // Buying increases demand
+        demand[elementName] = (demand[elementName] || 0) + quantity;
+    } else {
+        // Selling increases supply
+        supply[elementName] = (supply[elementName] || 0) + quantity;
+    }
+    
+    // Decay old values
+    for (const el of Object.keys(supply)) {
+        supply[el] = supply[el] * MARKET_CONFIG.VOLUME_DECAY;
+        if (supply[el] < 1) delete supply[el];
+    }
+    
+    for (const el of Object.keys(demand)) {
+        demand[el] = demand[el] * MARKET_CONFIG.VOLUME_DECAY;
+        if (demand[el] < 1) delete demand[el];
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify(supply));
+    localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify(demand));
+}
+
+/**
+ * Get supply index for an element
+ * @param {string} elementName - Element name
+ * @returns {number} Supply index
+ */
+export function getSupplyIndex(elementName) {
+    const supply = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX) || '{}');
+    return supply[elementName] || 0;
+}
+
+/**
+ * Get demand index for an element
+ * @param {string} elementName - Element name
+ * @returns {number} Demand index
+ */
+export function getDemandIndex(elementName) {
+    const demand = JSON.parse(localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX) || '{}');
+    return demand[elementName] || 0;
+}
+
+/**
+ * Get supply/demand ratio
+ * @param {string} elementName - Element name
+ * @returns {number} Ratio ( >1 means oversupply, <1 means undersupply)
+ */
+export function getSupplyDemandRatio(elementName) {
+    const supply = getSupplyIndex(elementName);
+    const demand = getDemandIndex(elementName);
+    
+    if (demand === 0) return 1;
+    return supply / demand;
+}
+
+// ===== MARKET LISTINGS =====
+
+/**
+ * Get all elements available for trading
+ * @param {string} rarity - Optional rarity filter
+ * @returns {Array} Available elements with current prices
+ */
+export function getAvailableElements(rarity = null) {
+    const elements = [];
     const prices = getCurrentPrices();
     
-    return products.map(product => {
-        const priceData = prices[product.id] || {
-            current: product.basePrice,
-            base: product.basePrice
+    for (const [name, element] of Object.entries(ELEMENT_DATABASE)) {
+        if (rarity && element.rarity !== rarity) continue;
+        
+        const priceData = prices[name] || {
+            current: element.basePrice || element.value || 100,
+            base: element.basePrice || element.value || 100,
+            bid: Math.floor((element.basePrice || 100) * 0.99),
+            ask: Math.ceil((element.basePrice || 100) * 1.01)
+        };
+        
+        elements.push({
+            name: name,
+            symbol: element.symbol,
+            icon: element.icon,
+            rarity: element.rarity,
+            basePrice: element.basePrice || element.value || 100,
+            currentPrice: Math.round(priceData.current),
+            bidPrice: priceData.bid,
+            askPrice: priceData.ask,
+            priceMultiplier: priceData.current / (element.basePrice || element.value || 100),
+            volume24h: priceData.volume24h || 0,
+            priceChange24h: priceData.priceChange24h || 0,
+            priceChangePercent: priceData.priceChangePercent || 0,
+            mass: element.mass || 100,
+            inStock: true
+        });
+    }
+    
+    return elements;
+}
+
+/**
+ * Get elements by rarity with current prices
+ * @param {string} rarity - Rarity filter
+ * @returns {Array} Elements in rarity
+ */
+export function getElementsByRarityWithPrices(rarity) {
+    const elements = getElementsByRarity(rarity);
+    const prices = getCurrentPrices();
+    
+    return elements.map(element => {
+        const priceData = prices[element.name] || {
+            current: element.basePrice || element.value || 100,
+            base: element.basePrice || element.value || 100
         };
         
         return {
-            ...product,
+            ...element,
             currentPrice: Math.round(priceData.current),
-            priceMultiplier: priceData.current / product.basePrice
+            bidPrice: Math.floor(priceData.current * 0.99),
+            askPrice: Math.ceil(priceData.current * 1.01),
+            priceMultiplier: priceData.current / (element.basePrice || element.value || 100)
         };
     });
 }
 
 /**
- * Check if player can afford a product
- * @param {string} productId - Product ID
+ * Check if player can afford to buy
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to buy
  * @param {number} playerCredits - Player's credits
  * @returns {boolean} True if affordable
  */
-export function canAffordProduct(productId, playerCredits) {
-    const price = getProductPrice(productId);
-    return playerCredits >= price;
+export function canAffordBuy(elementName, quantity, playerCredits) {
+    const askPrice = getAskPrice(elementName);
+    return playerCredits >= (askPrice * quantity);
 }
 
 /**
- * Check if player meets skill requirements for a product
- * @param {string} productId - Product ID
- * @param {Object} playerSkills - Player's skill progress
- * @returns {Object} Qualification result
+ * Check if player has enough to sell
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to sell
+ * @param {number} playerAmount - Player's amount
+ * @returns {boolean} True if has enough
  */
-export function checkSkillRequirements(productId, playerSkills) {
-    const product = getProductById(productId);
-    if (!product || !product.skillRequirements) {
-        return { qualified: true, percent: 100 };
-    }
-    
-    let totalQualification = 0;
-    let maxPossible = 0;
-    const requirements = [];
-    
-    for (const [skill, required] of Object.entries(product.skillRequirements)) {
-        const progress = playerSkills[skill] || 0;
-        const level = getLevelFromProgress(progress);
+export function hasEnoughToSell(elementName, quantity, playerAmount) {
+    return playerAmount >= quantity;
+}
+
+// ===== PRICE ALERTS =====
+
+/**
+ * Set a price alert
+ * @param {string} playerId - Player ID
+ * @param {string} elementName - Element name
+ * @param {string} type - 'above' or 'below'
+ * @param {number} targetPrice - Target price
+ * @returns {boolean} Success
+ */
+export function setPriceAlert(playerId, elementName, type, targetPrice) {
+    try {
+        const alerts = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_ALERTS) || '{}');
         
-        // Qualification based on progress relative to requirement
-        const qualification = Math.min(1.0, progress / (required * 10));
-        const weightedQual = qualification * (required / 100);
+        if (!alerts[playerId]) {
+            alerts[playerId] = [];
+        }
         
-        totalQualification += weightedQual;
-        maxPossible += required / 100;
-        
-        requirements.push({
-            skill: skill,
-            required: required,
-            current: progress,
-            level: level.name,
-            qualification: qualification
+        alerts[playerId].push({
+            id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            elementName: elementName,
+            type: type,
+            targetPrice: targetPrice,
+            createdAt: Date.now(),
+            triggered: false
         });
+        
+        localStorage.setItem(STORAGE_KEYS.PRICE_ALERTS, JSON.stringify(alerts));
+        return true;
+        
+    } catch (error) {
+        console.error('Error setting price alert:', error);
+        return false;
     }
-    
-    const qualificationPercent = maxPossible > 0 ? (totalQualification / maxPossible) * 100 : 100;
-    
-    return {
-        qualified: qualificationPercent >= 50, // 50% qualifies
-        percent: Math.min(100, Math.round(qualificationPercent)),
-        requirements: requirements
-    };
 }
 
-// ===== PURCHASE HANDLING =====
-
 /**
- * Process a product purchase
- * @param {string} productId - Product ID
+ * Check price alerts for a player
  * @param {string} playerId - Player ID
- * @param {number} playerCredits - Player's current credits
- * @returns {Object} Purchase result
+ * @returns {Array} Triggered alerts
  */
-export async function purchaseProduct(productId, playerId, playerCredits) {
-    const product = getProductById(productId);
-    if (!product) {
-        return { success: false, reason: 'Product not found' };
+export function checkPriceAlerts(playerId) {
+    try {
+        const alerts = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_ALERTS) || '{}');
+        const playerAlerts = alerts[playerId] || [];
+        const prices = getCurrentPrices();
+        const triggered = [];
+        
+        for (const alert of playerAlerts) {
+            if (alert.triggered) continue;
+            
+            const price = prices[alert.elementName]?.current;
+            if (!price) continue;
+            
+            if (alert.type === 'above' && price >= alert.targetPrice) {
+                alert.triggered = true;
+                triggered.push(alert);
+            } else if (alert.type === 'below' && price <= alert.targetPrice) {
+                alert.triggered = true;
+                triggered.push(alert);
+            }
+        }
+        
+        localStorage.setItem(STORAGE_KEYS.PRICE_ALERTS, JSON.stringify(alerts));
+        return triggered;
+        
+    } catch (error) {
+        console.error('Error checking price alerts:', error);
+        return [];
     }
-    
-    const price = getProductPrice(productId);
-    
-    if (playerCredits < price) {
-        return { success: false, reason: 'Insufficient credits' };
-    }
-    
-    // Add to player's products
-    const playerProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
-    
-    if (!playerProducts[playerId]) {
-        playerProducts[playerId] = [];
-    }
-    
-    const purchaseRecord = {
-        productId: productId,
-        productName: product.name,
-        purchasePrice: price,
-        purchaseDate: Date.now(),
-        purchaseDateStr: new Date().toISOString(),
-        id: 'pur_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
-    };
-    
-    playerProducts[playerId].push(purchaseRecord);
-    localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify(playerProducts));
-    
-    // Add to transaction history
-    addToTransactionHistory(playerId, productId, price);
-    
-    // Add to labor pool (50% of purchase price goes to labor pool)
-    if (typeof window.addToLaborPool === 'function') {
-        const laborContribution = Math.floor(price * 0.5);
-        window.addToLaborPool(laborContribution, `Product purchase: ${product.name}`);
-    }
-    
-    return {
-        success: true,
-        product: product,
-        price: price,
-        purchaseRecord: purchaseRecord,
-        laborContribution: Math.floor(price * 0.5)
-    };
-}
-
-/**
- * Add transaction to history
- * @param {string} playerId - Player ID
- * @param {string} productId - Product ID
- * @param {number} price - Purchase price
- */
-function addToTransactionHistory(playerId, productId, price) {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTION_HISTORY) || '[]');
-    
-    history.push({
-        playerId: playerId,
-        productId: productId,
-        price: price,
-        timestamp: Date.now(),
-        date: new Date().toISOString()
-    });
-    
-    // Keep last 1000 transactions
-    if (history.length > 1000) {
-        history.shift();
-    }
-    
-    localStorage.setItem(STORAGE_KEYS.TRANSACTION_HISTORY, JSON.stringify(history));
-}
-
-/**
- * Get player's purchased products
- * @param {string} playerId - Player ID
- * @returns {Array} Player's products
- */
-export function getPlayerProducts(playerId) {
-    const playerProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
-    return playerProducts[playerId] || [];
-}
-
-/**
- * Get transaction history
- * @param {string} playerId - Optional player ID filter
- * @param {number} limit - Max number of entries
- * @returns {Array} Transaction history
- */
-export function getTransactionHistory(playerId = null, limit = 50) {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTION_HISTORY) || '[]');
-    
-    let filtered = history;
-    if (playerId) {
-        filtered = history.filter(h => h.playerId === playerId);
-    }
-    
-    return filtered.slice(-limit).reverse();
 }
 
 // ===== MARKET STATISTICS =====
@@ -458,56 +632,91 @@ export function getTransactionHistory(playerId = null, limit = 50) {
  */
 export function getMarketSummary() {
     const prices = getCurrentPrices();
-    const trends = getMarketTrends();
+    const elements = getAvailableElements();
     
     let totalVolume = 0;
     let averageVolatility = 0;
-    let productCount = 0;
+    let totalMarketCap = 0;
+    let elementCount = 0;
     
-    for (const [id, priceData] of Object.entries(prices)) {
-        totalVolume += priceData.current;
-        averageVolatility += priceData.volatility;
-        productCount++;
+    const gainers = [];
+    const losers = [];
+    
+    for (const [name, priceData] of Object.entries(prices)) {
+        totalVolume += priceData.volume24h || 0;
+        averageVolatility += priceData.volatility || 0;
+        totalMarketCap += priceData.current * 1000000; // Simulated supply
+        elementCount++;
+        
+        if (priceData.priceChangePercent > 5) {
+            gainers.push({
+                name: name,
+                change: priceData.priceChangePercent,
+                price: priceData.current
+            });
+        } else if (priceData.priceChangePercent < -5) {
+            losers.push({
+                name: name,
+                change: priceData.priceChangePercent,
+                price: priceData.current
+            });
+        }
     }
     
-    averageVolatility = productCount > 0 ? averageVolatility / productCount : 0;
+    averageVolatility = elementCount > 0 ? averageVolatility / elementCount : 0;
     
-    // Get trending products
-    const trending = Object.entries(trends)
-        .map(([id, trend]) => ({
-            productId: id,
-            productName: PRODUCT_CATALOG[id]?.name || id,
-            trend: trend
-        }))
-        .sort((a, b) => b.trend - a.trend)
-        .slice(0, 5);
+    // Sort gainers and losers
+    gainers.sort((a, b) => b.change - a.change);
+    losers.sort((a, b) => a.change - b.change);
     
     return {
-        totalMarketCap: totalVolume,
+        totalMarketCap: totalMarketCap,
+        totalVolume24h: totalVolume,
         averageVolatility: averageVolatility,
-        productCount: productCount,
+        elementCount: elementCount,
         lastUpdate: parseInt(localStorage.getItem(STORAGE_KEYS.LAST_UPDATE)) || Date.now(),
-        trending: trending,
-        transactionCount: JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTION_HISTORY) || '[]').length
+        topGainers: gainers.slice(0, 5),
+        topLosers: losers.slice(0, 5),
+        mostActive: getMostActiveElements(5)
     };
 }
 
 /**
- * Get market volatility for a category
- * @param {string} category - Product category
+ * Get most active elements by volume
+ * @param {number} limit - Number to return
+ * @returns {Array} Most active elements
+ */
+export function getMostActiveElements(limit = 5) {
+    const elements = getAvailableElements();
+    
+    return elements
+        .filter(e => e.volume24h > 0)
+        .sort((a, b) => b.volume24h - a.volume24h)
+        .slice(0, limit)
+        .map(e => ({
+            name: e.name,
+            volume: e.volume24h,
+            price: e.currentPrice,
+            change: e.priceChangePercent
+        }));
+}
+
+/**
+ * Get market volatility for a rarity
+ * @param {string} rarity - Element rarity
  * @returns {number} Average volatility
  */
-export function getCategoryVolatility(category) {
-    const products = getProductsByCategory(category);
+export function getRarityVolatility(rarity) {
+    const elements = getElementsByRarity(rarity);
     const prices = getCurrentPrices();
     
     let totalVol = 0;
     let count = 0;
     
-    for (const product of products) {
-        const priceData = prices[product.id];
+    for (const element of elements) {
+        const priceData = prices[element.name];
         if (priceData) {
-            totalVol += priceData.volatility;
+            totalVol += priceData.volatility || 0;
             count++;
         }
     }
@@ -517,13 +726,13 @@ export function getCategoryVolatility(category) {
 
 /**
  * Get best time to buy based on price history
- * @param {string} productId - Product ID
+ * @param {string} elementName - Element name
  * @returns {Object} Buy recommendation
  */
-export function getBuyRecommendation(productId) {
-    const history = getPriceHistory(productId, 30);
+export function getBuyRecommendation(elementName) {
+    const history = getPriceHistory(elementName, 30);
     if (history.length < 5) {
-        return { recommendation: 'neutral', reason: 'Insufficient data' };
+        return { recommendation: 'neutral', reason: 'Insufficient data', confidence: 0 };
     }
     
     const prices = history.map(h => h.price);
@@ -533,26 +742,40 @@ export function getBuyRecommendation(productId) {
     const maxPrice = Math.max(...prices);
     
     const pricePosition = (currentPrice - minPrice) / (maxPrice - minPrice);
+    const trend = prices[prices.length - 1] - prices[0];
+    
+    let recommendation = 'neutral';
+    let confidence = 50;
+    let reason = 'Price in normal range';
     
     if (pricePosition < 0.2) {
-        return {
-            recommendation: 'buy',
-            reason: 'Price near 30-day low',
-            confidence: Math.round((1 - pricePosition) * 100)
-        };
+        recommendation = 'buy';
+        confidence = Math.round((1 - pricePosition) * 100);
+        reason = 'Price near 30-day low';
     } else if (pricePosition > 0.8) {
-        return {
-            recommendation: 'wait',
-            reason: 'Price near 30-day high',
-            confidence: Math.round(pricePosition * 100)
-        };
-    } else {
-        return {
-            recommendation: 'neutral',
-            reason: 'Price in normal range',
-            confidence: 50
-        };
+        recommendation = 'wait';
+        confidence = Math.round(pricePosition * 100);
+        reason = 'Price near 30-day high';
     }
+    
+    if (trend > 0 && recommendation === 'buy') {
+        confidence *= 0.8; // Uptrend makes buy less attractive
+        reason += ' (uptrend)';
+    } else if (trend < 0 && recommendation === 'wait') {
+        confidence *= 0.8; // Downtrend makes wait less certain
+        reason += ' (downtrend)';
+    }
+    
+    return {
+        recommendation,
+        reason,
+        confidence: Math.min(100, confidence),
+        currentPrice,
+        averagePrice,
+        minPrice,
+        maxPrice,
+        trend: trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat'
+    };
 }
 
 // ===== DAILY MAINTENANCE =====
@@ -567,20 +790,33 @@ export function runDailyMarketMaintenance(activeEvents = []) {
     // Update prices
     const newPrices = updatePrices(activeEvents);
     
-    // Clean up old transaction history
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRANSACTION_HISTORY) || '[]');
-    const cutoff = Date.now() - (90 * 24 * 60 * 60 * 1000); // Keep 90 days
+    // Clean up old data
+    decayVolumeData();
     
-    const filtered = history.filter(h => h.timestamp >= cutoff);
-    localStorage.setItem(STORAGE_KEYS.TRANSACTION_HISTORY, JSON.stringify(filtered));
+    // Archive old price history
+    archiveOldHistory();
     
     console.log('Market maintenance complete');
     
     return {
         pricesUpdated: true,
-        transactionCount: filtered.length,
+        elementCount: Object.keys(newPrices).length,
         newPrices: newPrices
     };
+}
+
+/**
+ * Archive old price history
+ */
+function archiveOldHistory() {
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
+    const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    
+    for (const elementName of Object.keys(history)) {
+        history[elementName] = history[elementName].filter(h => h.timestamp >= ninetyDaysAgo);
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
 }
 
 // ===== EXPORT =====
@@ -590,20 +826,28 @@ export default {
     initializeMarket,
     updatePrices,
     getCurrentPrices,
-    getProductPrice,
+    getElementPrice,
+    getBidPrice,
+    getAskPrice,
     getPriceMultiplier,
     getPriceHistory,
     getMarketTrends,
-    getAvailableProducts,
-    getProductsByCategoryWithPrices,
-    canAffordProduct,
-    checkSkillRequirements,
-    purchaseProduct,
-    getPlayerProducts,
-    getTransactionHistory,
+    getMarketVolume,
+    recordTrade,
+    getVolumeLast24h,
+    getSupplyIndex,
+    getDemandIndex,
+    getSupplyDemandRatio,
+    getAvailableElements,
+    getElementsByRarityWithPrices,
+    canAffordBuy,
+    hasEnoughToSell,
+    setPriceAlert,
+    checkPriceAlerts,
     getMarketSummary,
-    getCategoryVolatility,
+    getRarityVolatility,
     getBuyRecommendation,
+    getMostActiveElements,
     runDailyMarketMaintenance
 };
 
@@ -615,20 +859,28 @@ window.MARKET_CONFIG = MARKET_CONFIG;
 window.initializeMarket = initializeMarket;
 window.updatePrices = updatePrices;
 window.getCurrentPrices = getCurrentPrices;
-window.getProductPrice = getProductPrice;
+window.getElementPrice = getElementPrice;
+window.getBidPrice = getBidPrice;
+window.getAskPrice = getAskPrice;
 window.getPriceMultiplier = getPriceMultiplier;
 window.getPriceHistory = getPriceHistory;
 window.getMarketTrends = getMarketTrends;
-window.getAvailableProducts = getAvailableProducts;
-window.getProductsByCategoryWithPrices = getProductsByCategoryWithPrices;
-window.canAffordProduct = canAffordProduct;
-window.checkSkillRequirements = checkSkillRequirements;
-window.purchaseProduct = purchaseProduct;
-window.getPlayerProducts = getPlayerProducts;
-window.getTransactionHistory = getTransactionHistory;
+window.getMarketVolume = getMarketVolume;
+window.recordTrade = recordTrade;
+window.getVolumeLast24h = getVolumeLast24h;
+window.getSupplyIndex = getSupplyIndex;
+window.getDemandIndex = getDemandIndex;
+window.getSupplyDemandRatio = getSupplyDemandRatio;
+window.getAvailableElements = getAvailableElements;
+window.getElementsByRarityWithPrices = getElementsByRarityWithPrices;
+window.canAffordBuy = canAffordBuy;
+window.hasEnoughToSell = hasEnoughToSell;
+window.setPriceAlert = setPriceAlert;
+window.checkPriceAlerts = checkPriceAlerts;
 window.getMarketSummary = getMarketSummary;
-window.getCategoryVolatility = getCategoryVolatility;
+window.getRarityVolatility = getRarityVolatility;
 window.getBuyRecommendation = getBuyRecommendation;
+window.getMostActiveElements = getMostActiveElements;
 window.runDailyMarketMaintenance = runDailyMarketMaintenance;
 
-console.log('✅ market-dynamics.js loaded - Market system ready');
+console.log('✅ market-dynamics.js loaded - Market system ready with 118 elements');
