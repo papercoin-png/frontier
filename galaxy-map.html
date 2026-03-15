@@ -245,6 +245,12 @@
             background: #ffcc6a;
         }
         
+        .travel-btn:disabled {
+            background: #2a4a6a;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         /* Region boxes */
         .region-box {
             position: absolute;
@@ -708,6 +714,10 @@
             selectedRegion = displayName;
             selectedSector = sector;
             
+            // CRITICAL: Save selected sector for star sectors screen
+            localStorage.setItem('voidfarer_selected_sector', sector);
+            localStorage.setItem('voidfarer_selected_region', displayName);
+            
             const sectorData = sectorCoordinates[sector];
             const expData = sectorExplorationData[sector] || { percentage: 0, hasExplored: false };
             
@@ -758,32 +768,46 @@
                 console.log('Plotting course to sector:', {
                     from: currentSector,
                     to: selectedSector,
+                    region: selectedRegion,
                     distance: distance
                 });
                 
-                // Save plot data using navigation.js functions
-                if (typeof window.savePlotData === 'function') {
-                    // Use navigation.js
-                    window.savePlotData({
-                        fromSector: currentSector,
-                        fromRegion: currentRegion,
-                        destSector: selectedSector,
-                        destRegion: selectedRegion,
-                        sectorDistance: distance
-                    });
-                } else {
-                    // Fallback to direct localStorage
-                    localStorage.setItem('voidfarer_plot_sector', selectedSector);
-                    localStorage.setItem('voidfarer_plot_region', selectedRegion);
-                    localStorage.setItem('voidfarer_plot_from_sector', currentSector);
-                    localStorage.setItem('voidfarer_plot_from_region', currentRegion);
-                    localStorage.setItem('voidfarer_plot_sector_distance', distance.toString());
-                }
+                // Clear any old plot data
+                const plotKeys = [
+                    'voidfarer_plot_sector',
+                    'voidfarer_plot_region',
+                    'voidfarer_plot_from_sector',
+                    'voidfarer_plot_from_region',
+                    'voidfarer_plot_sector_distance',
+                    'voidfarer_plot_cumulative_distance',
+                    'voidfarer_plot_nebula',
+                    'voidfarer_plot_nebula_type',
+                    'voidfarer_plot_nebula_distance',
+                    'voidfarer_plot_nebula_stars',
+                    'voidfarer_plot_star',
+                    'voidfarer_plot_star_distance',
+                    'voidfarer_plot_planet'
+                ];
+                
+                plotKeys.forEach(key => localStorage.removeItem(key));
+                
+                // Save plot data
+                localStorage.setItem('voidfarer_plot_sector', selectedSector);
+                localStorage.setItem('voidfarer_plot_region', selectedRegion);
+                localStorage.setItem('voidfarer_plot_from_sector', currentSector);
+                localStorage.setItem('voidfarer_plot_from_region', currentRegion);
+                localStorage.setItem('voidfarer_plot_sector_distance', distance.toString());
+                
+                // CRITICAL: Save the target sector for star sectors screen
+                localStorage.setItem('voidfarer_target_sector', selectedSector);
+                localStorage.setItem('voidfarer_target_region', selectedRegion);
                 
                 // Set cumulative distance to sector distance (first leg)
                 localStorage.setItem('voidfarer_plot_cumulative_distance', distance.toString());
                 
-                // Navigate to star sectors to select star sector
+                console.log('Plot data saved, navigating to star sectors');
+                
+                // Navigate to star sectors
                 setTimeout(() => {
                     window.location.href = 'star-sectors.html?mode=plot';
                 }, 500);
