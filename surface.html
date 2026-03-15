@@ -253,7 +253,7 @@
             pointer-events: none;
         }
         
-        /* Resource Bar - At the bottom */
+        /* Resource Bar - Sticky at the bottom */
         .resource-bar {
             background: rgba(10, 10, 26, 0.4);
             backdrop-filter: blur(10px);
@@ -262,6 +262,11 @@
             padding: 15px;
             margin-top: auto;
             margin-bottom: 20px;
+            position: sticky;
+            bottom: 20px;
+            width: calc(100% - 40px);
+            z-index: 20;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
         }
         
         .resource-label {
@@ -270,6 +275,8 @@
             letter-spacing: 1px;
             margin-bottom: 12px;
             text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
         }
         
         /* 2-column grid for elements */
@@ -301,20 +308,22 @@
             transform: scale(0.95);
         }
         
-        /* Active/Success state - full color matching rarity */
+        /* Active/Success state - words match rarity color */
         .resource-toggle.active {
             opacity: 1;
             filter: none;
             border-color: currentColor;
             box-shadow: 0 0 15px currentColor;
+            background: rgba(30, 45, 70, 0.8);
         }
         
         /* Inactive/Failure state - greyed out with red glow */
         .resource-toggle:not(.active) {
-            opacity: 0.5;
-            filter: grayscale(0.8);
-            border-color: #ff6b6b !important;
-            box-shadow: 0 0 10px #ff6b6b;
+            opacity: 0.4;
+            filter: grayscale(0.9) brightness(0.7);
+            border-color: #ff3333 !important;
+            box-shadow: 0 0 15px #ff3333, 0 0 5px #ff0000 inset;
+            background: rgba(20, 20, 30, 0.9);
         }
         
         .resource-symbol {
@@ -349,7 +358,7 @@
             font-size: 12px;
         }
         
-        /* Rarity colors */
+        /* Rarity colors - these apply to both text and borders */
         .rarity-common { 
             border-color: #ffffff; 
             color: #ffffff;
@@ -395,12 +404,112 @@
             box-shadow: 0 0 15px #ffd700;
         }
         
+        /* For inactive state - ensure text is grayed out */
+        .resource-toggle:not(.active) .resource-symbol,
+        .resource-toggle:not(.active) .resource-name {
+            color: #aaaaaa !important;
+            opacity: 0.7;
+        }
+        
+        .resource-toggle:not(.active) .resource-chance {
+            background: rgba(50, 30, 30, 0.5);
+            color: #ff9999;
+        }
+        
+        .resource-toggle:not(.active) .resource-icon {
+            opacity: 0.5;
+        }
+        
         .active-count {
             text-align: center;
             margin-top: 8px;
             color: #4affaa;
             font-size: 11px;
             font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+        }
+        
+        /* Sliding Success/Failure Notification */
+        .extraction-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateX(100%);
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px 40px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: transform 0.3s ease-out, opacity 0.2s ease-out;
+            pointer-events: none;
+            box-shadow: 0 0 30px currentColor;
+            min-width: 280px;
+            text-align: center;
+        }
+        
+        .extraction-notification.show {
+            transform: translate(-50%, -50%) translateX(0);
+            opacity: 1;
+        }
+        
+        .extraction-notification.success {
+            border-color: #4affaa;
+            color: #4affaa;
+        }
+        
+        .extraction-notification.fail {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        .notification-icon {
+            font-size: 48px;
+            margin-bottom: 5px;
+        }
+        
+        .notification-title {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'Exo 2', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .notification-resource {
+            font-size: 18px;
+            font-family: 'Libre Baskerville', serif;
+            margin-top: 5px;
+            font-weight: 700;
+        }
+        
+        .notification-quantity {
+            font-size: 16px;
+            font-family: 'Exo 2', sans-serif;
+            opacity: 0.9;
+        }
+        
+        .notification-rarity {
+            font-size: 14px;
+            text-transform: capitalize;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 12px;
+            border-radius: 60px 20px 60px 20px;
+            margin-top: 5px;
+        }
+        
+        .notification-pity {
+            font-size: 14px;
+            color: #ffd700;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
         }
         
         /* Toast Notifications - Slide from right, centered */
@@ -551,7 +660,7 @@
                 <!-- Spacer to push resource bar to bottom -->
                 <div class="spacer"></div>
                 
-                <!-- Resource Bar - At the bottom with 2-column grid -->
+                <!-- Resource Bar - Sticky at the bottom with 2-column grid -->
                 <div class="resource-bar">
                     <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
                     <div class="resource-grid" id="resourceGrid"></div>
@@ -561,6 +670,16 @@
             
             <!-- Toast Notifications - Slide from right, centered -->
             <div class="toast-container" id="toastContainer"></div>
+            
+            <!-- Sliding Extraction Notification -->
+            <div class="extraction-notification" id="extractionNotification">
+                <div class="notification-icon" id="notificationIcon">✨</div>
+                <div class="notification-title" id="notificationTitle">SUCCESS</div>
+                <div class="notification-resource" id="notificationResource"></div>
+                <div class="notification-quantity" id="notificationQuantity"></div>
+                <div class="notification-rarity" id="notificationRarity"></div>
+                <div class="notification-pity" id="notificationPity"></div>
+            </div>
             
             <!-- Loading Overlay -->
             <div class="loading-overlay" id="loadingOverlay">
@@ -664,6 +783,78 @@
         const toastContainer = document.getElementById('toastContainer');
         const extractorText = document.getElementById('extractorText');
         const claimBtn = document.getElementById('claimBtn');
+        
+        // Notification elements
+        const extractionNotification = document.getElementById('extractionNotification');
+        const notificationIcon = document.getElementById('notificationIcon');
+        const notificationTitle = document.getElementById('notificationTitle');
+        const notificationResource = document.getElementById('notificationResource');
+        const notificationQuantity = document.getElementById('notificationQuantity');
+        const notificationRarity = document.getElementById('notificationRarity');
+        const notificationPity = document.getElementById('notificationPity');
+
+        // ===== NOTIFICATION SYSTEM =====
+        let notificationTimeout = null;
+
+        function showExtractionNotification(result) {
+            // Clear any pending hide timeout
+            if (notificationTimeout) {
+                clearTimeout(notificationTimeout);
+            }
+            
+            // Remove previous show class
+            extractionNotification.classList.remove('show', 'success', 'fail');
+            
+            // Set notification content based on result
+            if (result.success) {
+                extractionNotification.classList.add('success');
+                notificationIcon.textContent = '✨';
+                notificationTitle.textContent = 'SUCCESS';
+                
+                const resource = result.resource;
+                const rarity = getElementRarity(resource);
+                const config = RARITY_CONFIG[rarity];
+                
+                notificationResource.textContent = resource;
+                notificationQuantity.textContent = `+${result.quantity} units • ${Math.round(result.mass)} AMU`;
+                notificationRarity.textContent = `${rarity} • ${config.icon}`;
+                
+                if (result.wasPity) {
+                    notificationPity.textContent = '⚡ PITY BONUS! ⚡';
+                } else {
+                    notificationPity.textContent = '';
+                }
+            } else {
+                extractionNotification.classList.add('fail');
+                notificationIcon.textContent = '⚠️';
+                notificationTitle.textContent = 'FAILURE';
+                
+                if (result.resource) {
+                    const rarity = getElementRarity(result.resource);
+                    const config = RARITY_CONFIG[rarity];
+                    notificationResource.textContent = result.resource;
+                    notificationQuantity.textContent = `Extraction failed`;
+                    notificationRarity.textContent = `${rarity} • ${config.icon}`;
+                } else if (result.reason === 'cargo_full') {
+                    notificationResource.textContent = 'Cargo Full';
+                    notificationQuantity.textContent = 'Extraction paused';
+                    notificationRarity.textContent = '';
+                } else {
+                    notificationResource.textContent = 'No Resources Selected';
+                    notificationQuantity.textContent = 'Toggle resources to extract';
+                    notificationRarity.textContent = '';
+                }
+                notificationPity.textContent = '';
+            }
+            
+            // Show the notification
+            extractionNotification.classList.add('show');
+            
+            // Auto hide after 2 seconds
+            notificationTimeout = setTimeout(() => {
+                extractionNotification.classList.remove('show');
+            }, 2000);
+        }
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.toggleResource = toggleResource;
@@ -1127,12 +1318,26 @@
                         extractionTimer = null;
                     }
                     showFailToast('Cargo full!');
+                    
+                    // Show failure notification for cargo full
+                    showExtractionNotification({
+                        success: false,
+                        resource: null,
+                        reason: 'cargo_full'
+                    });
                     return;
                 }
                 
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
+                    
+                    // Show failure notification for no resources
+                    showExtractionNotification({
+                        success: false,
+                        resource: null,
+                        reason: 'no_resources'
+                    });
                     return;
                 } else {
                     extractorText.textContent = 'Auto-extractor active';
@@ -1212,51 +1417,66 @@
                     if (wasPity) {
                         quantity = Math.max(1, Math.floor(quantity * 1.5));
                     }
-                }
-                
-                if (quantity === 0) {
-                    return;
-                }
-                
-                const totalMass = massPerUnit * quantity;
-                
-                if (currentMass + totalMass <= cargoLimit) {
-                    if (typeof window.addElementToCollection !== 'function') {
-                        console.warn('window.addElementToCollection not available');
-                        return;
-                    }
                     
-                    const avgQuantity = Math.floor(config.massTarget / massPerUnit);
-                    const isRichFind = quantity > avgQuantity * 1.5;
+                    const totalMass = massPerUnit * quantity;
                     
-                    // ===== ENHANCED LOCATION DATA =====
-                    const locationData = {
-                        planet: currentPlanet.name,
-                        planetType: currentPlanet.type,
-                        quantity: quantity,
-                        rarity: rarity,
-                        timestamp: Date.now()
-                    };
-                    
-                    const result = await window.addElementToCollection(resource, quantity, locationData);
-                    
-                    if (result && result.success) {
-                        cachedCargoMass = currentMass + totalMass;
-                        lastMassUpdate = Date.now();
-                        await updateCargoDisplay();
+                    if (currentMass + totalMass <= cargoLimit) {
+                        if (typeof window.addElementToCollection !== 'function') {
+                            console.warn('window.addElementToCollection not available');
+                            return;
+                        }
                         
-                        let message = `+${quantity} ${resource}`;
-                        if (isRichFind) message += ' (Rich Find!)';
-                        if (wasPity) message += ' (Pity!)';
-                        showSuccessToast(message);
+                        const avgQuantity = Math.floor(config.massTarget / massPerUnit);
+                        const isRichFind = quantity > avgQuantity * 1.5;
                         
-                        // Update claim button status after new discovery
-                        await updateClaimButton();
+                        // ===== ENHANCED LOCATION DATA =====
+                        const locationData = {
+                            planet: currentPlanet.name,
+                            planetType: currentPlanet.type,
+                            quantity: quantity,
+                            rarity: rarity,
+                            timestamp: Date.now()
+                        };
+                        
+                        const result = await window.addElementToCollection(resource, quantity, locationData);
+                        
+                        if (result && result.success) {
+                            cachedCargoMass = currentMass + totalMass;
+                            lastMassUpdate = Date.now();
+                            await updateCargoDisplay();
+                            
+                            // Show success notification
+                            showExtractionNotification({
+                                success: true,
+                                resource: resource,
+                                quantity: quantity,
+                                mass: totalMass,
+                                wasPity: wasPity,
+                                isRichFind: isRichFind
+                            });
+                            
+                            // Update claim button status after new discovery
+                            await updateClaimButton();
+                        }
                     }
+                } else {
+                    // Show failure notification
+                    showExtractionNotification({
+                        success: false,
+                        resource: resource,
+                        reason: 'failed_roll'
+                    });
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
                 showFailToast('Extraction failed');
+                
+                // Show failure notification for error
+                showExtractionNotification({
+                    success: false,
+                    resource: null,
+                    reason: 'error'
+                });
             }
         }
 
