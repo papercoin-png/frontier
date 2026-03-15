@@ -362,13 +362,13 @@ async function getCollection() {
 }
 
 // ===== DIRECT DB ACCESS FUNCTIONS (NO RECURSION) =====
-// These call the db.js functions directly without going through window
+// These call the db.js prefixed functions directly without going through window
 
 async function dbAddElementToCollection(elementName, count = 1) {
     try {
-        // Call the db.js function directly if available
-        if (typeof window.addElementToCollection === 'function') {
-            return await window.addElementToCollection(elementName, count, {});
+        // Call the db.js prefixed function directly
+        if (typeof window.dbAddElementToCollection === 'function') {
+            return await window.dbAddElementToCollection(elementName, count, {});
         }
         return { success: false, error: 'db.js function not available' };
     } catch (error) {
@@ -379,9 +379,9 @@ async function dbAddElementToCollection(elementName, count = 1) {
 
 async function dbRemoveElementFromCollection(elementName, count = 1) {
     try {
-        // Call the db.js function directly if available
-        if (typeof window.removeElementFromCollection === 'function') {
-            return await window.removeElementFromCollection(elementName, count);
+        // Call the db.js prefixed function directly
+        if (typeof window.dbRemoveElementFromCollection === 'function') {
+            return await window.dbRemoveElementFromCollection(elementName, count);
         }
         return { success: false, error: 'db.js function not available' };
     } catch (error) {
@@ -432,11 +432,19 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 
                 try {
                     // Call the db.js function with full metadata
-                    if (typeof window.saveElementLocation === 'function') {
-                        await window.saveElementLocation(elementName, planetName, enhancedLocationData);
+                    if (typeof window.dbSaveElementLocation === 'function') {
+                        await window.dbSaveElementLocation(elementName, planetName, enhancedLocationData);
                         console.log(`✅ Journal entry saved: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
                         
                         // Also update planet status
+                        if (typeof window.updatePlanetStatusFromLocations === 'function') {
+                            await window.updatePlanetStatusFromLocations(planetName);
+                        }
+                    } else if (typeof window.saveElementLocation === 'function') {
+                        // Fallback to regular function
+                        await window.saveElementLocation(elementName, planetName, enhancedLocationData);
+                        console.log(`✅ Journal entry saved (fallback): ${count}x ${elementName} (${rarity}) found on ${planetName}`);
+                        
                         if (typeof window.updatePlanetStatusFromLocations === 'function') {
                             await window.updatePlanetStatusFromLocations(planetName);
                         }
@@ -567,8 +575,14 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
 // Get all locations for a specific element
 async function getElementLocations(elementName) {
     try {
-        // Use getAll directly from db.js, not through window
-        if (typeof window.getAll === 'function') {
+        // Use dbGetAll directly from db.js
+        if (typeof window.dbGetAll === 'function') {
+            const allLocations = await window.dbGetAll('elementLocations') || [];
+            return allLocations
+                .filter(loc => loc.elementName === elementName)
+                .sort((a, b) => b.discoveredAt - a.discoveredAt);
+        } else if (typeof window.getAll === 'function') {
+            // Fallback to regular getAll
             const allLocations = await window.getAll('elementLocations') || [];
             return allLocations
                 .filter(loc => loc.elementName === elementName)
@@ -589,8 +603,16 @@ async function getElementLocations(elementName) {
 // Get all player locations (for stats)
 async function getAllPlayerLocations() {
     try {
-        // Use getAll directly from db.js
-        if (typeof window.getAll === 'function') {
+        // Use dbGetAll directly from db.js
+        if (typeof window.dbGetAll === 'function') {
+            const allLocations = await window.dbGetAll('elementLocations') || [];
+            const playerId = localStorage.getItem('voidfarer_player_id');
+            if (!playerId) return [];
+            
+            return allLocations
+                .filter(loc => loc.playerId === playerId)
+                .sort((a, b) => b.discoveredAt - a.discoveredAt);
+        } else if (typeof window.getAll === 'function') {
             const allLocations = await window.getAll('elementLocations') || [];
             const playerId = localStorage.getItem('voidfarer_player_id');
             if (!playerId) return [];
