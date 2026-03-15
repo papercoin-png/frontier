@@ -261,7 +261,6 @@
             border-radius: 60px 20px 60px 20px;
             padding: 15px;
             margin-top: auto;
-            margin-bottom: 10px;
             position: sticky;
             bottom: 10px;
             width: 100%;
@@ -304,10 +303,32 @@
             justify-content: space-between;
             font-size: 12px;
             width: 100%;
+            position: relative;
         }
         
         .resource-toggle:active {
             transform: scale(0.95);
+        }
+        
+        /* Explored checkmark - green check for fully explored elements */
+        .resource-toggle.explored::after {
+            content: "✓";
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #4affaa;
+            color: #0a0a1a;
+            font-size: 14px;
+            font-weight: bold;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #0a0a1a;
+            box-shadow: 0 0 10px #4affaa;
+            z-index: 5;
         }
         
         /* Active/Success state - words match rarity color */
@@ -422,19 +443,39 @@
             opacity: 0.5;
         }
         
-        .active-count {
+        /* Explored count indicator */
+        .explored-count {
             text-align: center;
             margin-top: 8px;
             color: #4affaa;
             font-size: 11px;
             font-family: 'Exo 2', sans-serif;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .explored-count span {
+            background: rgba(74, 255, 170, 0.2);
+            padding: 2px 8px;
+            border-radius: 20px;
+            color: #4affaa;
+        }
+        
+        .active-count {
+            text-align: center;
+            margin-top: 4px;
+            color: #a0c0ff;
+            font-size: 10px;
+            font-family: 'Exo 2', sans-serif;
         }
         
         /* Sliding Success/Failure Notification - Smaller for failures */
         .extraction-notification {
             position: fixed;
-            top: 50%;
+            top: 40%;
             left: 50%;
             transform: translate(-50%, -50%) translateX(100%);
             background: rgba(10, 10, 26, 0.95);
@@ -725,6 +766,9 @@
                 <div class="resource-bar">
                     <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
                     <div class="resource-grid" id="resourceGrid"></div>
+                    <div class="explored-count" id="exploredCount">
+                        <span id="exploredProgress">0/4</span> ELEMENTS EXPLORED
+                    </div>
                     <div class="active-count" id="activeCount">Extracting: 0 resources</div>
                 </div>
             </div>
@@ -821,15 +865,53 @@
             'legendary': { threshold: 25 }  // 4% chance → guarantee after 25 failures
         };
 
-        function initializePityCounters() {
+        // ===== EXPLORATION TRACKING =====
+        let exploredElements = {}; // Track which elements have been found
+        let totalElements = 4; // Default, will update from planet data
+
+        function initializeExplorationTracking() {
+            totalElements = currentPlanet.resources.length;
             currentPlanet.resources.forEach(resource => {
-                const rarity = getElementRarity(resource);
-                pityCounters[resource] = {
-                    attempts: 0,
-                    threshold: PITY_CONFIG[rarity].threshold
-                };
+                if (!exploredElements[resource]) {
+                    exploredElements[resource] = false;
+                }
             });
-            console.log('Pity counters initialized:', pityCounters);
+            console.log('Exploration tracking initialized:', exploredElements);
+        }
+
+        function checkElementExplored(resource) {
+            return exploredElements[resource] || false;
+        }
+
+        function markElementExplored(resource) {
+            if (!exploredElements[resource]) {
+                exploredElements[resource] = true;
+                updateExploredCount();
+                renderResourceToggles(); // Re-render to show checkmarks
+                checkAllElementsExplored();
+            }
+        }
+
+        function updateExploredCount() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            const exploredProgress = document.getElementById('exploredProgress');
+            if (exploredProgress) {
+                exploredProgress.textContent = `${explored}/${totalElements}`;
+            }
+            return explored;
+        }
+
+        function checkAllElementsExplored() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            if (explored === totalElements && totalElements > 0) {
+                // All elements explored - show claim button
+                claimBtn.classList.add('visible');
+                claimBtn.disabled = false;
+                claimBtn.textContent = '✨ CLAIM PLANET';
+                
+                // Show success message
+                showSuccessToast('✨ All elements discovered! Planet ready to claim.');
+            }
         }
 
         // ===== DOM ELEMENTS =====
@@ -1231,6 +1313,9 @@
                 // Initialize pity counters
                 initializePityCounters();
                 
+                // Initialize exploration tracking
+                initializeExplorationTracking();
+                
                 // Check planet status and update claim button
                 await updateClaimButton();
                 
@@ -1285,9 +1370,10 @@
                 const symbol = getElementSymbol(resource);
                 const chance = resourceChances[resource] || config.baseChance;
                 const isActive = resourceStates[resource];
+                const isExplored = checkElementExplored(resource);
                 
                 html += `
-                    <div class="resource-toggle rarity-${rarity} ${isActive ? 'active' : ''}" 
+                    <div class="resource-toggle rarity-${rarity} ${isActive ? 'active' : ''} ${isExplored ? 'explored' : ''}" 
                          onclick="window.toggleResource('${resource}')"
                          title="Chance: ${chance}%">
                         <span class="resource-symbol">${symbol}</span>
@@ -1498,6 +1584,9 @@
                             cachedCargoMass = currentMass + totalMass;
                             lastMassUpdate = Date.now();
                             await updateCargoDisplay();
+                            
+                            // Mark element as explored
+                            markElementExplored(resource);
                             
                             // Show success notification
                             showExtractionNotification({
