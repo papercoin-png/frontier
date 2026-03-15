@@ -77,7 +77,10 @@ const STORAGE_KEYS = {
     // HUB STORAGE KEYS (for Earth Hub)
     HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
     HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
-    HUB_INVENTORY: 'voidfarer_hub_inventory'
+    HUB_INVENTORY: 'voidfarer_hub_inventory',
+    // SHIP STORAGE KEYS
+    SHIP_STORAGE_MAX: 'voidfarer_ship_storage_max',
+    SHIP_STORAGE_USED: 'voidfarer_ship_storage_used'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
@@ -212,7 +215,43 @@ async function getRemainingHubStorage() {
     }
 }
 
-// ===== CURRENT PLANET HELPERS =====
+// ===== SHIP STORAGE UTILITIES =====
+async function getShipStorageMax() {
+    try {
+        // Ship has fixed capacity of 5000, could be upgraded later
+        return 5000;
+    } catch (error) {
+        console.error('Error getting ship storage max:', error);
+        return 5000;
+    }
+}
+
+async function getShipStorageUsed() {
+    try {
+        return await getTotalCargoMass();
+    } catch (error) {
+        console.error('Error getting ship storage used:', error);
+        return 0;
+    }
+}
+
+async function getRemainingShipStorage() {
+    try {
+        const max = await getShipStorageMax();
+        const used = await getShipStorageUsed();
+        return Math.max(0, max - used);
+    } catch (error) {
+        console.error('Error calculating remaining ship storage:', error);
+        return 5000;
+    }
+}
+
+// ===== LOCATION HELPERS =====
+function isAtEarth() {
+    const currentPlanet = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
+    return currentPlanet === 'Earth';
+}
+
 function getCurrentPlanetName() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
 }
@@ -224,6 +263,99 @@ function getCurrentPlanetType() {
 function getCurrentPlanetResources() {
     const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
     return resources ? JSON.parse(resources) : [];
+}
+
+// ===== TRANSFER FUNCTIONS =====
+async function transferShipToHub(elementName, quantity) {
+    try {
+        console.log(`Transferring ${quantity}x ${elementName} from ship to hub...`);
+        
+        // Check if at Earth
+        if (!isAtEarth()) {
+            return { success: false, reason: 'not_at_earth', message: 'You must be at Earth to transfer items to hub' };
+        }
+        
+        // Get element mass
+        const massPerUnit = getElementMass(elementName);
+        const massToTransfer = quantity * massPerUnit;
+        
+        // Check hub space
+        const remainingHub = await getRemainingHubStorage();
+        if (massToTransfer > remainingHub) {
+            return { success: false, reason: 'insufficient_hub_space', remaining: remainingHub, required: massToTransfer };
+        }
+        
+        // Remove from ship
+        const removeResult = await removeElementFromCollection(elementName, quantity);
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add to hub
+        const addResult = await addElementToHub(elementName, quantity);
+        if (!addResult.success) {
+            // Rollback ship removal
+            await addElementToCollection(elementName, quantity);
+            return addResult;
+        }
+        
+        return { 
+            success: true, 
+            quantity: quantity,
+            elementName: elementName,
+            massTransferred: massToTransfer
+        };
+        
+    } catch (error) {
+        console.error('Error in transferShipToHub:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
+}
+
+async function transferHubToShip(elementName, quantity) {
+    try {
+        console.log(`Transferring ${quantity}x ${elementName} from hub to ship...`);
+        
+        // Check if at Earth
+        if (!isAtEarth()) {
+            return { success: false, reason: 'not_at_earth', message: 'You must be at Earth to transfer items from hub' };
+        }
+        
+        // Get element mass
+        const massPerUnit = getElementMass(elementName);
+        const massToTransfer = quantity * massPerUnit;
+        
+        // Check ship space
+        const remainingShip = await getRemainingShipStorage();
+        if (massToTransfer > remainingShip) {
+            return { success: false, reason: 'insufficient_ship_space', remaining: remainingShip, required: massToTransfer };
+        }
+        
+        // Remove from hub
+        const removeResult = await removeElementFromHub(elementName, quantity);
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add to ship
+        const addResult = await addElementToCollection(elementName, quantity);
+        if (!addResult.success) {
+            // Rollback hub removal
+            await addElementToHub(elementName, quantity);
+            return addResult;
+        }
+        
+        return { 
+            success: true, 
+            quantity: quantity,
+            elementName: elementName,
+            massTransferred: massToTransfer
+        };
+        
+    } catch (error) {
+        console.error('Error in transferHubToShip:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
 }
 
 // ===== ALCHEMY PROGRESS FUNCTIONS =====
@@ -367,6 +499,14 @@ async function initializeStorage() {
         localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, '{}');
     }
     
+    // Initialize ship storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX)) {
+        localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_MAX, '5000');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED)) {
+        localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, '0');
+    }
+    
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
@@ -471,6 +611,14 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
     try {
         console.log(`Adding ${count}x ${elementName} to collection...`, locationData ? 'with location data' : 'no location data');
         
+        // Check ship capacity
+        const remaining = await getRemainingShipStorage();
+        const massToAdd = count * getElementMass(elementName);
+        
+        if (massToAdd > remaining) {
+            return { success: false, reason: 'insufficient_space', remaining: remaining, required: massToAdd };
+        }
+        
         // First add to collection using db.js function DIRECTLY (not through window)
         const result = await dbAddElementToCollection(elementName, count);
         
@@ -481,6 +629,10 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
                 player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
                 await savePlayer(player);
             }
+            
+            // Update ship storage used
+            const newUsed = await getShipStorageUsed();
+            localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, newUsed.toString());
             
             // CRITICAL: ALWAYS save location data if provided (for planetary discoveries)
             // This ensures journal entries are created for every discovery
@@ -542,8 +694,22 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
 
 // Remove element from collection (public wrapper)
 async function removeElementFromCollection(elementName, count = 1) {
-    console.log(`Removing ${count}x ${elementName} from collection...`);
-    return await dbRemoveElementFromCollection(elementName, count);
+    try {
+        console.log(`Removing ${count}x ${elementName} from collection...`);
+        
+        const result = await dbRemoveElementFromCollection(elementName, count);
+        
+        if (result && result.success) {
+            // Update ship storage used
+            const newUsed = await getShipStorageUsed();
+            localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, newUsed.toString());
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('Error in removeElementFromCollection:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
 }
 
 // ===== HUB INVENTORY FUNCTIONS =====
@@ -1247,6 +1413,10 @@ async function resetGame() {
     localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_USED);
     localStorage.removeItem(STORAGE_KEYS.HUB_INVENTORY);
     
+    // Clear ship storage
+    localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_MAX);
+    localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_USED);
+    
     setHapticsEnabled(settings.haptics);
     setAutoGatherEnabled(settings.autoGather);
     setOrbitSpeed(settings.orbitSpeed);
@@ -1281,6 +1451,12 @@ window.getHubInventory = getHubInventory;
 window.addElementToHub = addElementToHub;
 window.removeElementFromHub = removeElementFromHub;
 window.safeSellHubElement = safeSellHubElement;
+window.getShipStorageMax = getShipStorageMax;
+window.getShipStorageUsed = getShipStorageUsed;
+window.getRemainingShipStorage = getRemainingShipStorage;
+window.isAtEarth = isAtEarth;
+window.transferShipToHub = transferShipToHub;
+window.transferHubToShip = transferHubToShip;
 window.getCurrentPlanetName = getCurrentPlanetName;
 window.getCurrentPlanetType = getCurrentPlanetType;
 window.getCurrentPlanetResources = getCurrentPlanetResources;
