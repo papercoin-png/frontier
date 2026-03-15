@@ -253,7 +253,7 @@
             pointer-events: none;
         }
         
-        /* Resource Bar - Sticky at the bottom */
+        /* Resource Bar - Sticky at the bottom, full width */
         .resource-bar {
             background: rgba(10, 10, 26, 0.4);
             backdrop-filter: blur(10px);
@@ -261,10 +261,12 @@
             border-radius: 60px 20px 60px 20px;
             padding: 15px;
             margin-top: auto;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             position: sticky;
-            bottom: 20px;
-            width: calc(100% - 40px);
+            bottom: 10px;
+            width: 100%;
+            left: 0;
+            right: 0;
             z-index: 20;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
         }
@@ -313,8 +315,28 @@
             opacity: 1;
             filter: none;
             border-color: currentColor;
-            box-shadow: 0 0 15px currentColor;
             background: rgba(30, 45, 70, 0.8);
+        }
+        
+        /* Glow for active states - common has no glow */
+        .resource-toggle.active.rarity-uncommon {
+            box-shadow: 0 0 15px #b0ffb0;
+        }
+        
+        .resource-toggle.active.rarity-rare {
+            box-shadow: 0 0 15px #b0b0ff;
+        }
+        
+        .resource-toggle.active.rarity-very-rare {
+            box-shadow: 0 0 15px #e0b0ff;
+        }
+        
+        .resource-toggle.active.rarity-legendary {
+            box-shadow: 0 0 15px #ffd700;
+        }
+        
+        .resource-toggle.active.rarity-common {
+            box-shadow: none;
         }
         
         /* Inactive/Failure state - greyed out with red glow */
@@ -363,45 +385,25 @@
             border-color: #ffffff; 
             color: #ffffff;
         }
-        .rarity-common.active { 
-            border-color: #ffffff; 
-            box-shadow: 0 0 15px #ffffff;
-        }
         
         .rarity-uncommon { 
             border-color: #b0ffb0; 
             color: #b0ffb0;
-        }
-        .rarity-uncommon.active { 
-            border-color: #b0ffb0; 
-            box-shadow: 0 0 15px #b0ffb0;
         }
         
         .rarity-rare { 
             border-color: #b0b0ff; 
             color: #b0b0ff;
         }
-        .rarity-rare.active { 
-            border-color: #b0b0ff; 
-            box-shadow: 0 0 15px #b0b0ff;
-        }
         
         .rarity-very-rare { 
             border-color: #e0b0ff; 
             color: #e0b0ff;
         }
-        .rarity-very-rare.active { 
-            border-color: #e0b0ff; 
-            box-shadow: 0 0 15px #e0b0ff;
-        }
         
         .rarity-legendary { 
             border-color: #ffd700; 
             color: #ffd700;
-        }
-        .rarity-legendary.active { 
-            border-color: #ffd700; 
-            box-shadow: 0 0 15px #ffd700;
         }
         
         /* For inactive state - ensure text is grayed out */
@@ -429,7 +431,7 @@
             font-weight: 600;
         }
         
-        /* Sliding Success/Failure Notification */
+        /* Sliding Success/Failure Notification - Smaller for failures */
         .extraction-notification {
             position: fixed;
             top: 50%;
@@ -448,24 +450,83 @@
             opacity: 0;
             transition: transform 0.3s ease-out, opacity 0.2s ease-out;
             pointer-events: none;
-            box-shadow: 0 0 30px currentColor;
             min-width: 280px;
             text-align: center;
+        }
+        
+        /* Success notification glow based on rarity */
+        .extraction-notification.success {
+            border-color: currentColor;
+        }
+        
+        .extraction-notification.success.rarity-uncommon {
+            color: #b0ffb0;
+            box-shadow: 0 0 30px #b0ffb0;
+        }
+        
+        .extraction-notification.success.rarity-rare {
+            color: #b0b0ff;
+            box-shadow: 0 0 30px #b0b0ff;
+        }
+        
+        .extraction-notification.success.rarity-very-rare {
+            color: #e0b0ff;
+            box-shadow: 0 0 30px #e0b0ff;
+        }
+        
+        .extraction-notification.success.rarity-legendary {
+            color: #ffd700;
+            box-shadow: 0 0 30px #ffd700;
+        }
+        
+        .extraction-notification.success.rarity-common {
+            color: #ffffff;
+            box-shadow: none;
+            border-color: #ffffff;
+        }
+        
+        /* Smaller notification for failures */
+        .extraction-notification.fail {
+            min-width: 200px;
+            padding: 15px 25px;
+            border-width: 1px;
+            box-shadow: 0 0 20px #ff6b6b;
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        .extraction-notification.fail .notification-icon {
+            font-size: 32px;
+            filter: grayscale(0.8);
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-title {
+            font-size: 18px;
+            color: #aaaaaa;
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-resource {
+            font-size: 14px;
+            color: #aaaaaa;
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-quantity {
+            font-size: 12px;
+            color: #888888;
+        }
+        
+        .extraction-notification.fail .notification-rarity {
+            font-size: 11px;
+            background: rgba(100, 100, 100, 0.2);
+            color: #999999;
         }
         
         .extraction-notification.show {
             transform: translate(-50%, -50%) translateX(0);
             opacity: 1;
-        }
-        
-        .extraction-notification.success {
-            border-color: #4affaa;
-            color: #4affaa;
-        }
-        
-        .extraction-notification.fail {
-            border-color: #ff6b6b;
-            color: #ff6b6b;
         }
         
         .notification-icon {
@@ -802,20 +863,21 @@
                 clearTimeout(notificationTimeout);
             }
             
-            // Remove previous show class
-            extractionNotification.classList.remove('show', 'success', 'fail');
+            // Remove previous classes
+            extractionNotification.classList.remove('show', 'success', 'fail', 'rarity-common', 'rarity-uncommon', 'rarity-rare', 'rarity-very-rare', 'rarity-legendary');
             
             // Set notification content based on result
             if (result.success) {
                 extractionNotification.classList.add('success');
+                const rarity = getElementRarity(result.resource);
+                extractionNotification.classList.add(`rarity-${rarity}`);
+                
                 notificationIcon.textContent = '✨';
                 notificationTitle.textContent = 'SUCCESS';
                 
-                const resource = result.resource;
-                const rarity = getElementRarity(resource);
                 const config = RARITY_CONFIG[rarity];
                 
-                notificationResource.textContent = resource;
+                notificationResource.textContent = result.resource;
                 notificationQuantity.textContent = `+${result.quantity} units • ${Math.round(result.mass)} AMU`;
                 notificationRarity.textContent = `${rarity} • ${config.icon}`;
                 
@@ -827,21 +889,20 @@
             } else {
                 extractionNotification.classList.add('fail');
                 notificationIcon.textContent = '⚠️';
-                notificationTitle.textContent = 'FAILURE';
+                notificationTitle.textContent = 'FAIL';
                 
                 if (result.resource) {
                     const rarity = getElementRarity(result.resource);
-                    const config = RARITY_CONFIG[rarity];
                     notificationResource.textContent = result.resource;
                     notificationQuantity.textContent = `Extraction failed`;
-                    notificationRarity.textContent = `${rarity} • ${config.icon}`;
+                    notificationRarity.textContent = `${rarity}`;
                 } else if (result.reason === 'cargo_full') {
                     notificationResource.textContent = 'Cargo Full';
-                    notificationQuantity.textContent = 'Extraction paused';
+                    notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
                 } else {
-                    notificationResource.textContent = 'No Resources Selected';
-                    notificationQuantity.textContent = 'Toggle resources to extract';
+                    notificationResource.textContent = 'No Resources';
+                    notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
                 }
                 notificationPity.textContent = '';
@@ -850,10 +911,11 @@
             // Show the notification
             extractionNotification.classList.add('show');
             
-            // Auto hide after 2 seconds
+            // Auto hide after 1.5 seconds for failures, 2 seconds for successes
+            const hideDelay = result.success ? 2000 : 1500;
             notificationTimeout = setTimeout(() => {
                 extractionNotification.classList.remove('show');
-            }, 2000);
+            }, hideDelay);
         }
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
@@ -1286,14 +1348,6 @@
                     toast.remove();
                 }
             }, 3000);
-        }
-
-        function showMessageToast(message, isSuccess) {
-            if (isSuccess) {
-                showSuccessToast(message);
-            } else {
-                showFailToast(message);
-            }
         }
 
         // ===== MAIN EXTRACTION FUNCTION =====
