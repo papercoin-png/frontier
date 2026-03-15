@@ -553,12 +553,23 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
 
 // ===== LOCATION RETRIEVAL FUNCTIONS =====
 // Get all locations for a specific element
+// FIXED: Now calls db.js functions directly to avoid recursion
 async function getElementLocations(elementName) {
     try {
-        if (typeof window.getElementLocations === 'function') {
-            return await window.getElementLocations(elementName);
+        // Use getAll directly from db.js, not through window
+        // This avoids the recursive loop
+        if (typeof window.getAll === 'function') {
+            const allLocations = await window.getAll('elementLocations') || [];
+            return allLocations
+                .filter(loc => loc.elementName === elementName)
+                .sort((a, b) => b.discoveredAt - a.discoveredAt);
         }
-        return [];
+        
+        // Fallback to localStorage if db.js not available
+        const locationsKey = `voidfarer_locations_${elementName}`;
+        const locations = localStorage.getItem(locationsKey);
+        return locations ? JSON.parse(locations) : [];
+        
     } catch (error) {
         console.error(`Error getting locations for ${elementName}:`, error);
         return [];
@@ -566,12 +577,37 @@ async function getElementLocations(elementName) {
 }
 
 // Get all player locations (for stats)
+// FIXED: Now calls db.js functions directly to avoid recursion
 async function getAllPlayerLocations() {
     try {
-        if (typeof window.getPlayerLocations === 'function') {
-            return await window.getPlayerLocations();
+        // Use getAll directly from db.js
+        if (typeof window.getAll === 'function') {
+            const allLocations = await window.getAll('elementLocations') || [];
+            const playerId = localStorage.getItem('voidfarer_player_id');
+            if (!playerId) return [];
+            
+            return allLocations
+                .filter(loc => loc.playerId === playerId)
+                .sort((a, b) => b.discoveredAt - a.discoveredAt);
         }
-        return [];
+        
+        // Fallback: Scan localStorage for all location keys
+        const allLocations = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('voidfarer_locations_')) {
+                const elementName = key.replace('voidfarer_locations_', '');
+                const locations = JSON.parse(localStorage.getItem(key) || '[]');
+                locations.forEach(loc => {
+                    allLocations.push({
+                        element: elementName,
+                        ...loc
+                    });
+                });
+            }
+        }
+        return allLocations;
+        
     } catch (error) {
         console.error('Error getting all player locations:', error);
         return [];
