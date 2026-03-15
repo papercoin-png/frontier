@@ -903,13 +903,6 @@
             tg.expand();
         }
 
-        // ===== STORAGE KEYS =====
-        const STORAGE_KEYS = {
-            HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
-            HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
-            HUB_INVENTORY: 'voidfarer_hub_inventory'
-        };
-
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -1101,24 +1094,15 @@
         // ===== LOAD HUB STORAGE DATA =====
         async function loadHubStorage() {
             try {
-                // Get hub storage max from real estate purchases
+                // Use functions from storage.js
                 let hubMax = 0;
-                if (typeof window.getRealEstate === 'function') {
-                    const estateData = await window.getRealEstate();
-                    const properties = estateData.properties || [];
-                    hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
-                } else {
-                    // Fallback to localStorage
-                    hubMax = parseInt(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX) || '0');
+                if (typeof window.getHubStorageMax === 'function') {
+                    hubMax = await window.getHubStorageMax();
                 }
                 
-                // Get hub storage used (items stored at Earth Hub)
                 let hubUsed = 0;
-                if (typeof window.getHubInventory === 'function') {
-                    const inventory = await window.getHubInventory();
-                    hubUsed = inventory.totalMass || 0;
-                } else {
-                    hubUsed = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
+                if (typeof window.getHubStorageUsed === 'function') {
+                    hubUsed = await window.getHubStorageUsed();
                 }
                 
                 currentHubMax = hubMax;
@@ -1156,12 +1140,10 @@
                 // Load hub storage
                 await loadHubStorage();
 
-                // Load collection (this should be HUB inventory, not ship cargo)
+                // Load hub inventory
                 let collection = {};
                 if (typeof window.getHubInventory === 'function') {
                     collection = await window.getHubInventory();
-                } else {
-                    collection = JSON.parse(localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY) || '{}');
                 }
 
                 let events = [];
@@ -1666,17 +1648,6 @@
                 // Initialize database if needed
                 if (typeof window.initializeDatabase === 'function') {
                     await window.initializeDatabase();
-                }
-
-                // Ensure hub storage keys exist
-                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
-                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
-                }
-                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED)) {
-                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, '0');
-                }
-                if (!localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY)) {
-                    localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, '{}');
                 }
 
                 // Load all data
