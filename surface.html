@@ -174,6 +174,8 @@
             flex-direction: column;
             gap: 10px;
             margin-top: 5px;
+            position: relative;
+            z-index: 30;
         }
         
         /* Navigation Row */
@@ -215,10 +217,10 @@
             color: #0a0a1a;
         }
         
-        /* Claim Button */
+        /* Claim Button - Overlapping positioning */
         .claim-btn {
             width: 100%;
-            background: rgba(255, 215, 0, 0.9);
+            background: rgba(255, 215, 0, 0.95);
             backdrop-filter: blur(10px);
             border: 2px solid gold;
             color: #0a0a1a;
@@ -233,6 +235,11 @@
             letter-spacing: 1px;
             box-shadow: 0 0 30px gold;
             display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 10px;
+            z-index: 35;
         }
         
         .claim-btn.visible {
@@ -349,6 +356,12 @@
             color: #999999;
         }
         
+        .extraction-notification.fail .notification-pity {
+            font-size: 12px;
+            color: #ffaaaa;
+            margin-top: 2px;
+        }
+        
         .extraction-notification.show {
             transform: translate(-50%, -50%) translateX(0);
             opacity: 1;
@@ -405,13 +418,14 @@
             border: 1px solid rgba(74, 255, 170, 0.3);
             border-radius: 60px 20px 60px 20px;
             padding: 15px;
-            margin-top: 300px; /* Position below the notification */
+            margin-top: 280px; /* Position below the notification */
             margin-bottom: 20px;
             width: 100%;
             left: 0;
             right: 0;
             z-index: 20;
             box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            position: relative;
         }
         
         .resource-label {
@@ -424,30 +438,31 @@
             text-transform: uppercase;
         }
         
-        /* 2-column grid for elements */
+        /* 2-column grid for elements - adjusted to prevent overflow */
         .resource-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
             max-height: 200px;
             overflow-y: auto;
-            padding: 5px;
+            padding: 3px;
         }
         
         .resource-toggle {
             background: rgba(30, 45, 70, 0.5);
             border: 2px solid;
             border-radius: 40px 10px 40px 10px;
-            padding: 10px 8px;
+            padding: 8px 5px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             cursor: pointer;
             transition: all 0.1s;
             justify-content: space-between;
-            font-size: 12px;
+            font-size: 11px;
             width: 100%;
             position: relative;
+            min-width: 0; /* Allow flex items to shrink */
         }
         
         .resource-toggle:active {
@@ -462,10 +477,10 @@
             right: -5px;
             background: #4affaa;
             color: #0a0a1a;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -509,35 +524,39 @@
         }
         
         .resource-symbol {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 700;
             font-family: 'Courier New', monospace;
-            min-width: 25px;
+            min-width: 22px;
             text-align: center;
+            flex-shrink: 0;
         }
         
         .resource-name {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             flex: 1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 60px;
+            max-width: 50px;
+            min-width: 0;
         }
         
         .resource-chance {
             color: #ffd966;
-            font-size: 10px;
+            font-size: 9px;
             background: rgba(0,0,0,0.3);
-            padding: 2px 4px;
+            padding: 2px 3px;
             border-radius: 20px;
-            min-width: 35px;
+            min-width: 32px;
             text-align: center;
+            flex-shrink: 0;
         }
         
         .resource-icon {
-            font-size: 12px;
+            font-size: 10px;
+            flex-shrink: 0;
         }
         
         /* Rarity colors - rare changed to blue */
@@ -585,9 +604,9 @@
         /* Explored count indicator */
         .explored-count {
             text-align: center;
-            margin-top: 8px;
+            margin-top: 6px;
             color: #4affaa;
-            font-size: 11px;
+            font-size: 10px;
             font-family: 'Exo 2', sans-serif;
             font-weight: 600;
             display: flex;
@@ -598,7 +617,7 @@
         
         .explored-count span {
             background: rgba(74, 255, 170, 0.2);
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 20px;
             color: #4affaa;
         }
@@ -607,7 +626,7 @@
             text-align: center;
             margin-top: 4px;
             color: #a0c0ff;
-            font-size: 10px;
+            font-size: 9px;
             font-family: 'Exo 2', sans-serif;
         }
         
@@ -655,6 +674,17 @@
         
         .toast-icon {
             font-size: 20px;
+        }
+        
+        /* Small failure toast */
+        .toast.fail.small {
+            padding: 8px 15px;
+            font-size: 14px;
+            min-width: 180px;
+        }
+        
+        .toast.fail.small .toast-icon {
+            font-size: 16px;
         }
         
         @keyframes slideIn {
@@ -744,15 +774,15 @@
                     <span id="extractorText">Auto-extractor active</span>
                 </div>
                 
-                <!-- Action Buttons -->
-                <div class="action-buttons">
+                <!-- Action Buttons - with overlapping claim button -->
+                <div class="action-buttons" style="position: relative;">
                     <!-- Navigation Row -->
                     <div class="nav-row">
                         <button class="nav-btn system-btn" id="systemBtn" onclick="window.returnToSystem()">🪐 SYSTEM VIEW</button>
                         <button class="nav-btn" id="shipBtn" onclick="window.returnToShip()">🚀 RETURN TO SHIP</button>
                     </div>
                     
-                    <!-- Claim Button (appears when planet is fully explored) -->
+                    <!-- Claim Button (overlaps above resource bar) -->
                     <button class="claim-btn" id="claimBtn" onclick="window.claimCurrentPlanet()">✨ CLAIM PLANET</button>
                 </div>
                 
@@ -956,16 +986,24 @@
                     notificationResource.textContent = result.resource;
                     notificationQuantity.textContent = `Extraction failed`;
                     notificationRarity.textContent = `${rarity}`;
+                    
+                    // Show pity counter in failure notification
+                    if (result.pityCount) {
+                        notificationPity.textContent = `Pity: ${result.pityCount}/${result.pityThreshold}`;
+                    } else {
+                        notificationPity.textContent = '';
+                    }
                 } else if (result.reason === 'cargo_full') {
                     notificationResource.textContent = 'Cargo Full';
                     notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
+                    notificationPity.textContent = '';
                 } else {
                     notificationResource.textContent = 'No Resources';
                     notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
+                    notificationPity.textContent = '';
                 }
-                notificationPity.textContent = '';
             }
             
             // Show the notification
@@ -976,6 +1014,23 @@
             notificationTimeout = setTimeout(() => {
                 extractionNotification.classList.remove('show');
             }, hideDelay);
+        }
+
+        // ===== SMALL FAILURE TOAST =====
+        function showSmallFailToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast fail small';
+            toast.innerHTML = `
+                <span class="toast-icon">⚠️</span>
+                <span>${message}</span>
+            `;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 2000);
         }
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
@@ -1020,7 +1075,7 @@
         function checkAllElementsExplored() {
             const explored = Object.values(exploredElements).filter(v => v).length;
             if (explored === totalElements && totalElements > 0) {
-                // All elements explored - show claim button
+                // All elements explored - show claim button (overlapping)
                 claimBtn.classList.add('visible');
                 claimBtn.disabled = false;
                 claimBtn.textContent = '✨ CLAIM PLANET';
@@ -1463,7 +1518,9 @@
                         clearInterval(extractionTimer);
                         extractionTimer = null;
                     }
-                    showFailToast('Cargo full!');
+                    
+                    // Show small failure toast
+                    showSmallFailToast('Cargo full!');
                     
                     // Show failure notification for cargo full
                     showExtractionNotification({
@@ -1477,6 +1534,9 @@
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
+                    
+                    // Show small failure toast
+                    showSmallFailToast('No resources selected');
                     
                     // Show failure notification for no resources
                     showExtractionNotification({
@@ -1531,6 +1591,9 @@
                     wasPity = true;
                     success = true;
                     console.log(`🎯 PITY TRIGGERED for ${resource} after ${pityCounters[resource].attempts} attempts - FORCED SUCCESS`);
+                    
+                    // Show small toast for pity trigger
+                    showSmallFailToast(`⚡ Pity triggered for ${resource}!`);
                 } else {
                     // Normal random roll
                     let roll = Math.random() * 100;
@@ -1615,7 +1678,9 @@
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
-                showFailToast('Extraction failed');
+                
+                // Show small failure toast
+                showSmallFailToast('Extraction failed');
                 
                 // Show failure notification for error
                 showExtractionNotification({
@@ -1690,12 +1755,12 @@
                         tg.HapticFeedback.notificationOccurred('success');
                     }
                 } else {
-                    showFailToast('Failed to claim planet');
+                    showSmallFailToast('Failed to claim planet');
                 }
                 
             } catch (error) {
                 console.error('Error claiming planet:', error);
-                showFailToast('Error claiming planet');
+                showSmallFailToast('Error claiming planet');
             } finally {
                 loadingOverlay.classList.remove('active');
             }
