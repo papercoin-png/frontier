@@ -1,1 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Alchemy Lab</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .lab-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4affaa;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4affaa;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .lab-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .lab-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #4affaa, 0 0 40px #2a8a6a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .lab-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .lab-stats {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .lab-stats span {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        /* Mastery Card */
+        .mastery-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .mastery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .mastery-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .mastery-level {
+            color: #4affaa;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .mastery-progress {
+            margin-bottom: 10px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4affaa, #8affcc);
+            transition: width 0.3s;
+        }
+        
+        .mastery-footer {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .mastery-multiplier {
+            color: #ffd966;
+        }
+        
+        /* Category Navigation */
+        .category-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        
+        .category-nav-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        
+        .category-nav-btn.active {
+            background: #4affaa;
+            border-color: #4affaa;
+            color: #0a1a2a;
+        }
+        
+        .category-nav-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .category-nav-btn.tier1 { border-color: #ffffff; }
+        .category-nav-btn.tier2 { border-color: #b0ffb0; }
+        .category-nav-btn.tier3 { border-color: #b0b0ff; }
+        .category-nav-btn.tier4 { border-color: #e0b0ff; }
+        .category-nav-btn.tier5 { border-color: #ffd700; }
+        .category-nav-btn.tier6 { border-color: #ffaa4a; }
+        .category-nav-btn.tier7 { border-color: #ff6b6b; }
+        .category-nav-btn.tier8 { border-color: #4affaa; }
+        .category-nav-btn.tier9 { border-color: #c0a0ff; }
+        .category-nav-btn.tier10 { border-color: #ff69b4; }
+        
+        /* Category Section */
+        .category-section {
+            margin-bottom: 30px;
+        }
+        
+        .category-header {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            border-radius: 40px 10px 40px 10px;
+            background: rgba(30, 45, 70, 0.8);
+            border-left: 4px solid;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .category-header:active {
+            transform: scale(0.99);
+            background: rgba(60, 90, 140, 0.9);
+        }
+        
+        .category-header.tier1 { border-left-color: #ffffff; }
+        .category-header.tier2 { border-left-color: #b0ffb0; }
+        .category-header.tier3 { border-left-color: #b0b0ff; }
+        .category-header.tier4 { border-left-color: #e0b0ff; }
+        .category-header.tier5 { border-left-color: #ffd700; }
+        .category-header.tier6 { border-left-color: #ffaa4a; }
+        .category-header.tier7 { border-left-color: #ff6b6b; }
+        .category-header.tier8 { border-left-color: #4affaa; }
+        .category-header.tier9 { border-left-color: #c0a0ff; }
+        .category-header.tier10 { border-left-color: #ff69b4; }
+        
+        .category-stats {
+            font-size: 14px;
+            color: #ffd966;
+        }
+        
+        .category-arrow {
+            color: #a0c0ff;
+            font-size: 18px;
+            transition: transform 0.3s;
+        }
+        
+        .category-header.collapsed .category-arrow {
+            transform: rotate(-90deg);
+        }
+        
+        /* Recipes Grid */
+        .recipes-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .recipes-grid.collapsed {
+            display: none;
+        }
+        
+        .recipe-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .recipe-card:active {
+            transform: scale(0.99);
+            background: rgba(60, 90, 140, 0.7);
+        }
+        
+        .recipe-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+        
+        .recipe-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .recipe-icon {
+            font-size: 24px;
+            min-width: 40px;
+            text-align: center;
+            color: #4affaa;
+        }
+        
+        .recipe-info {
+            flex: 1;
+        }
+        
+        .recipe-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .recipe-name {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+        }
+        
+        .recipe-tier-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 20px;
+            background: rgba(0,0,0,0.3);
+            color: #a0c0ff;
+        }
+        
+        .recipe-formula {
+            font-size: 11px;
+            color: #a0c0ff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .recipe-progress {
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .recipe-progress-bar {
+            width: 80px;
+            height: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 2px;
+        }
+        
+        .recipe-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .recipe-progress-text {
+            font-size: 9px;
+            color: #ffd966;
+        }
+        
+        .recipe-level {
+            font-size: 10px;
+            color: #4affaa;
+        }
+        
+        /* Inventory Bar */
+        .inventory-bar {
+            position: sticky;
+            top: 0;
+            background: rgba(10, 26, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            z-index: 50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .inventory-title {
+            color: #ffffff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .inventory-count {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .inventory-btn {
+            background: rgba(74, 255, 170, 0.2);
+            border: 1px solid #4affaa;
+            color: #4affaa;
+            padding: 6px 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .inventory-btn:active {
+            background: #4affaa;
+            color: #0a1a2a;
+            transform: scale(0.95);
+        }
+        
+        /* Craft Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(20, 30, 50, 0.95);
+            backdrop-filter: blur(15px);
+            border: 3px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 25px;
+            width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+            text-align: center;
+            color: #ffffff;
+            box-shadow: 0 0 30px #4affaa;
+        }
+        
+        .modal-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .modal-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .modal-icon {
+            font-size: 48px;
+            margin: 10px 0;
+        }
+        
+        .modal-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .modal-section-title {
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .modal-formula {
+            font-family: 'Courier New', monospace;
+            color: #ffd966;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        
+        .modal-ingredient {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .modal-ingredient-name {
+            color: #ffffff;
+        }
+        
+        .modal-ingredient-amount {
+            color: #4affaa;
+        }
+        
+        .modal-ingredient-amount.insufficient {
+            color: #ff6b6b;
+        }
+        
+        .modal-progress {
+            margin: 15px 0;
+        }
+        
+        .modal-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .modal-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4affaa, #8affcc);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .modal-progress-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #a0c0ff;
+        }
+        
+        .modal-progress-value {
+            color: #ffd966;
+        }
+        
+        .modal-quantity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .qty-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(74, 255, 170, 0.2);
+            border: 2px solid #4affaa;
+            color: #4affaa;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-btn:active {
+            background: #4affaa;
+            color: #0a1a2a;
+            transform: scale(0.9);
+        }
+        
+        .qty-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #craftQuantity {
+            width: 70px;
+            height: 50px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #4affaa;
+            border-radius: 30px 8px 30px 8px;
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            min-width: 100px;
+            background: rgba(74, 255, 170, 0.2);
+            border: 2px solid #4affaa;
+            color: #4affaa;
+            padding: 14px;
+            border-radius: 40px 10px 40px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+        }
+        
+        .modal-btn:active {
+            background: #4affaa;
+            color: #0a1a2a;
+            transform: scale(0.95);
+        }
+        
+        .modal-btn.cancel {
+            background: rgba(106, 138, 192, 0.2);
+            border-color: #6a8ac0;
+            color: #a0c0ff;
+        }
+        
+        .modal-btn.cancel:active {
+            background: #6a8ac0;
+            color: #ffffff;
+        }
+        
+        /* Inventory Modal */
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid rgba(74, 255, 170, 0.2);
+        }
+        
+        .inventory-item:last-child {
+            border-bottom: none;
+        }
+        
+        .inventory-item-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .inventory-item-icon {
+            font-size: 20px;
+        }
+        
+        .inventory-item-count {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4affaa;
+            font-style: italic;
+        }
+        
+        /* Craft Notification Animation */
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        
+        /* Back Button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="lab-view" id="labView">
+            <!-- Header -->
+            <div class="lab-header">
+                <div class="lab-title">Alchemy Lab</div>
+                <div class="lab-subtitle">✦ transmute elements into knowledge ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="lab-stats" id="labStats">
+                    Crafts: <span id="totalCrafts">0</span>
+                </div>
+            </div>
+            
+            <!-- Mastery Card -->
+            <div class="mastery-card" id="masteryCard">
+                <div class="mastery-header">
+                    <span class="mastery-title">✦ Alchemy Mastery ✦</span>
+                    <span class="mastery-level" id="masteryLevel">Untrained</span>
+                </div>
+                <div class="mastery-progress">
+                    <div class="progress-header">
+                        <span>Progress to next level</span>
+                        <span id="masteryProgressText">0/0</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="masteryProgressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mastery-footer">
+                    <span>Labor Multiplier</span>
+                    <span class="mastery-multiplier" id="masteryMultiplier">1.0x</span>
+                </div>
+            </div>
+            
+            <!-- Quick Inventory Bar -->
+            <div class="inventory-bar" id="inventoryBar">
+                <div class="inventory-title">
+                    <span>📦</span> Element Inventory
+                </div>
+                <div class="inventory-count" id="inventoryCount">0 items</div>
+                <button class="inventory-btn" onclick="window.showInventoryModal()">VIEW</button>
+            </div>
+            
+            <!-- Category Navigation -->
+            <div class="category-nav" id="categoryNav"></div>
+            
+            <!-- Content Container -->
+            <div id="contentContainer">
+                <div class="empty-state">Loading alchemy recipes...</div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToShip()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">SHIP BRIDGE</span>
+                <span class="back-icon">🚀</span>
+            </button>
+        </div>
+        
+        <!-- Craft Modal -->
+        <div class="modal-overlay" id="craftModal">
+            <div class="modal-content">
+                <div class="modal-title" id="modalTitle">Recipe Name</div>
+                <div class="modal-subtitle" id="modalTier">Tier 1</div>
+                <div class="modal-icon" id="modalIcon">⚗️</div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Formula</div>
+                    <div class="modal-formula" id="modalFormula">H₂O</div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Required Materials</div>
+                    <div id="modalIngredients"></div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Mastery Progress</div>
+                    <div class="modal-progress">
+                        <div class="modal-progress-bar">
+                            <div class="modal-progress-fill" id="modalProgressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="modal-progress-stats">
+                            <span id="modalProgressCurrent">0</span>
+                            <span class="modal-progress-value">/</span>
+                            <span id="modalProgressTarget">100</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span style="color: #a0c0ff;">Skill Gain:</span>
+                        <span style="color: #4affaa;" id="modalSkillGain">1</span>
+                    </div>
+                </div>
+                
+                <div class="modal-quantity">
+                    <button class="qty-btn" id="decrementBtn" onclick="window.decrementQty()">−</button>
+                    <input type="number" id="craftQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="incrementBtn" onclick="window.incrementQty()">+</button>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn" id="craftBtn" onclick="window.craftItem()">⚗️ CRAFT</button>
+                    <button class="modal-btn cancel" onclick="window.closeCraftModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Inventory Modal -->
+        <div class="modal-overlay" id="inventoryModal">
+            <div class="modal-content" style="width: 280px;">
+                <div class="modal-title">📦 Element Inventory</div>
+                
+                <div style="max-height: 400px; overflow-y: auto; margin: 15px 0;" id="inventoryList">
+                    <div style="text-align: center; color: #a0c0ff; padding: 20px;">Loading...</div>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn cancel" onclick="window.closeInventoryModal()">CLOSE</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">processing...</div>
+        </div>
+        
+        <!-- Migration status (debug) -->
+        <div class="migration-status" id="migrationStatus"></div>
+    </div>
 
+    <!-- Scripts -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/alchemy.js"></script>
+
+    <script type="module">
+        import { 
+            ALCHEMY_RECIPES, 
+            LEVEL_THRESHOLDS,
+            getLevelFromProgress, 
+            craftItem as alchemyCraft,
+            getRecipesWithProgress,
+            getTotalCrafts,
+            getProgressToNextLevel,
+            getMasteryMultiplier,
+            getMasteryLevelName,
+            getRecipeById,
+            calculateRequiredMaterials,
+            hasIngredients,
+            getCurrentInventory
+        } from './js/alchemy.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const contentContainer = document.getElementById('contentContainer');
+        const categoryNav = document.getElementById('categoryNav');
+        
+        // Craft modal elements
+        const craftModal = document.getElementById('craftModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalTier = document.getElementById('modalTier');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalFormula = document.getElementById('modalFormula');
+        const modalIngredients = document.getElementById('modalIngredients');
+        const modalProgressFill = document.getElementById('modalProgressFill');
+        const modalProgressCurrent = document.getElementById('modalProgressCurrent');
+        const modalProgressTarget = document.getElementById('modalProgressTarget');
+        const modalSkillGain = document.getElementById('modalSkillGain');
+        const craftQuantity = document.getElementById('craftQuantity');
+        const decrementBtn = document.getElementById('decrementBtn');
+        const incrementBtn = document.getElementById('incrementBtn');
+        const craftBtn = document.getElementById('craftBtn');
+        
+        // Inventory modal
+        const inventoryModal = document.getElementById('inventoryModal');
+        const inventoryList = document.getElementById('inventoryList');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToShip = returnToShip;
+        window.scrollToCategory = scrollToCategory;
+        window.toggleCategory = toggleCategory;
+        window.openCraftModal = openCraftModal;
+        window.closeCraftModal = closeCraftModal;
+        window.incrementQty = incrementQty;
+        window.decrementQty = decrementQty;
+        window.craftItem = craftItem;
+        window.showInventoryModal = showInventoryModal;
+        window.closeInventoryModal = closeInventoryModal;
+
+        // ===== STATE =====
+        let recipesWithProgress = {};
+        let alchemyTotalCrafts = 0;
+        let alchemyMastery = {};
+        let currentInventory = {};
+        let expandedCategories = new Set();
+        
+        // Current craft state
+        let currentRecipe = null;
+        let currentMaxCraft = 1;
+
+        // ===== LOAD LAB DATA =====
+        async function loadLabData() {
+            try {
+                loadingText.textContent = 'loading alchemy lab...';
+                
+                // Get credits
+                let credits = 5000;
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
+                }
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                
+                // Get inventory
+                currentInventory = await getCurrentInventory();
+                
+                // Get alchemy data
+                recipesWithProgress = getRecipesWithProgress();
+                alchemyTotalCrafts = getTotalCrafts(
+                    JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}')
+                );
+                
+                // Update stats
+                document.getElementById('totalCrafts').textContent = alchemyTotalCrafts;
+                
+                // Update mastery display
+                updateMasteryDisplay();
+                
+                // Update inventory count
+                updateInventoryCount();
+                
+                // Render categories
+                renderCategories();
+                
+            } catch (error) {
+                console.error('Error loading lab data:', error);
+                contentContainer.innerHTML = '<div class="empty-state">Error loading alchemy lab</div>';
+            }
+        }
+
+        // ===== UPDATE MASTERY DISPLAY =====
+        function updateMasteryDisplay() {
+            const progress = getProgressToNextLevel(alchemyTotalCrafts);
+            const level = getLevelFromProgress(alchemyTotalCrafts);
+            const multiplier = getMasteryMultiplier(alchemyTotalCrafts);
+            
+            document.getElementById('masteryLevel').textContent = level.name;
+            document.getElementById('masteryMultiplier').textContent = `${multiplier.toFixed(1)}x`;
+            
+            if (progress.nextLevel) {
+                document.getElementById('masteryProgressText').textContent = 
+                    `${progress.progress}/${progress.totalNeeded}`;
+                document.getElementById('masteryProgressFill').style.width = `${progress.percentage}%`;
+            } else {
+                document.getElementById('masteryProgressText').textContent = 'MAX';
+                document.getElementById('masteryProgressFill').style.width = '100%';
+            }
+        }
+
+        // ===== UPDATE INVENTORY COUNT =====
+        function updateInventoryCount() {
+            const totalItems = Object.values(currentInventory).reduce((sum, item) => {
+                return sum + (item.count || 1);
+            }, 0);
+            document.getElementById('inventoryCount').textContent = `${totalItems} items`;
+        }
+
+        // ===== RENDER CATEGORIES =====
+        function renderCategories() {
+            if (Object.keys(recipesWithProgress).length === 0) {
+                contentContainer.innerHTML = '<div class="empty-state">No alchemy recipes available</div>';
+                return;
+            }
+            
+            // Build category navigation
+            let navHtml = '';
+            const categories = Object.keys(recipesWithProgress);
+            
+            categories.forEach((category, index) => {
+                const tier = Math.floor(index / 5) + 1;
+                const hasUnlocked = recipesWithProgress[category].some(item => item.unlocked);
+                if (!hasUnlocked) return;
+                
+                const categoryId = category.replace(/\s+/g, '-').toLowerCase();
+                navHtml += `<button class="category-nav-btn tier${tier}" onclick="window.scrollToCategory('${categoryId}')">${category}</button>`;
+            });
+            
+            categoryNav.innerHTML = navHtml;
+            
+            // Build category content
+            let html = '';
+            
+            categories.forEach((category, index) => {
+                const items = recipesWithProgress[category];
+                const unlockedItems = items.filter(item => item.unlocked);
+                if (unlockedItems.length === 0) return;
+                
+                const categoryId = category.replace(/\s+/g, '-').toLowerCase();
+                const tier = Math.floor(index / 5) + 1;
+                const isExpanded = expandedCategories.has(category) || expandedCategories.size === 0;
+                
+                // Calculate category progress
+                const categoryTotal = items.reduce((sum, item) => sum + (item.progress || 0), 0);
+                const categoryTarget = items.reduce((sum, item) => sum + (item.target || 1000), 0);
+                const categoryPercent = Math.min(100, Math.round((categoryTotal / categoryTarget) * 100));
+                
+                html += `<div class="category-section" id="${categoryId}">`;
+                html += `<div class="category-header tier${tier} ${isExpanded ? '' : 'collapsed'}" onclick="window.toggleCategory('${category}')">`;
+                html += `<span>✦ ${category} ✦</span>`;
+                html += `<div style="display: flex; align-items: center; gap: 10px;">`;
+                html += `<span class="category-stats">${categoryPercent}%</span>`;
+                html += `<span class="category-arrow">${isExpanded ? '▼' : '▶'}</span>`;
+                html += `</div>`;
+                html += `</div>`;
+                
+                html += `<div class="recipes-grid ${isExpanded ? '' : 'collapsed'}">`;
+                
+                unlockedItems.forEach(item => {
+                    const percentComplete = Math.min(100, Math.round((item.progress / item.target) * 100));
+                    
+                    html += `
+                        <div class="recipe-card" onclick="window.openCraftModal('${item.id}')">
+                            <div class="recipe-header">
+                                <div class="recipe-icon">${item.icon}</div>
+                                <div class="recipe-info">
+                                    <div class="recipe-name-row">
+                                        <span class="recipe-name">${item.name}</span>
+                                        <span class="recipe-tier-badge">T${item.tier}</span>
+                                    </div>
+                                    <div class="recipe-formula">${item.formula}</div>
+                                </div>
+                                <div class="recipe-progress">
+                                    <div class="recipe-progress-bar">
+                                        <div class="recipe-progress-fill" style="width: ${percentComplete}%"></div>
+                                    </div>
+                                    <div class="recipe-progress-text">${item.progress}/${item.target}</div>
+                                    <div class="recipe-level">${item.level}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`; // Close recipes-grid
+                html += `</div>`; // Close category-section
+            });
+            
+            contentContainer.innerHTML = html;
+        }
+
+        // ===== SCROLL TO CATEGORY =====
+        function scrollToCategory(categoryId) {
+            const element = document.getElementById(categoryId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // Update active button
+            document.querySelectorAll('.category-nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== TOGGLE CATEGORY =====
+        function toggleCategory(category) {
+            if (expandedCategories.has(category)) {
+                expandedCategories.delete(category);
+            } else {
+                expandedCategories.add(category);
+            }
+            renderCategories();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== OPEN CRAFT MODAL =====
+        async function openCraftModal(recipeId) {
+            // Find recipe
+            let recipe = null;
+            for (const category of Object.values(ALCHEMY_RECIPES)) {
+                const found = category.find(r => r.id === recipeId);
+                if (found) {
+                    recipe = found;
+                    break;
+                }
+            }
+            
+            if (!recipe) {
+                alert('Recipe not found');
+                return;
+            }
+            
+            currentRecipe = recipe;
+            
+            // Get current progress
+            const alchemyProgress = JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}');
+            const progress = alchemyProgress[recipeId] || 0;
+            
+            // Update modal content
+            modalTitle.textContent = recipe.name;
+            modalTier.textContent = `Tier ${recipe.tier}`;
+            modalIcon.textContent = recipe.icon;
+            modalFormula.textContent = recipe.formula;
+            modalSkillGain.textContent = recipe.skillGain;
+            
+            modalProgressCurrent.textContent = progress;
+            modalProgressTarget.textContent = recipe.target;
+            const percentComplete = Math.min(100, (progress / recipe.target) * 100);
+            modalProgressFill.style.width = `${percentComplete}%`;
+            
+            // Build ingredients list
+            let ingredientsHtml = '';
+            let canCraft = true;
+            let maxCraft = Infinity;
+            
+            for (const [element, amount] of Object.entries(recipe.ingredients)) {
+                let available = 0;
+                if (currentInventory[element]) {
+                    available = typeof currentInventory[element] === 'object' 
+                        ? (currentInventory[element].count || 0) 
+                        : currentInventory[element];
+                }
+                
+                const enough = available >= amount;
+                if (!enough) canCraft = false;
+                
+                // Calculate max possible crafts based on this ingredient
+                const possibleCrafts = Math.floor(available / amount);
+                maxCraft = Math.min(maxCraft, possibleCrafts);
+                
+                const amountClass = enough ? '' : 'insufficient';
+                
+                ingredientsHtml += `
+                    <div class="modal-ingredient">
+                        <span class="modal-ingredient-name">${element}</span>
+                        <span class="modal-ingredient-amount ${amountClass}">${available} / ${amount}</span>
+                    </div>
+                `;
+            }
+            
+            modalIngredients.innerHTML = ingredientsHtml;
+            
+            // Set max craft
+            currentMaxCraft = maxCraft;
+            craftQuantity.value = 1;
+            craftQuantity.max = maxCraft;
+            
+            // Enable/disable increment button
+            incrementBtn.disabled = (maxCraft <= 1);
+            decrementBtn.disabled = true;
+            
+            // Enable/disable craft button
+            craftBtn.disabled = !canCraft;
+            craftBtn.style.opacity = canCraft ? '1' : '0.5';
+            
+            // Show modal
+            craftModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE CRAFT MODAL =====
+        function closeCraftModal() {
+            craftModal.classList.remove('active');
+            currentRecipe = null;
+        }
+
+        // ===== INCREMENT QUANTITY =====
+        function incrementQty() {
+            let current = parseInt(craftQuantity.value);
+            if (current < currentMaxCraft) {
+                current++;
+                craftQuantity.value = current;
+                decrementBtn.disabled = (current <= 1);
+                incrementBtn.disabled = (current >= currentMaxCraft);
+            }
+        }
+
+        // ===== DECREMENT QUANTITY =====
+        function decrementQty() {
+            let current = parseInt(craftQuantity.value);
+            if (current > 1) {
+                current--;
+                craftQuantity.value = current;
+                decrementBtn.disabled = (current <= 1);
+                incrementBtn.disabled = (current >= currentMaxCraft);
+            }
+        }
+
+        // ===== CRAFT ITEM =====
+        async function craftItem() {
+            if (!currentRecipe) return;
+            
+            const quantity = parseInt(craftQuantity.value);
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'crafting...';
+            
+            try {
+                const result = await alchemyCraft(currentRecipe.id, quantity);
+                
+                if (result.success) {
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: rgba(74, 255, 170, 0.2);
+                        border: 2px solid #4affaa;
+                        border-radius: 60px 20px 60px 20px;
+                        padding: 20px 40px;
+                        color: #4affaa;
+                        font-family: 'Exo 2', sans-serif;
+                        font-size: 18px;
+                        text-align: center;
+                        z-index: 1000;
+                        backdrop-filter: blur(10px);
+                        animation: fadeInOut 2s forwards;
+                    `;
+                    
+                    notification.innerHTML = `
+                        ✦ Donated ${quantity} ${currentRecipe.name} to University ✦<br>
+                        <span style="font-size: 14px;">+${quantity * currentRecipe.skillGain} knowledge</span>
+                    `;
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.remove();
+                        closeCraftModal();
+                        
+                        // Reload all data
+                        loadLabData();
+                        
+                    }, 2000);
+                    
+                    if (result.leveledUp) {
+                        setTimeout(() => {
+                            alert(`✦ MASTERY LEVEL UP! ✦\nYou are now a ${result.newLevel}!`);
+                        }, 500);
+                    }
+                } else {
+                    alert(`Crafting failed: ${result.error}`);
+                }
+                
+            } catch (error) {
+                console.error('Craft error:', error);
+                alert('Error during crafting');
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== SHOW INVENTORY MODAL =====
+        async function showInventoryModal() {
+            // Refresh inventory
+            currentInventory = await getCurrentInventory();
+            
+            let html = '';
+            const items = Object.entries(currentInventory).sort((a, b) => a[0].localeCompare(b[0]));
+            
+            if (items.length === 0) {
+                html = '<div style="text-align: center; color: #a0c0ff; padding: 20px;">No elements in inventory</div>';
+            } else {
+                items.forEach(([name, data]) => {
+                    const count = data.count || 1;
+                    const icon = getElementIcon(name);
+                    html += `
+                        <div class="inventory-item">
+                            <div class="inventory-item-name">
+                                <span class="inventory-item-icon">${icon}</span>
+                                <span>${name}</span>
+                            </div>
+                            <span class="inventory-item-count">${count}</span>
+                        </div>
+                    `;
+                });
+            }
+            
+            inventoryList.innerHTML = html;
+            inventoryModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE INVENTORY MODAL =====
+        function closeInventoryModal() {
+            inventoryModal.classList.remove('active');
+        }
+
+        // ===== HELPER: GET ELEMENT ICON =====
+        function getElementIcon(elementName) {
+            const icons = {
+                'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
+                'Boron': '🧪', 'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨',
+                'Fluorine': '🧪', 'Neon': '💡', 'Sodium': '🧂', 'Magnesium': '✨',
+                'Aluminum': '🥫', 'Silicon': '💻', 'Phosphorus': '✨', 'Sulfur': '🟡',
+                'Chlorine': '🧪', 'Argon': '🎈', 'Potassium': '🍌', 'Calcium': '🥛',
+                'Iron': '⚙️', 'Nickel': '🔩', 'Copper': '🔴', 'Zinc': '⚪',
+                'Silver': '⚪', 'Gold': '🟡', 'Platinum': '⬜', 'Titanium': '🔷',
+                'Uranium': '☢️', 'Thorium': '🔮', 'Plutonium': '☢️', 'Promethium': '✨',
+                'default': '🔹'
+            };
+            return icons[elementName] || icons.default;
+        }
+
+        // ===== RETURN TO SHIP =====
+        function returnToShip() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'ship-bridge.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'initializing alchemy lab...';
+                
+                await loadLabData();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading lab';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
