@@ -87,7 +87,11 @@ const STORAGE_KEYS = {
     LABOR_POOL_TOTAL: 'voidfarer_labor_pool_total',
     LABOR_POOL_DISTRIBUTED: 'voidfarer_labor_pool_distributed',
     LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
-    PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings'
+    PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
+    // PRODUCT OWNERSHIP KEYS (NEW)
+    PLAYER_PRODUCTS: 'voidfarer_player_products',
+    PRODUCT_TRANSACTIONS: 'voidfarer_product_transactions',
+    ACTIVE_PRODUCTS: 'voidfarer_active_products'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
@@ -354,65 +358,6 @@ function getRecipeProgress(recipeId) {
 }
 
 /**
- * Get alchemy mastery level for a specific recipe
- * @param {string} recipeId - Recipe ID
- * @returns {Object} Level object with name, threshold, multiplier
- */
-function getRecipeMasteryLevel(recipeId) {
-    const progress = getRecipeProgress(recipeId);
-    // This function will be complemented by the alchemy.js level calculation
-    return { name: 'Untrained', threshold: 0, multiplier: 1.0 };
-}
-
-/**
- * Get category progress (sum of all recipes in category)
- * @param {string} category - Category name
- * @param {Object} recipes - Recipe database from alchemy.js
- * @returns {number} Total progress in category
- */
-function getCategoryProgress(category, recipes) {
-    try {
-        const progress = getAlchemyProgress();
-        const categoryRecipes = recipes[category] || [];
-        
-        return categoryRecipes.reduce((sum, recipe) => {
-            return sum + (progress[recipe.id] || 0);
-        }, 0);
-    } catch (error) {
-        console.error('Error getting category progress:', error);
-        return 0;
-    }
-}
-
-/**
- * Save category progress (for quick access)
- * @param {string} category - Category name
- * @param {number} progress - Progress amount
- */
-function saveCategoryProgress(category, progress) {
-    try {
-        const categoryProgress = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS) || '{}');
-        categoryProgress[category] = progress;
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS, JSON.stringify(categoryProgress));
-    } catch (error) {
-        console.error('Error saving category progress:', error);
-    }
-}
-
-/**
- * Get all category progress
- * @returns {Object} Category progress object
- */
-function getAllCategoryProgress() {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS) || '{}');
-    } catch (error) {
-        console.error('Error getting category progress:', error);
-        return {};
-    }
-}
-
-/**
  * Get unlocked recipes (legacy, kept for compatibility)
  * @returns {Array} Array of unlocked recipe IDs
  */
@@ -477,52 +422,15 @@ function getAlchemyMastery() {
     }
 }
 
-/**
- * Update alchemy mastery based on current progress
- * @param {Object} recipes - Recipe database from alchemy.js
- * @param {Function} levelCalc - Level calculation function from alchemy.js
- */
-function updateAlchemyMastery(recipes, levelCalc) {
-    try {
-        const progress = getAlchemyProgress();
-        const totalCrafts = getAlchemyTotalCrafts();
-        const categoryProgress = {};
-        
-        // Calculate per-category progress
-        for (const [category, categoryRecipes] of Object.entries(recipes)) {
-            categoryProgress[category] = categoryRecipes.reduce((sum, recipe) => {
-                return sum + (progress[recipe.id] || 0);
-            }, 0);
-            saveCategoryProgress(category, categoryProgress[category]);
-        }
-        
-        // Calculate overall level
-        const overallLevel = levelCalc(totalCrafts);
-        
-        const mastery = {
-            overallLevel: overallLevel.name,
-            overallMultiplier: overallLevel.multiplier,
-            totalCrafts: totalCrafts,
-            categories: categoryProgress,
-            lastUpdated: Date.now()
-        };
-        
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_MASTERY, JSON.stringify(mastery));
-        return mastery;
-    } catch (error) {
-        console.error('Error updating alchemy mastery:', error);
-        return null;
-    }
-}
-
 // ===== LABOR POOL FUNCTIONS =====
 
 /**
  * Add credits to labor pool
  * @param {number} amount - Amount to add
+ * @param {string} reason - Reason for addition
  * @returns {number} New total
  */
-function addToLaborPool(amount) {
+function addToLaborPool(amount, reason = 'Manual addition') {
     try {
         const current = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL)) || 0;
         const newTotal = current + amount;
@@ -533,6 +441,7 @@ function addToLaborPool(amount) {
         history.push({
             type: 'addition',
             amount: amount,
+            reason: reason,
             timestamp: Date.now(),
             date: new Date().toISOString()
         });
@@ -557,60 +466,6 @@ function getLaborPoolTotal() {
     } catch (error) {
         console.error('Error getting labor pool total:', error);
         return 0;
-    }
-}
-
-/**
- * Distribute labor pool to skilled players
- * @param {Object} skillWeights - Object with player IDs as keys and skill multipliers as values
- * @returns {Object} Distribution results
- */
-function distributeLaborPool(skillWeights) {
-    try {
-        const totalPool = getLaborPoolTotal();
-        if (totalPool <= 0 || Object.keys(skillWeights).length === 0) {
-            return { success: false, reason: 'No labor pool or no skilled players' };
-        }
-        
-        const totalWeight = Object.values(skillWeights).reduce((sum, w) => sum + w, 0);
-        const distribution = {};
-        
-        for (const [playerId, weight] of Object.entries(skillWeights)) {
-            const share = Math.floor((weight / totalWeight) * totalPool);
-            distribution[playerId] = share;
-            
-            // Add to player's earnings
-            const earnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-            earnings[playerId] = (earnings[playerId] || 0) + share;
-            localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, JSON.stringify(earnings));
-        }
-        
-        // Record distribution
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED, (parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED)) || 0) + totalPool);
-        
-        // Reset pool
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_TOTAL, '0');
-        
-        // Add to history
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-        history.push({
-            type: 'distribution',
-            amount: totalPool,
-            recipients: Object.keys(distribution).length,
-            timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
-        if (history.length > 100) history.shift();
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(history));
-        
-        return {
-            success: true,
-            totalDistributed: totalPool,
-            distribution: distribution
-        };
-    } catch (error) {
-        console.error('Error distributing labor pool:', error);
-        return { success: false, error: error.message };
     }
 }
 
@@ -645,6 +500,18 @@ async function claimLaborEarnings(playerId) {
             // Clear earnings
             delete earnings[playerId];
             localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, JSON.stringify(earnings));
+            
+            // Record claim in history
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
+            history.push({
+                type: 'claim',
+                playerId: playerId,
+                amount: amount,
+                timestamp: Date.now(),
+                date: new Date().toISOString()
+            });
+            if (history.length > 100) history.shift();
+            localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(history));
         }
         
         return amount;
@@ -665,6 +532,188 @@ function getLaborPoolHistory(limit = 20) {
         return history.slice(-limit).reverse();
     } catch (error) {
         console.error('Error getting labor pool history:', error);
+        return [];
+    }
+}
+
+// ===== PRODUCT OWNERSHIP FUNCTIONS =====
+
+/**
+ * Get player's purchased products
+ * @param {string} playerId - Player ID
+ * @returns {Array} Player's products
+ */
+function getPlayerProducts(playerId) {
+    try {
+        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
+        return products[playerId] || [];
+    } catch (error) {
+        console.error('Error getting player products:', error);
+        return [];
+    }
+}
+
+/**
+ * Add product to player's inventory
+ * @param {string} playerId - Player ID
+ * @param {Object} productData - Product purchase data
+ * @returns {boolean} Success status
+ */
+function addPlayerProduct(playerId, productData) {
+    try {
+        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
+        
+        if (!products[playerId]) {
+            products[playerId] = [];
+        }
+        
+        products[playerId].push({
+            ...productData,
+            acquiredAt: Date.now(),
+            acquiredDate: new Date().toISOString()
+        });
+        
+        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify(products));
+        return true;
+    } catch (error) {
+        console.error('Error adding player product:', error);
+        return false;
+    }
+}
+
+/**
+ * Remove product from player's inventory (if used/sold)
+ * @param {string} playerId - Player ID
+ * @param {string} productId - Product ID
+ * @param {string} purchaseId - Specific purchase ID
+ * @returns {boolean} Success status
+ */
+function removePlayerProduct(playerId, productId, purchaseId) {
+    try {
+        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
+        
+        if (!products[playerId]) return false;
+        
+        products[playerId] = products[playerId].filter(p => 
+            !(p.productId === productId && (!purchaseId || p.id === purchaseId))
+        );
+        
+        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify(products));
+        return true;
+    } catch (error) {
+        console.error('Error removing player product:', error);
+        return false;
+    }
+}
+
+/**
+ * Check if player owns a specific product
+ * @param {string} playerId - Player ID
+ * @param {string} productId - Product ID
+ * @returns {boolean} True if owned
+ */
+function playerOwnsProduct(playerId, productId) {
+    try {
+        const products = getPlayerProducts(playerId);
+        return products.some(p => p.productId === productId);
+    } catch (error) {
+        console.error('Error checking product ownership:', error);
+        return false;
+    }
+}
+
+/**
+ * Get player's active products (equipped/active)
+ * @param {string} playerId - Player ID
+ * @returns {Array} Active products
+ */
+function getActiveProducts(playerId) {
+    try {
+        const active = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS) || '{}');
+        return active[playerId] || [];
+    } catch (error) {
+        console.error('Error getting active products:', error);
+        return [];
+    }
+}
+
+/**
+ * Set product active status
+ * @param {string} playerId - Player ID
+ * @param {string} purchaseId - Purchase ID
+ * @param {boolean} active - Active status
+ * @returns {boolean} Success status
+ */
+function setProductActive(playerId, purchaseId, active) {
+    try {
+        const activeProducts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS) || '{}');
+        
+        if (!activeProducts[playerId]) {
+            activeProducts[playerId] = [];
+        }
+        
+        if (active) {
+            if (!activeProducts[playerId].includes(purchaseId)) {
+                activeProducts[playerId].push(purchaseId);
+            }
+        } else {
+            activeProducts[playerId] = activeProducts[playerId].filter(id => id !== purchaseId);
+        }
+        
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PRODUCTS, JSON.stringify(activeProducts));
+        return true;
+    } catch (error) {
+        console.error('Error setting product active status:', error);
+        return false;
+    }
+}
+
+/**
+ * Record product transaction
+ * @param {Object} transaction - Transaction data
+ * @returns {boolean} Success status
+ */
+function recordProductTransaction(transaction) {
+    try {
+        const transactions = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS) || '[]');
+        
+        transactions.push({
+            ...transaction,
+            timestamp: Date.now(),
+            date: new Date().toISOString()
+        });
+        
+        // Keep last 1000 transactions
+        if (transactions.length > 1000) {
+            transactions.shift();
+        }
+        
+        localStorage.setItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS, JSON.stringify(transactions));
+        return true;
+    } catch (error) {
+        console.error('Error recording product transaction:', error);
+        return false;
+    }
+}
+
+/**
+ * Get product transaction history
+ * @param {string} playerId - Optional player ID filter
+ * @param {number} limit - Max number of entries
+ * @returns {Array} Transaction history
+ */
+function getProductTransactions(playerId = null, limit = 50) {
+    try {
+        const transactions = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS) || '[]');
+        
+        let filtered = transactions;
+        if (playerId) {
+            filtered = transactions.filter(t => t.playerId === playerId);
+        }
+        
+        return filtered.slice(-limit).reverse();
+    } catch (error) {
+        console.error('Error getting product transactions:', error);
         return [];
     }
 }
@@ -830,6 +879,17 @@ async function initializeStorage() {
         localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, '{}');
     }
     
+    // Initialize product ownership storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS)) {
+        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS)) {
+        localStorage.setItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS, '[]');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS)) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PRODUCTS, '{}');
+    }
+    
     // Initialize hub storage if not present
     if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
         localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
@@ -897,7 +957,9 @@ async function createDefaultPlayer(name = 'Voidfarer') {
             alchemyTotalCrafts: 0,
             alchemyMasteredRecipes: 0,
             alchemyOverallLevel: 'Untrained',
-            alchemyOverallMultiplier: 1.0
+            alchemyOverallMultiplier: 1.0,
+            // Product ownership
+            ownedProducts: []
         };
         await savePlayer(player);
         console.log('Created default player');
@@ -1760,6 +1822,11 @@ async function resetGame() {
     localStorage.removeItem(STORAGE_KEYS.LABOR_POOL_HISTORY);
     localStorage.removeItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS);
     
+    // Clear product ownership data
+    localStorage.removeItem(STORAGE_KEYS.PLAYER_PRODUCTS);
+    localStorage.removeItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_PRODUCTS);
+    
     // Clear hub storage
     localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_MAX);
     localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_USED);
@@ -1878,23 +1945,27 @@ window.saveAlchemyProgress = saveAlchemyProgress;
 window.addAlchemyProgress = addAlchemyProgress;
 window.getAlchemyTotalCrafts = getAlchemyTotalCrafts;
 window.getRecipeProgress = getRecipeProgress;
-window.getRecipeMasteryLevel = getRecipeMasteryLevel;
-window.getCategoryProgress = getCategoryProgress;
-window.saveCategoryProgress = saveCategoryProgress;
-window.getAllCategoryProgress = getAllCategoryProgress;
 window.getUnlockedRecipes = getUnlockedRecipes;
 window.unlockRecipe = unlockRecipe;
 window.isRecipeUnlocked = isRecipeUnlocked;
 window.getAlchemyMastery = getAlchemyMastery;
-window.updateAlchemyMastery = updateAlchemyMastery;
 
 // ===== LABOR POOL FUNCTIONS =====
 window.addToLaborPool = addToLaborPool;
 window.getLaborPoolTotal = getLaborPoolTotal;
-window.distributeLaborPool = distributeLaborPool;
 window.getPlayerLaborEarnings = getPlayerLaborEarnings;
 window.claimLaborEarnings = claimLaborEarnings;
 window.getLaborPoolHistory = getLaborPoolHistory;
+
+// ===== PRODUCT OWNERSHIP FUNCTIONS =====
+window.getPlayerProducts = getPlayerProducts;
+window.addPlayerProduct = addPlayerProduct;
+window.removePlayerProduct = removePlayerProduct;
+window.playerOwnsProduct = playerOwnsProduct;
+window.getActiveProducts = getActiveProducts;
+window.setProductActive = setProductActive;
+window.recordProductTransaction = recordProductTransaction;
+window.getProductTransactions = getProductTransactions;
 
 // NOTE: Planet status functions are already exposed by db.js
 // We do NOT redefine them here to avoid recursion
