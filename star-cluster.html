@@ -469,8 +469,8 @@
             </div>
             
             <div class="star-info-buttons">
-                <button class="star-info-btn" id="actionBtn" onclick="handleStarAction()">🚀 VIEW SYSTEM</button>
-                <button class="star-info-btn secondary" onclick="hideStarInfo()">CLOSE</button>
+                <button class="star-info-btn" id="actionBtn" onclick="window.handleStarAction()">🚀 VIEW SYSTEM</button>
+                <button class="star-info-btn secondary" onclick="window.hideStarInfo()">CLOSE</button>
             </div>
         </div>
         
@@ -655,27 +655,40 @@
         // ===== LOAD CLUSTER DATA =====
         async function loadClusterData() {
             try {
-                // Load data from storage functions
-                let star = '';
-                let starSector = '';
-                let count = 85;
+                console.log('Loading cluster data...');
+                console.log('Is plot mode:', isPlotMode);
                 
+                // First check if we're in plot mode with a selected star sector
+                let targetCluster = null;
+                
+                if (isPlotMode) {
+                    // Get the destination star sector from plot data
+                    targetCluster = localStorage.getItem('voidfarer_plot_nebula');
+                    console.log('Plot mode target cluster:', targetCluster);
+                }
+                
+                // If no plot target, check for current location
+                if (!targetCluster) {
+                    if (typeof window.getCurrentStarSector === 'function') {
+                        targetCluster = await window.getCurrentStarSector();
+                    } else {
+                        targetCluster = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
+                    }
+                    console.log('Using current cluster:', targetCluster);
+                }
+                
+                // Load current star
                 if (typeof window.getCurrentStar === 'function') {
-                    star = await window.getCurrentStar() || '';
+                    currentStarName = await window.getCurrentStar() || '';
                 } else {
-                    star = localStorage.getItem('voidfarer_current_star') || '';
+                    currentStarName = localStorage.getItem('voidfarer_current_star') || '';
                 }
                 
-                if (typeof window.getCurrentStarSector === 'function') {
-                    starSector = await window.getCurrentStarSector() || 'Orion Molecular Cloud';
-                } else {
-                    starSector = localStorage.getItem('voidfarer_current_starSector') || 'Orion Molecular Cloud';
-                }
-                
+                // Load star count
                 if (typeof window.getCurrentSectorStars === 'function') {
-                    count = await window.getCurrentSectorStars() || 85;
+                    starCount = await window.getCurrentSectorStars() || 85;
                 } else {
-                    count = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
+                    starCount = parseInt(localStorage.getItem('voidfarer_current_sector_stars')) || 85;
                 }
                 
                 // Get current sector ID for planet naming
@@ -685,9 +698,7 @@
                     currentSectorId = localStorage.getItem('voidfarer_current_sector') || 'B2';
                 }
 
-                currentStarName = star || '';
-                clusterName = starSector || 'Orion Molecular Cloud';
-                starCount = count || 85;
+                clusterName = targetCluster || 'Orion Molecular Cloud';
 
                 // Update UI
                 document.getElementById('clusterTitle').textContent = clusterName + ' Cluster';
@@ -704,6 +715,13 @@
 
                 // Load explored planets
                 await loadExploredPlanets();
+
+                console.log('Cluster data loaded:', {
+                    cluster: clusterName,
+                    currentStar: currentStarName,
+                    starCount: starCount,
+                    sectorId: currentSectorId
+                });
 
                 return true;
 
@@ -909,17 +927,12 @@
                     newCumulative: newCumulative
                 });
                 
-                // Save star data using navigation.js if available
-                if (typeof window.savePlotStar === 'function') {
-                    window.savePlotStar(selectedStar.name, selectedStar.distance);
-                } else {
-                    // Fallback to direct localStorage
-                    localStorage.setItem('voidfarer_plot_star', selectedStar.name);
-                    localStorage.setItem('voidfarer_plot_star_distance', selectedStar.distance.toString());
-                    
-                    // Update cumulative distance
-                    localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
-                }
+                // Save star data
+                localStorage.setItem('voidfarer_plot_star', selectedStar.name);
+                localStorage.setItem('voidfarer_plot_star_distance', selectedStar.distance.toString());
+                
+                // Update cumulative distance
+                localStorage.setItem('voidfarer_plot_cumulative_distance', newCumulative.toString());
                 
                 // Navigate to system view in plot mode
                 setTimeout(() => {
