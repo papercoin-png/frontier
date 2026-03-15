@@ -1,1 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Market History</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .history-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a2a3a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a9a8a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a9a8a;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .history-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .history-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #c0e0ff;
+            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        
+        .history-subtitle {
+            color: #a0d0c0;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .market-time {
+            font-size: 14px;
+            color: #a0d0c0;
+            text-align: right;
+        }
+        
+        /* Market Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 30% 10% 30% 10%;
+            padding: 16px;
+            text-align: center;
+        }
+        
+        .summary-label {
+            color: #a0d0c0;
+            font-size: 11px;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+        
+        .summary-value {
+            color: #ffd966;
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .summary-change {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        .change-positive {
+            color: #4affaa;
+        }
+        
+        .change-negative {
+            color: #ff6b6b;
+        }
+        
+        /* Tab Navigation */
+        .history-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(30, 60, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            padding: 5px;
+            border: 1px solid #4a9a8a;
+        }
+        
+        .history-tab {
+            flex: 1;
+            padding: 12px 5px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #a0d0c0;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .history-tab.active {
+            background: #4a9a8a;
+            color: #ffffff;
+            box-shadow: 0 0 15px #2a5a4a;
+        }
+        
+        .history-tab:active {
+            transform: scale(0.95);
+        }
+        
+        /* Element Selector */
+        .element-selector {
+            margin-bottom: 20px;
+        }
+        
+        .element-select {
+            width: 100%;
+            padding: 14px 20px;
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 60px 20px 60px 20px;
+            color: #ffffff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+        }
+        
+        .element-select option {
+            background: #0a2a3a;
+            color: #ffffff;
+        }
+        
+        /* Time Period Selector */
+        .period-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        
+        .period-btn {
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(30, 60, 70, 0.7);
+            border: 2px solid #4a9a8a;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .period-btn.active {
+            background: #4a9a8a;
+            color: #ffffff;
+            border-color: #7ac0b0;
+            box-shadow: 0 0 15px #2a5a5a;
+        }
+        
+        .period-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Chart Card */
+        .chart-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px #2a5a5a;
+        }
+        
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .chart-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .chart-title span {
+            font-size: 24px;
+        }
+        
+        .chart-price {
+            color: #ffd966;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 250px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            margin-top: 10px;
+        }
+        
+        .chart-stat-item {
+            text-align: center;
+        }
+        
+        .chart-stat-label {
+            color: #a0d0c0;
+            font-size: 11px;
+        }
+        
+        .chart-stat-value {
+            color: #ffd966;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        /* Order Book Card */
+        .orderbook-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .orderbook-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .orderbook-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .spread-info {
+            color: #ffd966;
+            font-size: 14px;
+        }
+        
+        .orderbook-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .orderbook-column {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+        }
+        
+        .orderbook-column-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #4a9a8a;
+            color: #a0d0c0;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .orderbook-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        
+        .orderbook-row.bid {
+            color: #4affaa;
+        }
+        
+        .orderbook-row.ask {
+            color: #ff6b6b;
+        }
+        
+        .orderbook-price {
+            font-weight: 600;
+        }
+        
+        .orderbook-quantity {
+            color: #ffd966;
+        }
+        
+        /* Recent Trades Card */
+        .trades-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .trades-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .trades-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .trades-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .trade-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid rgba(74, 154, 138, 0.3);
+        }
+        
+        .trade-row:last-child {
+            border-bottom: none;
+        }
+        
+        .trade-time {
+            color: #a0d0c0;
+            font-size: 11px;
+        }
+        
+        .trade-side {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .trade-side.buy {
+            color: #4affaa;
+        }
+        
+        .trade-side.sell {
+            color: #ff6b6b;
+        }
+        
+        .trade-price {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .trade-quantity {
+            color: #ffffff;
+        }
+        
+        /* Top Movers Card */
+        .movers-card {
+            background: rgba(30, 60, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .movers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .movers-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .movers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .movers-column {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+        }
+        
+        .movers-column-header {
+            color: #a0d0c0;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 0;
+            border-bottom: 1px solid #4a9a8a;
+            text-align: center;
+        }
+        
+        .mover-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(74, 154, 138, 0.2);
+        }
+        
+        .mover-item:last-child {
+            border-bottom: none;
+        }
+        
+        .mover-name {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffffff;
+            font-size: 13px;
+        }
+        
+        .mover-icon {
+            font-size: 16px;
+        }
+        
+        .mover-change {
+            font-weight: 600;
+        }
+        
+        .mover-change.positive {
+            color: #4affaa;
+        }
+        
+        .mover-change.negative {
+            color: #ff6b6b;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 60, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a9a8a;
+            font-style: italic;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 60, 70, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid #6aa0a0;
+            color: #ffffff;
+            padding: 12px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            box-shadow: 0 0 30px #2a5a5a;
+            z-index: 100;
+            margin-top: 10px;
+            font-weight: 500;
+        }
+        
+        .back-button:active {
+            background: #4a9a8a;
+            transform: translateX(-50%) scale(0.98);
+        }
+        
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="history-view" id="historyView">
+            <!-- Header -->
+            <div class="history-header">
+                <div class="history-title">Market History</div>
+                <div class="history-subtitle">✦ track the markets ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="market-time" id="marketTime">
+                    Last update: --
+                </div>
+            </div>
+            
+            <!-- Market Summary Cards -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">24h Volume</div>
+                    <div class="summary-value" id="volume24h">0</div>
+                    <div class="summary-change" id="volumeChange">+0%</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">24h Trades</div>
+                    <div class="summary-value" id="trades24h">0</div>
+                    <div class="summary-change" id="tradesChange">+0%</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Market Cap</div>
+                    <div class="summary-value" id="marketCap">0</div>
+                    <div class="summary-change" id="capChange">+0%</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Active Orders</div>
+                    <div class="summary-value" id="activeOrders">0</div>
+                    <div class="summary-change" id="ordersChange">0</div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="history-tabs">
+                <button class="history-tab active" onclick="window.switchTab('price')">📈 PRICE CHARTS</button>
+                <button class="history-tab" onclick="window.switchTab('orderbook')">📊 ORDER BOOK</button>
+                <button class="history-tab" onclick="window.switchTab('trades')">🔄 RECENT TRADES</button>
+                <button class="history-tab" onclick="window.switchTab('movers')">📈 TOP MOVERS</button>
+            </div>
+            
+            <!-- Price Charts Tab (default visible) -->
+            <div id="priceTab">
+                <!-- Element Selector -->
+                <div class="element-selector">
+                    <select class="element-select" id="elementSelect" onchange="window.updatePriceChart()">
+                        <!-- Filled by JavaScript -->
+                    </select>
+                </div>
+                
+                <!-- Time Period Selector -->
+                <div class="period-selector">
+                    <button class="period-btn active" onclick="window.setPeriod(7)">7D</button>
+                    <button class="period-btn" onclick="window.setPeriod(30)">30D</button>
+                    <button class="period-btn" onclick="window.setPeriod(90)">90D</button>
+                    <button class="period-btn" onclick="window.setPeriod(365)">1Y</button>
+                </div>
+                
+                <!-- Chart Card -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <span id="chartElementIcon">🔹</span>
+                            <span id="chartElementName">Gold</span>
+                        </div>
+                        <div class="chart-price" id="currentPrice">0⭐</div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                    
+                    <div class="chart-stats">
+                        <div class="chart-stat-item">
+                            <div class="chart-stat-label">Open</div>
+                            <div class="chart-stat-value" id="statOpen">0⭐</div>
+                        </div>
+                        <div class="chart-stat-item">
+                            <div class="chart-stat-label">High</div>
+                            <div class="chart-stat-value" id="statHigh">0⭐</div>
+                        </div>
+                        <div class="chart-stat-item">
+                            <div class="chart-stat-label">Low</div>
+                            <div class="chart-stat-value" id="statLow">0⭐</div>
+                        </div>
+                        <div class="chart-stat-item">
+                            <div class="chart-stat-label">Volume</div>
+                            <div class="chart-stat-value" id="statVolume">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Book Tab (hidden by default) -->
+            <div id="orderbookTab" style="display: none;">
+                <!-- Element Selector -->
+                <div class="element-selector">
+                    <select class="element-select" id="orderbookElement" onchange="window.updateOrderBook()">
+                        <!-- Filled by JavaScript -->
+                    </select>
+                </div>
+                
+                <!-- Order Book Card -->
+                <div class="orderbook-card">
+                    <div class="orderbook-header">
+                        <div class="orderbook-title">
+                            <span>📊</span> Order Book
+                        </div>
+                        <div class="spread-info" id="spreadInfo">Spread: --</div>
+                    </div>
+                    
+                    <div class="orderbook-grid">
+                        <div class="orderbook-column">
+                            <div class="orderbook-column-header">
+                                <span>Bid</span>
+                                <span>Quantity</span>
+                            </div>
+                            <div id="bidsList">
+                                <div class="empty-state" style="padding: 20px;">No bids</div>
+                            </div>
+                        </div>
+                        
+                        <div class="orderbook-column">
+                            <div class="orderbook-column-header">
+                                <span>Ask</span>
+                                <span>Quantity</span>
+                            </div>
+                            <div id="asksList">
+                                <div class="empty-state" style="padding: 20px;">No asks</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Trades Tab (hidden by default) -->
+            <div id="tradesTab" style="display: none;">
+                <!-- Element Selector -->
+                <div class="element-selector">
+                    <select class="element-select" id="tradesElement" onchange="window.updateRecentTrades()">
+                        <!-- Filled by JavaScript -->
+                    </select>
+                </div>
+                
+                <!-- Recent Trades Card -->
+                <div class="trades-card">
+                    <div class="trades-header">
+                        <div class="trades-title">
+                            <span>🔄</span> Recent Trades
+                        </div>
+                    </div>
+                    
+                    <div class="trades-list" id="tradesList">
+                        <div class="empty-state">No recent trades</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Top Movers Tab (hidden by default) -->
+            <div id="moversTab" style="display: none;">
+                <div class="movers-card">
+                    <div class="movers-header">
+                        <div class="movers-title">
+                            <span>📈</span> Top Gainers
+                        </div>
+                    </div>
+                    
+                    <div class="movers-grid">
+                        <div class="movers-column">
+                            <div class="movers-column-header">Gainers</div>
+                            <div id="gainersList">
+                                <div class="empty-state" style="padding: 15px;">No data</div>
+                            </div>
+                        </div>
+                        
+                        <div class="movers-column">
+                            <div class="movers-column-header">Losers</div>
+                            <div id="losersList">
+                                <div class="empty-state" style="padding: 15px;">No data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="movers-card">
+                    <div class="movers-header">
+                        <div class="movers-title">
+                            <span>🔥</span> Most Active
+                        </div>
+                    </div>
+                    
+                    <div id="mostActiveList">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading market history...</div>
+            </div>
 
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
+        </div>
+    </div>
+
+    <!-- Load all JavaScript files -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+    <script src="js/element-prices.js"></script>
+    <script src="js/market-dynamics.js"></script>
+    <script src="js/market-engine.js"></script>
+
+    <script>
+        // Chart is available globally from the UMD script
+        const Chart = window.Chart;
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        
+        // Tab elements
+        const priceTab = document.getElementById('priceTab');
+        const orderbookTab = document.getElementById('orderbookTab');
+        const tradesTab = document.getElementById('tradesTab');
+        const moversTab = document.getElementById('moversTab');
+        
+        // Chart elements
+        const elementSelect = document.getElementById('elementSelect');
+        const orderbookElement = document.getElementById('orderbookElement');
+        const tradesElement = document.getElementById('tradesElement');
+        const chartElementIcon = document.getElementById('chartElementIcon');
+        const chartElementName = document.getElementById('chartElementName');
+        const currentPrice = document.getElementById('currentPrice');
+        
+        // Stat elements
+        const statOpen = document.getElementById('statOpen');
+        const statHigh = document.getElementById('statHigh');
+        const statLow = document.getElementById('statLow');
+        const statVolume = document.getElementById('statVolume');
+        
+        // Order book elements
+        const bidsList = document.getElementById('bidsList');
+        const asksList = document.getElementById('asksList');
+        const spreadInfo = document.getElementById('spreadInfo');
+        
+        // Trades list
+        const tradesList = document.getElementById('tradesList');
+        
+        // Movers lists
+        const gainersList = document.getElementById('gainersList');
+        const losersList = document.getElementById('losersList');
+        const mostActiveList = document.getElementById('mostActiveList');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToEarthHub = returnToEarthHub;
+        window.switchTab = switchTab;
+        window.setPeriod = setPeriod;
+        window.updatePriceChart = updatePriceChart;
+        window.updateOrderBook = updateOrderBook;
+        window.updateRecentTrades = updateRecentTrades;
+
+        // ===== STATE =====
+        let currentTab = 'price';
+        let currentPeriod = 7;
+        let currentElement = 'Gold';
+        let priceChart = null;
+        let allElements = [];
+
+        // ===== LOAD MARKET HISTORY DATA =====
+        async function loadMarketHistory() {
+            try {
+                loadingText.textContent = 'loading market data...';
+                
+                // Get credits
+                let credits = 5000;
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
+                }
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                
+                // Get all elements
+                if (typeof window.getAllElements === 'function') {
+                    allElements = window.getAllElements();
+                } else {
+                    // Fallback to ELEMENT_DATABASE
+                    allElements = Object.entries(window.ELEMENT_DATABASE || {}).map(([name, data]) => ({
+                        name,
+                        ...data
+                    }));
+                }
+                
+                // Populate element selectors
+                populateElementSelectors();
+                
+                // Load market summary
+                loadMarketSummary();
+                
+                // Load initial chart
+                updatePriceChart();
+                
+                // Load order book
+                updateOrderBook();
+                
+                // Load recent trades
+                updateRecentTrades();
+                
+                // Load top movers
+                loadTopMovers();
+                
+                // Update last update time
+                document.getElementById('marketTime').textContent = 'Last update: just now';
+                
+            } catch (error) {
+                console.error('Error loading market history:', error);
+            }
+        }
+
+        // ===== POPULATE ELEMENT SELECTORS =====
+        function populateElementSelectors() {
+            let options = '';
+            
+            // Sort elements by name
+            const sorted = [...allElements].sort((a, b) => a.name.localeCompare(b.name));
+            
+            sorted.forEach(element => {
+                options += `<option value="${element.name}">${element.icon} ${element.name} (${element.symbol})</option>`;
+            });
+            
+            elementSelect.innerHTML = options;
+            orderbookElement.innerHTML = options;
+            tradesElement.innerHTML = options;
+        }
+
+        // ===== LOAD MARKET SUMMARY =====
+        function loadMarketSummary() {
+            // Get 24h summary from market engine
+            let summary = {};
+            if (typeof window.get24HourSummary === 'function') {
+                summary = window.get24HourSummary();
+            } else {
+                // Simulated data
+                summary = {
+                    volume: 1250000,
+                    value: 25000000,
+                    trades: 342,
+                    change: 5.2
+                };
+            }
+            
+            document.getElementById('volume24h').textContent = formatNumber(summary.volume || 1250000) + '⭐';
+            document.getElementById('trades24h').textContent = (summary.trades || 342).toLocaleString();
+            document.getElementById('marketCap').textContent = formatNumber(summary.value || 25000000) + '⭐';
+            
+            // Get active orders count
+            let activeOrders = 0;
+            if (typeof window.getUserOrders === 'function') {
+                // This would need a user ID in production
+                activeOrders = 156;
+            } else {
+                activeOrders = 156;
+            }
+            document.getElementById('activeOrders').textContent = activeOrders;
+            
+            // Set change indicators
+            document.getElementById('volumeChange').textContent = '+5.2%';
+            document.getElementById('volumeChange').className = 'summary-change change-positive';
+            document.getElementById('tradesChange').textContent = '+3.8%';
+            document.getElementById('tradesChange').className = 'summary-change change-positive';
+            document.getElementById('capChange').textContent = '+2.1%';
+            document.getElementById('capChange').className = 'summary-change change-positive';
+            document.getElementById('ordersChange').textContent = '+12';
+            document.getElementById('ordersChange').className = 'summary-change change-positive';
+        }
+
+        // ===== UPDATE PRICE CHART =====
+        async function updatePriceChart() {
+            currentElement = elementSelect.value;
+            const element = allElements.find(e => e.name === currentElement);
+            
+            if (element) {
+                chartElementIcon.textContent = element.icon || '🔹';
+                chartElementName.textContent = element.name;
+            }
+            
+            // Get current price
+            let price = 1000;
+            if (typeof window.getElementPrice === 'function') {
+                const priceData = window.getElementPrice(currentElement);
+                price = priceData.current || priceData || 1000;
+            } else if (typeof window.getMarketPrice === 'function') {
+                price = window.getMarketPrice(currentElement);
+            }
+            currentPrice.textContent = price.toLocaleString() + '⭐';
+            
+            // Get price history
+            let history = [];
+            if (typeof window.getPriceHistory === 'function') {
+                history = window.getPriceHistory(currentElement, currentPeriod);
+            }
+            
+            // Generate labels and data
+            const labels = [];
+            const data = [];
+            
+            if (history.length > 0) {
+                // Use real history
+                history.forEach(h => {
+                    const date = new Date(h.timestamp || h.date);
+                    labels.push(`${date.getMonth()+1}/${date.getDate()}`);
+                    data.push(h.price);
+                });
+                
+                // Calculate stats
+                const prices = data;
+                statOpen.textContent = (prices[0] || price).toLocaleString() + '⭐';
+                statHigh.textContent = (Math.max(...prices) || price).toLocaleString() + '⭐';
+                statLow.textContent = (Math.min(...prices) || price).toLocaleString() + '⭐';
+                
+                const volume = history.reduce((sum, h) => sum + (h.volume || 0), 0);
+                statVolume.textContent = formatNumber(volume || Math.floor(Math.random() * 10000));
+            } else {
+                // Generate simulated data
+                const basePrice = element?.basePrice || element?.value || 1000;
+                
+                for (let i = 0; i < currentPeriod; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (currentPeriod - i));
+                    labels.push(`${date.getMonth()+1}/${date.getDate()}`);
+                    
+                    // Simulate price movement
+                    const randomWalk = (Math.random() - 0.5) * 100;
+                    const simulatedPrice = basePrice + (i * 2) + randomWalk;
+                    data.push(Math.max(1, simulatedPrice));
+                }
+                
+                // Calculate simulated stats
+                statOpen.textContent = data[0].toLocaleString() + '⭐';
+                statHigh.textContent = Math.max(...data).toLocaleString() + '⭐';
+                statLow.textContent = Math.min(...data).toLocaleString() + '⭐';
+                statVolume.textContent = formatNumber(Math.floor(Math.random() * 10000) + 1000);
+            }
+            
+            // Update chart
+            if (priceChart) {
+                priceChart.data.labels = labels;
+                priceChart.data.datasets[0].data = data;
+                priceChart.update();
+            } else {
+                initPriceChart(labels, data);
+            }
+        }
+
+        // ===== INITIALIZE PRICE CHART =====
+        function initPriceChart(labels, data) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Price (⭐)',
+                        data: data,
+                        borderColor: '#4affaa',
+                        backgroundColor: 'rgba(74, 255, 170, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0a2a3a',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a0d0c0',
+                            borderColor: '#4a9a8a',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(74, 154, 138, 0.1)' },
+                            ticks: { 
+                                color: '#a0d0c0',
+                                callback: function(value) {
+                                    return value + '⭐';
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#a0d0c0', maxRotation: 45 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ===== UPDATE ORDER BOOK =====
+        function updateOrderBook() {
+            const element = orderbookElement.value;
+            
+            // Get order book data
+            let orderBook = null;
+            if (typeof window.getOrderBook === 'function') {
+                orderBook = window.getOrderBook(element, 10);
+            }
+            
+            if (orderBook && orderBook.bids && orderBook.bids.length > 0) {
+                let bidsHtml = '';
+                orderBook.bids.slice(0, 10).forEach(bid => {
+                    bidsHtml += `
+                        <div class="orderbook-row bid">
+                            <span class="orderbook-price">${bid.price}⭐</span>
+                            <span class="orderbook-quantity">${bid.quantity}</span>
+                        </div>
+                    `;
+                });
+                bidsList.innerHTML = bidsHtml;
+            } else {
+                // Simulated bids
+                let bidsHtml = '';
+                for (let i = 0; i < 5; i++) {
+                    const price = 950 - (i * 5);
+                    const quantity = Math.floor(Math.random() * 100) + 10;
+                    bidsHtml += `
+                        <div class="orderbook-row bid">
+                            <span class="orderbook-price">${price}⭐</span>
+                            <span class="orderbook-quantity">${quantity}</span>
+                        </div>
+                    `;
+                }
+                bidsList.innerHTML = bidsHtml;
+            }
+            
+            if (orderBook && orderBook.asks && orderBook.asks.length > 0) {
+                let asksHtml = '';
+                orderBook.asks.slice(0, 10).forEach(ask => {
+                    asksHtml += `
+                        <div class="orderbook-row ask">
+                            <span class="orderbook-price">${ask.price}⭐</span>
+                            <span class="orderbook-quantity">${ask.quantity}</span>
+                        </div>
+                    `;
+                });
+                asksList.innerHTML = asksHtml;
+            } else {
+                // Simulated asks
+                let asksHtml = '';
+                for (let i = 0; i < 5; i++) {
+                    const price = 1050 + (i * 5);
+                    const quantity = Math.floor(Math.random() * 100) + 10;
+                    asksHtml += `
+                        <div class="orderbook-row ask">
+                            <span class="orderbook-price">${price}⭐</span>
+                            <span class="orderbook-quantity">${quantity}</span>
+                        </div>
+                    `;
+                }
+                asksList.innerHTML = asksHtml;
+            }
+            
+            // Update spread
+            if (orderBook && orderBook.spreadPercent) {
+                spreadInfo.textContent = `Spread: ${orderBook.spreadPercent.toFixed(2)}%`;
+            } else {
+                spreadInfo.textContent = `Spread: 2.50%`;
+            }
+        }
+
+        // ===== UPDATE RECENT TRADES =====
+        function updateRecentTrades() {
+            const element = tradesElement.value;
+            
+            // Get recent trades
+            let trades = [];
+            if (typeof window.getRecentTrades === 'function') {
+                trades = window.getRecentTrades(element, 20);
+            }
+            
+            if (trades && trades.length > 0) {
+                let tradesHtml = '';
+                trades.forEach(trade => {
+                    const time = new Date(trade.timestamp).toLocaleTimeString();
+                    const side = trade.side || (trade.buyOrderId ? 'buy' : 'sell');
+                    tradesHtml += `
+                        <div class="trade-row">
+                            <span class="trade-time">${time}</span>
+                            <span class="trade-side ${side}">${side.toUpperCase()}</span>
+                            <span class="trade-price">${trade.price}⭐</span>
+                            <span class="trade-quantity">${trade.quantity}</span>
+                        </div>
+                    `;
+                });
+                tradesList.innerHTML = tradesHtml;
+            } else {
+                // Simulated trades
+                let tradesHtml = '';
+                const sides = ['buy', 'sell'];
+                for (let i = 0; i < 10; i++) {
+                    const time = new Date(Date.now() - (i * 300000)).toLocaleTimeString();
+                    const side = sides[Math.floor(Math.random() * sides.length)];
+                    const price = 1000 + (Math.random() * 50 - 25);
+                    const quantity = Math.floor(Math.random() * 50) + 1;
+                    tradesHtml += `
+                        <div class="trade-row">
+                            <span class="trade-time">${time}</span>
+                            <span class="trade-side ${side}">${side.toUpperCase()}</span>
+                            <span class="trade-price">${Math.round(price)}⭐</span>
+                            <span class="trade-quantity">${quantity}</span>
+                        </div>
+                    `;
+                }
+                tradesList.innerHTML = tradesHtml;
+            }
+        }
+
+        // ===== LOAD TOP MOVERS =====
+        function loadTopMovers() {
+            // Get market summary for top movers
+            let summary = {};
+            if (typeof window.getMarketSummary === 'function') {
+                summary = window.getMarketSummary();
+            }
+            
+            const gainers = summary.topGainers || [
+                { name: 'Gold', change: 12.5, price: 1125 },
+                { name: 'Silver', change: 8.3, price: 1083 },
+                { name: 'Platinum', change: 5.7, price: 1057 },
+                { name: 'Neodymium', change: 4.2, price: 1042 },
+                { name: 'Titanium', change: 3.8, price: 1038 }
+            ];
+            
+            const losers = summary.topLosers || [
+                { name: 'Lead', change: -7.2, price: 928 },
+                { name: 'Mercury', change: -5.5, price: 945 },
+                { name: 'Uranium', change: -4.1, price: 959 },
+                { name: 'Thorium', change: -3.3, price: 967 },
+                { name: 'Bismuth', change: -2.8, price: 972 }
+            ];
+            
+            const mostActive = summary.mostActive || [
+                { name: 'Gold', volume: 12500, price: 1125 },
+                { name: 'Silver', volume: 9800, price: 1083 },
+                { name: 'Copper', volume: 7600, price: 1042 },
+                { name: 'Iron', volume: 5400, price: 985 },
+                { name: 'Titanium', volume: 3200, price: 1038 }
+            ];
+            
+            // Render gainers
+            let gainersHtml = '';
+            gainers.forEach(gainer => {
+                const element = allElements.find(e => e.name === gainer.name) || { icon: '🔹' };
+                gainersHtml += `
+                    <div class="mover-item">
+                        <div class="mover-name">
+                            <span class="mover-icon">${element.icon}</span>
+                            ${gainer.name}
+                        </div>
+                        <div class="mover-change positive">+${gainer.change}%</div>
+                    </div>
+                `;
+            });
+            gainersList.innerHTML = gainersHtml || '<div class="empty-state">No gainers</div>';
+            
+            // Render losers
+            let losersHtml = '';
+            losers.forEach(loser => {
+                const element = allElements.find(e => e.name === loser.name) || { icon: '🔹' };
+                losersHtml += `
+                    <div class="mover-item">
+                        <div class="mover-name">
+                            <span class="mover-icon">${element.icon}</span>
+                            ${loser.name}
+                        </div>
+                        <div class="mover-change negative">${loser.change}%</div>
+                    </div>
+                `;
+            });
+            losersList.innerHTML = losersHtml || '<div class="empty-state">No losers</div>';
+            
+            // Render most active
+            let activeHtml = '';
+            mostActive.forEach(item => {
+                const element = allElements.find(e => e.name === item.name) || { icon: '🔹' };
+                activeHtml += `
+                    <div class="mover-item">
+                        <div class="mover-name">
+                            <span class="mover-icon">${element.icon}</span>
+                            ${item.name}
+                        </div>
+                        <div class="mover-change">${formatNumber(item.volume)} vol</div>
+                    </div>
+                `;
+            });
+            mostActiveList.innerHTML = activeHtml || '<div class="empty-state">No data</div>';
+        }
+
+        // ===== SWITCH TAB =====
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.history-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show corresponding content
+            priceTab.style.display = 'none';
+            orderbookTab.style.display = 'none';
+            tradesTab.style.display = 'none';
+            moversTab.style.display = 'none';
+            
+            switch(tab) {
+                case 'price':
+                    priceTab.style.display = 'block';
+                    updatePriceChart();
+                    break;
+                case 'orderbook':
+                    orderbookTab.style.display = 'block';
+                    updateOrderBook();
+                    break;
+                case 'trades':
+                    tradesTab.style.display = 'block';
+                    updateRecentTrades();
+                    break;
+                case 'movers':
+                    moversTab.style.display = 'block';
+                    break;
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== SET PERIOD =====
+        function setPeriod(days) {
+            currentPeriod = days;
+            
+            // Update active button
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            updatePriceChart();
+        }
+
+        // ===== FORMAT NUMBER =====
+        function formatNumber(num) {
+            if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        // ===== RETURN TO EARTH HUB =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading market history...';
+                
+                await loadMarketHistory();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+                // Refresh every 30 seconds
+                setInterval(() => {
+                    document.getElementById('marketTime').textContent = 'Last update: just now';
+                    if (currentTab === 'price') updatePriceChart();
+                    if (currentTab === 'orderbook') updateOrderBook();
+                    if (currentTab === 'trades') updateRecentTrades();
+                    if (currentTab === 'movers') loadTopMovers();
+                }, 30000);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading data';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
