@@ -501,7 +501,6 @@
             seededRandomChoice, 
             hashString,
             getStarType,
-            generateStar as generateProceduralStar,
             getGalaxyStatistics
         } from './js/procedural-universe.js';
         
@@ -654,44 +653,172 @@
             return planets;
         }
 
-        // ===== GENERATE UNIQUE STAR NAME BASED ON CLUSTER =====
+        // ===== GENERATE UNIQUE STAR NAME WITH HUGE VARIETY =====
         function generateStarName(clusterSeed, index) {
-            // Use cluster seed + index to create a unique hash for this star
-            const starHash = clusterSeed + index * 7919; // Use a prime multiplier
+            // Create a unique seed for this star
+            const starHash = (clusterSeed * 7919 + index * 104729) % 10000000;
             
-            // Star name components that vary by cluster
+            // HUGE list of prefixes from various mythologies and naming conventions
             const prefixes = [
-                'ALPHA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA', 'ETA', 'THETA',
-                'IOTA', 'KAPPA', 'LAMBDA', 'MU', 'NU', 'XI', 'OMICRON', 'PI',
-                'RHO', 'SIGMA', 'TAU', 'UPSILON', 'PHI', 'CHI', 'PSI', 'OMEGA'
+                // Greek letters
+                'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 
+                'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 
+                'Phi', 'Chi', 'Psi', 'Omega',
+                
+                // Roman numerals
+                'Primus', 'Secundus', 'Tertius', 'Quartus', 'Quintus', 'Sextus', 'Septimus', 
+                'Octavus', 'Nonus', 'Decimus',
+                
+                // Colors
+                'Red', 'Blue', 'Green', 'Gold', 'Silver', 'Crimson', 'Azure', 'Violet', 'Scarlet',
+                'Emerald', 'Ruby', 'Sapphire', 'Amber', 'Ochre', 'Indigo', 'Magenta', 'Cyan',
+                
+                // Celestial
+                'Star', 'Sun', 'Nova', 'Pulsar', 'Quasar', 'Nebula', 'Comet', 'Asteroid',
+                'Galaxy', 'Cosmos', 'Void', 'Eclipse', 'Solstice', 'Equinox',
+                
+                // Mythological
+                'Apollo', 'Athena', 'Zeus', 'Hera', 'Poseidon', 'Ares', 'Artemis', 'Hermes',
+                'Odin', 'Thor', 'Freyja', 'Loki', 'Baldur', 'Tyr', 'Heimdall',
+                'Ra', 'Anubis', 'Osiris', 'Isis', 'Horus', 'Thoth', 'Bastet',
+                'Indra', 'Agni', 'Varuna', 'Surya', 'Chandra', 'Vayu',
+                'Quetzalcoatl', 'Tezcatlipoca', 'Kukulkan', 'Coatlicue',
+                
+                // Abstract concepts
+                'Ancient', 'Eternal', 'Infinite', 'Mystic', 'Sacred', 'Divine', 'Celestial',
+                'Radiant', 'Luminous', 'Brilliant', 'Sparkling', 'Glimmering', 'Shimmering',
+                'Silent', 'Whispering', 'Singing', 'Dancing', 'Wandering', 'Roaming',
+                'Hope', 'Dream', 'Destiny', 'Fate', 'Fortune', 'Legacy', 'Memory',
+                
+                // Astronomical terms
+                'Spiral', 'Elliptical', 'Binary', 'Triple', 'Dwarf', 'Giant', 'Supergiant',
+                'Hypergiant', 'Variable', 'Eruptive', 'Flare', 'Spot', 'Corona', 'Prominence',
+                
+                // Fantasy/Sci-fi
+                'Crystal', 'Prism', 'Mirror', 'Shadow', 'Phantom', 'Ghost', 'Specter',
+                'Oracle', 'Prophet', 'Seer', 'Vision', 'Mirage', 'Illusion',
+                'Aurora', 'Borealis', 'Australis', 'Zenith', 'Nadir', 'Apex', 'Pinnacle',
+                
+                // Elements
+                'Iron', 'Gold', 'Silver', 'Copper', 'Bronze', 'Steel', 'Titanium',
+                'Carbon', 'Silicon', 'Neon', 'Argon', 'Krypton', 'Xenon', 'Radon',
+                
+                // Numbers in various languages
+                'Uno', 'Due', 'Tre', 'Quattro', 'Cinque', 'Sei', 'Sette', 'Otto', 'Nove', 'Dieci',
+                'Ein', 'Zwei', 'Drei', 'Vier', 'Funf', 'Sechs', 'Sieben', 'Acht', 'Neun', 'Zehn',
+                'Ichi', 'Ni', 'San', 'Yon', 'Go', 'Roku', 'Shichi', 'Hachi', 'Kyu', 'Ju',
+                
+                // Animals
+                'Phoenix', 'Dragon', 'Griffin', 'Pegasus', 'Sphinx', 'Chimera', 'Hydra',
+                'Wolf', 'Raven', 'Eagle', 'Hawk', 'Falcon', 'Owl', 'Serpent', 'Viper',
+                'Lion', 'Tiger', 'Leopard', 'Panther', 'Jaguar', 'Cheetah',
+                'Whale', 'Dolphin', 'Shark', 'Kraken', 'Leviathan',
+                
+                // Plants
+                'Rose', 'Lily', 'Orchid', 'Lotus', 'Ivy', 'Oak', 'Maple', 'Pine', 'Cedar',
+                'Willow', 'Birch', 'Ash', 'Elm', 'Yew', 'Holly', 'Thorn', 'Briar'
             ];
             
+            // HUGE list of suffixes
             const suffixes = [
-                'PRIME', 'SECUNDUS', 'TERTIUS', 'QUARTUS', 'QUINTUS',
-                'MAJOR', 'MINOR', 'AUSTRALIS', 'BOREALIS', 'ORIENTALIS',
-                'OCCIDENTALIS', 'INFERIOR', 'SUPERIOR', 'MEDIA'
+                // Star designations
+                'Major', 'Minor', 'Prima', 'Secunda', 'Tertia', 'Quarta', 'Quinta',
+                'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+                
+                // Location descriptors
+                'Prime', 'Secundus', 'Tertius', 'Quartus', 'Quintus',
+                'Borealis', 'Australis', 'Orientalis', 'Occidentalis',
+                'Centralis', 'Marginalis', 'Peripheral', 'Frontier',
+                'Nexus', 'Terminus', 'Outpost', 'Station', 'Hub',
+                
+                // Quality descriptors
+                'Magnificus', 'Sublime', 'Exalted', 'Noble', 'Royal', 'Imperial',
+                'Ancient', 'Eternal', 'Immortal', 'Legendary', 'Mythic',
+                'Glorious', 'Radiant', 'Brilliant', 'Luminous', 'Resplendent',
+                'Mysterious', 'Enigmatic', 'Arcane', 'Esoteric', 'Occult',
+                
+                // Scientific
+                'Stellaris', 'Nebularis', 'Galactica', 'Cosmica', 'Universalis',
+                'Astralis', 'Sideralis', 'Caelestis', 'Lunaris', 'Solaris',
+                
+                // Mythological places
+                'Valhalla', 'Asgard', 'Olympus', 'Elysium', 'Avalon', 'Camelot',
+                'Atlantis', 'El Dorado', 'Shangri-La', 'Xanadu', 'Avalon',
+                
+                // Natural features
+                'Peak', 'Summit', 'Mountain', 'Valley', 'Canyon', 'Crater',
+                'Ocean', 'Sea', 'Lake', 'River', 'Falls', 'Cascade',
+                'Desert', 'Oasis', 'Forest', 'Jungle', 'Savanna', 'Tundra',
+                
+                // Constellations
+                'Andromeda', 'Cassiopeia', 'Perseus', 'Hercules', 'Orion',
+                'Draco', 'Ursa', 'Cygnus', 'Lyra', 'Aquila', 'Pegasus',
+                
+                // Colors (as suffixes)
+                'Rubra', 'Viridis', 'Caerulea', 'Aurea', 'Argentea', 'Nigra', 'Alba',
+                'Rufus', 'Flavus', 'Glaucus', 'Purpureus', 'Roseus',
+                
+                // Directions
+                'North', 'South', 'East', 'West', 'Northeast', 'Northwest', 'Southeast', 'Southwest',
+                'Northern', 'Southern', 'Eastern', 'Western', 'Upper', 'Lower', 'Inner', 'Outer',
+                
+                // Status
+                'Sanctum', 'Sanctuary', 'Haven', 'Refuge', 'Asylum',
+                'Dominion', 'Realm', 'Kingdom', 'Empire', 'Republic',
+                'Colony', 'Settlement', 'Outpost', 'Station', 'Base',
+                
+                // Astronomical features
+                'Nebula', 'Cluster', 'Cloud', 'Field', 'Region', 'Zone', 'Sector',
+                'Arm', 'Spur', 'Branch', 'Stream', 'Flow', 'Current',
+                
+                // Abstract
+                'Paradox', 'Enigma', 'Mystery', 'Wonder', 'Marvel', 'Miracle',
+                'Infinity', 'Eternity', 'Forever', 'Always', 'Never', 'Ever',
+                
+                // Scientific notation
+                'Prime', 'Secundus', 'Tertiary', 'Binary', 'Trinary', 'Quadrant',
+                'Spectral', 'Luminosity', 'Magnitude', 'Parsec', 'Lightyear'
             ];
             
-            // Use the cluster name to influence the naming
-            const clusterHash = hashString(clusterName);
+            // Use different naming styles
+            const style = Math.floor(seededRandom(starHash, 0) * 6);
             
-            // Combine hashes to make names unique per cluster
-            const combinedHash = (starHash + clusterHash) % 1000000;
+            // Generate a number for the star (1-999)
+            const number1 = Math.floor(seededRandom(starHash, 1) * 999) + 1;
+            const number2 = Math.floor(seededRandom(starHash, 2) * 99) + 1;
+            const letter = String.fromCharCode(65 + Math.floor(seededRandom(starHash, 3) * 26)); // A-Z
             
-            // Select prefix and suffix based on combined hash
-            const prefixIndex = Math.floor(seededRandom(combinedHash, 0) * prefixes.length);
-            const suffixIndex = Math.floor(seededRandom(combinedHash, 1) * suffixes.length);
-            const numberPart = Math.floor(seededRandom(combinedHash, 2) * 100) + 1;
+            // Select prefix and suffix based on hash
+            const prefixIndex = Math.floor(seededRandom(starHash, 4) * prefixes.length);
+            const suffixIndex = Math.floor(seededRandom(starHash, 5) * suffixes.length);
+            const altPrefixIndex = Math.floor(seededRandom(starHash, 6) * prefixes.length);
+            const altSuffixIndex = Math.floor(seededRandom(starHash, 7) * suffixes.length);
             
-            // Occasionally use a different naming convention
-            const namingStyle = Math.floor(seededRandom(combinedHash, 3) * 3);
-            
-            if (namingStyle === 0) {
-                return `${prefixes[prefixIndex]} ${suffixes[suffixIndex]}`;
-            } else if (namingStyle === 1) {
-                return `${clusterName} ${prefixes[prefixIndex]}`;
-            } else {
-                return `${prefixes[prefixIndex]}-${numberPart}`;
+            // Generate name based on style
+            switch(style) {
+                case 0: // Classic: Prefix + Suffix
+                    return `${prefixes[prefixIndex]} ${suffixes[suffixIndex]}`;
+                    
+                case 1: // Numbered: Prefix + Number
+                    return `${prefixes[prefixIndex]}-${number1}`;
+                    
+                case 2: // Location-based: Suffix + Number
+                    return `${suffixes[suffixIndex]} ${number2}`;
+                    
+                case 3: // Double-barreled: Prefix + Prefix + Suffix
+                    return `${prefixes[prefixIndex]} ${prefixes[altPrefixIndex]} ${suffixes[suffixIndex]}`;
+                    
+                case 4: // Scientific: Letter + Number
+                    return `${letter} ${number1}`;
+                    
+                case 5: // Cluster-specific: Cluster prefix + Suffix
+                    // Use part of cluster name as prefix
+                    const clusterPart = clusterName.split(' ')[0]; // First word of cluster
+                    return `${clusterPart} ${suffixes[suffixIndex]}`;
+                    
+                default: // Fallback
+                    return `${prefixes[prefixIndex]} ${suffixes[suffixIndex]}`;
             }
         }
 
@@ -804,16 +931,32 @@
             stars = [];
             
             // Use cluster name to create a unique seed - this ensures different clusters have different stars
-            const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 100000;
+            const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 1000000;
             
             console.log(`Generating stars for cluster: ${clusterName} with seed: ${clusterSeed}`);
+            
+            // Use a Set to track generated names and ensure uniqueness
+            const usedNames = new Set();
             
             for (let i = 0; i < starCount; i++) {
                 const starSeed = clusterSeed + i * 1000;
                 const starType = getStarType(starSeed, i);
                 
                 // Generate unique star name based on cluster
-                const starName = generateStarName(clusterSeed, i);
+                let starName;
+                let attempts = 0;
+                do {
+                    starName = generateStarName(clusterSeed, i + attempts * 100);
+                    attempts++;
+                    // Prevent infinite loop
+                    if (attempts > 100) {
+                        starName = `Star ${i}`;
+                        break;
+                    }
+                } while (usedNames.has(starName));
+                
+                usedNames.add(starName);
+                
                 const isCurrent = (starName === currentStarName);
                 const distance = generateStarDistance(i, isCurrent);
                 
@@ -848,9 +991,9 @@
                 return a.distance - b.distance;
             });
             
-            console.log(`Generated ${stars.length} stars for cluster ${clusterName}`);
-            console.log('First star:', stars[0]?.name);
-            console.log('Last star:', stars[stars.length-1]?.name);
+            console.log(`Generated ${stars.length} unique stars for cluster ${clusterName}`);
+            console.log('First 5 stars:', stars.slice(0, 5).map(s => s.name));
+            console.log('Last 5 stars:', stars.slice(-5).map(s => s.name));
         }
 
         // ===== SHOW STAR INFO =====
