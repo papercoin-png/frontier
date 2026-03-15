@@ -73,7 +73,11 @@ const STORAGE_KEYS = {
     WARP_ORIGIN_STAR: 'voidfarer_warp_origin_star',
     WARP_ORIGIN_STAR_SECTOR: 'voidfarer_warp_origin_starSector',
     WARP_ORIGIN_REGION: 'voidfarer_warp_origin_region',
-    WARP_ORIGIN_SECTOR: 'voidfarer_warp_origin_sector'
+    WARP_ORIGIN_SECTOR: 'voidfarer_warp_origin_sector',
+    // HUB STORAGE KEYS (for Earth Hub)
+    HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
+    HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
+    HUB_INVENTORY: 'voidfarer_hub_inventory'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
@@ -166,6 +170,45 @@ async function getRemainingCargoMass() {
     } catch (error) {
         console.error('Error calculating remaining cargo mass:', error);
         return getCargoMassLimit();
+    }
+}
+
+// ===== HUB STORAGE UTILITIES =====
+async function getHubStorageMax() {
+    try {
+        const estateData = await getRealEstate();
+        const properties = estateData.properties || [];
+        return properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
+    } catch (error) {
+        console.error('Error getting hub storage max:', error);
+        return 0;
+    }
+}
+
+async function getHubStorageUsed() {
+    try {
+        const inventory = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        const hubInventory = inventory ? JSON.parse(inventory) : {};
+        let totalMass = 0;
+        for (const [name, data] of Object.entries(hubInventory)) {
+            const count = data.count || 1;
+            totalMass += count * getElementMass(name);
+        }
+        return totalMass;
+    } catch (error) {
+        console.error('Error calculating hub storage used:', error);
+        return 0;
+    }
+}
+
+async function getRemainingHubStorage() {
+    try {
+        const max = await getHubStorageMax();
+        const used = await getHubStorageUsed();
+        return Math.max(0, max - used);
+    } catch (error) {
+        console.error('Error calculating remaining hub storage:', error);
+        return 0;
     }
 }
 
@@ -311,6 +354,17 @@ async function initializeStorage() {
     }
     if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS)) {
         localStorage.setItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS, '0');
+    }
+    
+    // Initialize hub storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED)) {
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, '0');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY)) {
+        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, '{}');
     }
     
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
@@ -490,6 +544,139 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
 async function removeElementFromCollection(elementName, count = 1) {
     console.log(`Removing ${count}x ${elementName} from collection...`);
     return await dbRemoveElementFromCollection(elementName, count);
+}
+
+// ===== HUB INVENTORY FUNCTIONS =====
+async function addElementToHub(elementName, count = 1) {
+    try {
+        console.log(`Adding ${count}x ${elementName} to hub storage...`);
+        
+        // Check if enough space
+        const remaining = await getRemainingHubStorage();
+        const massToAdd = count * getElementMass(elementName);
+        
+        if (massToAdd > remaining) {
+            return { success: false, reason: 'insufficient_space', remaining: remaining, required: massToAdd };
+        }
+        
+        // Get current hub inventory
+        let hubInventory = {};
+        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        if (inventoryStr) {
+            hubInventory = JSON.parse(inventoryStr);
+        }
+        
+        // Add to inventory
+        if (!hubInventory[elementName]) {
+            hubInventory[elementName] = { count: 0 };
+        }
+        hubInventory[elementName].count = (hubInventory[elementName].count || 0) + count;
+        
+        // Save
+        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
+        
+        // Update used storage
+        const newUsed = await getHubStorageUsed();
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, newUsed.toString());
+        
+        return { success: true, newCount: hubInventory[elementName].count };
+    } catch (error) {
+        console.error('Error adding to hub:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
+}
+
+async function removeElementFromHub(elementName, count = 1) {
+    try {
+        console.log(`Removing ${count}x ${elementName} from hub storage...`);
+        
+        // Get current hub inventory
+        let hubInventory = {};
+        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        if (inventoryStr) {
+            hubInventory = JSON.parse(inventoryStr);
+        }
+        
+        // Check if exists
+        if (!hubInventory[elementName]) {
+            return { success: false, reason: 'not_found' };
+        }
+        
+        const currentCount = hubInventory[elementName].count || 0;
+        if (currentCount < count) {
+            return { success: false, reason: 'insufficient', available: currentCount };
+        }
+        
+        // Remove
+        hubInventory[elementName].count -= count;
+        if (hubInventory[elementName].count <= 0) {
+            delete hubInventory[elementName];
+        }
+        
+        // Save
+        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
+        
+        // Update used storage
+        const newUsed = await getHubStorageUsed();
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, newUsed.toString());
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Error removing from hub:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
+}
+
+async function getHubInventory() {
+    try {
+        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        return inventoryStr ? JSON.parse(inventoryStr) : {};
+    } catch (error) {
+        console.error('Error getting hub inventory:', error);
+        return {};
+    }
+}
+
+async function safeSellHubElement(elementName, quantity, pricePerUnit) {
+    try {
+        console.log('safeSellHubElement called:', elementName, quantity, pricePerUnit);
+        
+        // Get hub inventory
+        let hubInventory = {};
+        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        if (inventoryStr) {
+            hubInventory = JSON.parse(inventoryStr);
+        }
+        
+        if (!hubInventory[elementName]) {
+            return { success: false, reason: 'not_found' };
+        }
+        
+        const availableCount = hubInventory[elementName].count || 0;
+        if (availableCount < quantity) {
+            return { success: false, reason: 'insufficient', available: availableCount };
+        }
+        
+        // Remove from hub
+        const removeResult = await removeElementFromHub(elementName, quantity);
+        if (!removeResult.success) {
+            return removeResult;
+        }
+        
+        // Add credits
+        const earnings = quantity * pricePerUnit;
+        const newCredits = await addCredits(earnings);
+        
+        return { 
+            success: true, 
+            earnings: earnings,
+            newCredits: newCredits
+        };
+        
+    } catch (error) {
+        console.error('Error in safeSellHubElement:', error);
+        return { success: false, reason: 'error', error: error.message };
+    }
 }
 
 // Helper to get element rarity
@@ -1055,6 +1242,11 @@ async function resetGame() {
     localStorage.removeItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED);
     localStorage.removeItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS);
     
+    // Clear hub storage
+    localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_MAX);
+    localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_USED);
+    localStorage.removeItem(STORAGE_KEYS.HUB_INVENTORY);
+    
     setHapticsEnabled(settings.haptics);
     setAutoGatherEnabled(settings.autoGather);
     setOrbitSpeed(settings.orbitSpeed);
@@ -1082,6 +1274,13 @@ window.ELEMENT_MASS = ELEMENT_MASS;
 window.getElementMass = getElementMass;
 window.getTotalCargoMass = getTotalCargoMass;
 window.getRemainingCargoMass = getRemainingCargoMass;
+window.getHubStorageMax = getHubStorageMax;
+window.getHubStorageUsed = getHubStorageUsed;
+window.getRemainingHubStorage = getRemainingHubStorage;
+window.getHubInventory = getHubInventory;
+window.addElementToHub = addElementToHub;
+window.removeElementFromHub = removeElementFromHub;
+window.safeSellHubElement = safeSellHubElement;
 window.getCurrentPlanetName = getCurrentPlanetName;
 window.getCurrentPlanetType = getCurrentPlanetType;
 window.getCurrentPlanetResources = getCurrentPlanetResources;
