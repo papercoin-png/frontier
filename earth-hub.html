@@ -178,6 +178,73 @@
             font-size: 14px;
         }
         
+        /* Labor Pool Card */
+        .labor-pool-card {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 0 15px rgba(255, 170, 74, 0.3);
+        }
+        
+        .labor-pool-card:active {
+            transform: scale(0.99);
+            background: rgba(50, 100, 110, 0.8);
+        }
+        
+        .labor-pool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .labor-pool-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+        }
+        
+        .labor-pool-title span {
+            font-size: 24px;
+        }
+        
+        .labor-pool-amount {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .labor-pool-details {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            color: #a0d0c0;
+            font-size: 13px;
+        }
+        
+        .labor-pool-multiplier {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .labor-pool-footer {
+            display: flex;
+            justify-content: space-between;
+            color: #ffaa4a;
+            font-size: 12px;
+            border-top: 1px solid rgba(255, 170, 74, 0.3);
+            padding-top: 8px;
+        }
+        
         /* Economic Alert Banner */
         .alert-banner {
             background: rgba(255, 170, 74, 0.15);
@@ -741,13 +808,31 @@
                 <div class="earth-subtitle">✦ home port ✦</div>
             </div>
             
-            <!-- Stats Bar - UPDATED to show Hub Storage instead of Cargo -->
+            <!-- Stats Bar -->
             <div class="stats-bar" id="statsBar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
                 <div class="hub-storage" id="hubStorageDisplay">
                     Hub Storage: <span id="hubUsed">--</span>/<span id="hubMax">--</span> AMU
+                </div>
+            </div>
+            
+            <!-- Labor Pool Card -->
+            <div class="labor-pool-card" onclick="window.navigateTo('labor-exchange.html')">
+                <div class="labor-pool-header">
+                    <div class="labor-pool-title">
+                        <span>💰</span> Labor Pool
+                    </div>
+                    <div class="labor-pool-amount" id="laborPoolAmount">--⭐</div>
+                </div>
+                <div class="labor-pool-details">
+                    <span id="laborPoolEarnings">Your earnings: --⭐</span>
+                    <span class="labor-pool-multiplier" id="laborPoolMultiplier">1.0x</span>
+                </div>
+                <div class="labor-pool-footer">
+                    <span id="laborPoolParticipants">-- skilled workers</span>
+                    <span>Click to claim →</span>
                 </div>
             </div>
             
@@ -868,6 +953,18 @@
                     <div class="hub-label">Economy</div>
                     <div class="hub-desc">Galactic economic stats</div>
                 </div>
+                
+                <div class="hub-card" onclick="window.navigateTo('labor-exchange.html')">
+                    <div class="hub-icon">💰</div>
+                    <div class="hub-label">Labor Exchange</div>
+                    <div class="hub-desc">Claim labor earnings</div>
+                </div>
+                
+                <div class="hub-card" onclick="window.navigateTo('alchemy-lab.html')">
+                    <div class="hub-icon">⚗️</div>
+                    <div class="hub-label">Alchemy Lab</div>
+                    <div class="hub-desc">Craft and donate</div>
+                </div>
             </div>
             
             <!-- Back button to main menu -->
@@ -924,6 +1021,9 @@
         let currentCredits = 0;
         let currentHubMax = 0;
         let currentHubUsed = 0;
+        let currentLaborPool = 0;
+        let currentLaborEarnings = 0;
+        let currentLaborMultiplier = 1.0;
 
         // ===== COMPLETE ELEMENT DATABASE (matches storage.js) =====
         const ELEMENT_DATABASE = {
@@ -1091,6 +1191,49 @@
             navigateTo('index.html');
         }
 
+        // ===== LOAD LABOR POOL DATA =====
+        async function loadLaborPoolData() {
+            try {
+                // Get labor pool total
+                if (typeof window.getLaborPoolTotal === 'function') {
+                    currentLaborPool = await window.getLaborPoolTotal();
+                } else {
+                    currentLaborPool = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
+                }
+                
+                // Get player's labor earnings
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                if (typeof window.getPlayerLaborEarnings === 'function') {
+                    currentLaborEarnings = await window.getPlayerLaborEarnings(playerId);
+                } else {
+                    const earnings = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
+                    currentLaborEarnings = earnings[playerId] || 0;
+                }
+                
+                // Get labor multiplier from alchemy mastery
+                if (typeof window.getAlchemyMastery === 'function') {
+                    const mastery = await window.getAlchemyMastery();
+                    currentLaborMultiplier = mastery.overallMultiplier || 1.0;
+                } else {
+                    currentLaborMultiplier = 1.0;
+                }
+                
+                // Update display
+                document.getElementById('laborPoolAmount').textContent = currentLaborPool.toLocaleString() + '⭐';
+                document.getElementById('laborPoolEarnings').textContent = `Your earnings: ${currentLaborEarnings.toLocaleString()}⭐`;
+                document.getElementById('laborPoolMultiplier').textContent = currentLaborMultiplier.toFixed(1) + 'x';
+                
+                // Get participant count (simulated)
+                const participants = Math.floor(Math.random() * 50) + 10;
+                document.getElementById('laborPoolParticipants').textContent = participants + ' skilled workers';
+                
+            } catch (error) {
+                console.error('Error loading labor pool data:', error);
+                document.getElementById('laborPoolAmount').textContent = '0⭐';
+                document.getElementById('laborPoolEarnings').textContent = 'Your earnings: 0⭐';
+            }
+        }
+
         // ===== LOAD HUB STORAGE DATA =====
         async function loadHubStorage() {
             try {
@@ -1139,6 +1282,9 @@
 
                 // Load hub storage
                 await loadHubStorage();
+                
+                // Load labor pool data
+                await loadLaborPoolData();
 
                 // Load hub inventory
                 let collection = {};
@@ -1181,8 +1327,6 @@
             
             const totalItems = Object.values(collection).reduce((sum, item) => sum + (item.count || 1), 0);
             const uniqueItems = Object.keys(collection).length;
-            
-            // Hub storage already displayed separately via loadHubStorage()
         }
 
         // ===== UPDATE TAX SUMMARY =====
@@ -1670,6 +1814,8 @@
                     if (typeof window.checkAndExpireEvents === 'function') {
                         await window.checkAndExpireEvents();
                     }
+                    // Refresh labor pool data
+                    await loadLaborPoolData();
                 }, 60000);
 
             } catch (error) {
