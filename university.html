@@ -1,1 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - University</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/university.css">
+    
+    <style>
+        /* Additional styles not covered in university.css */
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+            margin: 0 auto;
+        }
+        
+        .university-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #ffd966;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #ffd966;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="university-view" id="universityView">
+            <!-- Header -->
+            <div class="university-header">
+                <div class="university-title">University of Alchemy</div>
+                <div class="university-subtitle">✦ knowledge is power ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="university-stats-bar">
+                <div class="credits-display" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="stats-display">
+                    <span>Donated: <span class="stat-highlight" id="totalDonated">0</span></span>
+                    <span>Mastery: <span class="stat-highlight" id="masteryLevel">Untrained</span></span>
+                </div>
+            </div>
+            
+            <!-- Hall of Fame Banner -->
+            <div class="hall-of-fame-banner" onclick="window.scrollToHall()">
+                <div class="hall-icon">🏆</div>
+                <div class="hall-content">
+                    <div class="hall-title">Hall of Fame</div>
+                    <div class="hall-description">View the greatest alchemists in history</div>
+                </div>
+                <div class="hall-arrow">→</div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="university-tabs">
+                <button class="university-tab active" onclick="window.switchTab('mastery')">MASTERY</button>
+                <button class="university-tab" onclick="window.switchTab('skills')">SKILL TREE</button>
+                <button class="university-tab" onclick="window.switchTab('history')">HISTORY</button>
+                <button class="university-tab" onclick="window.switchTab('hall')">HALL OF FAME</button>
+            </div>
+            
+            <!-- Content Container -->
+            <div id="contentContainer">
+                <!-- Mastery Tab Content (default) -->
+                <div id="masteryContent">
+                    <!-- Mastery Overview Card -->
+                    <div class="mastery-overview-card">
+                        <div class="overview-header">
+                            <div class="overview-title">
+                                <span>🎓</span> Your Mastery
+                            </div>
+                            <div class="overview-level" id="overviewMasteryLevel">Untrained</div>
+                        </div>
+                        
+                        <div class="overview-grid">
+                            <div class="overview-stat">
+                                <div class="overview-stat-value" id="totalCrafts">0</div>
+                                <div class="overview-stat-label">Total Crafts</div>
+                            </div>
+                            <div class="overview-stat">
+                                <div class="overview-stat-value" id="uniqueRecipes">0</div>
+                                <div class="overview-stat-label">Recipes Mastered</div>
+                            </div>
+                            <div class="overview-stat">
+                                <div class="overview-stat-value" id="laborMultiplier">1.0x</div>
+                                <div class="overview-stat-label">Labor Multiplier</div>
+                            </div>
+                            <div class="overview-stat">
+                                <div class="overview-stat-value" id="skillCategories">0</div>
+                                <div class="overview-stat-label">Skill Categories</div>
+                            </div>
+                        </div>
+                        
+                        <div class="overview-progress">
+                            <div class="overview-progress-bar">
+                                <div class="overview-progress-fill" id="masteryProgressFill" style="width: 0%"></div>
+                            </div>
+                            <div class="overview-next-level">
+                                <span id="nextLevelText">Progress to Novice</span>
+                                <span id="nextLevelProgress">0/100</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Navigation -->
+                    <div class="university-category-nav" id="categoryNav">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                    
+                    <!-- Category Cards -->
+                    <div id="categoryCards">
+                        <!-- Filled by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Skills Tab Content (hidden by default) -->
+                <div id="skillsContent" style="display: none;">
+                    <div class="skill-tree-container">
+                        <div class="skill-tree-title">
+                            <span>🌳</span> Alchemy Skill Tree
+                        </div>
+                        <div id="skillTreeVisualization">
+                            <!-- Filled by JavaScript -->
+                            <div class="university-empty-state">Loading skill tree...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="next-level-card">
+                        <div class="next-level-header">
+                            <span class="next-level-title">Next Milestone</span>
+                            <span class="next-level-badge" id="nextMilestone">Novice</span>
+                        </div>
+                        <div class="next-level-progress">
+                            <div class="next-level-bar">
+                                <div class="next-level-fill" id="nextMilestoneFill" style="width: 0%"></div>
+                            </div>
+                            <div class="next-level-stats">
+                                <span id="nextMilestoneCurrent">0</span>
+                                <span id="nextMilestoneTarget">100</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- History Tab Content (hidden by default) -->
+                <div id="historyContent" style="display: none;">
+                    <div class="donation-history">
+                        <div class="history-filters">
+                            <button class="history-filter-btn active" onclick="window.filterHistory('all')">ALL</button>
+                            <button class="history-filter-btn" onclick="window.filterHistory('donation')">DONATIONS</button>
+                            <button class="history-filter-btn" onclick="window.filterHistory('craft')">CRAFTS</button>
+                            <button class="history-filter-btn" onclick="window.filterHistory('milestone')">MILESTONES</button>
+                        </div>
+                        
+                        <div class="history-list" id="historyList">
+                            <!-- Filled by JavaScript -->
+                            <div class="university-empty-state">No history yet. Start crafting!</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hall of Fame Tab Content (hidden by default) -->
+                <div id="hallContent" style="display: none;">
+                    <div class="hall-of-fame">
+                        <div class="hall-category">
+                            <div class="hall-category-title">🏆 Top Crafters</div>
+                            <div class="hall-entries" id="topCrafters">
+                                <!-- Filled by JavaScript -->
+                                <div class="university-empty-state">Loading Hall of Fame...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="hall-category">
+                            <div class="hall-category-title">⚗️ Master Alchemists</div>
+                            <div class="hall-entries" id="masterAlchemists">
+                                <!-- Filled by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div class="hall-category">
+                            <div class="hall-category-title">🔬 Legendary Discoveries</div>
+                            <div class="hall-entries" id="legendaryDiscoveries">
+                                <!-- Filled by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading university...</div>
+            </div>
+            
+            <!-- Migration status (debug) -->
+            <div class="migration-status" id="migrationStatus"></div>
+        </div>
+    </div>
 
+    <!-- Scripts -->
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/migration.js"></script>
+    <script src="js/alchemy.js"></script>
+    <script src="js/skill-tree.js"></script>
+    <script src="js/skill-multipliers.js"></script>
+    <script src="js/ui-helpers.js"></script>
+
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const contentContainer = document.getElementById('contentContainer');
+        const masteryContent = document.getElementById('masteryContent');
+        const skillsContent = document.getElementById('skillsContent');
+        const historyContent = document.getElementById('historyContent');
+        const hallContent = document.getElementById('hallContent');
+        const categoryNav = document.getElementById('categoryNav');
+        const categoryCards = document.getElementById('categoryCards');
+        const skillTreeViz = document.getElementById('skillTreeVisualization');
+        const historyList = document.getElementById('historyList');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToEarthHub = returnToEarthHub;
+        window.switchTab = switchTab;
+        window.filterHistory = filterHistory;
+        window.scrollToHall = scrollToHall;
+        window.viewSkillDetails = viewSkillDetails;
+
+        // ===== STATE =====
+        let currentTab = 'mastery';
+        let historyFilter = 'all';
+        let alchemyProgress = {};
+        let totalCrafts = 0;
+        let masteryLevel = { name: 'Untrained', multiplier: 1.0 };
+        let categoryData = [];
+        let skillNodes = [];
+        let donationHistory = [];
+
+        // ===== LOAD UNIVERSITY DATA =====
+        async function loadUniversityData() {
+            try {
+                loadingText.textContent = 'loading university data...';
+                
+                // Get credits
+                let credits = 5000;
+                if (typeof window.getCredits === 'function') {
+                    credits = await window.getCredits();
+                }
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                
+                // Get alchemy progress
+                if (typeof window.getAlchemyProgress === 'function') {
+                    alchemyProgress = await window.getAlchemyProgress();
+                } else {
+                    alchemyProgress = JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}');
+                }
+                
+                // Calculate total crafts
+                totalCrafts = Object.values(alchemyProgress).reduce((sum, val) => sum + val, 0);
+                document.getElementById('totalDonated').textContent = totalCrafts.toLocaleString();
+                
+                // Get mastery level
+                if (typeof window.getLevelFromProgress === 'function') {
+                    masteryLevel = window.getLevelFromProgress(totalCrafts);
+                } else {
+                    masteryLevel = { name: 'Untrained', multiplier: 1.0 };
+                }
+                document.getElementById('masteryLevel').textContent = masteryLevel.name;
+                document.getElementById('overviewMasteryLevel').textContent = masteryLevel.name;
+                
+                // Update mastery stats
+                document.getElementById('totalCrafts').textContent = totalCrafts.toLocaleString();
+                document.getElementById('uniqueRecipes').textContent = Object.keys(alchemyProgress).length;
+                document.getElementById('laborMultiplier').textContent = masteryLevel.multiplier.toFixed(1) + 'x';
+                
+                // Calculate skill categories
+                const categories = new Set();
+                Object.keys(alchemyProgress).forEach(recipe => {
+                    // In a real implementation, you'd map recipe IDs to categories
+                    categories.add('Basic'); // Placeholder
+                });
+                document.getElementById('skillCategories').textContent = categories.size;
+                
+                // Calculate next level progress
+                const nextLevel = getNextLevelProgress(totalCrafts);
+                document.getElementById('masteryProgressFill').style.width = nextLevel.percentage + '%';
+                document.getElementById('nextLevelText').textContent = `Progress to ${nextLevel.nextName}`;
+                document.getElementById('nextLevelProgress').textContent = `${nextLevel.current}/${nextLevel.total}`;
+                
+                // Load category data
+                loadCategoryData();
+                
+                // Load skill tree
+                loadSkillTree();
+                
+                // Load donation history
+                loadDonationHistory();
+                
+                // Load Hall of Fame
+                loadHallOfFame();
+                
+            } catch (error) {
+                console.error('Error loading university data:', error);
+            }
+        }
+
+        // ===== GET NEXT LEVEL PROGRESS =====
+        function getNextLevelProgress(progress) {
+            const thresholds = [
+                { name: 'Untrained', threshold: 0 },
+                { name: 'Novice', threshold: 100 },
+                { name: 'Apprentice', threshold: 1000 },
+                { name: 'Journeyman', threshold: 5000 },
+                { name: 'Expert', threshold: 10000 },
+                { name: 'Master', threshold: 25000 },
+                { name: 'Grand Master', threshold: 50000 },
+                { name: 'Sage', threshold: 100000 },
+                { name: 'Legendary', threshold: 250000 },
+                { name: 'Mythic', threshold: 500000 },
+                { name: 'Transcendent', threshold: 1000000 }
+            ];
+            
+            for (let i = 0; i < thresholds.length - 1; i++) {
+                const current = thresholds[i];
+                const next = thresholds[i + 1];
+                
+                if (progress >= current.threshold && progress < next.threshold) {
+                    const currentProgress = progress - current.threshold;
+                    const totalNeeded = next.threshold - current.threshold;
+                    const percentage = (currentProgress / totalNeeded) * 100;
+                    
+                    return {
+                        currentLevel: current.name,
+                        nextName: next.name,
+                        current: currentProgress,
+                        total: totalNeeded,
+                        percentage: percentage
+                    };
+                }
+            }
+            
+            return {
+                currentLevel: 'Transcendent',
+                nextName: 'MAX',
+                current: 0,
+                total: 0,
+                percentage: 100
+            };
+        }
+
+        // ===== LOAD CATEGORY DATA =====
+        function loadCategoryData() {
+            // This would come from skill-multipliers.js in a real implementation
+            const categories = [
+                { name: 'Basic Compounds', progress: 450, target: 1000, icon: '💧', color: 'default' },
+                { name: 'Acids & Bases', progress: 320, target: 800, icon: '🧪', color: 'uncommon' },
+                { name: 'Salts & Minerals', progress: 280, target: 600, icon: '🧂', color: 'uncommon' },
+                { name: 'Hydrocarbons', progress: 150, target: 500, icon: '🔥', color: 'rare' },
+                { name: 'Alcohols', progress: 120, target: 500, icon: '🍶', color: 'rare' },
+                { name: 'Polymers', progress: 50, target: 1000, icon: '🧴', color: 'very-rare' },
+                { name: 'Basic Alloys', progress: 30, target: 2000, icon: '⚙️', color: 'very-rare' }
+            ];
+            
+            // Build category navigation
+            let navHtml = '';
+            categories.forEach(cat => {
+                navHtml += `<button class="university-category-btn" onclick="window.viewSkillDetails('${cat.name}')">${cat.icon} ${cat.name}</button>`;
+            });
+            categoryNav.innerHTML = navHtml;
+            
+            // Build category cards
+            let cardsHtml = '';
+            categories.forEach(cat => {
+                const percent = (cat.progress / cat.target) * 100;
+                cardsHtml += `
+                    <div class="university-category-card">
+                        <div class="category-card-header" onclick="window.toggleCategory('${cat.name}')">
+                            <div class="category-card-title">
+                                <span class="category-card-icon">${cat.icon}</span>
+                                <span class="category-card-name">${cat.name}</span>
+                            </div>
+                            <div class="category-card-stats">${Math.round(percent)}%</div>
+                            <div class="category-card-arrow">▶</div>
+                        </div>
+                        <div class="category-card-progress">
+                            <div class="category-progress-bar">
+                                <div class="category-progress-fill" style="width: ${percent}%"></div>
+                            </div>
+                            <div class="category-progress-text">
+                                <span>${cat.progress}</span>
+                                <span class="category-progress-value">/${cat.target}</span>
+                            </div>
+                        </div>
+                        <div class="skill-list" id="skillList-${cat.name.replace(/\s+/g, '')}" style="display: none;">
+                            <!-- Skills would be listed here -->
+                        </div>
+                    </div>
+                `;
+            });
+            categoryCards.innerHTML = cardsHtml;
+        }
+
+        // ===== LOAD SKILL TREE =====
+        function loadSkillTree() {
+            // This would come from skill-tree.js in a real implementation
+            const nodes = [
+                { id: 'water', name: 'Water', tier: 1, icon: '💧', progress: 450, target: 1000 },
+                { id: 'methane', name: 'Methane', tier: 1, icon: '🔥', progress: 380, target: 1000 },
+                { id: 'ammonia', name: 'Ammonia', tier: 1, icon: '⚗️', progress: 420, target: 1000 },
+                { id: 'sulfuric_acid', name: 'Sulfuric Acid', tier: 2, icon: '🧪', progress: 120, target: 500 },
+                { id: 'nitric_acid', name: 'Nitric Acid', tier: 2, icon: '🧪', progress: 90, target: 500 }
+            ];
+            
+            let treeHtml = '<div class="skill-tree-grid">';
+            nodes.forEach(node => {
+                const percent = (node.progress / node.target) * 100;
+                const unlocked = node.progress > 0;
+                const current = node.progress >= node.target;
+                
+                treeHtml += `
+                    <div class="skill-tree-node ${unlocked ? 'unlocked' : 'locked'} ${current ? 'current' : ''}" data-id="${node.id}">
+                        <div class="skill-tree-node-header">
+                            <span class="skill-tree-node-icon">${node.icon}</span>
+                            <span class="skill-tree-node-name">${node.name}</span>
+                            <span class="skill-tree-node-level">Tier ${node.tier}</span>
+                        </div>
+                        <div class="skill-tree-node-progress">
+                            <div class="skill-tree-progress-bar">
+                                <div class="skill-tree-progress-fill" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            treeHtml += '</div>';
+            
+            skillTreeViz.innerHTML = treeHtml;
+            
+            // Update next milestone
+            const next = getNextLevelProgress(totalCrafts);
+            document.getElementById('nextMilestone').textContent = next.nextName;
+            document.getElementById('nextMilestoneFill').style.width = next.percentage + '%';
+            document.getElementById('nextMilestoneCurrent').textContent = next.current;
+            document.getElementById('nextMilestoneTarget').textContent = next.total;
+        }
+
+        // ===== LOAD DONATION HISTORY =====
+        function loadDonationHistory() {
+            // Simulated history data
+            donationHistory = [
+                { type: 'donation', item: 'Water', quantity: 10, date: new Date(Date.now() - 86400000).toISOString() },
+                { type: 'donation', item: 'Methane', quantity: 5, date: new Date(Date.now() - 172800000).toISOString() },
+                { type: 'craft', item: 'Water', quantity: 1, date: new Date(Date.now() - 259200000).toISOString() },
+                { type: 'milestone', item: 'Novice', description: 'Reached Novice level', date: new Date(Date.now() - 604800000).toISOString() }
+            ];
+            
+            filterHistory('all');
+        }
+
+        // ===== FILTER HISTORY =====
+        function filterHistory(filter) {
+            historyFilter = filter;
+            
+            // Update active button
+            document.querySelectorAll('.history-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            let filtered = donationHistory;
+            if (filter !== 'all') {
+                filtered = donationHistory.filter(h => h.type === filter);
+            }
+            
+            if (filtered.length === 0) {
+                historyList.innerHTML = '<div class="university-empty-state">No history entries found</div>';
+                return;
+            }
+            
+            let html = '';
+            filtered.forEach(entry => {
+                const date = new Date(entry.date).toLocaleDateString();
+                const icon = entry.type === 'donation' ? '📦' : entry.type === 'craft' ? '⚗️' : '🏆';
+                
+                html += `
+                    <div class="history-entry">
+                        <div class="history-icon">${icon}</div>
+                        <div class="history-content">
+                            <div class="history-item-name">${entry.item || entry.description}</div>
+                            <div class="history-date">${date}</div>
+                        </div>
+                        <div class="history-quantity">${entry.quantity ? '+' + entry.quantity : ''}</div>
+                    </div>
+                `;
+            });
+            
+            historyList.innerHTML = html;
+        }
+
+        // ===== LOAD HALL OF FAME =====
+        function loadHallOfFame() {
+            // Simulated Hall of Fame data
+            const topCrafters = [
+                { name: 'Alex', crafts: 15420, title: 'Grand Master' },
+                { name: 'Jamie', crafts: 12350, title: 'Master' },
+                { name: 'Taylor', crafts: 10890, title: 'Master' },
+                { name: 'Jordan', crafts: 9540, title: 'Expert' },
+                { name: 'Casey', crafts: 8320, title: 'Expert' }
+            ];
+            
+            const masterAlchemists = [
+                { name: 'Morgan', title: 'Transcendent', achievement: 'First to craft Room Temp Superconductor' },
+                { name: 'Riley', title: 'Mythic', achievement: 'Mastered all Tier 8 recipes' },
+                { name: 'Quinn', title: 'Legendary', achievement: '100,000 total crafts' }
+            ];
+            
+            const discoveries = [
+                { name: 'Sam', discovery: 'Room Temperature Superconductor', date: '2345.03.15' },
+                { name: 'Casey', discovery: 'Graphene Synthesis', date: '2345.02.28' },
+                { name: 'Taylor', discovery: 'Antimatter Containment', date: '2345.01.07' }
+            ];
+            
+            let craftersHtml = '';
+            topCrafters.forEach((crafter, index) => {
+                craftersHtml += `
+                    <div class="hall-entry">
+                        <div class="hall-rank">#${index + 1}</div>
+                        <div class="hall-avatar">👤</div>
+                        <div class="hall-info">
+                            <div class="hall-player-name">${crafter.name}</div>
+                            <div class="hall-player-title">${crafter.title}</div>
+                        </div>
+                        <div class="hall-value">${crafter.crafts.toLocaleString()}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('topCrafters').innerHTML = craftersHtml;
+            
+            let mastersHtml = '';
+            masterAlchemists.forEach(master => {
+                mastersHtml += `
+                    <div class="hall-entry">
+                        <div class="hall-avatar">👑</div>
+                        <div class="hall-info">
+                            <div class="hall-player-name">${master.name}</div>
+                            <div class="hall-player-title">${master.title}</div>
+                            <div style="font-size: 11px; color: #a0c0ff;">${master.achievement}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('masterAlchemists').innerHTML = mastersHtml;
+            
+            let discoveriesHtml = '';
+            discoveries.forEach(d => {
+                discoveriesHtml += `
+                    <div class="hall-entry">
+                        <div class="hall-avatar">🔬</div>
+                        <div class="hall-info">
+                            <div class="hall-player-name">${d.name}</div>
+                            <div class="hall-player-title">${d.discovery}</div>
+                            <div style="font-size: 11px; color: #a0c0ff;">${d.date}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('legendaryDiscoveries').innerHTML = discoveriesHtml;
+        }
+
+        // ===== SWITCH TAB =====
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.university-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show corresponding content
+            masteryContent.style.display = 'none';
+            skillsContent.style.display = 'none';
+            historyContent.style.display = 'none';
+            hallContent.style.display = 'none';
+            
+            switch(tab) {
+                case 'mastery':
+                    masteryContent.style.display = 'block';
+                    break;
+                case 'skills':
+                    skillsContent.style.display = 'block';
+                    break;
+                case 'history':
+                    historyContent.style.display = 'block';
+                    break;
+                case 'hall':
+                    hallContent.style.display = 'block';
+                    break;
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== TOGGLE CATEGORY =====
+        window.toggleCategory = function(categoryName) {
+            const card = event.target.closest('.university-category-card');
+            const arrow = card.querySelector('.category-card-arrow');
+            const skillList = document.getElementById(`skillList-${categoryName.replace(/\s+/g, '')}`);
+            
+            if (skillList.style.display === 'none') {
+                skillList.style.display = 'block';
+                arrow.classList.add('expanded');
+            } else {
+                skillList.style.display = 'none';
+                arrow.classList.remove('expanded');
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        // ===== VIEW SKILL DETAILS =====
+        function viewSkillDetails(skillName) {
+            // Navigate to alchemy lab with skill filter
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = `alchemy-lab.html?skill=${encodeURIComponent(skillName)}`;
+        }
+
+        // ===== SCROLL TO HALL =====
+        function scrollToHall() {
+            switchTab('hall');
+        }
+
+        // ===== NAVIGATION =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'opening university...';
+                
+                await loadUniversityData();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading university';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
