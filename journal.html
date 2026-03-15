@@ -1043,15 +1043,16 @@
         // ===== LOAD LOCATIONS FOR ELEMENT =====
         async function loadLocationsForElement(elementName) {
             try {
-                // Use the new getElementLocations function from storage.js
+                // Use the getElementLocations function from storage.js
                 if (typeof window.getElementLocations === 'function') {
                     const locations = await window.getElementLocations(elementName);
-                    console.log(`Loaded ${locations.length} locations for ${elementName}:`, locations);
+                    console.log(`Loaded ${locations.length} locations for ${elementName}`);
                     return locations || [];
                 }
                 return [];
             } catch (error) {
                 console.error(`Error loading locations for ${elementName}:`, error);
+                // Return empty array on error to prevent UI from breaking
                 return [];
             }
         }
@@ -1172,15 +1173,14 @@
             } else {
                 expandedElement = elementName;
                 
-                // Show loading indicator
-                const loadingMsg = document.createElement('div');
-                loadingMsg.className = 'loading-locations';
-                loadingMsg.style.cssText = 'color: #a0c0ff; padding: 10px; text-align: center;';
-                loadingMsg.textContent = 'Loading location data...';
-                
                 // Load locations for this element if not cached
                 if (!locationsCache[elementName]) {
-                    locationsCache[elementName] = await loadLocationsForElement(elementName);
+                    try {
+                        locationsCache[elementName] = await loadLocationsForElement(elementName);
+                    } catch (error) {
+                        console.error(`Failed to load locations for ${elementName}:`, error);
+                        locationsCache[elementName] = []; // Set empty array on error
+                    }
                 }
                 
                 renderDiscoveries();
@@ -1231,7 +1231,7 @@
                     const isExpanded = expandedElement === element.name;
                     const firstFoundDate = new Date(element.firstFound).toLocaleDateString();
                     
-                    // Get locations from cache
+                    // Get locations from cache (safe even if empty)
                     const elementLocations = locationsCache[element.name] || [];
                     
                     // Build locations HTML
@@ -1244,7 +1244,6 @@
                             if (!planetMap.has(planet)) {
                                 planetMap.set(planet, {
                                     count: 0,
-                                    firstDate: loc.discoveredDate || loc.timestamp,
                                     planetType: loc.planetType || 'unknown',
                                     locations: []
                                 });
@@ -1583,7 +1582,7 @@
             currentWarpTarget = null;
         }
 
-        // ===== CONFIRM WARP - FIXED to go to SURFACE not back to journal =====
+        // ===== CONFIRM WARP =====
         function confirmWarp() {
             if (!currentWarpTarget) return;
             
@@ -1607,7 +1606,6 @@
                 const fuel = parseInt(fuelText.replace('⭐', ''));
                 
                 // CRITICAL: Save the destination planet so surface.html can load it
-                // We're overriding the current planet with the destination
                 localStorage.setItem('voidfarer_warp_destination_planet', currentWarpTarget.planet);
                 localStorage.setItem('voidfarer_warp_destination_planet_type', currentWarpTarget.planetType);
                 
@@ -1627,13 +1625,13 @@
                     totalDistance: distance,
                     warpCycles: cycles,
                     fuelCost: fuel,
-                    returnPage: 'surface.html',  // CRITICAL: Go to surface, not journal
+                    returnPage: 'surface.html',
                     
                     destPlanet: currentWarpTarget.planet,
                     destPlanetType: currentWarpTarget.planetType,
                     
-                    destSector: currentSector,  // Note: We're keeping sector info the same
-                    destRegion: currentRegion,  // This assumes the planet is in same region
+                    destSector: currentSector,
+                    destRegion: currentRegion,
                     destStarSector: currentStarSector,
                     destStar: currentStar
                 };
