@@ -998,16 +998,6 @@
                     notificationQuantity.textContent = '';
                     notificationRarity.textContent = '';
                     notificationPity.textContent = '';
-                } else if (result.reason === 'no_resources') {
-                    notificationResource.textContent = 'No Resources';
-                    notificationQuantity.textContent = 'Select resources to extract';
-                    notificationRarity.textContent = '';
-                    notificationPity.textContent = '';
-                } else {
-                    notificationResource.textContent = 'Extraction Failed';
-                    notificationQuantity.textContent = '';
-                    notificationRarity.textContent = '';
-                    notificationPity.textContent = '';
                 }
             }
             
@@ -1056,6 +1046,23 @@
             toastContainer.appendChild(toast);
             
             // Failure toast shows for 2 seconds
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 2000);
+        }
+
+        function showCargoFullToast() {
+            const toast = document.createElement('div');
+            toast.className = 'toast fail';
+            toast.innerHTML = `
+                <span class="toast-icon">⚠️</span>
+                <span>Cargo full - extraction paused</span>
+            `;
+            toastContainer.appendChild(toast);
+            
+            // Cargo full toast shows for 2 seconds
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.remove();
@@ -1516,8 +1523,8 @@
                         extractionTimer = null;
                     }
                     
-                    // Show failure toast for cargo full
-                    showFailToast('Cargo full!');
+                    // Show cargo full toast
+                    showCargoFullToast();
                     
                     // Show failure notification for cargo full
                     showExtractionNotification({
@@ -1531,16 +1538,6 @@
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
-                    
-                    // Show failure toast for no resources
-                    showFailToast('No resources selected');
-                    
-                    // Show failure notification for no resources
-                    showExtractionNotification({
-                        success: false,
-                        resource: null,
-                        reason: 'no_resources'
-                    });
                     return;
                 } else {
                     extractorText.textContent = 'Auto-extractor active';
@@ -1626,15 +1623,6 @@
                     if (currentMass + totalMass <= cargoLimit) {
                         if (typeof window.addElementToCollection !== 'function') {
                             console.warn('window.addElementToCollection not available');
-                            
-                            // Show failure toast for missing function
-                            showFailToast('Storage error');
-                            
-                            showExtractionNotification({
-                                success: false,
-                                resource: resource,
-                                reason: 'storage_error'
-                            });
                             return;
                         }
                         
@@ -1678,25 +1666,7 @@
                             
                             // Update claim button status after new discovery
                             await updateClaimButton();
-                        } else {
-                            // Failed to add to collection
-                            showFailToast('Extraction failed');
-                            
-                            showExtractionNotification({
-                                success: false,
-                                resource: resource,
-                                reason: 'storage_error'
-                            });
                         }
-                    } else {
-                        // Cargo would overflow
-                        showFailToast('Cargo full');
-                        
-                        showExtractionNotification({
-                            success: false,
-                            resource: resource,
-                            reason: 'cargo_overflow'
-                        });
                     }
                 } else {
                     // Failed extraction - show failure toast with pity count
@@ -1715,16 +1685,6 @@
                 }
             } catch (error) {
                 console.error('Extraction error:', error);
-                
-                // Show failure toast for error
-                showFailToast('Extraction error');
-                
-                // Show failure notification for error
-                showExtractionNotification({
-                    success: false,
-                    resource: null,
-                    reason: 'error'
-                });
             }
         }
 
