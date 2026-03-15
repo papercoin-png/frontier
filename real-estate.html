@@ -478,7 +478,7 @@
             <!-- Header -->
             <div class="estate-header">
                 <div class="estate-title">Real Estate</div>
-                <div class="estate-subtitle">✦ shared storage expansion ✦</div>
+                <div class="estate-subtitle">✦ Earth Hub Storage Expansion ✦</div>
             </div>
             
             <!-- Stats Bar -->
@@ -487,12 +487,12 @@
                     <span>⭐</span> --
                 </div>
                 <div class="total-capacity" id="totalCapacity">
-                    Storage: --/-- AMU
+                    Hub Storage: --/-- AMU
                 </div>
             </div>
             
             <!-- Your Properties Section -->
-            <div class="section-title">✦ Your Properties</div>
+            <div class="section-title">✦ Your Earth Hub Properties</div>
             <div class="properties-grid" id="propertiesContainer">
                 <div class="empty-state">Loading your properties...</div>
             </div>
@@ -557,28 +557,28 @@
                 capacity: 500, // 500 AMU
                 price: 10000,
                 icon: '🔐',
-                desc: 'Basic personal storage unit. Adds 500 AMU to your total storage.'
+                desc: 'Basic personal storage unit at Earth Hub. Adds 500 AMU to your hub storage.'
             },
             'small_warehouse': {
                 name: 'Small Warehouse',
                 capacity: 2000, // 2000 AMU
                 price: 50000,
                 icon: '🏢',
-                desc: 'Secure storage facility. Adds 2,000 AMU to your total storage.'
+                desc: 'Secure storage facility at Earth Hub. Adds 2,000 AMU to your hub storage.'
             },
             'commercial_depot': {
                 name: 'Commercial Depot',
                 capacity: 10000, // 10000 AMU
                 price: 200000,
                 icon: '🏭',
-                desc: 'Industrial-sized warehouse. Adds 10,000 AMU to your total storage.'
+                desc: 'Industrial-sized warehouse at Earth Hub. Adds 10,000 AMU to your hub storage.'
             },
             'orbital_platform': {
                 name: 'Orbital Platform',
                 capacity: 50000, // 50000 AMU
                 price: 1000000,
                 icon: '🛰️',
-                desc: 'Zero-G storage in orbit. Adds 50,000 AMU to your total storage.'
+                desc: 'Zero-G storage in Earth orbit. Adds 50,000 AMU to your hub storage.'
             }
         };
 
@@ -586,9 +586,10 @@
         const STORAGE_KEYS = {
             CREDITS: 'voidfarer_credits',
             REAL_ESTATE: 'voidfarer_real_estate',
-            STORAGE_MAX: 'voidfarer_storage_max',
-            STORAGE_USED: 'voidfarer_storage_used',
-            INVENTORY: 'voidfarer_inventory'
+            HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',  // Earth Hub storage max
+            HUB_STORAGE_USED: 'voidfarer_hub_storage_used', // Earth Hub storage used
+            SHIP_STORAGE_MAX: 'voidfarer_ship_storage_max', // Ship cargo hold max (separate)
+            SHIP_STORAGE_USED: 'voidfarer_ship_storage_used' // Ship cargo hold used
         };
 
         // ===== FALLBACK STORAGE FUNCTIONS =====
@@ -623,74 +624,135 @@
             };
         }
         
-        if (typeof window.getStorageUsed !== 'function') {
-            window.getStorageUsed = async function() {
-                return parseFloat(localStorage.getItem(STORAGE_KEYS.STORAGE_USED) || '0');
+        if (typeof window.getHubStorageUsed !== 'function') {
+            window.getHubStorageUsed = async function() {
+                return parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
             };
         }
 
-        // ===== SHARED STORAGE UPDATE FUNCTION =====
-        // This is the key function that makes it a shared space
-        async function updateSharedStorage(propertyData) {
+        // ===== EARTH HUB STORAGE UPDATE FUNCTION =====
+        // This ONLY updates Earth Hub storage, NOT ship cargo hold
+        async function updateHubStorage(propertyData) {
             try {
-                // Calculate total capacity from ALL properties
+                // Calculate total capacity from ALL properties (Earth Hub storage only)
                 const properties = propertyData.properties || [];
                 let totalCapacity = 0;
-                let totalUsed = 0;
                 
                 properties.forEach(prop => {
                     totalCapacity += prop.capacity || 0;
-                    totalUsed += prop.used || 0;
                 });
                 
-                // Save to multiple locations to ensure all parts of the app can access it
+                // Get current used hub storage (items stored at Earth Hub)
+                let usedStorage = await getCurrentHubStorageUsed();
                 
-                // 1. Save to localStorage as primary shared storage
-                localStorage.setItem(STORAGE_KEYS.STORAGE_MAX, totalCapacity.toString());
-                localStorage.setItem(STORAGE_KEYS.STORAGE_USED, totalUsed.toString());
+                // Save ONLY to Earth Hub storage keys - NOT affecting ship storage
+                localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, totalCapacity.toString());
+                localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, usedStorage.toString());
                 
-                // 2. If player module exists, update there too
-                if (typeof window.setPlayerStorageMax === 'function') {
-                    await window.setPlayerStorageMax(totalCapacity);
+                // Update any Earth Hub specific objects, but leave ship storage alone
+                try {
+                    // Update hub-specific data if it exists
+                    let hubData = {};
+                    const hubJson = localStorage.getItem('voidfarer_hub_data');
+                    if (hubJson) {
+                        hubData = JSON.parse(hubJson);
+                    }
+                    hubData.storageMax = totalCapacity;
+                    hubData.storageUsed = usedStorage;
+                    localStorage.setItem('voidfarer_hub_data', JSON.stringify(hubData));
+                } catch (e) {
+                    console.log('Could not update hub data:', e);
                 }
                 
-                if (typeof window.setPlayerStorageUsed === 'function') {
-                    await window.setPlayerStorageUsed(totalUsed);
+                // If hub module exists, update there too
+                if (typeof window.setHubStorageMax === 'function') {
+                    await window.setHubStorageMax(totalCapacity);
                 }
                 
-                // 3. Update inventory system if it exists
-                if (typeof window.updateInventoryCapacity === 'function') {
-                    await window.updateInventoryCapacity(totalCapacity);
+                if (typeof window.setHubStorageUsed === 'function') {
+                    await window.setHubStorageUsed(usedStorage);
                 }
                 
-                // 4. Dispatch an event so other tabs/pages can update
-                window.dispatchEvent(new CustomEvent('storage-updated', {
-                    detail: { max: totalCapacity, used: totalUsed }
+                // Dispatch event for Earth Hub updates only
+                window.dispatchEvent(new CustomEvent('hub-storage-updated', {
+                    detail: { max: totalCapacity, used: usedStorage }
                 }));
                 
-                console.log(`Shared storage updated: ${totalUsed}/${totalCapacity} AMU`);
+                console.log(`🏭 Earth Hub storage updated: ${usedStorage}/${totalCapacity} AMU (ship cargo hold unchanged)`);
                 
-                return { totalCapacity, totalUsed };
+                return { totalCapacity, usedStorage };
             } catch (error) {
-                console.error('Error updating shared storage:', error);
-                return { totalCapacity: 0, totalUsed: 0 };
+                console.error('Error updating hub storage:', error);
+                return { totalCapacity: 0, usedStorage: 0 };
             }
+        }
+
+        // Helper function to get current used hub storage
+        async function getCurrentHubStorageUsed() {
+            // Try multiple sources to get the current used hub storage
+            let used = 0;
+            
+            // 1. Try via function
+            if (typeof window.getHubStorageUsed === 'function') {
+                try {
+                    used = await window.getHubStorageUsed();
+                    return used;
+                } catch (e) {}
+            }
+            
+            // 2. Try localStorage
+            const storedUsed = localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED);
+            if (storedUsed) {
+                used = parseFloat(storedUsed);
+                return used;
+            }
+            
+            // 3. Try hub data
+            try {
+                const hubJson = localStorage.getItem('voidfarer_hub_data');
+                if (hubJson) {
+                    const hub = JSON.parse(hubJson);
+                    if (hub.storageUsed) {
+                        used = hub.storageUsed;
+                        return used;
+                    }
+                }
+            } catch (e) {}
+            
+            return used;
         }
 
         // ===== NAVIGATION =====
         function returnToEarthHub() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            // Before leaving, ensure hub storage values are fresh
+            updateHubStorageBeforeLeave();
+            
             window.location.href = 'earth-hub.html';
+        }
+
+        async function updateHubStorageBeforeLeave() {
+            try {
+                const propertyData = await window.getRealEstate();
+                await updateHubStorage(propertyData);
+            } catch (e) {
+                console.log('Final hub storage update:', e);
+            }
         }
 
         function navigateTo(screen) {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'navigating...';
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = screen;
-            }, 300);
+            
+            // Final hub storage update before navigating
+            updateHubStorageBeforeLeave().then(() => {
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                    window.location.href = screen;
+                }, 300);
+            });
         }
 
         // ===== LOAD DATA =====
@@ -707,40 +769,25 @@
                     propertyData = await window.getRealEstate();
                 }
 
-                // Get current used storage
-                let usedStorage = 0;
-                if (typeof window.getStorageUsed === 'function') {
-                    usedStorage = await window.getStorageUsed();
-                } else {
-                    usedStorage = parseFloat(localStorage.getItem(STORAGE_KEYS.STORAGE_USED) || '0');
-                }
-
-                // Update property used values from shared storage
-                if (propertyData.properties && propertyData.properties.length > 0) {
-                    // Distribute used storage across properties proportionally
-                    // (or you could just update the first property - but for shared space, 
-                    // we just need the total to match)
-                    const totalCapacity = propertyData.properties.reduce((sum, p) => sum + p.capacity, 0);
-                    
-                    if (totalCapacity > 0) {
-                        // Update each property's used value proportionally
-                        propertyData.properties.forEach(prop => {
-                            prop.used = (prop.capacity / totalCapacity) * usedStorage;
-                        });
-                    }
-                }
+                // Get current used hub storage
+                let usedStorage = await getCurrentHubStorageUsed();
 
                 // Update header
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
 
                 // Render properties
-                renderProperties(propertyData);
+                renderProperties(propertyData, usedStorage);
                 
                 // Render market
                 renderMarket(propertyData, credits);
 
                 // Update total capacity display
-                await updateTotalCapacityDisplay(propertyData);
+                await updateTotalCapacityDisplay(propertyData, usedStorage);
+
+                // Display ship storage info for clarity (without affecting it)
+                const shipMax = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX) || '500';
+                const shipUsed = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED) || '0';
+                console.log(`🚀 Ship cargo hold remains separate: ${shipUsed}/${shipMax} AMU`);
 
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -752,27 +799,32 @@
         }
 
         // ===== RENDER PROPERTIES =====
-        function renderProperties(propertyData) {
+        function renderProperties(propertyData, usedStorage) {
             const container = document.getElementById('propertiesContainer');
             container.innerHTML = '';
 
             if (!propertyData.properties || propertyData.properties.length === 0) {
-                container.innerHTML = '<div class="empty-state">You don\'t own any properties yet</div>';
+                container.innerHTML = '<div class="empty-state">You don\'t own any Earth Hub properties yet</div>';
                 return;
             }
 
+            // Calculate total capacity for proportional display
+            const totalCapacity = propertyData.properties.reduce((sum, p) => sum + p.capacity, 0);
+            
             propertyData.properties.forEach(prop => {
                 const propType = PROPERTY_TYPES[prop.type];
                 if (!propType) return;
 
-                const usedPercent = ((prop.used || 0) / prop.capacity) * 100;
+                // Calculate proportional usage for this property (visual only)
+                const propUsed = totalCapacity > 0 ? (prop.capacity / totalCapacity) * usedStorage : 0;
+                const usedPercent = (propUsed / prop.capacity) * 100;
 
                 const card = document.createElement('div');
                 card.className = 'property-card';
                 card.innerHTML = `
                     <div class="property-header">
                         <span class="property-name">${prop.name}</span>
-                        <span class="property-type">${propType.icon} ${propType.name}</span>
+                        <span class="property-type">${propType.icon} Earth Hub</span>
                     </div>
                     <div class="property-details">
                         <span>Adds: <span class="property-capacity">+${prop.capacity}</span> <span class="property-capacity-unit">AMU</span></span>
@@ -782,7 +834,7 @@
                         <div class="capacity-bar-fill" style="width: ${usedPercent}%"></div>
                     </div>
                     <div class="property-actions">
-                        <button class="property-btn" onclick="window.viewProperty('${prop.id}')">DETAILS</button>
+                        <button class="property-btn" onclick="window.viewProperty('${prop.id}')">HUB STORAGE</button>
                         <button class="property-btn primary" onclick="window.transferToProperty('${prop.id}')">MANAGE</button>
                     </div>
                 `;
@@ -811,13 +863,13 @@
                         <span class="market-price">${prop.price.toLocaleString()}⭐</span>
                     </div>
                     <div class="market-details">
-                        <span class="market-capacity">➕ ${prop.capacity.toLocaleString()} <span class="market-capacity-unit">AMU</span></span>
+                        <span class="market-capacity">🏭 +${prop.capacity.toLocaleString()} <span class="market-capacity-unit">AMU</span></span>
                     </div>
                     <div class="market-desc">${prop.desc}</div>
                     <button class="purchase-btn" 
                         onclick="window.purchaseProperty('${type}')" 
                         ${alreadyOwned || credits < prop.price ? 'disabled' : ''}>
-                        ${alreadyOwned ? '✓ OWNED' : 'ADD TO SHARED STORAGE'}
+                        ${alreadyOwned ? '✓ OWNED' : 'EXPAND HUB STORAGE'}
                     </button>
                 `;
 
@@ -826,16 +878,14 @@
         }
 
         // ===== UPDATE TOTAL CAPACITY DISPLAY =====
-        async function updateTotalCapacityDisplay(propertyData) {
+        async function updateTotalCapacityDisplay(propertyData, usedStorage) {
             let totalCapacity = 0;
-            let totalUsed = 0;
 
             (propertyData.properties || []).forEach(prop => {
                 totalCapacity += prop.capacity;
-                totalUsed += prop.used || 0;
             });
 
-            document.getElementById('totalCapacity').textContent = `Storage: ${totalUsed.toFixed(1)}/${totalCapacity} AMU`;
+            document.getElementById('totalCapacity').textContent = `Hub Storage: ${usedStorage.toFixed(1)}/${totalCapacity} AMU`;
         }
 
         // ===== PURCHASE PROPERTY =====
@@ -859,7 +909,7 @@
             }
 
             loadingOverlay.classList.add('active');
-            loadingText.textContent = 'adding storage space...';
+            loadingText.textContent = 'expanding hub storage...';
 
             try {
                 // Spend credits
@@ -872,13 +922,8 @@
                     localStorage.setItem(STORAGE_KEYS.CREDITS, (credits - propType.price).toString());
                 }
 
-                // Get current used storage
-                let currentUsed = 0;
-                if (typeof window.getStorageUsed === 'function') {
-                    currentUsed = await window.getStorageUsed();
-                } else {
-                    currentUsed = parseFloat(localStorage.getItem(STORAGE_KEYS.STORAGE_USED) || '0');
-                }
+                // Get current used hub storage BEFORE creating new property
+                let currentUsed = await getCurrentHubStorageUsed();
 
                 // Create new property record
                 const newProp = {
@@ -886,9 +931,10 @@
                     type: type,
                     name: propType.name,
                     capacity: propType.capacity,
-                    used: 0, // Individual properties don't track used - it's shared
+                    used: 0, // Individual properties don't track used - it's shared hub storage
                     purchaseDate: new Date().toISOString(),
-                    cost: propType.price
+                    cost: propType.price,
+                    location: 'earth_hub' // Mark as Earth Hub property
                 };
 
                 if (!propertyData.properties) {
@@ -904,15 +950,21 @@
                     localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(propertyData));
                 }
 
-                // CRITICAL: Update shared storage with new total capacity
-                // This adds the new property's capacity to the player's total storage
-                const { totalCapacity } = await updateSharedStorage(propertyData);
+                // CRITICAL: Update ONLY Earth Hub storage with new total capacity
+                // This does NOT affect ship cargo hold
+                const { totalCapacity } = await updateHubStorage(propertyData);
+
+                // Get ship storage for comparison (just to show it's unchanged)
+                const shipMax = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX) || '500';
+                const shipUsed = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED) || '0';
 
                 // Reload data to reflect changes
                 await loadData();
 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                alert(`✅ Storage Expanded!\n\nYou've purchased ${propType.name}.\nYour total storage is now ${totalCapacity} AMU.`);
+                
+                // Show detailed success message - emphasizing it's ONLY Earth Hub storage
+                alert(`✅ EARTH HUB STORAGE EXPANDED!\n\nYou've purchased ${propType.name} at Earth Hub.\n\n🏭 HUB STORAGE:\n• Added: +${propType.capacity} AMU\n• Total Hub Capacity: ${totalCapacity} AMU\n• Hub Used: ${currentUsed} AMU\n• Hub Available: ${(totalCapacity - currentUsed).toFixed(1)} AMU\n\n🚀 SHIP CARGO HOLD (Unchanged):\n• Ship Capacity: ${shipMax} AMU\n• Ship Used: ${shipUsed} AMU\n\nYour ship's cargo space remains separate!`);
 
             } catch (error) {
                 console.error('Purchase error:', error);
@@ -924,12 +976,17 @@
 
         // ===== PROPERTY ACTIONS =====
         function viewProperty(propertyId) {
-            alert(`📍 ${propertyId}\n\nThis property adds ${PROPERTY_TYPES[propertyId.split('_')[1]]?.capacity || '?'} AMU to your shared storage.`);
+            const prop = PROPERTY_TYPES[propertyId.split('_')[1]];
+            if (prop) {
+                alert(`📍 Earth Hub: ${prop.name}\n\nThis property adds ${prop.capacity} AMU to your Earth Hub storage.\n\nAll your Earth Hub items share this space collectively.\n\n🚫 Does NOT affect your ship's cargo hold.`);
+            } else {
+                alert(`Earth Hub Property\n\nThis is part of your Earth Hub storage pool.\n\nShip cargo space remains separate.`);
+            }
         }
 
         function transferToProperty(propertyId) {
-            // Navigate to inventory management
-            navigateTo(`inventory.html?property=${propertyId}`);
+            // Navigate to hub inventory management
+            navigateTo(`hub-inventory.html?property=${propertyId}`);
         }
 
         // ===== INITIALIZE =====
@@ -937,11 +994,27 @@
             try {
                 // Show loading
                 loadingOverlay.classList.add('active');
-                loadingText.textContent = 'loading real estate...';
+                loadingText.textContent = 'loading earth hub real estate...';
 
                 // Ensure we have default data if none exists
                 if (!localStorage.getItem(STORAGE_KEYS.CREDITS)) {
                     localStorage.setItem(STORAGE_KEYS.CREDITS, '50000');
+                }
+
+                // Initialize hub storage values if they don't exist
+                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
+                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
+                }
+                if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED)) {
+                    localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, '0');
+                }
+
+                // Initialize ship storage separately if it doesn't exist (just for reference)
+                if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX)) {
+                    localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_MAX, '500'); // Default ship capacity
+                }
+                if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED)) {
+                    localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, '0');
                 }
 
                 // Load data
