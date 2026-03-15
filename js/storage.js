@@ -361,89 +361,45 @@ async function getCollection() {
     }
 }
 
-// Internal function to add element to collection (no recursion)
-async function _addElementToCollection(elementName, count = 1) {
+// ===== DIRECT DB ACCESS FUNCTIONS (NO RECURSION) =====
+// These call the db.js functions directly without going through window
+
+async function dbAddElementToCollection(elementName, count = 1) {
     try {
-        return await window.addElementToCollection(elementName, count);
+        // Call the db.js function directly if available
+        if (typeof window.addElementToCollection === 'function') {
+            return await window.addElementToCollection(elementName, count, {});
+        }
+        return { success: false, error: 'db.js function not available' };
     } catch (error) {
-        console.error('Error in _addElementToCollection:', error);
+        console.error('Error in dbAddElementToCollection:', error);
         return { success: false, error: error.message };
     }
 }
 
-// Internal function to remove element from collection
-async function _removeElementFromCollection(elementName, count = 1) {
+async function dbRemoveElementFromCollection(elementName, count = 1) {
     try {
-        return await window.removeElementFromCollection(elementName, count);
+        // Call the db.js function directly if available
+        if (typeof window.removeElementFromCollection === 'function') {
+            return await window.removeElementFromCollection(elementName, count);
+        }
+        return { success: false, error: 'db.js function not available' };
     } catch (error) {
-        console.error('Error in _removeElementFromCollection:', error);
+        console.error('Error in dbRemoveElementFromCollection:', error);
         return { success: false, error: error.message };
     }
 }
 
-// Helper to get element rarity
-function getElementRarity(elementName) {
-    const rareElements = [
-        'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
-        'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
-        'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
-    ];
-    
-    if (rareElements.includes(elementName)) {
-        if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
-            return 'legendary';
-        }
-        if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
-            return 'very-rare';
-        }
-        return 'rare';
-    }
-    
-    const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
-    if (uncommonElements.includes(elementName)) {
-        return 'uncommon';
-    }
-    
-    return 'common';
-}
-
-// Helper to get element value
-function getElementValue(elementName) {
-    const values = {
-        // Common - 100
-        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
-        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
-        'Scandium': 100, 'Vanadium': 100, 'Manganese': 100,
-        
-        // Uncommon - 250
-        'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
-        'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
-        'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
-        
-        // Rare - 1000
-        'Copper': 1000, 'Zinc': 1000, 'Silver': 1000, 'Gold': 1000,
-        'Platinum': 1000, 'Titanium': 1000, 'Cobalt': 1000, 'Chromium': 1000,
-        'Tin': 1000, 'Mercury': 1000,
-        
-        // Very Rare - 5000
-        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
-        'Radium': 5000, 'Polonium': 5000,
-        
-        // Legendary - 25000
-        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
-    };
-    
-    return values[elementName] || 100;
-}
+// ===== PUBLIC WRAPPER FUNCTIONS =====
+// These add additional functionality (stats, location tracking) and then call db.js
 
 // Public wrapper function - adds element to collection and saves location with full metadata
 async function addElementToCollection(elementName, count = 1, locationData = null) {
     try {
         console.log(`Adding ${count}x ${elementName} to collection...`, locationData ? 'with location data' : 'no location data');
         
-        // First add to collection using db.js function
-        const result = await window.addElementToCollection(elementName, count, {});
+        // First add to collection using db.js function DIRECTLY (not through window)
+        const result = await dbAddElementToCollection(elementName, count);
         
         if (result && result.success) {
             // Update player stats
@@ -506,7 +462,63 @@ async function addElementToCollection(elementName, count = 1, locationData = nul
 // Remove element from collection (public wrapper)
 async function removeElementFromCollection(elementName, count = 1) {
     console.log(`Removing ${count}x ${elementName} from collection...`);
-    return await window.removeElementFromCollection(elementName, count);
+    return await dbRemoveElementFromCollection(elementName, count);
+}
+
+// Helper to get element rarity
+function getElementRarity(elementName) {
+    const rareElements = [
+        'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
+        'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
+        'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
+    ];
+    
+    if (rareElements.includes(elementName)) {
+        if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
+            return 'legendary';
+        }
+        if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
+            return 'very-rare';
+        }
+        return 'rare';
+    }
+    
+    const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
+    if (uncommonElements.includes(elementName)) {
+        return 'uncommon';
+    }
+    
+    return 'common';
+}
+
+// Helper to get element value
+function getElementValue(elementName) {
+    const values = {
+        // Common - 100
+        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
+        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
+        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
+        'Scandium': 100, 'Vanadium': 100, 'Manganese': 100,
+        
+        // Uncommon - 250
+        'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
+        'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
+        'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
+        
+        // Rare - 1000
+        'Copper': 1000, 'Zinc': 1000, 'Silver': 1000, 'Gold': 1000,
+        'Platinum': 1000, 'Titanium': 1000, 'Cobalt': 1000, 'Chromium': 1000,
+        'Tin': 1000, 'Mercury': 1000,
+        
+        // Very Rare - 5000
+        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
+        'Radium': 5000, 'Polonium': 5000,
+        
+        // Legendary - 25000
+        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
+    };
+    
+    return values[elementName] || 100;
 }
 
 // ===== SAFE SELL ELEMENT =====
@@ -527,8 +539,8 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
             return { success: false, reason: 'insufficient', available: availableCount };
         }
         
-        // Remove from collection using internal function
-        const removeResult = await removeElementFromCollection(elementName, quantity);
+        // Remove from collection using db.js function directly
+        const removeResult = await dbRemoveElementFromCollection(elementName, quantity);
         
         if (!removeResult.success) {
             return removeResult;
@@ -553,11 +565,9 @@ async function safeSellElement(elementName, quantity, pricePerUnit) {
 
 // ===== LOCATION RETRIEVAL FUNCTIONS =====
 // Get all locations for a specific element
-// FIXED: Now calls db.js functions directly to avoid recursion
 async function getElementLocations(elementName) {
     try {
         // Use getAll directly from db.js, not through window
-        // This avoids the recursive loop
         if (typeof window.getAll === 'function') {
             const allLocations = await window.getAll('elementLocations') || [];
             return allLocations
@@ -577,7 +587,6 @@ async function getElementLocations(elementName) {
 }
 
 // Get all player locations (for stats)
-// FIXED: Now calls db.js functions directly to avoid recursion
 async function getAllPlayerLocations() {
     try {
         // Use getAll directly from db.js
