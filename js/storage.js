@@ -1131,7 +1131,7 @@ function setAmbientVolume(volume) {
 // EXPORTS
 // ============================================================================
 
-// Named exports - ADDED getElementMass here!
+// Named exports
 export {
     // Constants
     STORAGE_KEYS,
@@ -1162,7 +1162,7 @@ export {
     // Cargo
     getTotalCargoMass,
     getRemainingCargoMass,
-    getElementMass,  // <-- THIS WAS MISSING! Now added.
+    getElementMass,
     
     // Credits
     getCredits,
@@ -1209,7 +1209,7 @@ export {
     saveTimestamp
 };
 
-// Also keep the default export for backward compatibility
+// Default export for backward compatibility
 export default {
     // Constants
     STORAGE_KEYS,
