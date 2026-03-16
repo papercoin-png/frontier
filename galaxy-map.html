@@ -114,7 +114,7 @@
             transform: scale(0.96);
         }
         
-        /* Region Info Panel - NO VIEW BUTTON, only PLOT COURSE */
+        /* Region Info Panel - with CLAIM STATUS */
         .region-panel {
             position: absolute;
             bottom: max(100px, env(safe-area-inset-bottom) + 70px);
@@ -144,6 +144,16 @@
             border-bottom: 1px solid rgba(255,255,255,0.2);
             padding-bottom: 8px;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .region-name .claimed-crown {
+            color: gold;
+            font-size: 20px;
+            filter: drop-shadow(0 0 10px gold);
         }
         
         .info-row {
@@ -160,6 +170,39 @@
         .info-value {
             color: #ffd966;
             font-weight: bold;
+        }
+        
+        /* Claim info row - special styling */
+        .claim-row {
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 30px 5px 30px 5px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid gold;
+        }
+        
+        .claim-row .info-label {
+            color: gold;
+        }
+        
+        .claim-row .info-value {
+            color: #4affaa;
+        }
+        
+        .claim-detail {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .claim-detail-label {
+            color: #a0c0ff;
+        }
+        
+        .claim-detail-value {
+            color: #ffd966;
+            font-weight: 600;
         }
         
         .exploration-badge {
@@ -251,7 +294,7 @@
             cursor: not-allowed;
         }
         
-        /* Region boxes */
+        /* Region boxes - UPDATED with claim indicator */
         .region-box {
             position: absolute;
             border: 2px solid rgba(160, 176, 192, 0.4);
@@ -287,6 +330,18 @@
             box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
         }
         
+        .region-box.has-claims {
+            border-color: gold;
+            border-width: 3px;
+            box-shadow: 0 0 30px gold;
+            animation: claim-pulse 3s infinite alternate;
+        }
+        
+        @keyframes claim-pulse {
+            from { box-shadow: 0 0 20px gold; }
+            to { box-shadow: 0 0 40px gold; }
+        }
+        
         .region-label {
             color: white;
             font-family: 'Exo 2', sans-serif;
@@ -300,6 +355,15 @@
             white-space: nowrap;
             pointer-events: none;
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .region-label .crown-icon {
+            color: gold;
+            font-size: 14px;
+            filter: drop-shadow(0 0 5px gold);
         }
         
         .region-count {
@@ -334,6 +398,30 @@
         .exploration-indicator.full {
             background: #ffd700;
             box-shadow: 0 0 10px #ffd700;
+        }
+        
+        .claim-indicator {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: gold;
+            color: #0a0a1a;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 0 15px gold;
+            animation: bounce 2s infinite;
+            z-index: 25;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
         }
         
         /* Loading overlay */
@@ -415,9 +503,14 @@
         <!-- Region boxes will be dynamically created -->
         <div id="regionBoxes"></div>
         
-        <!-- Region Info Panel - ONLY PLOT COURSE BUTTON -->
+        <!-- Region Info Panel - with CLAIM STATUS -->
         <div class="region-panel" id="regionPanel">
-            <div class="region-name" id="selectedRegionName">Loading...</div>
+            <div class="region-name" id="selectedRegionName">
+                Loading...
+                <span class="claimed-crown" id="regionCrown" style="display: none;">👑</span>
+            </div>
+            
+            <!-- Basic sector info -->
             <div class="info-row">
                 <span class="info-label">Sector:</span>
                 <span class="info-value" id="sectorId">---</span>
@@ -436,6 +529,22 @@
                 <span class="exploration-badge" id="explorationBadge">Unknown</span>
             </div>
             
+            <!-- CLAIM INFO SECTION - appears if sector has claimed planets -->
+            <div class="claim-row" id="claimInfoRow" style="display: none;">
+                <div class="info-row">
+                    <span class="info-label">Claimed Planets:</span>
+                    <span class="info-value" id="claimedCount">0</span>
+                </div>
+                <div class="claim-detail">
+                    <span class="claim-detail-label">Highest Value:</span>
+                    <span class="claim-detail-value" id="highestValue">---</span>
+                </div>
+                <div class="claim-detail">
+                    <span class="claim-detail-label">Total Fees Earned:</span>
+                    <span class="claim-detail-value" id="totalFees">0⭐</span>
+                </div>
+            </div>
+            
             <!-- Warp Information -->
             <div class="warp-info">
                 <div class="warp-row">
@@ -452,7 +561,7 @@
                 </div>
             </div>
             
-            <!-- ONLY ONE BUTTON - PLOT COURSE -->
+            <!-- PLOT COURSE BUTTON -->
             <button class="travel-btn primary" id="plotBtn" onclick="window.plotCourseToSector()">🚀 PLOT COURSE TO SECTOR</button>
         </div>
         
@@ -473,9 +582,10 @@
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/migration.js"></script>
     <script type="module" src="js/planet-status.js"></script>
+    <script type="module" src="js/claim-system.js"></script>
 
     <script type="module">
-        import { getPlanetStatus, getClaimedPlanets } from './js/planet-status.js';
+        import { getPlanetStatus, getClaimedPlanets, getPlayerClaimStats } from './js/planet-status.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -492,6 +602,13 @@
         const migrationStatus = document.getElementById('migrationStatus');
         const regionPanel = document.getElementById('regionPanel');
         const regionBoxes = document.getElementById('regionBoxes');
+        
+        // Claim-related elements
+        const regionCrown = document.getElementById('regionCrown');
+        const claimInfoRow = document.getElementById('claimInfoRow');
+        const claimedCount = document.getElementById('claimedCount');
+        const highestValue = document.getElementById('highestValue');
+        const totalFees = document.getElementById('totalFees');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.returnToShip = returnToShip;
@@ -506,6 +623,10 @@
         // Exploration data cache
         let sectorExplorationData = {};
         let playerLocations = [];
+        
+        // Claim data cache
+        let allClaimedPlanets = [];
+        let sectorClaimData = {};
 
         // ===== SECTOR COORDINATES =====
         const sectorCoordinates = {
@@ -547,6 +668,64 @@
             'Fringe': { left: '75%', top: '20%', width: '120px', height: '80px' }
         };
 
+        // ===== LOAD CLAIM DATA =====
+        async function loadClaimData() {
+            try {
+                // Get all claimed planets
+                allClaimedPlanets = await getClaimedPlanets();
+                console.log('Loaded claimed planets:', allClaimedPlanets.length);
+                
+                // Group claims by sector
+                sectorClaimData = {};
+                
+                allClaimedPlanets.forEach(claim => {
+                    // Determine which sector this planet belongs to
+                    // For now, we'll use a simple mapping based on planet name or coordinates
+                    // In a real implementation, you'd have sector info in the claim data
+                    
+                    // Since we don't have direct sector mapping in claims yet,
+                    // we'll use a simplified approach: check if the planet name matches known patterns
+                    // or use the sector coordinates from the claim if available
+                    
+                    let sectorId = null;
+                    
+                    if (claim.sectorX !== undefined && claim.sectorY !== undefined) {
+                        // Find sector by coordinates
+                        for (const [id, coords] of Object.entries(sectorCoordinates)) {
+                            if (coords.x === claim.sectorX && coords.y === claim.sectorY) {
+                                sectorId = id;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Fallback: try to infer from planet name (simplified for demo)
+                    if (!sectorId) {
+                        // This is a simplified mapping - in production, you'd have proper sector data
+                        if (claim.planetName.includes('Earth') || claim.planetName.includes('Mars') || claim.planetName.includes('Venus')) {
+                            sectorId = 'B2'; // Sol system is in Orion Arm
+                        } else if (claim.planetName.includes('Pyros')) {
+                            sectorId = 'C4'; // Pyros in The Fringe
+                        } else {
+                            sectorId = 'B2'; // Default to Orion Arm for demo
+                        }
+                    }
+                    
+                    if (sectorId) {
+                        if (!sectorClaimData[sectorId]) {
+                            sectorClaimData[sectorId] = [];
+                        }
+                        sectorClaimData[sectorId].push(claim);
+                    }
+                });
+                
+                console.log('Sector claim data:', sectorClaimData);
+                
+            } catch (error) {
+                console.error('Error loading claim data:', error);
+            }
+        }
+
         // ===== LOAD EXPLORATION DATA =====
         async function loadExplorationData() {
             try {
@@ -557,13 +736,6 @@
                 
                 // Initialize exploration data for each sector
                 for (const [sectorId, data] of Object.entries(sectorCoordinates)) {
-                    // Filter locations in this sector
-                    const sectorLocations = playerLocations.filter(loc => {
-                        // This assumes locations have sector info - you may need to adjust
-                        // For now, we'll use a simplified approach
-                        return true; // Placeholder
-                    });
-                    
                     // Count unique planets in this sector
                     const uniquePlanets = new Set();
                     playerLocations.forEach(loc => {
@@ -571,24 +743,20 @@
                     });
                     
                     // Calculate exploration percentage (simplified)
-                    // In reality, you'd want to know total planets per sector
                     const totalPlanetsInSector = 300; // Approximate
                     const exploredCount = uniquePlanets.size;
                     const percentage = Math.min(100, Math.floor((exploredCount / totalPlanetsInSector) * 100));
                     
                     // Check if any planets in this sector are claimed
-                    const claimedPlanets = await getClaimedPlanets();
-                    const claimedInSector = claimedPlanets.filter(p => {
-                        // Would need sector mapping - simplified
-                        return false;
-                    }).length;
+                    const claimedInSector = sectorClaimData[sectorId]?.length || 0;
                     
                     sectorExplorationData[sectorId] = {
                         exploredCount,
                         totalEstimate: totalPlanetsInSector,
                         percentage,
                         hasExplored: exploredCount > 0,
-                        hasClaimed: claimedInSector > 0
+                        hasClaimed: claimedInSector > 0,
+                        claimedCount: claimedInSector
                     };
                 }
                 
@@ -597,6 +765,44 @@
             } catch (error) {
                 console.error('Error loading exploration data:', error);
             }
+        }
+
+        // ===== GET SECTOR CLAIM STATS =====
+        function getSectorClaimStats(sectorId) {
+            const claims = sectorClaimData[sectorId] || [];
+            
+            if (claims.length === 0) {
+                return {
+                    count: 0,
+                    highestValue: null,
+                    totalFees: 0
+                };
+            }
+            
+            // Calculate highest value element found
+            const rarityValues = {
+                'legendary': 5,
+                'very-rare': 4,
+                'rare': 3,
+                'uncommon': 2,
+                'common': 1
+            };
+            
+            let highestRarity = 'common';
+            let totalFees = 0;
+            
+            claims.forEach(claim => {
+                if (claim.rarity && rarityValues[claim.rarity] > (rarityValues[highestRarity] || 0)) {
+                    highestRarity = claim.rarity;
+                }
+                totalFees += claim.totalEarned || 0;
+            });
+            
+            return {
+                count: claims.length,
+                highestValue: highestRarity.charAt(0).toUpperCase() + highestRarity.slice(1),
+                totalFees: totalFees
+            };
         }
 
         // ===== WARP CALCULATION FUNCTIONS =====
@@ -668,7 +874,7 @@
                 const expData = sectorExplorationData[sectorId];
                 if (expData) {
                     if (expData.hasClaimed) {
-                        box.classList.add('fully-explored');
+                        box.classList.add('has-claims');
                     } else if (expData.hasExplored) {
                         box.classList.add('explored');
                     }
@@ -682,15 +888,23 @@
                     box.style.borderWidth = '3px';
                 }
                 
-                // Add exploration indicator if sector has been visited
+                // Add claim indicator if sector has claimed planets
                 let indicatorHtml = '';
-                if (expData && expData.hasExplored) {
+                if (expData && expData.hasClaimed) {
+                    indicatorHtml = `<div class="claim-indicator" title="${expData.claimedCount} claimed planet${expData.claimedCount !== 1 ? 's' : ''}">👑</div>`;
+                } else if (expData && expData.hasExplored) {
                     const indicatorClass = expData.hasClaimed ? 'exploration-indicator full' : 'exploration-indicator';
                     indicatorHtml = `<div class="${indicatorClass}"></div>`;
                 }
                 
+                // Add crown icon to label if sector has claims
+                const crownInLabel = expData && expData.hasClaimed ? '<span class="crown-icon">👑</span>' : '';
+                
                 box.innerHTML = `
-                    <span class="region-label">${data.displayName}</span>
+                    <span class="region-label">
+                        ${crownInLabel}
+                        <span>${data.displayName}</span>
+                    </span>
                     <span class="region-count">${data.nebulae}</span>
                     ${indicatorHtml}
                 `;
@@ -719,13 +933,16 @@
             localStorage.setItem('voidfarer_selected_region', displayName);
             
             const sectorData = sectorCoordinates[sector];
-            const expData = sectorExplorationData[sector] || { percentage: 0, hasExplored: false };
+            const expData = sectorExplorationData[sector] || { percentage: 0, hasExplored: false, claimedCount: 0 };
             
             const distance = getSectorDistance(currentSector, sector);
             const cycles = getWarpCyclesFromDistance(distance);
             const fuel = getFuelCostFromDistance(distance);
             
-            document.getElementById('selectedRegionName').textContent = displayName;
+            document.getElementById('selectedRegionName').innerHTML = `
+                ${displayName}
+                ${expData.hasClaimed ? '<span class="claimed-crown">👑</span>' : ''}
+            `;
             document.getElementById('sectorId').textContent = sector;
             document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
             document.getElementById('starsCount').textContent = sectorData.stars;
@@ -733,7 +950,7 @@
             
             const badge = document.getElementById('explorationBadge');
             if (expData.hasClaimed) {
-                badge.textContent = 'Fully Explored';
+                badge.textContent = 'Has Claims';
                 badge.className = 'exploration-badge exploration-high';
             } else if (expData.hasExplored) {
                 badge.textContent = 'Partially Explored';
@@ -741,6 +958,19 @@
             } else {
                 badge.textContent = 'Unexplored';
                 badge.className = 'exploration-badge exploration-low';
+            }
+            
+            // Update claim info section
+            if (expData.hasClaimed) {
+                const claimStats = getSectorClaimStats(sector);
+                claimedCount.textContent = claimStats.count;
+                highestValue.textContent = claimStats.highestValue || 'None';
+                totalFees.textContent = claimStats.totalFees.toLocaleString() + '⭐';
+                claimInfoRow.style.display = 'block';
+                regionCrown.style.display = 'inline-block';
+            } else {
+                claimInfoRow.style.display = 'none';
+                regionCrown.style.display = 'none';
             }
             
             document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
@@ -895,6 +1125,9 @@
                     window.location.href = 'index.html';
                     return;
                 }
+                
+                // Load claim data first
+                await loadClaimData();
                 
                 await loadCurrentLocation();
                 await loadExplorationData();
