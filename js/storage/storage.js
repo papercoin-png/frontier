@@ -1,5 +1,6 @@
-// js/storage.js - Save/load player progress for Voidfarer
+// js/storage/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
+// UPDATED: Added material inventory, recipe unlocks, skill progression across all fields
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -7,12 +8,41 @@
 
 // ===== STORAGE KEYS =====
 const STORAGE_KEYS = {
+    // Player data
     PLAYER: 'voidfarer_player',
-    COLLECTION: 'voidfarer_collection',
-    MISSIONS: 'voidfarer_missions',
-    COMPLETED_MISSIONS: 'voidfarer_completed_missions',
+    PLAYER_ID: 'voidfarer_player_id',
+    PLAYER_STATS: 'voidfarer_player_stats',
+    
+    // Collections
+    COLLECTION: 'voidfarer_collection',           // Raw elements (legacy)
+    ELEMENT_INVENTORY: 'voidfarer_element_inventory', // Raw elements (new)
+    MATERIAL_INVENTORY: 'voidfarer_material_inventory', // Crafted materials
+    MATERIAL_QUALITY: 'voidfarer_material_quality', // Quality tracking
+    
+    // Crafting progression
+    ALCHEMY_PROGRESS: 'voidfarer_alchemy_progress',
+    METALLURGY_PROGRESS: 'voidfarer_metallurgy_progress',
+    MATERIALS_SCIENCE_PROGRESS: 'voidfarer_materials_science_progress',
+    PHARMACEUTICALS_PROGRESS: 'voidfarer_pharmaceuticals_progress',
+    TEXTILES_PROGRESS: 'voidfarer_textiles_progress',
+    CONSTRUCTION_PROGRESS: 'voidfarer_construction_progress',
+    AEROSPACE_PROGRESS: 'voidfarer_aerospace_progress',
+    NUCLEAR_PROGRESS: 'voidfarer_nuclear_progress',
+    OPTICAL_PROGRESS: 'voidfarer_optical_progress',
+    MAGNETIC_PROGRESS: 'voidfarer_magnetic_progress',
+    CRYOGENIC_PROGRESS: 'voidfarer_cryogenic_progress',
+    POLYMERS_PROGRESS: 'voidfarer_polymers_progress',
+    
+    // Recipe unlocks
+    RECIPES_UNLOCKED: 'voidfarer_recipes_unlocked',
+    
+    // Credits
     CREDITS: 'voidfarer_credits',
+    
+    // Universe data
     UNIVERSE_SEED: 'voidfarer_universe_seed',
+    
+    // Location data
     CURRENT_SECTOR: 'voidfarer_current_sector',
     CURRENT_REGION: 'voidfarer_current_region',
     CURRENT_STAR_SECTOR: 'voidfarer_current_starSector',
@@ -31,28 +61,53 @@ const STORAGE_KEYS = {
     CURRENT_PLANET_TYPE: 'voidfarer_current_planet_type',
     CURRENT_PLANET_RESOURCES: 'voidfarer_current_planet_resources',
     CURRENT_PLANET_IMAGE: 'voidfarer_current_planet_image',
+    
+    // Warp data
     WARP_DESTINATION: 'voidfarer_warp_destination',
     WARP_RETURN: 'voidfarer_warp_return',
     WARP_CYCLES: 'voidfarer_warp_cycles',
     WARP_DISTANCE: 'voidfarer_warp_distance',
     WARP_FUEL: 'voidfarer_warp_fuel',
+    WARP_DESTINATION_PLANET: 'voidfarer_warp_destination_planet',
+    WARP_DESTINATION_PLANET_TYPE: 'voidfarer_warp_destination_planet_type',
+    WARP_ORIGIN_PLANET: 'voidfarer_warp_origin_planet',
+    WARP_ORIGIN_STAR: 'voidfarer_warp_origin_star',
+    WARP_ORIGIN_STAR_SECTOR: 'voidfarer_warp_origin_starSector',
+    WARP_ORIGIN_REGION: 'voidfarer_warp_origin_region',
+    WARP_ORIGIN_SECTOR: 'voidfarer_warp_origin_sector',
+    
+    // Colonies
     COLONIES: 'voidfarer_colonies',
     DISCOVERED_LOCATIONS: 'voidfarer_discovered_locations',
     BOOKMARKS: 'voidfarer_bookmarks',
     RECENT_LOCATIONS: 'voidfarer_recent_locations',
     SCAN_HISTORY: 'voidfarer_scan_history',
+    
+    // Ship data
     SHIP_POWER: 'voidfarer_ship_power',
     SHIP_UPGRADES: 'voidfarer_ship_upgrades',
     SHIP_FUEL: 'voidfarer_ship_fuel',
+    SHIP_STORAGE_MAX: 'voidfarer_ship_storage_max',
+    SHIP_STORAGE_USED: 'voidfarer_ship_storage_used',
+    
+    // Settings
     SETTINGS_HAPTICS: 'voidfarer_haptics',
     SETTINGS_AUTO_GATHER: 'voidfarer_auto_gather',
     SETTINGS_ORBIT_SPEED: 'voidfarer_orbit_speed',
     SETTINGS_MUSIC: 'voidfarer_music',
     SETTINGS_AMBIENT: 'voidfarer_ambient',
-    PLAYER_STATS: 'voidfarer_player_stats',
+    
+    // Achievements
     ACHIEVEMENTS: 'voidfarer_achievements',
     LAST_SAVE: 'voidfarer_last_save',
+    
+    // Real estate
     REAL_ESTATE: 'voidfarer_real_estate',
+    HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
+    HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
+    HUB_INVENTORY: 'voidfarer_hub_inventory',
+    
+    // Economy
     TOTAL_MONEY_SUPPLY: 'voidfarer_total_money_supply',
     DAILY_METRICS: 'voidfarer_daily_metrics',
     HOURLY_SNAPSHOTS: 'voidfarer_hourly_snapshots',
@@ -61,94 +116,70 @@ const STORAGE_KEYS = {
     COMMUNITY_FUND: 'voidfarer_community_fund',
     ACTIVE_EVENTS: 'voidfarer_active_events',
     EVENT_HISTORY: 'voidfarer_event_history',
-    CLAIMED_PLANETS: 'voidfarer_claimed_planets',
-    // ALCHEMY KEYS
-    ALCHEMY_PROGRESS: 'voidfarer_alchemy_progress',
-    ALCHEMY_RECIPES_UNLOCKED: 'voidfarer_alchemy_recipes_unlocked',
-    ALCHEMY_TOTAL_CRAFTS: 'voidfarer_alchemy_total_crafts',
-    ALCHEMY_MASTERY: 'voidfarer_alchemy_mastery',
-    ALCHEMY_CATEGORY_PROGRESS: 'voidfarer_alchemy_category_progress',
-    // WARP DESTINATION KEYS
-    WARP_DESTINATION_PLANET: 'voidfarer_warp_destination_planet',
-    WARP_DESTINATION_PLANET_TYPE: 'voidfarer_warp_destination_planet_type',
-    WARP_ORIGIN_PLANET: 'voidfarer_warp_origin_planet',
-    WARP_ORIGIN_STAR: 'voidfarer_warp_origin_star',
-    WARP_ORIGIN_STAR_SECTOR: 'voidfarer_warp_origin_starSector',
-    WARP_ORIGIN_REGION: 'voidfarer_warp_origin_region',
-    WARP_ORIGIN_SECTOR: 'voidfarer_warp_origin_sector',
-    // HUB STORAGE KEYS (for Earth Hub)
-    HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
-    HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
-    HUB_INVENTORY: 'voidfarer_hub_inventory',
-    // SHIP STORAGE KEYS
-    SHIP_STORAGE_MAX: 'voidfarer_ship_storage_max',
-    SHIP_STORAGE_USED: 'voidfarer_ship_storage_used',
-    // LABOR POOL KEYS
+    
+    // Labor pool
     LABOR_POOL_TOTAL: 'voidfarer_labor_pool_total',
     LABOR_POOL_DISTRIBUTED: 'voidfarer_labor_pool_distributed',
     LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
     PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
-    // PRODUCT OWNERSHIP KEYS
+    
+    // Products & marketplace
     PLAYER_PRODUCTS: 'voidfarer_player_products',
     PRODUCT_TRANSACTIONS: 'voidfarer_product_transactions',
     ACTIVE_PRODUCTS: 'voidfarer_active_products',
-    // MARKETPLACE KEYS
     MARKET_PRICES: 'voidfarer_market_prices',
     MARKET_HISTORY: 'voidfarer_market_history',
     MARKET_VOLUME: 'voidfarer_market_volume',
     MARKET_ORDERS: 'voidfarer_market_orders',
-    // PLANET CLAIM KEYS - NEW
-    PLANET_CLAIMS: 'voidfarer_planet_claims',           // All claims by planet name
-    PLAYER_CLAIMS: 'voidfarer_player_claims',           // Claims by player ID
-    CLAIM_HISTORY: 'voidfarer_claim_history',           // All claim/mining transactions
-    CLAIM_NOTIFICATIONS: 'voidfarer_claim_notifications' // Global notifications
+    
+    // Planet claims
+    PLANET_CLAIMS: 'voidfarer_planet_claims',
+    PLAYER_CLAIMS: 'voidfarer_player_claims',
+    CLAIM_HISTORY: 'voidfarer_claim_history',
+    CLAIM_NOTIFICATIONS: 'voidfarer_claim_notifications',
+    
+    // Crafting recipes unlocked (new)
+    RECIPE_UNLOCKS: 'voidfarer_recipe_unlocks',
+    
+    // Field mastery levels (new)
+    FIELD_MASTERY: 'voidfarer_field_mastery'
 };
 
-// ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
+// ===== COMPLETE ELEMENT MASS DATABASE =====
 const ELEMENT_MASS = {
-    // Period 1 (Common)
+    // Period 1
     'Hydrogen': 1.008, 'Helium': 4.003,
-    
-    // Period 2 (Common)
+    // Period 2
     'Lithium': 6.94, 'Beryllium': 9.012, 'Boron': 10.81, 'Carbon': 12.011, 
     'Nitrogen': 14.007, 'Oxygen': 16.00, 'Fluorine': 19.00, 'Neon': 20.18,
-    
-    // Period 3 (Common)
+    // Period 3
     'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98, 'Silicon': 28.09,
     'Phosphorus': 30.97, 'Sulfur': 32.06, 'Chlorine': 35.45, 'Argon': 39.95,
-    
-    // Period 4 (Common - Transition Metals)
+    // Period 4
     'Potassium': 39.10, 'Calcium': 40.08, 'Scandium': 44.96, 'Titanium': 47.87,
     'Vanadium': 50.94, 'Chromium': 52.00, 'Manganese': 54.94, 'Iron': 55.85,
     'Cobalt': 58.93, 'Nickel': 58.69, 'Copper': 63.55, 'Zinc': 65.38,
     'Gallium': 69.72, 'Germanium': 72.63, 'Arsenic': 74.92, 'Selenium': 78.97,
     'Bromine': 79.90, 'Krypton': 83.80,
-    
-    // Period 5 (Common - Transition Metals)
+    // Period 5
     'Rubidium': 85.47, 'Strontium': 87.62, 'Yttrium': 88.91, 'Zirconium': 91.22,
     'Niobium': 92.91, 'Molybdenum': 95.95, 'Technetium': 98.0, 'Ruthenium': 101.1,
     'Rhodium': 102.9, 'Palladium': 106.4, 'Silver': 107.9, 'Cadmium': 112.4,
     'Indium': 114.8, 'Tin': 118.7, 'Antimony': 121.8, 'Tellurium': 127.6,
     'Iodine': 126.9, 'Xenon': 131.3,
-    
-    // Period 6 (Common - includes Lanthanides)
+    // Period 6
     'Cesium': 132.9, 'Barium': 137.3,
-    // Lanthanides (Rare Earths)
     'Lanthanum': 138.9, 'Cerium': 140.1, 'Praseodymium': 140.9, 'Neodymium': 144.2,
     'Promethium': 145.0, 'Samarium': 150.4, 'Europium': 152.0, 'Gadolinium': 157.3,
     'Terbium': 158.9, 'Dysprosium': 162.5, 'Holmium': 164.9, 'Erbium': 167.3,
     'Thulium': 168.9, 'Ytterbium': 173.0, 'Lutetium': 175.0,
-    // Transition Metals
     'Hafnium': 178.5, 'Tantalum': 180.9, 'Tungsten': 183.8, 'Rhenium': 186.2,
     'Osmium': 190.2, 'Iridium': 192.2, 'Platinum': 195.1, 'Gold': 197.0,
     'Mercury': 200.6, 'Thallium': 204.4, 'Lead': 207.2, 'Bismuth': 209.0,
-    
-    // Period 7 (Very Rare to Legendary)
-    // Very Rare
+    // Period 7
     'Polonium': 209.0, 'Astatine': 210.0, 'Radon': 222.0, 'Francium': 223.0,
     'Radium': 226.0, 'Actinium': 227.0, 'Thorium': 232.0, 'Protactinium': 231.0,
     'Uranium': 238.0,
-    // Legendary (Transuranic)
     'Neptunium': 237.0, 'Plutonium': 244.0, 'Americium': 243.0, 'Curium': 247.0,
     'Berkelium': 247.0, 'Californium': 251.0, 'Einsteinium': 252.0, 'Fermium': 257.0,
     'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0, 'Rutherfordium': 267.0,
@@ -169,911 +200,36 @@ function getCargoMassLimit() {
     return typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 }
 
-// ===== CARGO MASS UTILITIES =====
-async function getTotalCargoMass() {
-    try {
-        const collection = await getCollection();
-        let totalMass = 0;
-        for (const [name, data] of Object.entries(collection)) {
-            const count = data.count || 1;
-            totalMass += count * getElementMass(name);
-        }
-        return totalMass;
-    } catch (error) {
-        console.error('Error calculating total cargo mass:', error);
-        return 0;
-    }
-}
-
-async function getRemainingCargoMass() {
-    try {
-        const totalMass = await getTotalCargoMass();
-        const player = await getPlayer();
-        const massLimit = player?.cargoMassLimit || getCargoMassLimit();
-        return Math.max(0, massLimit - totalMass);
-    } catch (error) {
-        console.error('Error calculating remaining cargo mass:', error);
-        return getCargoMassLimit();
-    }
-}
-
-// ===== HUB STORAGE UTILITIES =====
-async function getHubStorageMax() {
-    try {
-        const estateData = await getRealEstate();
-        const properties = estateData.properties || [];
-        return properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
-    } catch (error) {
-        console.error('Error getting hub storage max:', error);
-        return 0;
-    }
-}
-
-async function getHubStorageUsed() {
-    try {
-        const inventory = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
-        const hubInventory = inventory ? JSON.parse(inventory) : {};
-        let totalMass = 0;
-        for (const [name, data] of Object.entries(hubInventory)) {
-            const count = data.count || 1;
-            totalMass += count * getElementMass(name);
-        }
-        return totalMass;
-    } catch (error) {
-        console.error('Error calculating hub storage used:', error);
-        return 0;
-    }
-}
-
-async function getRemainingHubStorage() {
-    try {
-        const max = await getHubStorageMax();
-        const used = await getHubStorageUsed();
-        return Math.max(0, max - used);
-    } catch (error) {
-        console.error('Error calculating remaining hub storage:', error);
-        return 0;
-    }
-}
-
-// ===== SHIP STORAGE UTILITIES =====
-async function getShipStorageMax() {
-    try {
-        // Ship has fixed capacity of 5000, could be upgraded later
-        return 5000;
-    } catch (error) {
-        console.error('Error getting ship storage max:', error);
-        return 5000;
-    }
-}
-
-async function getShipStorageUsed() {
-    try {
-        return await getTotalCargoMass();
-    } catch (error) {
-        console.error('Error getting ship storage used:', error);
-        return 0;
-    }
-}
-
-async function getRemainingShipStorage() {
-    try {
-        const max = await getShipStorageMax();
-        const used = await getShipStorageUsed();
-        return Math.max(0, max - used);
-    } catch (error) {
-        console.error('Error calculating remaining ship storage:', error);
-        return 5000;
-    }
-}
-
-// ===== LOCATION HELPERS =====
-function isAtEarth() {
-    const currentPlanet = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
-    return currentPlanet === 'Earth';
-}
-
-function getCurrentPlanetName() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
-}
-
-function getCurrentPlanetType() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'unknown';
-}
-
-function getCurrentPlanetResources() {
-    const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
-    return resources ? JSON.parse(resources) : [];
-}
-
-// ===== ALCHEMY SKILL TRACKING FUNCTIONS =====
+// ============================================================================
+// PLAYER DATA
+// ============================================================================
 
 /**
- * Get alchemy progress for all recipes
- * @returns {Object} Progress object with recipe IDs as keys and progress as values
- */
-function getAlchemyProgress() {
-    try {
-        const progress = localStorage.getItem(STORAGE_KEYS.ALCHEMY_PROGRESS);
-        return progress ? JSON.parse(progress) : {};
-    } catch (error) {
-        console.error('Error getting alchemy progress:', error);
-        return {};
-    }
-}
-
-/**
- * Save alchemy progress
- * @param {Object} progress - Progress object
- * @returns {boolean} Success status
- */
-function saveAlchemyProgress(progress) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_PROGRESS, JSON.stringify(progress));
-        
-        // Update total crafts count
-        const totalCrafts = Object.values(progress).reduce((sum, count) => sum + count, 0);
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS, totalCrafts.toString());
-        
-        return true;
-    } catch (error) {
-        console.error('Error saving alchemy progress:', error);
-        return false;
-    }
-}
-
-/**
- * Add progress to a specific recipe
- * @param {string} recipeId - Recipe ID
- * @param {number} amount - Amount of progress to add
- * @returns {boolean} Success status
- */
-function addAlchemyProgress(recipeId, amount = 1) {
-    try {
-        const progress = getAlchemyProgress();
-        progress[recipeId] = (progress[recipeId] || 0) + amount;
-        return saveAlchemyProgress(progress);
-    } catch (error) {
-        console.error('Error adding alchemy progress:', error);
-        return false;
-    }
-}
-
-/**
- * Get total crafts across all recipes
- * @returns {number} Total crafts
- */
-function getAlchemyTotalCrafts() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS)) || 0;
-    } catch (error) {
-        console.error('Error getting alchemy total crafts:', error);
-        return 0;
-    }
-}
-
-/**
- * Get progress for a specific recipe
- * @param {string} recipeId - Recipe ID
- * @returns {number} Progress amount
- */
-function getRecipeProgress(recipeId) {
-    try {
-        const progress = getAlchemyProgress();
-        return progress[recipeId] || 0;
-    } catch (error) {
-        console.error('Error getting recipe progress:', error);
-        return 0;
-    }
-}
-
-/**
- * Get unlocked recipes (legacy, kept for compatibility)
- * @returns {Array} Array of unlocked recipe IDs
- */
-function getUnlockedRecipes() {
-    try {
-        const unlocked = localStorage.getItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED);
-        return unlocked ? JSON.parse(unlocked) : [];
-    } catch (error) {
-        console.error('Error getting unlocked recipes:', error);
-        return [];
-    }
-}
-
-/**
- * Unlock a recipe (legacy, kept for compatibility)
- * @param {string} recipeId - Recipe ID to unlock
- * @returns {boolean} Success status
- */
-function unlockRecipe(recipeId) {
-    try {
-        const unlocked = getUnlockedRecipes();
-        if (!unlocked.includes(recipeId)) {
-            unlocked.push(recipeId);
-            localStorage.setItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED, JSON.stringify(unlocked));
-        }
-        return true;
-    } catch (error) {
-        console.error('Error unlocking recipe:', error);
-        return false;
-    }
-}
-
-/**
- * Check if recipe is unlocked (legacy, kept for compatibility)
- * @param {string} recipeId - Recipe ID
- * @returns {boolean} True if unlocked
- */
-function isRecipeUnlocked(recipeId) {
-    const unlocked = getUnlockedRecipes();
-    return unlocked.includes(recipeId);
-}
-
-/**
- * Get player's alchemy mastery across all categories
- * @returns {Object} Mastery object with overall and per-category data
- */
-function getAlchemyMastery() {
-    try {
-        const mastery = localStorage.getItem(STORAGE_KEYS.ALCHEMY_MASTERY);
-        return mastery ? JSON.parse(mastery) : {
-            overallLevel: 'Untrained',
-            overallMultiplier: 1.0,
-            categories: {}
-        };
-    } catch (error) {
-        console.error('Error getting alchemy mastery:', error);
-        return {
-            overallLevel: 'Untrained',
-            overallMultiplier: 1.0,
-            categories: {}
-        };
-    }
-}
-
-// ===== LABOR POOL FUNCTIONS =====
-
-/**
- * Add credits to labor pool
- * @param {number} amount - Amount to add
- * @param {string} reason - Reason for addition
- * @returns {number} New total
- */
-function addToLaborPool(amount, reason = 'Manual addition') {
-    try {
-        const current = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL)) || 0;
-        const newTotal = current + amount;
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_TOTAL, newTotal.toString());
-        
-        // Record in history
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-        history.push({
-            type: 'addition',
-            amount: amount,
-            reason: reason,
-            timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
-        // Keep last 100 entries
-        if (history.length > 100) history.shift();
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(history));
-        
-        return newTotal;
-    } catch (error) {
-        console.error('Error adding to labor pool:', error);
-        return 0;
-    }
-}
-
-/**
- * Get current labor pool total
- * @returns {number} Labor pool total
- */
-function getLaborPoolTotal() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL)) || 0;
-    } catch (error) {
-        console.error('Error getting labor pool total:', error);
-        return 0;
-    }
-}
-
-/**
- * Get player's labor earnings
+ * Get player data
  * @param {string} playerId - Player ID
- * @returns {number} Total earnings
+ * @returns {Promise<Object>} Player object
  */
-function getPlayerLaborEarnings(playerId) {
+export async function getPlayer(playerId = 'main') {
     try {
-        const earnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-        return earnings[playerId] || 0;
-    } catch (error) {
-        console.error('Error getting player labor earnings:', error);
-        return 0;
-    }
-}
-
-/**
- * Claim player's labor earnings
- * @param {string} playerId - Player ID
- * @returns {number} Amount claimed
- */
-async function claimLaborEarnings(playerId) {
-    try {
-        const earnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-        const amount = earnings[playerId] || 0;
-        
-        if (amount > 0) {
-            // Add to player's credits
-            await addCredits(amount);
-            // Clear earnings
-            delete earnings[playerId];
-            localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, JSON.stringify(earnings));
-            
-            // Record claim in history
-            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-            history.push({
-                type: 'claim',
-                playerId: playerId,
-                amount: amount,
-                timestamp: Date.now(),
-                date: new Date().toISOString()
-            });
-            if (history.length > 100) history.shift();
-            localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(history));
-        }
-        
-        return amount;
-    } catch (error) {
-        console.error('Error claiming labor earnings:', error);
-        return 0;
-    }
-}
-
-/**
- * Get labor pool history
- * @param {number} limit - Max number of entries
- * @returns {Array} History entries
- */
-function getLaborPoolHistory(limit = 20) {
-    try {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-        return history.slice(-limit).reverse();
-    } catch (error) {
-        console.error('Error getting labor pool history:', error);
-        return [];
-    }
-}
-
-// ===== PRODUCT OWNERSHIP FUNCTIONS =====
-
-/**
- * Get player's purchased products
- * @param {string} playerId - Player ID
- * @returns {Array} Player's products
- */
-function getPlayerProducts(playerId) {
-    try {
-        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
-        return products[playerId] || [];
-    } catch (error) {
-        console.error('Error getting player products:', error);
-        return [];
-    }
-}
-
-/**
- * Add product to player's inventory
- * @param {string} playerId - Player ID
- * @param {Object} productData - Product purchase data
- * @returns {boolean} Success status
- */
-function addPlayerProduct(playerId, productData) {
-    try {
-        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
-        
-        if (!products[playerId]) {
-            products[playerId] = [];
-        }
-        
-        products[playerId].push({
-            ...productData,
-            acquiredAt: Date.now(),
-            acquiredDate: new Date().toISOString()
-        });
-        
-        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify(products));
-        return true;
-    } catch (error) {
-        console.error('Error adding player product:', error);
-        return false;
-    }
-}
-
-/**
- * Remove product from player's inventory (if used/sold)
- * @param {string} playerId - Player ID
- * @param {string} productId - Product ID
- * @param {string} purchaseId - Specific purchase ID
- * @returns {boolean} Success status
- */
-function removePlayerProduct(playerId, productId, purchaseId) {
-    try {
-        const products = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS) || '{}');
-        
-        if (!products[playerId]) return false;
-        
-        products[playerId] = products[playerId].filter(p => 
-            !(p.productId === productId && (!purchaseId || p.id === purchaseId))
-        );
-        
-        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, JSON.stringify(products));
-        return true;
-    } catch (error) {
-        console.error('Error removing player product:', error);
-        return false;
-    }
-}
-
-/**
- * Check if player owns a specific product
- * @param {string} playerId - Player ID
- * @param {string} productId - Product ID
- * @returns {boolean} True if owned
- */
-function playerOwnsProduct(playerId, productId) {
-    try {
-        const products = getPlayerProducts(playerId);
-        return products.some(p => p.productId === productId);
-    } catch (error) {
-        console.error('Error checking product ownership:', error);
-        return false;
-    }
-}
-
-// ===== MARKETPLACE FUNCTIONS =====
-
-/**
- * Buy element from market and add to hub storage
- * @param {string} elementName - Element name
- * @param {number} quantity - Quantity to buy
- * @param {number} pricePerUnit - Price per unit
- * @returns {Promise<Object>} Result object
- */
-async function buyHubElement(elementName, quantity, pricePerUnit) {
-    try {
-        console.log(`Buying ${quantity}x ${elementName} from market...`);
-        
-        const totalCost = quantity * pricePerUnit;
-        
-        // Check credits
-        const credits = await getCredits();
-        if (credits < totalCost) {
-            return { success: false, reason: 'insufficient_credits', required: totalCost, available: credits };
-        }
-        
-        // Check hub space
-        const remainingHub = await getRemainingHubStorage();
-        const massToAdd = quantity * getElementMass(elementName);
-        if (massToAdd > remainingHub) {
-            return { success: false, reason: 'insufficient_hub_space', remaining: remainingHub, required: massToAdd };
-        }
-        
-        // Spend credits
-        const spent = await spendCredits(totalCost);
-        if (!spent) {
-            return { success: false, reason: 'spend_failed' };
-        }
-        
-        // Add to hub
-        const addResult = await addElementToHub(elementName, quantity);
-        if (!addResult.success) {
-            // Rollback credits
-            await addCredits(totalCost);
-            return addResult;
-        }
-        
-        // Record transaction in market history
-        recordMarketTransaction('buy', elementName, quantity, pricePerUnit, totalCost);
-        
-        return { 
-            success: true, 
-            quantity: quantity,
-            elementName: elementName,
-            totalCost: totalCost,
-            newBalance: credits - totalCost
-        };
-        
-    } catch (error) {
-        console.error('Error in buyHubElement:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-/**
- * Sell element from hub storage to market
- * @param {string} elementName - Element name
- * @param {number} quantity - Quantity to sell
- * @param {number} pricePerUnit - Price per unit
- * @returns {Promise<Object>} Result object
- */
-async function sellHubElement(elementName, quantity, pricePerUnit) {
-    try {
-        console.log(`Selling ${quantity}x ${elementName} to market...`);
-        
-        const totalEarnings = quantity * pricePerUnit;
-        
-        // Check hub inventory
-        const hubInventory = await getHubInventory();
-        if (!hubInventory[elementName]) {
-            return { success: false, reason: 'not_found' };
-        }
-        
-        const availableCount = hubInventory[elementName].count || 0;
-        if (availableCount < quantity) {
-            return { success: false, reason: 'insufficient', available: availableCount };
-        }
-        
-        // Remove from hub
-        const removeResult = await removeElementFromHub(elementName, quantity);
-        if (!removeResult.success) {
-            return removeResult;
-        }
-        
-        // Add credits
-        const newCredits = await addCredits(totalEarnings);
-        
-        // Record transaction in market history
-        recordMarketTransaction('sell', elementName, quantity, pricePerUnit, totalEarnings);
-        
-        return { 
-            success: true, 
-            quantity: quantity,
-            elementName: elementName,
-            totalEarnings: totalEarnings,
-            newCredits: newCredits
-        };
-        
-    } catch (error) {
-        console.error('Error in sellHubElement:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-/**
- * Record market transaction for history
- * @param {string} type - 'buy' or 'sell'
- * @param {string} elementName - Element name
- * @param {number} quantity - Quantity traded
- * @param {number} price - Price per unit
- * @param {number} total - Total value
- */
-function recordMarketTransaction(type, elementName, quantity, price, total) {
-    try {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY) || '[]');
-        
-        history.push({
-            type: type,
-            element: elementName,
-            quantity: quantity,
-            price: price,
-            total: total,
-            timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
-        
-        // Keep last 1000 transactions
-        if (history.length > 1000) {
-            history.shift();
-        }
-        
-        localStorage.setItem(STORAGE_KEYS.MARKET_HISTORY, JSON.stringify(history));
-        
-        // Update volume
-        updateMarketVolume(elementName, quantity);
-        
-    } catch (error) {
-        console.error('Error recording market transaction:', error);
-    }
-}
-
-/**
- * Update market volume for an element
- * @param {string} elementName - Element name
- * @param {number} quantity - Quantity traded
- */
-function updateMarketVolume(elementName, quantity) {
-    try {
-        const volume = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME) || '{}');
-        
-        const today = new Date().toISOString().split('T')[0];
-        if (!volume[elementName]) {
-            volume[elementName] = {};
-        }
-        volume[elementName][today] = (volume[elementName][today] || 0) + quantity;
-        
-        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
-        
-    } catch (error) {
-        console.error('Error updating market volume:', error);
-    }
-}
-
-/**
- * Get market price for an element (simulated - in production would come from market engine)
- * @param {string} elementName - Element name
- * @returns {number} Current price
- */
-function getMarketPrice(elementName) {
-    try {
-        const prices = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_PRICES) || '{}');
-        return prices[elementName]?.current || 100;
-    } catch (error) {
-        console.error('Error getting market price:', error);
-        return 100;
-    }
-}
-
-/**
- * Get market history for an element
- * @param {string} elementName - Element name
- * @param {number} days - Number of days of history
- * @returns {Array} Price history
- */
-function getMarketHistory(elementName, days = 30) {
-    try {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY) || '[]');
-        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-        
-        return history
-            .filter(h => h.element === elementName && h.timestamp >= cutoff)
-            .sort((a, b) => a.timestamp - b.timestamp);
-    } catch (error) {
-        console.error('Error getting market history:', error);
-        return [];
-    }
-}
-
-// ===== TRANSFER FUNCTIONS =====
-async function transferShipToHub(elementName, quantity) {
-    try {
-        console.log(`Transferring ${quantity}x ${elementName} from ship to hub...`);
-        
-        // Check if at Earth
-        if (!isAtEarth()) {
-            return { success: false, reason: 'not_at_earth', message: 'You must be at Earth to transfer items to hub' };
-        }
-        
-        // Get element mass
-        const massPerUnit = getElementMass(elementName);
-        const massToTransfer = quantity * massPerUnit;
-        
-        // Check hub space
-        const remainingHub = await getRemainingHubStorage();
-        if (massToTransfer > remainingHub) {
-            return { success: false, reason: 'insufficient_hub_space', remaining: remainingHub, required: massToTransfer };
-        }
-        
-        // Remove from ship
-        const removeResult = await removeElementFromCollection(elementName, quantity);
-        if (!removeResult.success) {
-            return removeResult;
-        }
-        
-        // Add to hub
-        const addResult = await addElementToHub(elementName, quantity);
-        if (!addResult.success) {
-            // Rollback ship removal
-            await addElementToCollection(elementName, quantity);
-            return addResult;
-        }
-        
-        return { 
-            success: true, 
-            quantity: quantity,
-            elementName: elementName,
-            massTransferred: massToTransfer
-        };
-        
-    } catch (error) {
-        console.error('Error in transferShipToHub:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-async function transferHubToShip(elementName, quantity) {
-    try {
-        console.log(`Transferring ${quantity}x ${elementName} from hub to ship...`);
-        
-        // Check if at Earth
-        if (!isAtEarth()) {
-            return { success: false, reason: 'not_at_earth', message: 'You must be at Earth to transfer items from hub' };
-        }
-        
-        // Get element mass
-        const massPerUnit = getElementMass(elementName);
-        const massToTransfer = quantity * massPerUnit;
-        
-        // Check ship space
-        const remainingShip = await getRemainingShipStorage();
-        if (massToTransfer > remainingShip) {
-            return { success: false, reason: 'insufficient_ship_space', remaining: remainingShip, required: massToTransfer };
-        }
-        
-        // Remove from hub
-        const removeResult = await removeElementFromHub(elementName, quantity);
-        if (!removeResult.success) {
-            return removeResult;
-        }
-        
-        // Add to ship
-        const addResult = await addElementToCollection(elementName, quantity);
-        if (!addResult.success) {
-            // Rollback hub removal
-            await addElementToHub(elementName, quantity);
-            return addResult;
-        }
-        
-        return { 
-            success: true, 
-            quantity: quantity,
-            elementName: elementName,
-            massTransferred: massToTransfer
-        };
-        
-    } catch (error) {
-        console.error('Error in transferHubToShip:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-// ===== INITIALIZATION =====
-async function initializeStorage() {
-    console.log('Initializing storage...');
-    
-    // Use the UNIVERSE_SEED from the HTML file (already declared globally)
-    // This value is accessible via window.UNIVERSE_SEED
-    if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED) && typeof window.UNIVERSE_SEED !== 'undefined') {
-        localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, window.UNIVERSE_SEED.toString());
-    }
-    
-    const player = await getPlayer();
-    if (!player) {
-        await createDefaultPlayer();
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS)) {
-        localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, 'true');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER)) {
-        localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, 'true');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED)) {
-        localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, 'gentle');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) {
-        localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, '50');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) {
-        localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
-    }
-    
-    // Initialize alchemy storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_PROGRESS)) {
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_PROGRESS, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED)) {
-        // Unlock basic recipes by default (kept for compatibility)
-        const defaultUnlocked = ['water', 'methane', 'ammonia', 'hydrogen_peroxide'];
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED, JSON.stringify(defaultUnlocked));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS)) {
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS, '0');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_MASTERY)) {
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_MASTERY, JSON.stringify({
-            overallLevel: 'Untrained',
-            overallMultiplier: 1.0,
-            categories: {}
-        }));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS)) {
-        localStorage.setItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS, '{}');
-    }
-    
-    // Initialize labor pool storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL)) {
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_TOTAL, '0');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED)) {
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED, '0');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, '[]');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS)) {
-        localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, '{}');
-    }
-    
-    // Initialize product ownership storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_PRODUCTS)) {
-        localStorage.setItem(STORAGE_KEYS.PLAYER_PRODUCTS, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS)) {
-        localStorage.setItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS, '[]');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ACTIVE_PRODUCTS)) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_PRODUCTS, '{}');
-    }
-    
-    // Initialize marketplace storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.MARKET_PRICES)) {
-        localStorage.setItem(STORAGE_KEYS.MARKET_PRICES, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.MARKET_HISTORY, '[]');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME)) {
-        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.MARKET_ORDERS)) {
-        localStorage.setItem(STORAGE_KEYS.MARKET_ORDERS, '{}');
-    }
-    
-    // Initialize hub storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
-        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED)) {
-        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, '0');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY)) {
-        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, '{}');
-    }
-    
-    // Initialize ship storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX)) {
-        localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_MAX, '5000');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED)) {
-        localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, '0');
-    }
-    
-    // Initialize planet claim storage if not present
-    if (!localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS)) {
-        localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_CLAIMS)) {
-        localStorage.setItem(STORAGE_KEYS.PLAYER_CLAIMS, '{}');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY)) {
-        localStorage.setItem(STORAGE_KEYS.CLAIM_HISTORY, '[]');
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS)) {
-        localStorage.setItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS, '[]');
-    }
-    
-    if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
-        setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
-    }
-    
-    console.log('Storage initialized');
-}
-
-// ===== PLAYER DATA =====
-async function getPlayer() {
-    try {
-        return await window.getItem('player', 'main');
+        const key = `${STORAGE_KEYS.PLAYER}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
     } catch (error) {
         console.error('Error getting player:', error);
         return null;
     }
 }
 
-async function savePlayer(playerData) {
+/**
+ * Save player data
+ * @param {Object} playerData - Player data
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function savePlayer(playerData, playerId = 'main') {
     try {
-        await window.setItem('player', { id: 'main', ...playerData });
+        const key = `${STORAGE_KEYS.PLAYER}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(playerData));
         saveTimestamp();
         return true;
     } catch (error) {
@@ -1082,10 +238,16 @@ async function savePlayer(playerData) {
     }
 }
 
-async function createDefaultPlayer(name = 'Voidfarer') {
+/**
+ * Create default player
+ * @param {string} name - Player name
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Created player
+ */
+export async function createDefaultPlayer(name = 'Voidfarer', playerId = 'main') {
     try {
         const player = {
-            id: 'main',
+            id: playerId,
             name: name,
             ship: 'Prospector',
             shipLevel: 1,
@@ -1093,24 +255,39 @@ async function createDefaultPlayer(name = 'Voidfarer') {
             lastPlayed: new Date().toISOString(),
             playTime: 0,
             totalElementsCollected: 0,
+            totalMaterialsCrafted: 0,
             totalCreditsEarned: 5000,
             totalDistanceTraveled: 0,
             totalWarps: 0,
             credits: 5000,
             cargoMassLimit: getCargoMassLimit(),
-            // Add alchemy stats to player
-            alchemyTotalCrafts: 0,
-            alchemyMasteredRecipes: 0,
-            alchemyOverallLevel: 'Untrained',
-            alchemyOverallMultiplier: 1.0,
-            // Product ownership
+            
+            // Crafting stats by field
+            craftingStats: {
+                alchemy: { totalCrafts: 0, level: 'Untrained' },
+                metallurgy: { totalCrafts: 0, level: 'Untrained' },
+                materialsScience: { totalCrafts: 0, level: 'Untrained' },
+                pharmaceuticals: { totalCrafts: 0, level: 'Untrained' },
+                textiles: { totalCrafts: 0, level: 'Untrained' },
+                construction: { totalCrafts: 0, level: 'Untrained' },
+                aerospace: { totalCrafts: 0, level: 'Untrained' },
+                nuclear: { totalCrafts: 0, level: 'Untrained' },
+                optical: { totalCrafts: 0, level: 'Untrained' },
+                magnetic: { totalCrafts: 0, level: 'Untrained' },
+                cryogenic: { totalCrafts: 0, level: 'Untrained' },
+                polymers: { totalCrafts: 0, level: 'Untrained' }
+            },
+            
+            // Owned products
             ownedProducts: [],
-            // Planet ownership stats
+            
+            // Planet ownership
             planetsOwned: 0,
             totalMiningEarnings: 0
         };
-        await savePlayer(player);
-        console.log('Created default player');
+        
+        await savePlayer(player, playerId);
+        console.log('Created default player:', playerId);
         return player;
     } catch (error) {
         console.error('Error creating default player:', error);
@@ -1118,511 +295,294 @@ async function createDefaultPlayer(name = 'Voidfarer') {
     }
 }
 
-// ===== COLLECTION DATA =====
-async function getCollection() {
+// ============================================================================
+// FIELD PROGRESSION (NEW)
+// ============================================================================
+
+/**
+ * Get progress for a specific field
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @returns {Promise<Object>} Progress object
+ */
+export async function getFieldProgress(playerId, field) {
     try {
-        return await window.getCollectionAsObject();
+        const key = `${getFieldKey(field)}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
     } catch (error) {
-        console.error('Error getting collection:', error);
+        console.error(`Error getting ${field} progress:`, error);
         return {};
     }
 }
 
-// ===== DIRECT DB ACCESS FUNCTIONS (NO RECURSION) =====
-// These call the db.js prefixed functions directly without going through window
-
-async function dbAddElementToCollection(elementName, count = 1) {
+/**
+ * Save progress for a specific field
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @param {Object} progress - Progress object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveFieldProgress(playerId, field, progress) {
     try {
-        // Call the db.js prefixed function directly
-        if (typeof window.dbAddElementToCollection === 'function') {
-            return await window.dbAddElementToCollection(elementName, count, {});
-        }
-        return { success: false, error: 'db.js function not available' };
+        const key = `${getFieldKey(field)}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(progress));
+        return true;
     } catch (error) {
-        console.error('Error in dbAddElementToCollection:', error);
-        return { success: false, error: error.message };
+        console.error(`Error saving ${field} progress:`, error);
+        return false;
     }
 }
 
-async function dbRemoveElementFromCollection(elementName, count = 1) {
+/**
+ * Update progress for a specific recipe in a field
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @param {string} recipeId - Recipe ID
+ * @param {number} newProgress - New progress value
+ * @returns {Promise<boolean>} Success status
+ */
+export async function updateFieldProgress(playerId, field, recipeId, newProgress) {
     try {
-        // Call the db.js prefixed function directly
-        if (typeof window.dbRemoveElementFromCollection === 'function') {
-            return await window.dbRemoveElementFromCollection(elementName, count);
-        }
-        return { success: false, error: 'db.js function not available' };
+        const progress = await getFieldProgress(playerId, field);
+        progress[recipeId] = newProgress;
+        return await saveFieldProgress(playerId, field, progress);
     } catch (error) {
-        console.error('Error in dbRemoveElementFromCollection:', error);
-        return { success: false, error: error.message };
+        console.error(`Error updating ${field} progress:`, error);
+        return false;
     }
 }
 
-// ===== PUBLIC WRAPPER FUNCTIONS =====
-// These add additional functionality (stats, location tracking) and then call db.js
-
-// Public wrapper function - adds element to collection and saves location with full metadata
-async function addElementToCollection(elementName, count = 1, locationData = null) {
-    try {
-        console.log(`Adding ${count}x ${elementName} to collection...`, locationData ? 'with location data' : 'no location data');
-        
-        // Check ship capacity
-        const remaining = await getRemainingShipStorage();
-        const massToAdd = count * getElementMass(elementName);
-        
-        if (massToAdd > remaining) {
-            return { success: false, reason: 'insufficient_space', remaining: remaining, required: massToAdd };
-        }
-        
-        // First add to collection using db.js function DIRECTLY (not through window)
-        const result = await dbAddElementToCollection(elementName, count);
-        
-        if (result && result.success) {
-            // Update player stats
-            const player = await getPlayer();
-            if (player) {
-                player.totalElementsCollected = (player.totalElementsCollected || 0) + count;
-                await savePlayer(player);
-            }
-            
-            // Update ship storage used
-            const newUsed = await getShipStorageUsed();
-            localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, newUsed.toString());
-            
-            // CRITICAL: ALWAYS save location data if provided (for planetary discoveries)
-            // This ensures journal entries are created for every discovery
-            if (locationData && locationData.fromPlanet === true) {
-                // Get planet name and type - with proper fallbacks
-                const planetName = locationData.planet || getCurrentPlanetName();
-                const planetType = locationData.planetType || getCurrentPlanetType();
-                const rarity = locationData.rarity || getElementRarity(elementName);
-                
-                console.log(`📍 Saving location for ${elementName}:`, { planetName, planetType, rarity });
-                
-                // Create enhanced location data with all metadata
-                const enhancedLocationData = {
-                    planet: planetName,
-                    planetType: planetType,
-                    quantity: count,
-                    rarity: rarity,
-                    value: getElementValue(elementName),
-                    timestamp: Date.now(),
-                    discoveredDate: new Date().toISOString()
-                };
-                
-                try {
-                    // Call the db.js function with full metadata
-                    if (typeof window.dbSaveElementLocation === 'function') {
-                        await window.dbSaveElementLocation(elementName, planetName, enhancedLocationData);
-                        console.log(`✅ Journal entry saved: ${count}x ${elementName} (${rarity}) found on ${planetName}`);
-                        
-                        // Also update planet status
-                        if (typeof window.updatePlanetStatusFromLocations === 'function') {
-                            await window.updatePlanetStatusFromLocations(planetName);
-                        }
-                    } else if (typeof window.saveElementLocation === 'function') {
-                        // Fallback to regular function
-                        await window.saveElementLocation(elementName, planetName, enhancedLocationData);
-                        console.log(`✅ Journal entry saved (fallback): ${count}x ${elementName} (${rarity}) found on ${planetName}`);
-                        
-                        if (typeof window.updatePlanetStatusFromLocations === 'function') {
-                            await window.updatePlanetStatusFromLocations(planetName);
-                        }
-                    } else {
-                        console.warn('saveElementLocation function not available');
-                    }
-                } catch (locError) {
-                    console.error('Failed to save location:', locError);
-                }
-            } else {
-                console.log(`No planetary location data for ${elementName} - this is normal for alchemy crafts or market purchases`);
-            }
-            
-            return { success: true, newCount: result.count };
-        }
-        return { success: false, reason: 'database_error', error: result?.error };
-    } catch (error) {
-        console.error('Error in addElementToCollection:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-// Remove element from collection (public wrapper)
-async function removeElementFromCollection(elementName, count = 1) {
-    try {
-        console.log(`Removing ${count}x ${elementName} from collection...`);
-        
-        const result = await dbRemoveElementFromCollection(elementName, count);
-        
-        if (result && result.success) {
-            // Update ship storage used
-            const newUsed = await getShipStorageUsed();
-            localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, newUsed.toString());
-        }
-        
-        return result;
-    } catch (error) {
-        console.error('Error in removeElementFromCollection:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-// ===== HUB INVENTORY FUNCTIONS =====
-async function addElementToHub(elementName, count = 1) {
-    try {
-        console.log(`Adding ${count}x ${elementName} to hub storage...`);
-        
-        // Check if enough space
-        const remaining = await getRemainingHubStorage();
-        const massToAdd = count * getElementMass(elementName);
-        
-        if (massToAdd > remaining) {
-            return { success: false, reason: 'insufficient_space', remaining: remaining, required: massToAdd };
-        }
-        
-        // Get current hub inventory
-        let hubInventory = {};
-        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
-        if (inventoryStr) {
-            hubInventory = JSON.parse(inventoryStr);
-        }
-        
-        // Add to inventory
-        if (!hubInventory[elementName]) {
-            hubInventory[elementName] = { count: 0 };
-        }
-        hubInventory[elementName].count = (hubInventory[elementName].count || 0) + count;
-        
-        // Save
-        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
-        
-        // Update used storage
-        const newUsed = await getHubStorageUsed();
-        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, newUsed.toString());
-        
-        return { success: true, newCount: hubInventory[elementName].count };
-    } catch (error) {
-        console.error('Error adding to hub:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-async function removeElementFromHub(elementName, count = 1) {
-    try {
-        console.log(`Removing ${count}x ${elementName} from hub storage...`);
-        
-        // Get current hub inventory
-        let hubInventory = {};
-        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
-        if (inventoryStr) {
-            hubInventory = JSON.parse(inventoryStr);
-        }
-        
-        // Check if exists
-        if (!hubInventory[elementName]) {
-            return { success: false, reason: 'not_found' };
-        }
-        
-        const currentCount = hubInventory[elementName].count || 0;
-        if (currentCount < count) {
-            return { success: false, reason: 'insufficient', available: currentCount };
-        }
-        
-        // Remove
-        hubInventory[elementName].count -= count;
-        if (hubInventory[elementName].count <= 0) {
-            delete hubInventory[elementName];
-        }
-        
-        // Save
-        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
-        
-        // Update used storage
-        const newUsed = await getHubStorageUsed();
-        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, newUsed.toString());
-        
-        return { success: true };
-    } catch (error) {
-        console.error('Error removing from hub:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-async function getHubInventory() {
-    try {
-        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
-        return inventoryStr ? JSON.parse(inventoryStr) : {};
-    } catch (error) {
-        console.error('Error getting hub inventory:', error);
-        return {};
-    }
-}
-
-async function safeSellHubElement(elementName, quantity, pricePerUnit) {
-    try {
-        console.log('safeSellHubElement called:', elementName, quantity, pricePerUnit);
-        
-        // Get hub inventory
-        let hubInventory = {};
-        const inventoryStr = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
-        if (inventoryStr) {
-            hubInventory = JSON.parse(inventoryStr);
-        }
-        
-        if (!hubInventory[elementName]) {
-            return { success: false, reason: 'not_found' };
-        }
-        
-        const availableCount = hubInventory[elementName].count || 0;
-        if (availableCount < quantity) {
-            return { success: false, reason: 'insufficient', available: availableCount };
-        }
-        
-        // Remove from hub
-        const removeResult = await removeElementFromHub(elementName, quantity);
-        if (!removeResult.success) {
-            return removeResult;
-        }
-        
-        // Add credits
-        const earnings = quantity * pricePerUnit;
-        const newCredits = await addCredits(earnings);
-        
-        return { 
-            success: true, 
-            earnings: earnings,
-            newCredits: newCredits
-        };
-        
-    } catch (error) {
-        console.error('Error in safeSellHubElement:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-// ===== NEW MARKET BUY FUNCTION =====
-async function safeBuyHubElement(elementName, quantity, pricePerUnit) {
-    try {
-        console.log('safeBuyHubElement called:', elementName, quantity, pricePerUnit);
-        
-        return await buyHubElement(elementName, quantity, pricePerUnit);
-        
-    } catch (error) {
-        console.error('Error in safeBuyHubElement:', error);
-        return { success: false, reason: 'error', error: error.message };
-    }
-}
-
-// Helper to get element rarity
-function getElementRarity(elementName) {
-    // All elements are common by default
-    let rarity = 'common';
-    
-    // Very Rare elements (mostly synthetic, radioactive)
-    const veryRareElements = [
-        'Polonium', 'Astatine', 'Radon', 'Francium', 'Radium', 'Actinium',
-        'Thorium', 'Protactinium', 'Uranium'
-    ];
-    
-    // Legendary elements (transuranic, super-heavy)
-    const legendaryElements = [
-        'Neptunium', 'Plutonium', 'Americium', 'Curium', 'Berkelium', 'Californium',
-        'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium',
-        'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium',
-        'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium',
-        'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'
-    ];
-    
-    // Rare elements (precious metals, rare earths)
-    const rareElements = [
-        'Scandium', 'Titanium', 'Vanadium', 'Chromium', 'Manganese', 'Cobalt', 'Nickel',
-        'Copper', 'Zinc', 'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine',
-        'Krypton', 'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium',
-        'Molybdenum', 'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver',
-        'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon',
-        'Cesium', 'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium',
-        'Promethium', 'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium',
-        'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium', 'Hafnium',
-        'Tantalum', 'Tungsten', 'Rhenium', 'Osmium', 'Iridium', 'Platinum',
-        'Gold', 'Mercury', 'Thallium', 'Lead', 'Bismuth'
-    ];
-    
-    if (legendaryElements.includes(elementName)) {
-        rarity = 'legendary';
-    } else if (veryRareElements.includes(elementName)) {
-        rarity = 'very-rare';
-    } else if (rareElements.includes(elementName)) {
-        rarity = 'rare';
-    }
-    
-    return rarity;
-}
-
-// Helper to get element value
-function getElementValue(elementName) {
-    const values = {
-        // Common - 100 (basic elements)
-        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-        'Boron': 100, 'Carbon': 100, 'Nitrogen': 100, 'Oxygen': 100,
-        'Fluorine': 100, 'Neon': 100, 'Sodium': 100, 'Magnesium': 100,
-        'Aluminum': 100, 'Silicon': 100, 'Phosphorus': 100, 'Sulfur': 100,
-        'Chlorine': 100, 'Argon': 100, 'Potassium': 100, 'Calcium': 100,
-        
-        // Rare - 1000 (transition metals, valuable)
-        'Scandium': 1000, 'Titanium': 1000, 'Vanadium': 1000, 'Chromium': 1000,
-        'Manganese': 1000, 'Iron': 1000, 'Cobalt': 1000, 'Nickel': 1000,
-        'Copper': 1000, 'Zinc': 1000, 'Gallium': 1000, 'Germanium': 1000,
-        'Arsenic': 1000, 'Selenium': 1000, 'Bromine': 1000, 'Krypton': 1000,
-        'Rubidium': 1000, 'Strontium': 1000, 'Yttrium': 1000, 'Zirconium': 1000,
-        'Niobium': 1000, 'Molybdenum': 1000, 'Technetium': 1000, 'Ruthenium': 1000,
-        'Rhodium': 1000, 'Palladium': 1000, 'Silver': 1000, 'Cadmium': 1000,
-        'Indium': 1000, 'Tin': 1000, 'Antimony': 1000, 'Tellurium': 1000,
-        'Iodine': 1000, 'Xenon': 1000, 'Cesium': 1000, 'Barium': 1000,
-        'Lanthanum': 1000, 'Cerium': 1000, 'Praseodymium': 1000, 'Neodymium': 1000,
-        'Promethium': 1000, 'Samarium': 1000, 'Europium': 1000, 'Gadolinium': 1000,
-        'Terbium': 1000, 'Dysprosium': 1000, 'Holmium': 1000, 'Erbium': 1000,
-        'Thulium': 1000, 'Ytterbium': 1000, 'Lutetium': 1000, 'Hafnium': 1000,
-        'Tantalum': 1000, 'Tungsten': 1000, 'Rhenium': 1000, 'Osmium': 1000,
-        'Iridium': 1000, 'Platinum': 1000, 'Gold': 1000, 'Mercury': 1000,
-        'Thallium': 1000, 'Lead': 1000, 'Bismuth': 1000,
-        
-        // Very Rare - 5000 (radioactive, difficult to obtain)
-        'Polonium': 5000, 'Astatine': 5000, 'Radon': 5000, 'Francium': 5000,
-        'Radium': 5000, 'Actinium': 5000, 'Thorium': 5000, 'Protactinium': 5000,
-        'Uranium': 5000,
-        
-        // Legendary - 25000 (super-heavy, synthetic, extremely rare)
-        'Neptunium': 25000, 'Plutonium': 25000, 'Americium': 25000, 'Curium': 25000,
-        'Berkelium': 25000, 'Californium': 25000, 'Einsteinium': 25000, 'Fermium': 25000,
-        'Mendelevium': 25000, 'Nobelium': 25000, 'Lawrencium': 25000, 'Rutherfordium': 25000,
-        'Dubnium': 25000, 'Seaborgium': 25000, 'Bohrium': 25000, 'Hassium': 25000,
-        'Meitnerium': 25000, 'Darmstadtium': 25000, 'Roentgenium': 25000, 'Copernicium': 25000,
-        'Nihonium': 25000, 'Flerovium': 25000, 'Moscovium': 25000, 'Livermorium': 25000,
-        'Tennessine': 25000, 'Oganesson': 25000
+/**
+ * Get field storage key
+ * @param {string} field - Field name
+ * @returns {string} Storage key
+ */
+function getFieldKey(field) {
+    const fieldMap = {
+        'alchemy': STORAGE_KEYS.ALCHEMY_PROGRESS,
+        'metallurgy': STORAGE_KEYS.METALLURGY_PROGRESS,
+        'materials-science': STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS,
+        'materialsScience': STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS,
+        'pharmaceuticals': STORAGE_KEYS.PHARMACEUTICALS_PROGRESS,
+        'textiles': STORAGE_KEYS.TEXTILES_PROGRESS,
+        'construction': STORAGE_KEYS.CONSTRUCTION_PROGRESS,
+        'aerospace': STORAGE_KEYS.AEROSPACE_PROGRESS,
+        'nuclear': STORAGE_KEYS.NUCLEAR_PROGRESS,
+        'optical': STORAGE_KEYS.OPTICAL_PROGRESS,
+        'magnetic': STORAGE_KEYS.MAGNETIC_PROGRESS,
+        'cryogenic': STORAGE_KEYS.CRYOGENIC_PROGRESS,
+        'polymers': STORAGE_KEYS.POLYMERS_PROGRESS
     };
-    
-    return values[elementName] || 100;
+    return fieldMap[field] || STORAGE_KEYS.ALCHEMY_PROGRESS;
 }
 
-// ===== SAFE SELL ELEMENT (SHIP CARGO) =====
-async function safeSellElement(elementName, quantity, pricePerUnit) {
+// ============================================================================
+// RECIPE UNLOCKS (NEW)
+// ============================================================================
+
+/**
+ * Get unlocked recipes for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Unlocked recipes by field
+ */
+export async function getUnlockedRecipes(playerId) {
     try {
-        console.log('safeSellElement called:', elementName, quantity, pricePerUnit);
-        const collection = await getCollection();
-        const credits = await getCredits();
+        const key = `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting unlocked recipes:', error);
+        return {};
+    }
+}
+
+/**
+ * Save unlocked recipes
+ * @param {string} playerId - Player ID
+ * @param {Object} unlocks - Unlocked recipes object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveUnlockedRecipes(playerId, unlocks) {
+    try {
+        const key = `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(unlocks));
+        return true;
+    } catch (error) {
+        console.error('Error saving unlocked recipes:', error);
+        return false;
+    }
+}
+
+/**
+ * Unlock a recipe for a player
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @param {string} recipeId - Recipe ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function unlockRecipe(playerId, field, recipeId) {
+    try {
+        const unlocks = await getUnlockedRecipes(playerId);
         
-        if (!collection[elementName]) {
-            return { success: false, reason: 'not_found' };
+        if (!unlocks[field]) {
+            unlocks[field] = [];
         }
         
-        const elementData = collection[elementName];
-        const availableCount = elementData.count || 1;
-        
-        if (availableCount < quantity) {
-            return { success: false, reason: 'insufficient', available: availableCount };
+        if (!unlocks[field].includes(recipeId)) {
+            unlocks[field].push(recipeId);
         }
         
-        // Remove from collection using db.js function directly
-        const removeResult = await dbRemoveElementFromCollection(elementName, quantity);
-        
-        if (!removeResult.success) {
-            return removeResult;
-        }
-        
-        // Add credits
-        const earnings = quantity * pricePerUnit;
-        const newCredits = credits + earnings;
-        await saveCredits(newCredits);
-        
-        return { 
-            success: true, 
-            earnings: earnings,
-            newCredits: newCredits
+        return await saveUnlockedRecipes(playerId, unlocks);
+    } catch (error) {
+        console.error('Error unlocking recipe:', error);
+        return false;
+    }
+}
+
+/**
+ * Check if recipe is unlocked
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @param {string} recipeId - Recipe ID
+ * @returns {Promise<boolean>} True if unlocked
+ */
+export async function isRecipeUnlocked(playerId, field, recipeId) {
+    try {
+        const unlocks = await getUnlockedRecipes(playerId);
+        return unlocks[field]?.includes(recipeId) || false;
+    } catch (error) {
+        console.error('Error checking recipe unlock:', error);
+        return false;
+    }
+}
+
+// ============================================================================
+// FIELD MASTERY (NEW)
+// ============================================================================
+
+/**
+ * Get field mastery levels
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Mastery levels by field
+ */
+export async function getFieldMastery(playerId) {
+    try {
+        const key = `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting field mastery:', error);
+        return {};
+    }
+}
+
+/**
+ * Save field mastery
+ * @param {string} playerId - Player ID
+ * @param {Object} mastery - Mastery object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveFieldMastery(playerId, mastery) {
+    try {
+        const key = `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(mastery));
+        return true;
+    } catch (error) {
+        console.error('Error saving field mastery:', error);
+        return false;
+    }
+}
+
+/**
+ * Update mastery for a field
+ * @param {string} playerId - Player ID
+ * @param {string} field - Field name
+ * @param {Object} levelData - Level data (name, multiplier, progress)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function updateFieldMastery(playerId, field, levelData) {
+    try {
+        const mastery = await getFieldMastery(playerId);
+        mastery[field] = {
+            ...mastery[field],
+            ...levelData,
+            lastUpdated: Date.now()
         };
-        
+        return await saveFieldMastery(playerId, mastery);
     } catch (error) {
-        console.error('Error in safeSellElement:', error);
-        return { success: false, reason: 'error', error: error.message };
+        console.error('Error updating field mastery:', error);
+        return false;
     }
 }
 
-// ===== LOCATION RETRIEVAL FUNCTIONS =====
-// Get all locations for a specific element
-async function getElementLocations(elementName) {
+// ============================================================================
+// CARGO MASS UTILITIES
+// ============================================================================
+
+/**
+ * Get total cargo mass
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Total mass
+ */
+export async function getTotalCargoMass(playerId = 'main') {
     try {
-        // Use dbGetAll directly from db.js
-        if (typeof window.dbGetAll === 'function') {
-            const allLocations = await window.dbGetAll('elementLocations') || [];
-            return allLocations
-                .filter(loc => loc.elementName === elementName)
-                .sort((a, b) => b.discoveredAt - a.discoveredAt);
-        } else if (typeof window.getAll === 'function') {
-            // Fallback to regular getAll
-            const allLocations = await window.getAll('elementLocations') || [];
-            return allLocations
-                .filter(loc => loc.elementName === elementName)
-                .sort((a, b) => b.discoveredAt - a.discoveredAt);
+        // Import dynamically to avoid circular dependency
+        const { getElementInventory, getMaterialInventory } = await import('./inventory.js');
+        
+        const elements = await getElementInventory(playerId);
+        const materials = await getMaterialInventory(playerId);
+        
+        let totalMass = 0;
+        
+        // Calculate element mass
+        for (const [name, data] of Object.entries(elements)) {
+            const count = typeof data === 'object' ? data.count : data;
+            totalMass += count * getElementMass(name);
         }
         
-        // Fallback to localStorage if db.js not available
-        const locationsKey = `voidfarer_locations_${elementName}`;
-        const locations = localStorage.getItem(locationsKey);
-        return locations ? JSON.parse(locations) : [];
+        // Calculate material mass (materials have their own mass)
+        for (const [materialId, data] of Object.entries(materials)) {
+            // Default material mass - could be customized per material
+            totalMass += data.count * 10; // Placeholder: 10 AMU per material unit
+        }
         
+        return totalMass;
     } catch (error) {
-        console.error(`Error getting locations for ${elementName}:`, error);
-        return [];
+        console.error('Error calculating total cargo mass:', error);
+        return 0;
     }
 }
 
-// Get all player locations (for stats)
-async function getAllPlayerLocations() {
+/**
+ * Get remaining cargo mass
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Remaining mass
+ */
+export async function getRemainingCargoMass(playerId = 'main') {
     try {
-        // Use dbGetAll directly from db.js
-        if (typeof window.dbGetAll === 'function') {
-            const allLocations = await window.dbGetAll('elementLocations') || [];
-            const playerId = localStorage.getItem('voidfarer_player_id');
-            if (!playerId) return [];
-            
-            return allLocations
-                .filter(loc => loc.playerId === playerId)
-                .sort((a, b) => b.discoveredAt - a.discoveredAt);
-        } else if (typeof window.getAll === 'function') {
-            const allLocations = await window.getAll('elementLocations') || [];
-            const playerId = localStorage.getItem('voidfarer_player_id');
-            if (!playerId) return [];
-            
-            return allLocations
-                .filter(loc => loc.playerId === playerId)
-                .sort((a, b) => b.discoveredAt - a.discoveredAt);
-        }
-        
-        // Fallback: Scan localStorage for all location keys
-        const allLocations = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('voidfarer_locations_')) {
-                const elementName = key.replace('voidfarer_locations_', '');
-                const locations = JSON.parse(localStorage.getItem(key) || '[]');
-                locations.forEach(loc => {
-                    allLocations.push({
-                        element: elementName,
-                        ...loc
-                    });
-                });
-            }
-        }
-        return allLocations;
-        
+        const totalMass = await getTotalCargoMass(playerId);
+        const player = await getPlayer(playerId);
+        const massLimit = player?.cargoMassLimit || getCargoMassLimit();
+        return Math.max(0, massLimit - totalMass);
     } catch (error) {
-        console.error('Error getting all player locations:', error);
-        return [];
+        console.error('Error calculating remaining cargo mass:', error);
+        return getCargoMassLimit();
     }
 }
 
-// ===== CREDITS =====
-async function getCredits() {
+// ============================================================================
+// CREDITS
+// ============================================================================
+
+/**
+ * Get player credits
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Credits
+ */
+export async function getCredits(playerId = 'main') {
     try {
-        const player = await getPlayer();
+        const player = await getPlayer(playerId);
         return player?.credits || 5000;
     } catch (error) {
         console.error('Error getting credits:', error);
@@ -1630,12 +590,18 @@ async function getCredits() {
     }
 }
 
-async function saveCredits(credits) {
+/**
+ * Save credits
+ * @param {number} credits - Credits amount
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveCredits(credits, playerId = 'main') {
     try {
-        const player = await getPlayer();
+        const player = await getPlayer(playerId);
         if (player) {
             player.credits = credits;
-            await savePlayer(player);
+            await savePlayer(player, playerId);
         }
         saveTimestamp();
         return true;
@@ -1645,16 +611,22 @@ async function saveCredits(credits) {
     }
 }
 
-async function addCredits(amount) {
+/**
+ * Add credits
+ * @param {number} amount - Amount to add
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} New total
+ */
+export async function addCredits(amount, playerId = 'main') {
     try {
-        const current = await getCredits();
+        const current = await getCredits(playerId);
         const newTotal = current + amount;
-        await saveCredits(newTotal);
+        await saveCredits(newTotal, playerId);
         
-        const player = await getPlayer();
+        const player = await getPlayer(playerId);
         if (player) {
             player.totalCreditsEarned = (player.totalCreditsEarned || 5000) + amount;
-            await savePlayer(player);
+            await savePlayer(player, playerId);
         }
         return newTotal;
     } catch (error) {
@@ -1663,11 +635,17 @@ async function addCredits(amount) {
     }
 }
 
-async function spendCredits(amount) {
+/**
+ * Spend credits
+ * @param {number} amount - Amount to spend
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success if had enough
+ */
+export async function spendCredits(amount, playerId = 'main') {
     try {
-        const current = await getCredits();
+        const current = await getCredits(playerId);
         if (current >= amount) {
-            await saveCredits(current - amount);
+            await saveCredits(current - amount, playerId);
             return true;
         }
         return false;
@@ -1677,124 +655,91 @@ async function spendCredits(amount) {
     }
 }
 
-// ===== ADD CREDITS TO OWNER (for mining fees) =====
-async function addCreditsToOwner(ownerId, amount) {
-    try {
-        console.log(`Adding ${amount}⭐ to owner ${ownerId} from mining fee`);
-        
-        // This is a simplified version - in a full implementation,
-        // you would have a mapping of player IDs to their credit balances
-        // For now, we'll just add to the current player's credits
-        // In a multi-player system, you'd need a proper database
-        
-        // For demo purposes, if the owner is the current player, add to their credits
-        const currentPlayerId = localStorage.getItem('voidfarer_player_id');
-        
-        if (ownerId === currentPlayerId) {
-            // Add to current player's credits
-            const newTotal = await addCredits(amount);
-            console.log(`Added ${amount}⭐ to current player (self-mining fee)`);
-            return newTotal;
-        } else {
-            // In a real implementation, you'd add to the owner's account in a database
-            // For now, store in a separate "owner earnings" object
-            const ownerEarnings = JSON.parse(localStorage.getItem('voidfarer_owner_earnings') || '{}');
-            ownerEarnings[ownerId] = (ownerEarnings[ownerId] || 0) + amount;
-            localStorage.setItem('voidfarer_owner_earnings', JSON.stringify(ownerEarnings));
-            console.log(`Stored ${amount}⭐ for owner ${ownerId} in owner earnings`);
-            return amount;
-        }
-    } catch (error) {
-        console.error('Error adding credits to owner:', error);
-        return 0;
-    }
+// ============================================================================
+// LOCATION HELPERS
+// ============================================================================
+
+/**
+ * Check if player is at Earth
+ * @returns {boolean} True if at Earth
+ */
+export function isAtEarth() {
+    const currentPlanet = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
+    return currentPlanet === 'Earth';
 }
 
-// ===== SHIP FUEL =====
-function getShipFuel() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_FUEL)) || 100;
-    } catch (error) {
-        console.error('Error getting ship fuel:', error);
-        return 100;
-    }
+/**
+ * Get current planet name
+ * @returns {string} Planet name
+ */
+export function getCurrentPlanetName() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Unknown';
 }
 
-function saveShipFuel(fuel) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
-    } catch (error) {
-        console.error('Error saving ship fuel:', error);
-    }
+/**
+ * Get current planet type
+ * @returns {string} Planet type
+ */
+export function getCurrentPlanetType() {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TYPE) || 'unknown';
 }
 
-function refuelShip(amount) {
-    try {
-        const current = getShipFuel();
-        saveShipFuel(Math.min(100, current + amount));
-    } catch (error) {
-        console.error('Error refueling ship:', error);
-    }
+/**
+ * Get current planet resources
+ * @returns {Array} Planet resources
+ */
+export function getCurrentPlanetResources() {
+    const resources = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES);
+    return resources ? JSON.parse(resources) : [];
 }
 
-// ===== SHIP POWER =====
-function getShipPower() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) || 100;
-    } catch (error) {
-        console.error('Error getting ship power:', error);
-        return 100;
-    }
-}
-
-function setShipPower(power) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
-    } catch (error) {
-        console.error('Error setting ship power:', error);
-    }
-}
-
-function repairShip(amount) {
-    try {
-        const current = getShipPower();
-        setShipPower(Math.min(100, current + amount));
-    } catch (error) {
-        console.error('Error repairing ship:', error);
-    }
-}
-
-// ===== LOCATION DATA =====
-function getCurrentSector() {
+/**
+ * Get current sector
+ * @returns {string} Sector ID
+ */
+export function getCurrentSector() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR) || 'B2';
 }
 
-function getCurrentRegion() {
+/**
+ * Get current region
+ * @returns {string} Region name
+ */
+export function getCurrentRegion() {
     return localStorage.getItem(STORAGE_KEYS.CURRENT_REGION) || 'Orion Arm';
 }
 
-function setCurrentSector(sector, region) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR, sector);
+/**
+ * Set current location
+ * @param {string} region - Region name
+ * @param {string} sector - Sector ID
+ * @param {string} starSector - Star sector name
+ * @param {string} starSectorType - Star sector type
+ * @param {number} starSectorStars - Number of stars
+ * @param {number} starSectorX - X coordinate
+ * @param {number} starSectorY - Y coordinate
+ */
+export function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_REGION, region);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR, sector);
+    
+    if (starSector) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_SECTOR, starSector);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_NAME, starSector);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_TYPE, starSectorType || 'Unknown');
+        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_STARS, (starSectorStars || 50).toString());
+        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_X, (starSectorX || 30).toString());
+        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_Y, (starSectorY || 40).toString());
+    }
 }
 
-function getCurrentStarSector() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR_SECTOR) || 'Orion Molecular Cloud';
-}
-
-function getCurrentStar() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_STAR) || 'Sol';
-}
-
-function getCurrentPlanet() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET) || 'Earth';
-}
-
-function getCurrentPlanetImage() {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE) || 'earth-view.jpg';
-}
-
-function setCurrentPlanet(name, type, resources) {
+/**
+ * Set current planet
+ * @param {string} name - Planet name
+ * @param {string} type - Planet type
+ * @param {Array} resources - Planet resources
+ */
+export function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
@@ -1812,20 +757,73 @@ function setCurrentPlanet(name, type, resources) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_IMAGE, image);
 }
 
-function setCurrentLocation(region, sector, starSector, starSectorType, starSectorStars, starSectorX, starSectorY) {
-    setCurrentSector(sector, region);
-    if (starSector) {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_STAR_SECTOR, starSector);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_NAME, starSector);
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_TYPE, starSectorType || 'Unknown');
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_STARS, (starSectorStars || 50).toString());
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_X, (starSectorX || 30).toString());
-        localStorage.setItem(STORAGE_KEYS.CURRENT_SECTOR_Y, (starSectorY || 40).toString());
+// ============================================================================
+// SHIP DATA
+// ============================================================================
+
+/**
+ * Get ship fuel
+ * @returns {number} Fuel percentage
+ */
+export function getShipFuel() {
+    try {
+        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_FUEL)) || 100;
+    } catch (error) {
+        console.error('Error getting ship fuel:', error);
+        return 100;
     }
 }
 
-// ===== WARP DATA =====
-function setWarpData(destination, returnPage, cycles, distance, fuel) {
+/**
+ * Save ship fuel
+ * @param {number} fuel - Fuel percentage
+ */
+export function saveShipFuel(fuel) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
+    } catch (error) {
+        console.error('Error saving ship fuel:', error);
+    }
+}
+
+/**
+ * Get ship power
+ * @returns {number} Power percentage
+ */
+export function getShipPower() {
+    try {
+        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) || 100;
+    } catch (error) {
+        console.error('Error getting ship power:', error);
+        return 100;
+    }
+}
+
+/**
+ * Save ship power
+ * @param {number} power - Power percentage
+ */
+export function saveShipPower(power) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
+    } catch (error) {
+        console.error('Error saving ship power:', error);
+    }
+}
+
+// ============================================================================
+// WARP DATA
+// ============================================================================
+
+/**
+ * Set warp data
+ * @param {string} destination - Destination name
+ * @param {string} returnPage - Return page URL
+ * @param {number} cycles - Warp cycles
+ * @param {number} distance - Distance in LY
+ * @param {number} fuel - Fuel cost
+ */
+export function setWarpData(destination, returnPage, cycles, distance, fuel) {
     localStorage.setItem(STORAGE_KEYS.WARP_DESTINATION, destination);
     localStorage.setItem(STORAGE_KEYS.WARP_RETURN, returnPage);
     localStorage.setItem(STORAGE_KEYS.WARP_CYCLES, cycles.toString());
@@ -1833,7 +831,11 @@ function setWarpData(destination, returnPage, cycles, distance, fuel) {
     if (fuel) localStorage.setItem(STORAGE_KEYS.WARP_FUEL, fuel.toString());
 }
 
-function getWarpData() {
+/**
+ * Get warp data
+ * @returns {Object} Warp data
+ */
+export function getWarpData() {
     return {
         destination: localStorage.getItem(STORAGE_KEYS.WARP_DESTINATION) || 'Unknown',
         returnPage: localStorage.getItem(STORAGE_KEYS.WARP_RETURN) || 'galaxy-map.html',
@@ -1843,92 +845,263 @@ function getWarpData() {
     };
 }
 
-function clearWarpData() {
+/**
+ * Clear warp data
+ */
+export function clearWarpData() {
     const keys = [
         STORAGE_KEYS.WARP_DESTINATION,
         STORAGE_KEYS.WARP_RETURN,
         STORAGE_KEYS.WARP_CYCLES,
         STORAGE_KEYS.WARP_DISTANCE,
-        STORAGE_KEYS.WARP_FUEL
+        STORAGE_KEYS.WARP_FUEL,
+        STORAGE_KEYS.WARP_DESTINATION_PLANET,
+        STORAGE_KEYS.WARP_DESTINATION_PLANET_TYPE,
+        STORAGE_KEYS.WARP_ORIGIN_PLANET,
+        STORAGE_KEYS.WARP_ORIGIN_STAR,
+        STORAGE_KEYS.WARP_ORIGIN_STAR_SECTOR,
+        STORAGE_KEYS.WARP_ORIGIN_REGION,
+        STORAGE_KEYS.WARP_ORIGIN_SECTOR
     ];
     keys.forEach(key => localStorage.removeItem(key));
 }
 
-// ===== SYSTEM DATA MANAGEMENT =====
-function saveSystemData(systemData) {
-    localStorage.setItem('voidfarer_system_data', JSON.stringify(systemData));
-}
+// ============================================================================
+// PLAYER ID
+// ============================================================================
 
-function loadSystemData() {
-    const data = localStorage.getItem('voidfarer_system_data');
-    return data ? JSON.parse(data) : null;
-}
-
-function clearSystemData() {
-    localStorage.removeItem('voidfarer_system_data');
-}
-
-// ===== COLONIES =====
-async function getColonies() {
-    return await window.getAll('colonies');
-}
-
-// ===== MISSIONS =====
-async function getMissions() {
-    return await window.getAll('missions');
-}
-
-async function getCompletedMissions() {
-    return await window.getAll('completedMissions');
-}
-
-// ===== SCAN HISTORY =====
-async function getScanHistory() {
-    const scans = await window.getAll('scanHistory');
-    return scans.sort((a, b) => b.timestamp - a.timestamp);
-}
-
-async function addScan(scanData) {
-    const scan = {
-        timestamp: Date.now(),
-        ...scanData,
-        date: new Date().toISOString()
-    };
-    await window.setItem('scanHistory', scan);
-    return await getScanHistory();
-}
-
-// ===== REAL ESTATE =====
-async function getRealEstate() {
-    const properties = await window.getAllProperties();
-    return { properties: properties };
-}
-
-// ===== TAX TRANSACTIONS =====
-async function getTaxHistory(playerId, limit = 100) {
-    if (playerId) {
-        return await window.getPlayerTransactions(playerId, limit);
+/**
+ * Get or create player ID
+ * @returns {string} Player ID
+ */
+export function getPlayerId() {
+    let playerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
+    if (!playerId) {
+        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem(STORAGE_KEYS.PLAYER_ID, playerId);
     }
-    const all = await window.getAll('taxTransactions');
-    return all.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    return playerId;
 }
 
-// ===== SETTINGS =====
-function getHapticsEnabled() {
+// ============================================================================
+// SAVE TIMESTAMP
+// ============================================================================
+
+/**
+ * Save timestamp of last save
+ */
+export function saveTimestamp() {
+    localStorage.setItem(STORAGE_KEYS.LAST_SAVE, new Date().toISOString());
+}
+
+// ============================================================================
+// SETTINGS
+// ============================================================================
+
+/**
+ * Get haptics enabled
+ * @returns {boolean} True if enabled
+ */
+export function getHapticsEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS) !== 'false';
 }
 
-function setHapticsEnabled(enabled) {
+/**
+ * Set haptics enabled
+ * @param {boolean} enabled - Enabled state
+ */
+export function setHapticsEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, enabled.toString());
 }
 
-function getAutoGatherEnabled() {
+/**
+ * Get auto gather enabled
+ * @returns {boolean} True if enabled
+ */
+export function getAutoGatherEnabled() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER) !== 'false';
 }
 
-function setAutoGatherEnabled(enabled) {
+/**
+ * Set auto gather enabled
+ * @param {boolean} enabled - Enabled state
+ */
+export function setAutoGatherEnabled(enabled) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, enabled.toString());
 }
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+/**
+ * Initialize storage
+ * @param {string} playerId - Player ID
+ */
+export async function initializeStorage(playerId = 'main') {
+    console.log('Initializing storage for player:', playerId);
+    
+    // Use the UNIVERSE_SEED from the HTML file
+    if (!localStorage.getItem(STORAGE_KEYS.UNIVERSE_SEED) && typeof window.UNIVERSE_SEED !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.UNIVERSE_SEED, window.UNIVERSE_SEED.toString());
+    }
+    
+    // Create default player if doesn't exist
+    const player = await getPlayer(playerId);
+    if (!player) {
+        await createDefaultPlayer('Voidfarer', playerId);
+    }
+    
+    // Initialize settings if not present
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, 'true');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_AUTO_GATHER, 'true');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, 'gentle');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, '50');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
+    }
+    
+    // Initialize crafting progression storage if not present
+    const fieldKeys = [
+        STORAGE_KEYS.ALCHEMY_PROGRESS,
+        STORAGE_KEYS.METALLURGY_PROGRESS,
+        STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS,
+        STORAGE_KEYS.PHARMACEUTICALS_PROGRESS,
+        STORAGE_KEYS.TEXTILES_PROGRESS,
+        STORAGE_KEYS.CONSTRUCTION_PROGRESS,
+        STORAGE_KEYS.AEROSPACE_PROGRESS,
+        STORAGE_KEYS.NUCLEAR_PROGRESS,
+        STORAGE_KEYS.OPTICAL_PROGRESS,
+        STORAGE_KEYS.MAGNETIC_PROGRESS,
+        STORAGE_KEYS.CRYOGENIC_PROGRESS,
+        STORAGE_KEYS.POLYMERS_PROGRESS
+    ];
+    
+    fieldKeys.forEach(key => {
+        const playerKey = `${key}_${playerId}`;
+        if (!localStorage.getItem(playerKey)) {
+            localStorage.setItem(playerKey, '{}');
+        }
+    });
+    
+    // Initialize recipe unlocks
+    const recipeKey = `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`;
+    if (!localStorage.getItem(recipeKey)) {
+        localStorage.setItem(recipeKey, '{}');
+    }
+    
+    // Initialize field mastery
+    const masteryKey = `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`;
+    if (!localStorage.getItem(masteryKey)) {
+        localStorage.setItem(masteryKey, '{}');
+    }
+    
+    // Initialize location if not set
+    if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
+        setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
+    }
+    
+    console.log('Storage initialized for player:', playerId);
+}
+
+// ============================================================================
+// RESET
+// ============================================================================
+
+/**
+ * Reset all game data for a player
+ * @param {string} playerId - Player ID
+ */
+export async function resetGame(playerId = 'main') {
+    // Save settings to restore after reset
+    const settings = {
+        haptics: getHapticsEnabled(),
+        autoGather: getAutoGatherEnabled(),
+        orbitSpeed: getOrbitSpeed(),
+        music: getMusicVolume(),
+        ambient: getAmbientVolume()
+    };
+    
+    // Clear all player-specific data
+    const keysToRemove = [
+        `${STORAGE_KEYS.PLAYER}_${playerId}`,
+        `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`,
+        `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`,
+        `${STORAGE_KEYS.MATERIAL_QUALITY}_${playerId}`,
+        `${STORAGE_KEYS.ALCHEMY_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.METALLURGY_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.PHARMACEUTICALS_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.TEXTILES_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.CONSTRUCTION_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.AEROSPACE_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.NUCLEAR_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.OPTICAL_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.MAGNETIC_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.CRYOGENIC_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.POLYMERS_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`,
+        `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`,
+        `${STORAGE_KEYS.PLAYER_PRODUCTS}_${playerId}`,
+        `${STORAGE_KEYS.PLAYER_LABOR_EARNINGS}_${playerId}`,
+        STORAGE_KEYS.CREDITS,
+        STORAGE_KEYS.SHIP_FUEL,
+        STORAGE_KEYS.SHIP_POWER,
+        STORAGE_KEYS.SHIP_UPGRADES,
+        STORAGE_KEYS.CURRENT_SECTOR,
+        STORAGE_KEYS.CURRENT_REGION,
+        STORAGE_KEYS.CURRENT_STAR_SECTOR,
+        STORAGE_KEYS.CURRENT_SECTOR_NAME,
+        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
+        STORAGE_KEYS.CURRENT_SECTOR_STARS,
+        STORAGE_KEYS.CURRENT_SECTOR_X,
+        STORAGE_KEYS.CURRENT_SECTOR_Y,
+        STORAGE_KEYS.CURRENT_STAR,
+        STORAGE_KEYS.CURRENT_STAR_TYPE,
+        STORAGE_KEYS.CURRENT_STAR_INDEX,
+        STORAGE_KEYS.CURRENT_STAR_X,
+        STORAGE_KEYS.CURRENT_STAR_Y,
+        STORAGE_KEYS.CURRENT_STAR_PLANETS,
+        STORAGE_KEYS.CURRENT_PLANET,
+        STORAGE_KEYS.CURRENT_PLANET_TYPE,
+        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
+        STORAGE_KEYS.CURRENT_PLANET_IMAGE,
+        STORAGE_KEYS.COLONIES,
+        STORAGE_KEYS.DISCOVERED_LOCATIONS,
+        STORAGE_KEYS.SCAN_HISTORY,
+        STORAGE_KEYS.HUB_INVENTORY,
+        STORAGE_KEYS.PLANET_CLAIMS,
+        STORAGE_KEYS.PLAYER_CLAIMS,
+        STORAGE_KEYS.CLAIM_HISTORY,
+        STORAGE_KEYS.CLAIM_NOTIFICATIONS
+    ];
+    
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+    });
+    
+    // Restore settings
+    setHapticsEnabled(settings.haptics);
+    setAutoGatherEnabled(settings.autoGather);
+    setOrbitSpeed(settings.orbitSpeed);
+    setMusicVolume(settings.music);
+    setAmbientVolume(settings.ambient);
+    
+    // Re-initialize
+    await initializeStorage(playerId);
+}
+
+// ============================================================================
+// SETTINGS (additional)
+// ============================================================================
 
 function getOrbitSpeed() {
     return localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED) || 'gentle';
@@ -1954,240 +1127,83 @@ function setAmbientVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
 }
 
-// ===== SHIP UPGRADES =====
-async function getShipUpgrades() {
-    const upgrades = await window.getItem('shipUpgrades', 'current');
-    return upgrades || { engine: 1, shields: 1, miningLaser: 1, cargoHold: 1, warpDrive: 1, scanner: 1 };
-}
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
-async function saveShipUpgrades(upgrades) {
-    await window.setItem('shipUpgrades', { id: 'current', ...upgrades });
-}
-
-// ===== SAVE TIMESTAMP =====
-function saveTimestamp() {
-    localStorage.setItem(STORAGE_KEYS.LAST_SAVE, new Date().toISOString());
-}
-
-// ===== RESET GAME =====
-async function resetGame() {
-    const settings = {
-        haptics: getHapticsEnabled(),
-        autoGather: getAutoGatherEnabled(),
-        orbitSpeed: getOrbitSpeed(),
-        music: getMusicVolume(),
-        ambient: getAmbientVolume()
-    };
+export default {
+    // Constants
+    STORAGE_KEYS,
+    ELEMENT_MASS,
     
-    await window.resetAllData();
+    // Player
+    getPlayer,
+    savePlayer,
+    createDefaultPlayer,
+    getPlayerId,
     
-    const locationKeys = [
-        STORAGE_KEYS.CURRENT_SECTOR,
-        STORAGE_KEYS.CURRENT_REGION,
-        STORAGE_KEYS.CURRENT_STAR_SECTOR,
-        STORAGE_KEYS.CURRENT_SECTOR_NAME,
-        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
-        STORAGE_KEYS.CURRENT_SECTOR_STARS,
-        STORAGE_KEYS.CURRENT_SECTOR_X,
-        STORAGE_KEYS.CURRENT_SECTOR_Y,
-        STORAGE_KEYS.CURRENT_STAR,
-        STORAGE_KEYS.CURRENT_STAR_TYPE,
-        STORAGE_KEYS.CURRENT_STAR_INDEX,
-        STORAGE_KEYS.CURRENT_STAR_X,
-        STORAGE_KEYS.CURRENT_STAR_Y,
-        STORAGE_KEYS.CURRENT_STAR_PLANETS,
-        STORAGE_KEYS.CURRENT_PLANET,
-        STORAGE_KEYS.CURRENT_PLANET_TYPE,
-        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
-        STORAGE_KEYS.CURRENT_PLANET_IMAGE
-    ];
-    locationKeys.forEach(key => localStorage.removeItem(key));
+    // Field progression (NEW)
+    getFieldProgress,
+    saveFieldProgress,
+    updateFieldProgress,
     
-    // Clear alchemy data
-    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_PROGRESS);
-    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_RECIPES_UNLOCKED);
-    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_TOTAL_CRAFTS);
-    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_MASTERY);
-    localStorage.removeItem(STORAGE_KEYS.ALCHEMY_CATEGORY_PROGRESS);
+    // Recipe unlocks (NEW)
+    getUnlockedRecipes,
+    saveUnlockedRecipes,
+    unlockRecipe,
+    isRecipeUnlocked,
     
-    // Clear labor pool data
-    localStorage.removeItem(STORAGE_KEYS.LABOR_POOL_TOTAL);
-    localStorage.removeItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED);
-    localStorage.removeItem(STORAGE_KEYS.LABOR_POOL_HISTORY);
-    localStorage.removeItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS);
+    // Field mastery (NEW)
+    getFieldMastery,
+    saveFieldMastery,
+    updateFieldMastery,
     
-    // Clear product ownership data
-    localStorage.removeItem(STORAGE_KEYS.PLAYER_PRODUCTS);
-    localStorage.removeItem(STORAGE_KEYS.PRODUCT_TRANSACTIONS);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_PRODUCTS);
+    // Cargo
+    getTotalCargoMass,
+    getRemainingCargoMass,
+    getElementMass,
     
-    // Clear marketplace data
-    localStorage.removeItem(STORAGE_KEYS.MARKET_PRICES);
-    localStorage.removeItem(STORAGE_KEYS.MARKET_HISTORY);
-    localStorage.removeItem(STORAGE_KEYS.MARKET_VOLUME);
-    localStorage.removeItem(STORAGE_KEYS.MARKET_ORDERS);
+    // Credits
+    getCredits,
+    saveCredits,
+    addCredits,
+    spendCredits,
     
-    // Clear hub storage
-    localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_MAX);
-    localStorage.removeItem(STORAGE_KEYS.HUB_STORAGE_USED);
-    localStorage.removeItem(STORAGE_KEYS.HUB_INVENTORY);
+    // Location
+    isAtEarth,
+    getCurrentPlanetName,
+    getCurrentPlanetType,
+    getCurrentPlanetResources,
+    getCurrentSector,
+    getCurrentRegion,
+    setCurrentLocation,
+    setCurrentPlanet,
     
-    // Clear ship storage
-    localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_MAX);
-    localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_USED);
+    // Ship
+    getShipFuel,
+    saveShipFuel,
+    getShipPower,
+    saveShipPower,
     
-    // Clear planet claim data
-    localStorage.removeItem(STORAGE_KEYS.PLANET_CLAIMS);
-    localStorage.removeItem(STORAGE_KEYS.PLAYER_CLAIMS);
-    localStorage.removeItem(STORAGE_KEYS.CLAIM_HISTORY);
-    localStorage.removeItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS);
+    // Warp
+    setWarpData,
+    getWarpData,
+    clearWarpData,
     
-    setHapticsEnabled(settings.haptics);
-    setAutoGatherEnabled(settings.autoGather);
-    setOrbitSpeed(settings.orbitSpeed);
-    setMusicVolume(settings.music);
-    setAmbientVolume(settings.ambient);
+    // Settings
+    getHapticsEnabled,
+    setHapticsEnabled,
+    getAutoGatherEnabled,
+    setAutoGatherEnabled,
+    getOrbitSpeed,
+    setOrbitSpeed,
+    getMusicVolume,
+    setMusicVolume,
+    getAmbientVolume,
+    setAmbientVolume,
     
-    await initializeStorage();
-}
-
-// ===== PLAYER ID =====
-function getPlayerId() {
-    let playerId = localStorage.getItem('voidfarer_player_id');
-    if (!playerId) {
-        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('voidfarer_player_id', playerId);
-    }
-    return playerId;
-}
-
-// ===== EXPOSE TO WINDOW =====
-window.CARGO_MASS_LIMIT = typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
-window.STORAGE_KEYS = STORAGE_KEYS;
-window.UNIVERSE_SEED = typeof window.UNIVERSE_SEED !== 'undefined' ? window.UNIVERSE_SEED : 42793;
-window.ELEMENT_MASS = ELEMENT_MASS;
-window.getElementMass = getElementMass;
-window.getTotalCargoMass = getTotalCargoMass;
-window.getRemainingCargoMass = getRemainingCargoMass;
-window.getHubStorageMax = getHubStorageMax;
-window.getHubStorageUsed = getHubStorageUsed;
-window.getRemainingHubStorage = getRemainingHubStorage;
-window.getHubInventory = getHubInventory;
-window.addElementToHub = addElementToHub;
-window.removeElementFromHub = removeElementFromHub;
-window.safeSellHubElement = safeSellHubElement;
-window.safeBuyHubElement = safeBuyHubElement;
-window.buyHubElement = buyHubElement;
-window.sellHubElement = sellHubElement;
-window.getMarketPrice = getMarketPrice;
-window.getMarketHistory = getMarketHistory;
-window.getShipStorageMax = getShipStorageMax;
-window.getShipStorageUsed = getShipStorageUsed;
-window.getRemainingShipStorage = getRemainingShipStorage;
-window.isAtEarth = isAtEarth;
-window.transferShipToHub = transferShipToHub;
-window.transferHubToShip = transferHubToShip;
-window.getCurrentPlanetName = getCurrentPlanetName;
-window.getCurrentPlanetType = getCurrentPlanetType;
-window.getCurrentPlanetResources = getCurrentPlanetResources;
-window.initializeStorage = initializeStorage;
-window.getPlayer = getPlayer;
-window.savePlayer = savePlayer;
-window.createDefaultPlayer = createDefaultPlayer;
-window.getCollection = getCollection;
-window.addElementToCollection = addElementToCollection;
-window.removeElementFromCollection = removeElementFromCollection;
-window.getElementLocations = getElementLocations;
-window.getAllPlayerLocations = getAllPlayerLocations;
-window.getCredits = getCredits;
-window.saveCredits = saveCredits;
-window.addCredits = addCredits;
-window.spendCredits = spendCredits;
-window.addCreditsToOwner = addCreditsToOwner;
-window.safeSellElement = safeSellElement;
-window.getShipFuel = getShipFuel;
-window.saveShipFuel = saveShipFuel;
-window.refuelShip = refuelShip;
-window.getShipPower = getShipPower;
-window.setShipPower = setShipPower;
-window.repairShip = repairShip;
-window.getCurrentSector = getCurrentSector;
-window.getCurrentRegion = getCurrentRegion;
-window.setCurrentSector = setCurrentSector;
-window.getCurrentStarSector = getCurrentStarSector;
-window.getCurrentStar = getCurrentStar;
-window.getCurrentPlanet = getCurrentPlanet;
-window.getCurrentPlanetType = getCurrentPlanetType;
-window.getCurrentPlanetResources = getCurrentPlanetResources;
-window.getCurrentPlanetImage = getCurrentPlanetImage;
-window.setCurrentPlanet = setCurrentPlanet;
-window.setCurrentLocation = setCurrentLocation;
-window.setWarpData = setWarpData;
-window.getWarpData = getWarpData;
-window.clearWarpData = clearWarpData;
-window.saveSystemData = saveSystemData;
-window.loadSystemData = loadSystemData;
-window.clearSystemData = clearSystemData;
-window.getColonies = getColonies;
-window.getMissions = getMissions;
-window.getCompletedMissions = getCompletedMissions;
-window.getScanHistory = getScanHistory;
-window.addScan = addScan;
-window.getRealEstate = getRealEstate;
-window.getTaxHistory = getTaxHistory;
-window.getHapticsEnabled = getHapticsEnabled;
-window.setHapticsEnabled = setHapticsEnabled;
-window.getAutoGatherEnabled = getAutoGatherEnabled;
-window.setAutoGatherEnabled = setAutoGatherEnabled;
-window.getOrbitSpeed = getOrbitSpeed;
-window.setOrbitSpeed = setOrbitSpeed;
-window.getMusicVolume = getMusicVolume;
-window.setMusicVolume = setMusicVolume;
-window.getAmbientVolume = getAmbientVolume;
-window.setAmbientVolume = setAmbientVolume;
-window.getShipUpgrades = getShipUpgrades;
-window.saveShipUpgrades = saveShipUpgrades;
-window.saveTimestamp = saveTimestamp;
-window.resetGame = resetGame;
-window.getPlayerId = getPlayerId;
-
-// ===== ALCHEMY FUNCTIONS =====
-window.getAlchemyProgress = getAlchemyProgress;
-window.saveAlchemyProgress = saveAlchemyProgress;
-window.addAlchemyProgress = addAlchemyProgress;
-window.getAlchemyTotalCrafts = getAlchemyTotalCrafts;
-window.getRecipeProgress = getRecipeProgress;
-window.getUnlockedRecipes = getUnlockedRecipes;
-window.unlockRecipe = unlockRecipe;
-window.isRecipeUnlocked = isRecipeUnlocked;
-window.getAlchemyMastery = getAlchemyMastery;
-
-// ===== LABOR POOL FUNCTIONS =====
-window.addToLaborPool = addToLaborPool;
-window.getLaborPoolTotal = getLaborPoolTotal;
-window.getPlayerLaborEarnings = getPlayerLaborEarnings;
-window.claimLaborEarnings = claimLaborEarnings;
-window.getLaborPoolHistory = getLaborPoolHistory;
-
-// ===== PRODUCT OWNERSHIP FUNCTIONS =====
-window.getPlayerProducts = getPlayerProducts;
-window.addPlayerProduct = addPlayerProduct;
-window.removePlayerProduct = removePlayerProduct;
-window.playerOwnsProduct = playerOwnsProduct;
-
-// ===== MARKETPLACE FUNCTIONS =====
-window.buyHubElement = buyHubElement;
-window.sellHubElement = sellHubElement;
-window.safeBuyHubElement = safeBuyHubElement;
-window.getMarketPrice = getMarketPrice;
-window.getMarketHistory = getMarketHistory;
-
-// NOTE: Planet status functions are already exposed by db.js
-// We do NOT redefine them here to avoid recursion
-// The following functions are available directly from db.js:
-// - getPlanetStatus
-// - updatePlanetStatusFromLocations
-// - claimPlanet
-// - getClaimedPlanets
-// - getPlanetsByExploration
-// - getPlanetsByRarity
+    // System
+    initializeStorage,
+    resetGame,
+    saveTimestamp
+};
