@@ -1,1 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Shipyard & Fleet</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/crafting.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .hub-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8ac0;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .hub-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .hub-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #4a8ac0;
+            text-shadow: 0 0 20px #4a8ac0, 0 0 40px #1a4a7a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .hub-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .location {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .location span {
+            color: #4a8ac0;
+            font-weight: 600;
+        }
+        
+        /* Fleet Stats Card */
+        .fleet-stats {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .stats-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .stats-title span {
+            color: #ffd966;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px;
+        }
+        
+        .stat-value {
+            color: #ffd966;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            color: #a0c0ff;
+            font-size: 10px;
+        }
+        
+        /* Section Header */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+        
+        .section-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title span {
+            color: #ffd966;
+            font-size: 24px;
+        }
+        
+        .back-link {
+            color: #a0c0ff;
+            font-size: 12px;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(74, 138, 192, 0.2);
+            cursor: pointer;
+        }
+        
+        .back-link:active {
+            background: #4a8ac0;
+            color: #ffffff;
+        }
+        
+        /* Hub Cards Grid - 2 columns for main features */
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .hub-card {
+            background: rgba(30, 45, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px 10px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: center;
+        }
+        
+        .hub-card:active {
+            transform: scale(0.97);
+            background: rgba(60, 90, 140, 0.8);
+        }
+        
+        .hub-card.shipyard {
+            border-color: #4affaa;
+        }
+        
+        .hub-card.equipment {
+            border-color: #ffaa4a;
+        }
+        
+        .hub-card.colony {
+            border-color: #8a6aff;
+        }
+        
+        .hub-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        
+        .hub-label {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 4px;
+        }
+        
+        .hub-desc {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        /* Owned Ships Section */
+        .ships-section {
+            margin-bottom: 25px;
+        }
+        
+        .ships-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .ship-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .ship-icon {
+            font-size: 36px;
+            min-width: 50px;
+            text-align: center;
+            color: #ffd966;
+        }
+        
+        .ship-info {
+            flex: 1;
+        }
+        
+        .ship-name {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        
+        .ship-class {
+            font-size: 11px;
+            color: #a0c0ff;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .ship-stats {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .empty-ships {
+            text-align: center;
+            padding: 30px;
+            color: #a0c0ff;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a8ac0;
+            font-style: italic;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 16px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 240px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 24px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a8ac0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="hub-view" id="hubView">
+            <!-- Header -->
+            <div class="hub-header">
+                <div class="hub-title">🚀 Shipyard & Fleet</div>
+                <div class="hub-subtitle">✦ build and manage your ships ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="location" id="locationDisplay">
+                    <span id="currentLocation">Earth Hub</span>
+                </div>
+            </div>
+            
+            <!-- Fleet Stats Card -->
+            <div class="fleet-stats">
+                <div class="stats-header">
+                    <div class="stats-title">
+                        <span>🚀</span> Your Fleet
+                    </div>
+                    <div class="stats-title">
+                        <span id="shipCount">0</span> ships
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="frigateCount">0</div>
+                        <div class="stat-label">Frigates</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="destroyerCount">0</div>
+                        <div class="stat-label">Destroyers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="cruiserCount">0</div>
+                        <div class="stat-label">Cruisers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="capitalCount">0</div>
+                        <div class="stat-label">Capital</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section Header -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🏭</span> Facilities
+                </div>
+                <div class="back-link" onclick="returnToEarthHub()">← BACK</div>
+            </div>
+            
+            <!-- Main Facilities Grid -->
+            <div class="hub-grid">
+                <!-- Shipyard -->
+                <div class="hub-card shipyard" onclick="navigateTo('shipyard.html')">
+                    <div class="hub-icon">🚀</div>
+                    <div class="hub-label">Shipyard</div>
+                    <div class="hub-desc">Build new ships</div>
+                </div>
+                
+                <!-- Equipment Fabricator -->
+                <div class="hub-card equipment" onclick="navigateTo('equipment-fabricator.html')">
+                    <div class="hub-icon">⚙️</div>
+                    <div class="hub-label">Equipment Fab</div>
+                    <div class="hub-desc">Craft gear</div>
+                </div>
+                
+                <!-- Colony Planner -->
+                <div class="hub-card colony" onclick="navigateTo('colony-planner.html')">
+                    <div class="hub-icon">🏗️</div>
+                    <div class="hub-label">Colony Planner</div>
+                    <div class="hub-desc">Build settlements</div>
+                </div>
+            </div>
+            
+            <!-- Owned Ships Section -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>✨</span> Your Ships
+                </div>
+            </div>
+            
+            <div class="ships-section">
+                <div class="ships-grid" id="shipsGrid">
+                    <!-- Filled by JavaScript -->
+                    <div class="empty-ships">No ships owned yet. Visit the Shipyard to build your first vessel.</div>
+                </div>
+            </div>
+            
+            <!-- Back button to Earth Hub -->
+            <button class="back-button" onclick="returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading...</div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Simple scripts - no modules -->
+    <script src="js/db.js"></script>
+    
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== LOAD CREDITS =====
+        function loadCredits() {
+            try {
+                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading credits:', error);
+            }
+        }
+
+        // ===== LOAD LOCATION =====
+        function loadLocation() {
+            document.getElementById('currentLocation').textContent = 'Earth • Shipyard';
+        }
+
+        // ===== LOAD OWNED SHIPS =====
+        function loadOwnedShips() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const ownedShips = JSON.parse(localStorage.getItem(`voidfarer_owned_ships_${playerId}`)) || [];
+                
+                // Update ship count
+                document.getElementById('shipCount').textContent = ownedShips.length;
+                
+                // Count by class
+                let frigates = 0, destroyers = 0, cruisers = 0, capitals = 0;
+                
+                ownedShips.forEach(ship => {
+                    if (ship.includes('Frigate')) frigates++;
+                    else if (ship.includes('Destroyer')) destroyers++;
+                    else if (ship.includes('Cruiser')) cruisers++;
+                    else capitals++;
+                });
+                
+                document.getElementById('frigateCount').textContent = frigates;
+                document.getElementById('destroyerCount').textContent = destroyers;
+                document.getElementById('cruiserCount').textContent = cruisers;
+                document.getElementById('capitalCount').textContent = capitals;
+                
+                // Render ship list
+                renderShipList(ownedShips);
+                
+            } catch (error) {
+                console.error('Error loading owned ships:', error);
+            }
+        }
+
+        // ===== RENDER SHIP LIST =====
+        function renderShipList(ships) {
+            const shipsGrid = document.getElementById('shipsGrid');
+            
+            if (ships.length === 0) {
+                shipsGrid.innerHTML = '<div class="empty-ships">No ships owned yet. Visit the Shipyard to build your first vessel.</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            // Ship icons mapping
+            const shipIcons = {
+                'Frigate': '🚀',
+                'Destroyer': '⚡',
+                'Cruiser': '🛡️',
+                'Battleship': '⚔️',
+                'Dreadnought': '👑',
+                'Carrier': '✈️',
+                'Explorer': '🔭',
+                'Freighter': '📦'
+            };
+            
+            ships.forEach(ship => {
+                // Extract ship class from name
+                let shipClass = 'Unknown';
+                let icon = '🚀';
+                
+                if (ship.includes('Frigate')) {
+                    shipClass = 'Frigate';
+                    icon = shipIcons.Frigate;
+                } else if (ship.includes('Destroyer')) {
+                    shipClass = 'Destroyer';
+                    icon = shipIcons.Destroyer;
+                } else if (ship.includes('Cruiser')) {
+                    shipClass = 'Cruiser';
+                    icon = shipIcons.Cruiser;
+                } else if (ship.includes('Battleship')) {
+                    shipClass = 'Battleship';
+                    icon = shipIcons.Battleship;
+                } else if (ship.includes('Dreadnought')) {
+                    shipClass = 'Dreadnought';
+                    icon = shipIcons.Dreadnought;
+                } else if (ship.includes('Carrier')) {
+                    shipClass = 'Carrier';
+                    icon = shipIcons.Carrier;
+                } else if (ship.includes('Explorer')) {
+                    shipClass = 'Explorer';
+                    icon = shipIcons.Explorer;
+                } else if (ship.includes('Freighter')) {
+                    shipClass = 'Freighter';
+                    icon = shipIcons.Freighter;
+                }
+                
+                html += `
+                    <div class="ship-card">
+                        <div class="ship-icon">${icon}</div>
+                        <div class="ship-info">
+                            <div class="ship-name">${ship}</div>
+                            <span class="ship-class">${shipClass}</span>
+                            <div class="ship-stats">
+                                <span>⚡ Ready</span>
+                                <span>📍 Earth</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            shipsGrid.innerHTML = html;
+        }
+
+        // ===== NAVIGATION =====
+        function navigateTo(url) {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = url;
+            }, 300);
+        }
+
+        function returnToEarthHub() {
+            safeHaptic();
+            navigateTo('earth-hub.html');
+        }
+
+        // ===== SAFE HAPTIC =====
+        function safeHaptic() {
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
+        }
+
+        // ===== INITIALIZE =====
+        function init() {
+            loadCredits();
+            loadLocation();
+            loadOwnedShips();
+        }
+
+        init();
+    </script>
+</body>
+</html>
