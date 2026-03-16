@@ -336,6 +336,11 @@
             text-align: center;
         }
         
+        .extraction-notification.show {
+            transform: translate(-50%, -50%) translateX(0);
+            opacity: 1;
+        }
+        
         /* Success notification colors */
         .extraction-notification.success {
             border-color: currentColor;
@@ -415,11 +420,6 @@
             font-size: 18px;
             color: #aaaaaa;
             opacity: 0.7;
-        }
-        
-        .extraction-notification.fail.show {
-            transform: translate(-50%, -50%) translateX(0);
-            opacity: 1;
         }
         
         .notification-icon {
@@ -808,12 +808,10 @@
 
     <script type="module">
         // ===== CORRECTED IMPORTS =====
-        // Import everything we need directly
         import { getPlanetStatus, claimPlanet, isPlanetClaimed } from './js/planet-status.js';
         import { getPlanetClaim, calculateMiningFee, recordMiningActivity } from './js/claim-system.js';
         import { addClaimNotification } from './js/claim-notifications.js';
         
-        // Import from storage.js - all functions we need
         import { 
             getPlayer,
             getCollection,
@@ -829,11 +827,11 @@
             tg.expand();
         }
 
-        // Constants
+        // ===== CONSTANTS =====
         const EXTRACTION_INTERVAL = 5000;
         const CARGO_MASS_LIMIT = 5000;
         let extractionAttempts = 0;
-        const MAX_EXTRACTION_ATTEMPTS = 100; // Prevent infinite loop
+        const MAX_EXTRACTION_ATTEMPTS = 1000; // High limit for normal play
         
         const RARITY_CONFIG = {
             'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', feePercent: 0 },
@@ -864,7 +862,7 @@
             });
         }
 
-        // DOM Elements
+        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const planetImage = document.getElementById('planetImage');
@@ -889,7 +887,7 @@
         const notificationPity = document.getElementById('notificationPity');
         const feeBreakdown = document.getElementById('feeBreakdown');
 
-        // State variables
+        // ===== STATE VARIABLES =====
         let currentPlanet = {
             name: 'Earth',
             type: 'lush',
@@ -909,7 +907,6 @@
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
         
-        // Claim data cache
         let planetClaimData = null;
         let playerId = null;
 
@@ -926,6 +923,7 @@
             feeBreakdown.style.display = 'none';
             
             if (result.type === 'fee') {
+                // Fee notification
                 extractionNotification.classList.add('fee', 'show');
                 
                 notificationIcon.textContent = '💰';
@@ -944,6 +942,7 @@
                 notificationPity.textContent = '';
                 
             } else if (result.success) {
+                // Success notification
                 extractionNotification.classList.add('success', 'show');
                 const rarity = getElementRarity(result.resource);
                 extractionNotification.classList.add(`rarity-${rarity}`);
@@ -951,9 +950,11 @@
                 notificationIcon.textContent = '✨';
                 notificationTitle.textContent = 'SUCCESS';
                 
+                const config = RARITY_CONFIG[rarity];
+                
                 notificationResource.textContent = result.resource;
                 notificationQuantity.textContent = `+${result.quantity} units • ${Math.round(result.mass)} AMU`;
-                notificationRarity.textContent = rarity;
+                notificationRarity.textContent = `${rarity} • ${config.icon}`;
                 
                 if (result.wasPity) {
                     notificationPity.textContent = '⚡ PITY BONUS! ⚡';
@@ -961,13 +962,16 @@
                     notificationPity.textContent = '';
                 }
             } else {
+                // Fail notification
                 extractionNotification.classList.add('fail', 'show');
                 notificationIcon.textContent = '⚠️';
                 notificationTitle.textContent = 'FAIL';
                 
                 if (result.resource) {
+                    const rarity = getElementRarity(result.resource);
                     notificationResource.textContent = result.resource;
                     notificationQuantity.textContent = `Extraction failed`;
+                    notificationRarity.textContent = `${rarity}`;
                     
                     if (result.pityCount) {
                         notificationPity.textContent = `Pity: ${result.pityCount}/${result.pityThreshold}`;
@@ -988,13 +992,14 @@
             }, hideDelay);
         }
 
-        // Make functions available globally for onclick handlers
+        // ===== GLOBAL FUNCTIONS FOR ONCLICK =====
         window.toggleResource = toggleResource;
         window.returnToShip = returnToShip;
         window.returnToSystem = returnToSystem;
         window.claimCurrentPlanet = claimCurrentPlanet;
         window.goToClaimsBoard = goToClaimsBoard;
 
+        // ===== EXPLORATION FUNCTIONS =====
         function initializeExplorationTracking() {
             totalElements = currentPlanet.resources.length;
             currentPlanet.resources.forEach(resource => {
@@ -1035,6 +1040,7 @@
             }
         }
 
+        // ===== ELEMENT UTILITY FUNCTIONS =====
         function getElementRarity(elementName) {
             const rareElements = [
                 'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
@@ -1102,18 +1108,15 @@
 
         function getElementValue(elementName) {
             const values = {
-                // Common
                 'Hydrogen': 100, 'Helium': 100, 'Carbon': 100, 'Oxygen': 100,
-                // Rare
                 'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Titanium': 1000,
-                // Very Rare
                 'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
-                // Legendary
                 'Promethium': 25000, 'Technetium': 25000
             };
             return values[elementName] || 100;
         }
 
+        // ===== CARGO FUNCTIONS =====
         async function getCurrentCargoMass() {
             const now = Date.now();
             if (cachedCargoMass > 0 && now - lastMassUpdate < MASS_UPDATE_INTERVAL) {
@@ -1124,12 +1127,14 @@
                 const collection = await getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
-                    mass += (data.count || 1) * getElementMass(name);
+                    const count = typeof data === 'object' ? data.count || 1 : 1;
+                    mass += count * getElementMass(name);
                 }
                 cachedCargoMass = mass;
                 lastMassUpdate = now;
                 return mass;
             } catch (error) {
+                console.error('Error getting cargo mass:', error);
                 return cachedCargoMass || 0;
             }
         }
@@ -1140,6 +1145,7 @@
             return mass;
         }
 
+        // ===== RESOURCE GENERATION =====
         function generateFallbackResources(planetType) {
             const fallbackPools = {
                 'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold'],
@@ -1156,7 +1162,7 @@
             return fallbackPools[planetType] || fallbackPools['barren'];
         }
 
-        // ===== LOAD CLAIM DATA =====
+        // ===== CLAIM DATA FUNCTIONS =====
         async function loadClaimData() {
             try {
                 playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
@@ -1184,6 +1190,7 @@
             }
         }
 
+        // ===== PLANET DATA LOADING =====
         async function loadPlanetData() {
             try {
                 let planetNameStr = localStorage.getItem('voidfarer_current_planet');
@@ -1239,7 +1246,6 @@
                     imageFile = 'asteroid-field.jpg';
                 }
                 
-                // Set image with fallback
                 planetImage.src = 'assets/images/' + imageFile;
                 
                 currentPlanet = {
@@ -1297,6 +1303,7 @@
             } catch (error) {}
         }
 
+        // ===== RESOURCE TOGGLE RENDERING =====
         function renderResourceToggles() {
             if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
                 resourceGrid.innerHTML = '<div style="color: #a0c0ff; padding: 20px;">No resources found</div>';
@@ -1343,13 +1350,12 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        // ===== MAIN EXTRACTION FUNCTION WITH FEE CALCULATION =====
+        // ===== MAIN EXTRACTION FUNCTION =====
         async function attemptExtraction() {
-            // Prevent infinite loop
             extractionAttempts++;
             if (extractionAttempts > MAX_EXTRACTION_ATTEMPTS) {
-                console.log('Max extraction attempts reached, stopping');
-                return;
+                console.log('Max extraction attempts reached, resetting counter');
+                extractionAttempts = 0;
             }
             
             console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
@@ -1386,6 +1392,7 @@
                     extractorText.textContent = 'Auto-extractor active';
                 }
                 
+                // Weighted random selection
                 let weightedResources = [];
                 activeResources.forEach(resource => {
                     const rarity = getElementRarity(resource);
@@ -1548,6 +1555,7 @@
             }
         }
 
+        // ===== EXTRACTION CONTROL =====
         function startExtraction() {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
@@ -1556,7 +1564,7 @@
             
             isExtracting = true;
             extractorText.textContent = 'Auto-extractor active';
-            extractionAttempts = 0; // Reset counter
+            extractionAttempts = 0;
             
             attemptExtraction().catch(console.error);
             
@@ -1567,6 +1575,7 @@
             }, EXTRACTION_INTERVAL);
         }
 
+        // ===== NAVIGATION FUNCTIONS =====
         function returnToShip() {
             if (tg?.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('light');
@@ -1600,6 +1609,7 @@
             window.location.href = 'claims-board.html';
         }
 
+        // ===== CLAIM FUNCTION =====
         async function claimCurrentPlanet() {
             try {
                 loadingOverlay.classList.add('active');
@@ -1678,6 +1688,7 @@
             }
         }
 
+        // ===== INITIALIZATION =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
@@ -1704,6 +1715,7 @@
             }
         }
 
+        // ===== EVENT LISTENERS =====
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) {
                 clearInterval(extractionTimer);
