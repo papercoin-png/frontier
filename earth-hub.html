@@ -1385,22 +1385,37 @@
         </div>
     </div>
 
-    <!-- Load all JavaScript files - NON-MODULE versions -->
-    <script src="js/db.js"></script>
-    <script src="js/storage/storage-fixed.js"></script>
-    <script src="js/market-dynamics.js"></script>
-    <script src="js/economic-events.js"></script>
-    <script src="js/tax-system.js"></script>
-    <script src="js/migration.js"></script>
-    <script src="js/element-prices.js"></script>
-    <script src="js/market-engine.js"></script>
-    <script src="js/crafting/recipe-index-fixed.js"></script>
-    <script src="js/crafting/crafting-core-fixed.js"></script>
-    <script src="js/planet-status-fixed.js"></script>
-    <script src="js/claim-system-fixed.js"></script>
-    <script src="js/claim-notifications-fixed.js"></script>
+    <!-- Load all JavaScript files with type="module" -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage/storage.js"></script>
+    <script type="module" src="js/storage/inventory.js"></script>
+    <script type="module" src="js/storage/progression.js"></script>
+    <script type="module" src="js/market-dynamics.js"></script>
+    <script type="module" src="js/economic-events.js"></script>
+    <script type="module" src="js/tax-system.js"></script>
+    <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/element-prices.js"></script>
+    <script type="module" src="js/market-engine.js"></script>
+    <script type="module" src="js/crafting/recipe-index.js"></script>
+    <script type="module" src="js/crafting/crafting-core.js"></script>
+    <script type="module" src="js/crafting/helpers/validation.js"></script>
+    <script type="module" src="js/crafting/fields/alchemy.js"></script>
+    <script type="module" src="js/crafting/fields/metallurgy.js"></script>
+    <script type="module" src="js/crafting/fields/materials-science.js"></script>
+    <script type="module" src="js/crafting/fields/pharmaceuticals.js"></script>
+    <script type="module" src="js/crafting/fields/textiles.js"></script>
+    <script type="module" src="js/crafting/fields/construction.js"></script>
+    <script type="module" src="js/crafting/fields/aerospace.js"></script>
+    <script type="module" src="js/crafting/fields/nuclear.js"></script>
+    <script type="module" src="js/crafting/fields/optical.js"></script>
+    <script type="module" src="js/crafting/fields/magnetic.js"></script>
+    <script type="module" src="js/crafting/fields/cryogenic.js"></script>
+    <script type="module" src="js/crafting/fields/polymers.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
+    <script type="module" src="js/claim-system.js"></script>
+    <script type="module" src="js/claim-notifications.js"></script>
 
-    <script>
+    <script type="module">
         // Chart is available globally from the UMD script
         const Chart = window.Chart;
 
@@ -1409,13 +1424,11 @@
         if (tg) {
             tg.ready();
             tg.expand();
-            // Check if haptic feedback is supported
-            window.supportsHaptic = tg.version >= '6.1';
         }
 
         // Safe haptic feedback function
         function safeHaptic(type) {
-            if (window.supportsHaptic && tg?.HapticFeedback) {
+            if (tg?.HapticFeedback) {
                 try {
                     tg.HapticFeedback.impactOccurred(type);
                 } catch (e) {
@@ -1641,17 +1654,6 @@
             navigateTo('index.html');
         }
 
-        // ===== FIXED getHubInventory (NO RECURSION) =====
-        function getHubInventory() {
-            try {
-                const inventory = localStorage.getItem('voidfarer_hub_inventory');
-                return inventory ? JSON.parse(inventory) : {};
-            } catch (error) {
-                console.error('Error getting hub inventory:', error);
-                return {};
-            }
-        }
-
         // ===== LOAD CLAIM DATA =====
         async function loadClaimData() {
             try {
@@ -1659,7 +1661,6 @@
                 
                 // Check for unread claim notifications
                 if (typeof window.getUnreadClaimNotifications === 'function') {
-                    // Use a try-catch since the function might not exist
                     try {
                         const unread = await window.getUnreadClaimNotifications(currentPlayerId);
                         if (unread && unread.length > 0) {
@@ -1698,20 +1699,14 @@
         async function loadLaborPoolData() {
             try {
                 // Get labor pool total
-                currentLaborPool = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
+                const laborPoolTotal = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
+                document.getElementById('laborPoolAmount').textContent = laborPoolTotal.toLocaleString() + '⭐';
                 
                 // Get player's labor earnings
                 const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                const earnings = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
-                currentLaborEarnings = earnings[playerId] || 0;
-                
-                // Get labor multiplier
-                currentLaborMultiplier = 1.0;
-                
-                // Update display
-                document.getElementById('laborPoolAmount').textContent = currentLaborPool.toLocaleString() + '⭐';
-                document.getElementById('laborPoolEarnings').textContent = `Your earnings: ${currentLaborEarnings.toLocaleString()}⭐`;
-                document.getElementById('laborPoolMultiplier').textContent = currentLaborMultiplier.toFixed(1) + 'x';
+                const earningsData = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
+                const earnings = earningsData[playerId] || 0;
+                document.getElementById('laborPoolEarnings').textContent = `Your earnings: ${earnings.toLocaleString()}⭐`;
                 
                 // Get participant count (simulated)
                 const participants = Math.floor(Math.random() * 50) + 10;
@@ -1719,8 +1714,6 @@
                 
             } catch (error) {
                 console.error('Error loading labor pool data:', error);
-                document.getElementById('laborPoolAmount').textContent = '0⭐';
-                document.getElementById('laborPoolEarnings').textContent = 'Your earnings: 0⭐';
             }
         }
 
@@ -1728,18 +1721,18 @@
         async function loadHubStorage() {
             try {
                 // Get hub max from real estate
-                let hubMax = 0;
                 const estateData = JSON.parse(localStorage.getItem('voidfarer_real_estate') || '{"properties":[]}');
                 const properties = estateData.properties || [];
-                hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
+                const hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
                 
-                // Get hub used - FIXED: using the non-recursive function
-                const hubInventory = getHubInventory();
+                // Get hub inventory
+                const hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
                 let hubUsed = 0;
+                
+                // Calculate used mass
                 for (const [name, data] of Object.entries(hubInventory)) {
                     const count = data.count || 1;
-                    const mass = getElementMass(name);
-                    hubUsed += count * mass;
+                    hubUsed += count * getElementMass(name);
                 }
                 
                 currentHubMax = hubMax;
@@ -1796,7 +1789,8 @@
                 loadingText.textContent = 'loading market data...';
                 
                 // Load credits
-                let credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                currentCredits = credits;
 
                 // Load hub storage
                 await loadHubStorage();
@@ -1807,11 +1801,10 @@
                 // Load claim data
                 await loadClaimData();
 
-                // Store in global state
-                currentCredits = credits;
-
                 // Update UI
-                updateHeader(credits);
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
+                
                 renderMarket();
 
             } catch (error) {
@@ -1820,15 +1813,9 @@
             }
         }
 
-        // ===== UPDATE HEADER =====
-        function updateHeader(credits) {
-            document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-            document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
-        }
-
         // ===== RENDER MARKET =====
         function renderMarket() {
-            const hubInventory = getHubInventory();
+            const hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
             const elements = Object.entries(ELEMENT_DATABASE);
             
             let filteredElements = elements.filter(([name, data]) => {
@@ -2024,7 +2011,7 @@
                     localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
                     
                     // Add to hub
-                    let hubInventory = getHubInventory();
+                    let hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
                     if (!hubInventory[currentTradeElement]) {
                         hubInventory[currentTradeElement] = { count: 0 };
                     }
@@ -2033,7 +2020,7 @@
                     
                 } else {
                     // Remove from hub
-                    let hubInventory = getHubInventory();
+                    let hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
                     if (hubInventory[currentTradeElement]) {
                         hubInventory[currentTradeElement].count -= quantity;
                         if (hubInventory[currentTradeElement].count <= 0) {
