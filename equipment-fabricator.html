@@ -1,1 +1,2127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Equipment Fabricator</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/crafting.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .fabricator-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Equipment Fabricator specific theme */
+        .equipment-fabricator {
+            --accent-color: #ffaa4a;
+            --accent-glow: 0 0 20px rgba(255, 170, 74, 0.5);
+            --secondary-color: #ff8c00;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #ffaa4a;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #ffaa4a;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .fabricator-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .fabricator-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #ffaa4a;
+            text-shadow: 0 0 20px #ffaa4a, 0 0 40px #cc5500;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .fabricator-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .fabricator-stats {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .fabricator-stats span {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        /* Mastery Card */
+        .mastery-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .mastery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .mastery-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .mastery-level {
+            color: #ffaa4a;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .mastery-progress {
+            margin-bottom: 10px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffaa4a, #ffcc66);
+            transition: width 0.3s;
+        }
+        
+        .mastery-footer {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .mastery-multiplier {
+            color: #ffd966;
+        }
+        
+        /* Quick Inventory Bar */
+        .inventory-bar {
+            position: sticky;
+            top: 0;
+            background: rgba(10, 26, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            z-index: 50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .inventory-title {
+            color: #ffffff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .inventory-count {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .inventory-btn {
+            background: rgba(255, 170, 74, 0.2);
+            border: 1px solid #ffaa4a;
+            color: #ffaa4a;
+            padding: 6px 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .inventory-btn:active {
+            background: #ffaa4a;
+            color: #0a1a2a;
+            transform: scale(0.95);
+        }
+        
+        /* Equipment Categories */
+        .category-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        
+        .category-nav-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #ffaa4a;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        
+        .category-nav-btn.active {
+            background: #ffaa4a;
+            border-color: #ffaa4a;
+            color: #0a1a2a;
+        }
+        
+        .category-nav-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Equipment Grid */
+        .equipment-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .equipment-card {
+            background: rgba(30, 45, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            transition: all 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .equipment-card.owned {
+            border-color: #ffd966;
+            opacity: 0.8;
+        }
+        
+        .owned-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ffd966;
+            color: #0a1a2a;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 2;
+        }
+        
+        .equipment-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .equipment-icon {
+            font-size: 32px;
+            min-width: 48px;
+            text-align: center;
+            color: #ffaa4a;
+        }
+        
+        .equipment-title {
+            flex: 1;
+        }
+        
+        .equipment-name {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        
+        .equipment-type {
+            font-size: 11px;
+            color: #a0c0ff;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .equipment-description {
+            color: #a0d0c0;
+            font-size: 12px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        
+        .equipment-stats {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-label {
+            color: #a0c0ff;
+            font-size: 9px;
+            margin-bottom: 2px;
+        }
+        
+        .stat-value {
+            color: #ffd966;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .materials-section {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .section-title {
+            color: #a0c0ff;
+            font-size: 10px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .materials-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .material-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        
+        .material-name {
+            color: #ffffff;
+        }
+        
+        .material-amount {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .material-status {
+            color: #ff6b6b;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        
+        .skill-requirements {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .skill-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin: 4px 0;
+        }
+        
+        .skill-name {
+            color: #a0c0ff;
+        }
+        
+        .skill-required {
+            color: #ffaa4a;
+            font-weight: 600;
+        }
+        
+        .skill-current {
+            color: #4affaa;
+        }
+        
+        .skill-current.insufficient {
+            color: #ff6b6b;
+        }
+        
+        .price-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: rgba(255, 170, 74, 0.1);
+            border-radius: 30px;
+        }
+        
+        .price-label {
+            color: #a0c0ff;
+            font-size: 11px;
+        }
+        
+        .price-amount {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .craft-btn {
+            width: 100%;
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            color: #ffaa4a;
+            padding: 14px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .craft-btn:active {
+            background: #ffaa4a;
+            color: #0a1a2a;
+            transform: scale(0.97);
+        }
+        
+        .craft-btn.owned {
+            background: rgba(255, 217, 102, 0.2);
+            border-color: #ffd966;
+            color: #ffd966;
+            cursor: default;
+        }
+        
+        .craft-btn.owned:active {
+            transform: none;
+        }
+        
+        .craft-btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /* Craft Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(20, 30, 50, 0.95);
+            backdrop-filter: blur(15px);
+            border: 3px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 25px;
+            width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+            text-align: center;
+            color: #ffffff;
+            box-shadow: 0 0 30px #ffaa4a;
+        }
+        
+        .modal-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #ffaa4a;
+        }
+        
+        .modal-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .modal-icon {
+            font-size: 56px;
+            margin: 10px 0;
+        }
+        
+        .modal-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .modal-section-title {
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .modal-description {
+            font-size: 13px;
+            color: #e0f0ff;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        
+        .modal-ingredient {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        
+        .modal-ingredient-name {
+            color: #ffffff;
+        }
+        
+        .modal-ingredient-amount {
+            color: #ffaa4a;
+        }
+        
+        .modal-ingredient-amount.insufficient {
+            color: #ff6b6b;
+        }
+        
+        .modal-total {
+            font-size: 15px;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255, 170, 74, 0.1);
+            border-radius: 30px;
+        }
+        
+        .modal-total span {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .modal-progress {
+            margin: 15px 0;
+        }
+        
+        .modal-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .modal-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffaa4a, #ffcc66);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .modal-progress-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #a0c0ff;
+        }
+        
+        .modal-progress-value {
+            color: #ffd966;
+        }
+        
+        .modal-quality {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255, 170, 74, 0.1);
+            border-radius: 30px;
+        }
+        
+        .modal-quality-label {
+            color: #a0c0ff;
+        }
+        
+        .modal-quality-value {
+            font-weight: 600;
+        }
+        
+        .quality-poor { color: #808080; }
+        .quality-standard { color: #ffffff; }
+        .quality-high { color: #4a8ac0; }
+        .quality-perfect { color: #e0b0ff; }
+        .quality-legendary { color: #ffd700; }
+        
+        .modal-quantity {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            color: #ffaa4a;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-btn:active {
+            background: #ffaa4a;
+            color: #0a1a2a;
+            transform: scale(0.9);
+        }
+        
+        .qty-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #craftQuantity {
+            width: 60px;
+            height: 40px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #ffaa4a;
+            border-radius: 30px 8px 30px 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            color: #ffaa4a;
+            padding: 12px;
+            border-radius: 40px 10px 40px 10px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.1s;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+        }
+        
+        .modal-btn:active {
+            background: #ffaa4a;
+            color: #0a1a2a;
+            transform: scale(0.95);
+        }
+        
+        .modal-btn.cancel {
+            background: rgba(106, 138, 192, 0.2);
+            border-color: #6a8ac0;
+            color: #a0c0ff;
+        }
+        
+        .modal-btn.cancel:active {
+            background: #6a8ac0;
+            color: #ffffff;
+        }
+        
+        /* Inventory Modal */
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 170, 74, 0.2);
+        }
+        
+        .inventory-item:last-child {
+            border-bottom: none;
+        }
+        
+        .inventory-item-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .inventory-item-icon {
+            font-size: 20px;
+        }
+        
+        .inventory-item-count {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .inventory-quality {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 20px;
+            margin-left: 8px;
+        }
+        
+        .quality-poor { background: rgba(128,128,128,0.3); color: #cccccc; }
+        .quality-standard { background: rgba(255,255,255,0.3); color: #ffffff; }
+        .quality-high { background: rgba(74,138,192,0.3); color: #4a8ac0; }
+        .quality-perfect { background: rgba(224,176,255,0.3); color: #e0b0ff; }
+        .quality-legendary { background: rgba(255,215,0,0.3); color: #ffd700; }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #ffaa4a;
+            font-style: italic;
+        }
+        
+        /* Craft Notification */
+        .craft-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px 40px;
+            color: #ffaa4a;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            text-align: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            animation: fadeInOut 2s forwards;
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        
+        /* Back Button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Migration status */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="fabricator-view equipment-fabricator" id="fabricatorView">
+            <!-- Header -->
+            <div class="fabricator-header">
+                <div class="fabricator-title">⚙️ Equipment Fabricator</div>
+                <div class="fabricator-subtitle">✦ craft tools & gear ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="fabricator-stats" id="fabricatorStats">
+                    Items: <span id="ownedItems">0</span>
+                </div>
+            </div>
+            
+            <!-- Mastery Card -->
+            <div class="mastery-card" id="masteryCard">
+                <div class="mastery-header">
+                    <span class="mastery-title">✦ Fabrication Mastery ✦</span>
+                    <span class="mastery-level" id="masteryLevel">Untrained</span>
+                </div>
+                <div class="mastery-progress">
+                    <div class="progress-header">
+                        <span>Progress to next level</span>
+                        <span id="masteryProgressText">0/0</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="masteryProgressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mastery-footer">
+                    <span>Fabrication Multiplier</span>
+                    <span class="mastery-multiplier" id="masteryMultiplier">1.0x</span>
+                </div>
+            </div>
+            
+            <!-- Quick Inventory Bar -->
+            <div class="inventory-bar" id="inventoryBar">
+                <div class="inventory-title">
+                    <span>📦</span> Material Inventory
+                </div>
+                <div class="inventory-count" id="inventoryCount">0 items</div>
+                <button class="inventory-btn" onclick="window.showInventoryModal()">VIEW</button>
+            </div>
+            
+            <!-- Equipment Categories -->
+            <div class="category-nav" id="categoryNav">
+                <button class="category-nav-btn active" onclick="window.filterCategory('all')">ALL</button>
+                <button class="category-nav-btn" onclick="window.filterCategory('tools')">🔧 TOOLS</button>
+                <button class="category-nav-btn" onclick="window.filterCategory('weapons')">⚔️ WEAPONS</button>
+                <button class="category-nav-btn" onclick="window.filterCategory('armor')">🛡️ ARMOR</button>
+                <button class="category-nav-btn" onclick="window.filterCategory('medical')">💊 MEDICAL</button>
+                <button class="category-nav-btn" onclick="window.filterCategory('scientific')">🔬 SCIENTIFIC</button>
+            </div>
+            
+            <!-- Equipment Grid -->
+            <div class="equipment-grid" id="equipmentGrid">
+                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading equipment data...</div>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="window.returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+        </div>
+        
+        <!-- Craft Modal -->
+        <div class="modal-overlay" id="craftModal">
+            <div class="modal-content">
+                <div class="modal-icon" id="modalIcon">⚙️</div>
+                <div class="modal-title" id="modalTitle">Equipment Name</div>
+                <div class="modal-subtitle" id="modalCategory">Category</div>
+                
+                <div class="modal-section">
+                    <div class="modal-description" id="modalDescription">
+                        Description of the equipment.
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Required Materials</div>
+                    <div id="modalMaterials"></div>
+                </div>
+                
+                <div class="modal-total">
+                    Total Value: <span id="modalTotal">0</span>⭐
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Mastery Progress</div>
+                    <div class="modal-progress">
+                        <div class="modal-progress-bar">
+                            <div class="modal-progress-fill" id="modalProgressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="modal-progress-stats">
+                            <span id="modalProgressCurrent">0</span>
+                            <span class="modal-progress-value">/</span>
+                            <span id="modalProgressTarget">100</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Expected Quality</div>
+                    <div class="modal-quality">
+                        <span class="modal-quality-label">Base:</span>
+                        <span class="modal-quality-value" id="modalQualityBase">Standard</span>
+                    </div>
+                    <div class="modal-quality">
+                        <span class="modal-quality-label">Final:</span>
+                        <span class="modal-quality-value" id="modalQualityActual">Standard</span>
+                    </div>
+                </div>
+                
+                <div class="modal-quantity">
+                    <button class="qty-btn" id="decrementBtn" onclick="window.decrementQty()">−</button>
+                    <input type="number" id="craftQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="incrementBtn" onclick="window.incrementQty()">+</button>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn" id="craftBtn" onclick="window.craftEquipment()">⚙️ FABRICATE</button>
+                    <button class="modal-btn cancel" onclick="window.closeCraftModal()">CANCEL</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Inventory Modal -->
+        <div class="modal-overlay" id="inventoryModal">
+            <div class="modal-content" style="width: 280px;">
+                <div class="modal-title">📦 Material Inventory</div>
+                
+                <div style="max-height: 400px; overflow-y: auto; margin: 15px 0;" id="inventoryList">
+                    <div style="text-align: center; color: #a0c0ff; padding: 20px;">Loading...</div>
+                </div>
+                
+                <div class="modal-buttons">
+                    <button class="modal-btn cancel" onclick="window.closeInventoryModal()">CLOSE</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">initializing fabricator...</div>
+        </div>
+        
+        <!-- Migration status -->
+        <div class="migration-status" id="migrationStatus"></div>
+    </div>
 
+    <!-- Scripts -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage/storage.js"></script>
+    <script type="module" src="js/storage/inventory.js"></script>
+    <script type="module" src="js/storage/progression.js"></script>
+    <script type="module" src="js/crafting/recipe-index.js"></script>
+    <script type="module" src="js/crafting/crafting-core.js"></script>
+    <script type="module" src="js/crafting/helpers/validation.js"></script>
+    <script type="module" src="js/migration.js"></script>
+
+    <script type="module">
+        import { 
+            getInventory, 
+            getItemCount,
+            removeMaterialFromInventory
+        } from './js/storage/inventory.js';
+        
+        import { 
+            getPlayer,
+            getCredits,
+            spendCredits,
+            getTotalFieldProgress
+        } from './js/storage/storage.js';
+        
+        import { 
+            getTotalCrafts,
+            getOverallMastery
+        } from './js/storage/progression.js';
+        
+        import { 
+            craftItem,
+            getProgressToNextLevel,
+            getFieldMastery,
+            QUALITY_TIERS
+        } from './js/crafting/crafting-core.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const equipmentGrid = document.getElementById('equipmentGrid');
+        const inventoryCount = document.getElementById('inventoryCount');
+        
+        // Craft modal elements
+        const craftModal = document.getElementById('craftModal');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalCategory = document.getElementById('modalCategory');
+        const modalDescription = document.getElementById('modalDescription');
+        const modalMaterials = document.getElementById('modalMaterials');
+        const modalTotal = document.getElementById('modalTotal');
+        const modalProgressFill = document.getElementById('modalProgressFill');
+        const modalProgressCurrent = document.getElementById('modalProgressCurrent');
+        const modalProgressTarget = document.getElementById('modalProgressTarget');
+        const modalQualityBase = document.getElementById('modalQualityBase');
+        const modalQualityActual = document.getElementById('modalQualityActual');
+        const craftQuantity = document.getElementById('craftQuantity');
+        const decrementBtn = document.getElementById('decrementBtn');
+        const incrementBtn = document.getElementById('incrementBtn');
+        const craftBtn = document.getElementById('craftBtn');
+        
+        // Inventory modal
+        const inventoryModal = document.getElementById('inventoryModal');
+        const inventoryList = document.getElementById('inventoryList');
+
+        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
+        window.returnToEarthHub = returnToEarthHub;
+        window.filterCategory = filterCategory;
+        window.showCraftModal = showCraftModal;
+        window.closeCraftModal = closeCraftModal;
+        window.incrementQty = incrementQty;
+        window.decrementQty = decrementQty;
+        window.craftEquipment = craftEquipment;
+        window.showInventoryModal = showInventoryModal;
+        window.closeInventoryModal = closeInventoryModal;
+
+        // ===== STATE =====
+        let playerId = null;
+        let playerCredits = 0;
+        let currentInventory = {};
+        let playerSkills = {};
+        let ownedEquipment = [];
+        let currentCategory = 'all';
+        let totalCrafts = 0;
+        
+        // Current craft state
+        let currentEquipment = null;
+        let currentMaxCraft = 1;
+
+        // ===== EQUIPMENT DATABASE =====
+        const EQUIPMENT = {
+            // TOOLS
+            'mining_laser': {
+                id: 'mining_laser',
+                name: 'Mining Laser',
+                category: 'tools',
+                icon: '🔦',
+                tier: 1,
+                value: 1000,
+                description: 'Efficient mining tool for extracting resources.',
+                materials: {
+                    'Aluminum': 20,
+                    'Copper': 15,
+                    'Tungsten': 5,
+                    'Polymer': 10
+                },
+                stats: {
+                    'Mining Speed': '+50%',
+                    'Energy Use': '20/s'
+                },
+                skills: {
+                    'metallurgy': 100,
+                    'polymers': 50
+                },
+                unlocksAt: 0
+            },
+            'advanced_drill': {
+                id: 'advanced_drill',
+                name: 'Advanced Drill',
+                category: 'tools',
+                icon: '⛏️',
+                tier: 2,
+                value: 5000,
+                description: 'Heavy-duty drill for deep excavation.',
+                materials: {
+                    'Titanium': 30,
+                    'TungstenCarbide': 10,
+                    'Steel': 40,
+                    'Motor': 2
+                },
+                stats: {
+                    'Mining Speed': '+100%',
+                    'Durability': 'High'
+                },
+                skills: {
+                    'metallurgy': 500,
+                    'construction': 200
+                },
+                unlocksAt: 1000
+            },
+            'plasma_cutter': {
+                id: 'plasma_cutter',
+                name: 'Plasma Cutter',
+                category: 'tools',
+                icon: '🔥',
+                tier: 3,
+                value: 15000,
+                description: 'High-temperature cutter for precision work.',
+                materials: {
+                    'TitaniumAlloy': 25,
+                    'Superconductor': 10,
+                    'Ceramic': 15,
+                    'PowerCell': 3
+                },
+                stats: {
+                    'Cutting Speed': '+200%',
+                    'Precision': 'Extreme'
+                },
+                skills: {
+                    'metallurgy': 1000,
+                    'aerospace': 500,
+                    'materials': 300
+                },
+                unlocksAt: 5000
+            },
+            
+            // WEAPONS
+            'laser_pistol': {
+                id: 'laser_pistol',
+                name: 'Laser Pistol',
+                category: 'weapons',
+                icon: '🔫',
+                tier: 1,
+                value: 800,
+                description: 'Personal defense sidearm.',
+                materials: {
+                    'Aluminum': 15,
+                    'Copper': 10,
+                    'OpticalLens': 2,
+                    'Polymer': 8
+                },
+                stats: {
+                    'Damage': '25',
+                    'Range': 'Medium',
+                    'Ammo': 'Energy Cell'
+                },
+                skills: {
+                    'optical': 100,
+                    'polymers': 50
+                },
+                unlocksAt: 0
+            },
+            'railgun': {
+                id: 'railgun',
+                name: 'Railgun',
+                category: 'weapons',
+                icon: '⚡',
+                tier: 3,
+                value: 20000,
+                description: 'Electromagnetic projectile weapon.',
+                materials: {
+                    'Titanium': 40,
+                    'Copper': 50,
+                    'Superconductor': 20,
+                    'RareEarthMagnets': 30,
+                    'TungstenProjectiles': 25
+                },
+                stats: {
+                    'Damage': '150',
+                    'Range': 'Long',
+                    'Penetration': 'High'
+                },
+                skills: {
+                    'metallurgy': 1500,
+                    'magnetic': 1000,
+                    'aerospace': 500
+                },
+                unlocksAt: 10000
+            },
+            'plasma_rifle': {
+                id: 'plasma_rifle',
+                name: 'Plasma Rifle',
+                category: 'weapons',
+                icon: '🔫',
+                tier: 4,
+                value: 50000,
+                description: 'Advanced energy weapon.',
+                materials: {
+                    'TitaniumAlloy': 50,
+                    'Superconductor': 30,
+                    'CeramicInsulator': 25,
+                    'PlasmaCore': 5,
+                    'OpticalLens': 10
+                },
+                stats: {
+                    'Damage': '300',
+                    'Rate of Fire': 'High',
+                    'Heat': 'Extreme'
+                },
+                skills: {
+                    'aerospace': 2000,
+                    'optical': 1500,
+                    'nuclear': 1000,
+                    'materials': 800
+                },
+                unlocksAt: 25000
+            },
+            
+            // ARMOR
+            'combat_vest': {
+                id: 'combat_vest',
+                name: 'Combat Vest',
+                category: 'armor',
+                icon: '👕',
+                tier: 1,
+                value: 500,
+                description: 'Light protective vest.',
+                materials: {
+                    'Kevlar': 20,
+                    'Polymer': 15,
+                    'SteelPlate': 5
+                },
+                stats: {
+                    'Protection': 'Low',
+                    'Weight': 'Light'
+                },
+                skills: {
+                    'textiles': 100,
+                    'polymers': 50
+                },
+                unlocksAt: 0
+            },
+            'power_armor': {
+                id: 'power_armor',
+                name: 'Power Armor',
+                category: 'armor',
+                icon: '🦾',
+                tier: 4,
+                value: 100000,
+                description: 'Full-body powered exoskeleton.',
+                materials: {
+                    'TitaniumAlloy': 100,
+                    'CarbonFiber': 80,
+                    'ServoMotors': 20,
+                    'PowerCell': 10,
+                    'ComputerChip': 15,
+                    'CeramicPlate': 50
+                },
+                stats: {
+                    'Protection': 'Extreme',
+                    'Strength Boost': '+200%',
+                    'Life Support': 'Integrated'
+                },
+                skills: {
+                    'metallurgy': 5000,
+                    'aerospace': 3000,
+                    'textiles': 2000,
+                    'polymers': 2000,
+                    'materials': 1500
+                },
+                unlocksAt: 50000
+            },
+            'hazmat_suit': {
+                id: 'hazmat_suit',
+                name: 'Hazmat Suit',
+                category: 'armor',
+                icon: '☣️',
+                tier: 3,
+                value: 15000,
+                description: 'Protection against hazardous environments.',
+                materials: {
+                    'Polymer': 60,
+                    'LeadLining': 30,
+                    'SealedClosures': 10,
+                    'AirFilter': 5,
+                    'Polyethylene': 40
+                },
+                stats: {
+                    'Chemical Resistance': 'High',
+                    'Radiation Shielding': 'Medium',
+                    'Bio-Containment': 'Complete'
+                },
+                skills: {
+                    'polymers': 2000,
+                    'nuclear': 1000,
+                    'pharmaceuticals': 800,
+                    'textiles': 500
+                },
+                unlocksAt: 15000
+            },
+            
+            // MEDICAL
+            'medkit': {
+                id: 'medkit',
+                name: 'Medkit',
+                category: 'medical',
+                icon: '💊',
+                tier: 1,
+                value: 200,
+                description: 'Basic medical supplies for treating injuries.',
+                materials: {
+                    'Antiseptic': 5,
+                    'Bandages': 10,
+                    'PainRelievers': 5
+                },
+                stats: {
+                    'Healing': '+50 HP',
+                    'Uses': 'Single'
+                },
+                skills: {
+                    'pharmaceuticals': 50
+                },
+                unlocksAt: 0
+            },
+            'advanced_medkit': {
+                id: 'advanced_medkit',
+                name: 'Advanced Medkit',
+                category: 'medical',
+                icon: '💊',
+                tier: 2,
+                value: 1000,
+                description: 'Enhanced medical supplies with antibiotics.',
+                materials: {
+                    'Antibiotics': 10,
+                    'PainRelievers': 10,
+                    'Bandages': 20,
+                    'SterileTools': 5
+                },
+                stats: {
+                    'Healing': '+150 HP',
+                    'Infection Control': 'Yes'
+                },
+                skills: {
+                    'pharmaceuticals': 300
+                },
+                unlocksAt: 1000
+            },
+            'auto_doc': {
+                id: 'auto_doc',
+                name: 'Auto-Doc',
+                category: 'medical',
+                icon: '🏥',
+                tier: 4,
+                value: 50000,
+                description: 'Automated surgical unit.',
+                materials: {
+                    'Titanium': 50,
+                    'MedicalInstruments': 30,
+                    'ComputerChip': 20,
+                    'Pharmaceuticals': 40,
+                    'ServoMotors': 15
+                },
+                stats: {
+                    'Healing': '+500 HP',
+                    'Surgery': 'Automated',
+                    'Diagnostics': 'Complete'
+                },
+                skills: {
+                    'pharmaceuticals': 5000,
+                    'construction': 2000,
+                    'optical': 1000,
+                    'polymers': 1000
+                },
+                unlocksAt: 20000
+            },
+            
+            // SCIENTIFIC
+            'hand_scanner': {
+                id: 'hand_scanner',
+                name: 'Hand Scanner',
+                category: 'scientific',
+                icon: '📱',
+                tier: 1,
+                value: 300,
+                description: 'Portable scanning device.',
+                materials: {
+                    'Aluminum': 10,
+                    'Copper': 8,
+                    'OpticalLens': 2,
+                    'ComputerChip': 1
+                },
+                stats: {
+                    'Scan Range': '10m',
+                    'Data Storage': 'Basic'
+                },
+                skills: {
+                    'optical': 50,
+                    'magnetic': 30
+                },
+                unlocksAt: 0
+            },
+            'spectrometer': {
+                id: 'spectrometer',
+                name: 'Spectrometer',
+                category: 'scientific',
+                icon: '📊',
+                tier: 3,
+                value: 12000,
+                description: 'Advanced material analysis tool.',
+                materials: {
+                    'OpticalLens': 10,
+                    'DiffractionGrating': 5,
+                    'DetectorArray': 8,
+                    'ComputerChip': 5,
+                    'Aluminum': 30
+                },
+                stats: {
+                    'Wavelength Range': 'UV to IR',
+                    'Resolution': '0.1nm'
+                },
+                skills: {
+                    'optical': 2000,
+                    'materials': 1000,
+                    'magnetic': 500
+                },
+                unlocksAt: 8000
+            },
+            'quantum_sensor': {
+                id: 'quantum_sensor',
+                name: 'Quantum Sensor',
+                category: 'scientific',
+                icon: '🔮',
+                tier: 5,
+                value: 200000,
+                description: 'Ultra-sensitive quantum measurement device.',
+                materials: {
+                    'Superconductor': 50,
+                    'LaserCrystal': 20,
+                    'CryogenicSystem': 10,
+                    'QuantumDot': 15,
+                    'Titanium': 40,
+                    'ComputerChip': 30
+                },
+                stats: {
+                    'Sensitivity': 'Quantum-limited',
+                    'Applications': 'Gravimetry, Magnetometry'
+                },
+                skills: {
+                    'cryogenic': 5000,
+                    'optical': 4000,
+                    'magnetic': 3000,
+                    'nuclear': 2000,
+                    'aerospace': 1000
+                },
+                unlocksAt: 100000
+            }
+        };
+
+        // ===== INITIALIZATION =====
+        async function init() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'initializing fabricator...';
+                
+                // Get player ID
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                
+                // Load player data
+                await loadPlayerData();
+                
+                // Load owned equipment
+                await loadOwnedEquipment();
+                
+                // Load player skills
+                await loadPlayerSkills();
+                
+                // Update mastery display
+                await updateMasteryDisplay();
+                
+                // Render equipment
+                renderEquipment();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                loadingText.textContent = 'error loading fabricator';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== LOAD PLAYER DATA =====
+        async function loadPlayerData() {
+            try {
+                // Get credits
+                playerCredits = await getCredits(playerId);
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                
+                // Get inventory
+                currentInventory = await getInventory(playerId);
+                updateInventoryCount();
+                
+                // Get total crafts
+                totalCrafts = await getTotalCrafts(playerId);
+                
+            } catch (error) {
+                console.error('Error loading player data:', error);
+            }
+        }
+
+        // ===== LOAD OWNED EQUIPMENT =====
+        async function loadOwnedEquipment() {
+            try {
+                const saved = localStorage.getItem(`voidfarer_equipment_${playerId}`);
+                if (saved) {
+                    ownedEquipment = JSON.parse(saved);
+                }
+                document.getElementById('ownedItems').textContent = ownedEquipment.length;
+            } catch (error) {
+                console.error('Error loading owned equipment:', error);
+            }
+        }
+
+        // ===== LOAD PLAYER SKILLS =====
+        async function loadPlayerSkills() {
+            const fields = [
+                'metallurgy', 'construction', 'aerospace', 'materials-science',
+                'nuclear', 'magnetic', 'optical', 'cryogenic', 'alchemy',
+                'pharmaceuticals', 'textiles', 'polymers'
+            ];
+            
+            for (const field of fields) {
+                const progress = await getTotalFieldProgress(playerId, field);
+                playerSkills[field] = progress;
+            }
+        }
+
+        // ===== UPDATE MASTERY DISPLAY =====
+        async function updateMasteryDisplay() {
+            const progress = getProgressToNextLevel(totalCrafts);
+            const mastery = getOverallMastery(totalCrafts);
+            
+            document.getElementById('masteryLevel').textContent = progress.currentLevel;
+            document.getElementById('masteryMultiplier').textContent = mastery.multiplier.toFixed(1) + 'x';
+            
+            if (progress.nextLevel) {
+                document.getElementById('masteryProgressText').textContent = 
+                    `${progress.progress}/${progress.totalNeeded}`;
+                document.getElementById('masteryProgressFill').style.width = `${progress.percentage}%`;
+            } else {
+                document.getElementById('masteryProgressText').textContent = 'MAX';
+                document.getElementById('masteryProgressFill').style.width = '100%';
+            }
+        }
+
+        // ===== UPDATE INVENTORY COUNT =====
+        function updateInventoryCount() {
+            const materialCount = Object.keys(currentInventory.materials || {}).length;
+            const elementCount = Object.keys(currentInventory.elements || {}).length;
+            inventoryCount.textContent = `${materialCount + elementCount} items`;
+        }
+
+        // ===== FILTER CATEGORY =====
+        function filterCategory(category) {
+            currentCategory = category;
+            
+            // Update active button
+            document.querySelectorAll('.category-nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            renderEquipment();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== RENDER EQUIPMENT =====
+        function renderEquipment() {
+            let html = '';
+            
+            for (const [id, item] of Object.entries(EQUIPMENT)) {
+                // Filter by category
+                if (currentCategory !== 'all' && item.category !== currentCategory) continue;
+                
+                // Check if unlocked
+                if (totalCrafts < item.unlocksAt) continue;
+                
+                const owned = ownedEquipment.includes(id);
+                
+                // Check materials
+                let hasAllMaterials = true;
+                for (const [material, amount] of Object.entries(item.materials)) {
+                    const available = getMaterialCount(material);
+                    if (available < amount) {
+                        hasAllMaterials = false;
+                        break;
+                    }
+                }
+                
+                // Check skills
+                let meetsSkills = true;
+                for (const [skill, required] of Object.entries(item.skills || {})) {
+                    const current = playerSkills[skill] || 0;
+                    if (current < required) {
+                        meetsSkills = false;
+                        break;
+                    }
+                }
+                
+                // Check credits
+                const canAfford = playerCredits >= item.value;
+                
+                // Determine button state
+                let buttonClass = 'craft-btn';
+                let buttonText = 'FABRICATE';
+                let disabled = false;
+                
+                if (owned) {
+                    buttonClass += ' owned';
+                    buttonText = '✓ OWNED';
+                    disabled = true;
+                } else if (!meetsSkills) {
+                    disabled = true;
+                } else if (!hasAllMaterials || !canAfford) {
+                    disabled = true;
+                }
+                
+                // Generate stats HTML
+                let statsHtml = '';
+                for (const [stat, value] of Object.entries(item.stats)) {
+                    statsHtml += `
+                        <div class="stat-item">
+                            <div class="stat-label">${stat}</div>
+                            <div class="stat-value">${value}</div>
+                        </div>
+                    `;
+                }
+                
+                // Generate materials preview (first 3)
+                let materialsHtml = '';
+                let count = 0;
+                for (const [material, amount] of Object.entries(item.materials)) {
+                    if (count >= 3) break;
+                    const available = getMaterialCount(material);
+                    const status = available >= amount ? '✅' : '❌';
+                    materialsHtml += `
+                        <div class="material-row">
+                            <span class="material-name">${material}</span>
+                            <span class="material-amount">${amount} ${status}</span>
+                        </div>
+                    `;
+                    count++;
+                }
+                if (Object.keys(item.materials).length > 3) {
+                    materialsHtml += `<div class="material-row"><span>...</span></div>`;
+                }
+                
+                html += `
+                    <div class="equipment-card ${owned ? 'owned' : ''}">
+                        ${owned ? '<div class="owned-badge">✓ OWNED</div>' : ''}
+                        <div class="equipment-header">
+                            <div class="equipment-icon">${item.icon}</div>
+                            <div class="equipment-title">
+                                <div class="equipment-name">${item.name}</div>
+                                <div class="equipment-type">${item.category} • Tier ${item.tier}</div>
+                            </div>
+                        </div>
+                        <div class="equipment-description">${item.description}</div>
+                        <div class="equipment-stats">
+                            ${statsHtml}
+                        </div>
+                        <div class="materials-section">
+                            <div class="section-title">Required Materials</div>
+                            <div class="materials-list">
+                                ${materialsHtml}
+                            </div>
+                        </div>
+                        <div class="price-container">
+                            <span class="price-label">Fabrication Cost</span>
+                            <span class="price-amount">${item.value.toLocaleString()}⭐</span>
+                        </div>
+                        <button class="${buttonClass}" 
+                                onclick="window.showCraftModal('${id}')" 
+                                ${disabled ? 'disabled' : ''}>
+                            ${buttonText}
+                        </button>
+                    </div>
+                `;
+            }
+            
+            if (html === '') {
+                html = '<div class="empty-state">No equipment available in this category</div>';
+            }
+            
+            equipmentGrid.innerHTML = html;
+        }
+
+        // ===== GET MATERIAL COUNT =====
+        function getMaterialCount(material) {
+            // Check in materials inventory
+            if (currentInventory.materials && currentInventory.materials[material]) {
+                return currentInventory.materials[material].count;
+            }
+            
+            // Check in elements inventory
+            if (currentInventory.elements && currentInventory.elements[material]) {
+                const data = currentInventory.elements[material];
+                return typeof data === 'object' ? data.count : data;
+            }
+            
+            return 0;
+        }
+
+        // ===== SHOW CRAFT MODAL =====
+        async function showCraftModal(equipmentId) {
+            const item = EQUIPMENT[equipmentId];
+            if (!item) return;
+            
+            currentEquipment = item;
+            
+            // Check if already owned
+            const owned = ownedEquipment.includes(equipmentId);
+            
+            // Update modal content
+            modalIcon.textContent = item.icon;
+            modalTitle.textContent = item.name;
+            modalCategory.textContent = item.category.charAt(0).toUpperCase() + item.category.slice(1) + ' • Tier ' + item.tier;
+            modalDescription.textContent = item.description;
+            
+            // Build materials list
+            let materialsHtml = '';
+            let canCraft = true;
+            let maxCraft = Infinity;
+            let totalMaterialValue = 0;
+            
+            for (const [material, amount] of Object.entries(item.materials)) {
+                const available = getMaterialCount(material);
+                const enough = available >= amount;
+                if (!enough) canCraft = false;
+                
+                const possibleCrafts = Math.floor(available / amount);
+                maxCraft = Math.min(maxCraft, possibleCrafts);
+                
+                // Estimate material value (simplified)
+                const materialValue = 10;
+                totalMaterialValue += amount * materialValue;
+                
+                const amountClass = enough ? '' : 'insufficient';
+                
+                materialsHtml += `
+                    <div class="modal-ingredient">
+                        <span class="modal-ingredient-name">${material}</span>
+                        <span class="modal-ingredient-amount ${amountClass}">${available} / ${amount}</span>
+                    </div>
+                `;
+            }
+            
+            modalMaterials.innerHTML = materialsHtml;
+            modalTotal.textContent = (item.value + totalMaterialValue).toLocaleString();
+            
+            // Set progress (simulated)
+            modalProgressCurrent.textContent = '0';
+            modalProgressTarget.textContent = '100';
+            modalProgressFill.style.width = '0%';
+            
+            // Set quality
+            const baseQuality = QUALITY_TIERS[1];
+            modalQualityBase.textContent = baseQuality.name;
+            modalQualityBase.className = `modal-quality-value quality-${baseQuality.name.toLowerCase()}`;
+            modalQualityActual.textContent = baseQuality.name;
+            modalQualityActual.className = `modal-quality-value quality-${baseQuality.name.toLowerCase()}`;
+            
+            // Set max craft
+            currentMaxCraft = maxCraft;
+            craftQuantity.value = 1;
+            craftQuantity.max = maxCraft;
+            
+            // Enable/disable buttons
+            const canAfford = playerCredits >= item.value;
+            incrementBtn.disabled = (maxCraft <= 1);
+            decrementBtn.disabled = true;
+            craftBtn.disabled = !canCraft || !canAfford || owned;
+            craftBtn.style.opacity = (canCraft && canAfford && !owned) ? '1' : '0.5';
+            craftBtn.textContent = owned ? 'ALREADY OWNED' : 'FABRICATE';
+            
+            // Show modal
+            craftModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE CRAFT MODAL =====
+        function closeCraftModal() {
+            craftModal.classList.remove('active');
+            currentEquipment = null;
+        }
+
+        // ===== INCREMENT QUANTITY =====
+        function incrementQty() {
+            let current = parseInt(craftQuantity.value);
+            if (current < currentMaxCraft) {
+                current++;
+                craftQuantity.value = current;
+                decrementBtn.disabled = (current <= 1);
+                incrementBtn.disabled = (current >= currentMaxCraft);
+            }
+        }
+
+        // ===== DECREMENT QUANTITY =====
+        function decrementQty() {
+            let current = parseInt(craftQuantity.value);
+            if (current > 1) {
+                current--;
+                craftQuantity.value = current;
+                decrementBtn.disabled = (current <= 1);
+                incrementBtn.disabled = (current >= currentMaxCraft);
+            }
+        }
+
+        // ===== CRAFT EQUIPMENT =====
+        async function craftEquipment() {
+            if (!currentEquipment) return;
+            
+            const quantity = parseInt(craftQuantity.value);
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'fabricating...';
+            
+            try {
+                // Check credits
+                if (playerCredits < currentEquipment.value * quantity) {
+                    throw new Error('Insufficient credits');
+                }
+                
+                // Check and consume materials
+                for (const [material, amount] of Object.entries(currentEquipment.materials)) {
+                    const required = amount * quantity;
+                    const available = getMaterialCount(material);
+                    if (available < required) {
+                        throw new Error(`Not enough ${material}`);
+                    }
+                    
+                    await removeMaterialFromInventory(playerId, material, required);
+                }
+                
+                // Spend credits
+                await spendCredits(currentEquipment.value * quantity, playerId);
+                
+                // Add equipment to owned
+                for (let i = 0; i < quantity; i++) {
+                    ownedEquipment.push(currentEquipment.id);
+                }
+                localStorage.setItem(`voidfarer_equipment_${playerId}`, JSON.stringify(ownedEquipment));
+                
+                // Reload data
+                await loadPlayerData();
+                await loadOwnedEquipment();
+                
+                // Show success notification
+                const notification = document.createElement('div');
+                notification.className = 'craft-notification';
+                notification.innerHTML = `
+                    ✦ Fabricated ${quantity}x ${currentEquipment.name} ✦<br>
+                    <span style="font-size: 14px;">Equipment added to inventory</span>
+                `;
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.remove();
+                    closeCraftModal();
+                    renderEquipment();
+                }, 2000);
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                
+            } catch (error) {
+                console.error('Craft error:', error);
+                alert(`Fabrication failed: ${error.message}`);
+            }
+            
+            loadingOverlay.classList.remove('active');
+        }
+
+        // ===== SHOW INVENTORY MODAL =====
+        async function showInventoryModal() {
+            // Refresh inventory
+            currentInventory = await getInventory(playerId);
+            
+            let html = '';
+            
+            // Show elements
+            if (currentInventory.elements && Object.keys(currentInventory.elements).length > 0) {
+                html += '<div style="color: #a0c0ff; margin: 10px 0 5px;">🔹 Raw Elements</div>';
+                
+                for (const [name, data] of Object.entries(currentInventory.elements)) {
+                    const count = typeof data === 'object' ? data.count : data;
+                    const icon = getElementIcon(name);
+                    html += `
+                        <div class="inventory-item">
+                            <div class="inventory-item-name">
+                                <span class="inventory-item-icon">${icon}</span>
+                                <span>${name}</span>
+                            </div>
+                            <span class="inventory-item-count">${count}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Show materials
+            if (currentInventory.materials && Object.keys(currentInventory.materials).length > 0) {
+                html += '<div style="color: #a0c0ff; margin: 15px 0 5px;">🔨 Crafted Materials</div>';
+                
+                for (const [id, data] of Object.entries(currentInventory.materials)) {
+                    const quality = data.quality || 'Standard';
+                    const qualityClass = `quality-${quality.toLowerCase()}`;
+                    
+                    html += `
+                        <div class="inventory-item">
+                            <div class="inventory-item-name">
+                                <span class="inventory-item-icon">${data.icon || '🔨'}</span>
+                                <span>${data.name || id}</span>
+                                <span class="inventory-quality ${qualityClass}">${quality}</span>
+                            </div>
+                            <span class="inventory-item-count">${data.count}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            if (!html) {
+                html = '<div style="text-align: center; color: #a0c0ff; padding: 20px;">No materials in inventory</div>';
+            }
+            
+            inventoryList.innerHTML = html;
+            inventoryModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== CLOSE INVENTORY MODAL =====
+        function closeInventoryModal() {
+            inventoryModal.classList.remove('active');
+        }
+
+        // ===== HELPER: GET ELEMENT ICON =====
+        function getElementIcon(elementName) {
+            const icons = {
+                'Hydrogen': '💧', 'Helium': '🎈', 'Carbon': '⚫', 'Nitrogen': '🌬️',
+                'Oxygen': '💨', 'Sodium': '🧂', 'Magnesium': '✨', 'Aluminum': '🥫',
+                'Silicon': '💻', 'Iron': '⚙️', 'Copper': '🔴', 'Tin': '⚪',
+                'Zinc': '⚪', 'Nickel': '🔩', 'Titanium': '🔷', 'Chromium': '🔩',
+                'Gold': '🟡', 'Silver': '⚪', 'Platinum': '⬜', 'Uranium': '☢️',
+                'Lead': '⚖️', 'Boron': '🔹', 'Lithium': '🔋', 'Beryllium': '💎',
+                'Calcium': '🥛', 'Potassium': '🍌', 'Phosphorus': '✨', 'Sulfur': '🟡',
+                'Chlorine': '🧪', 'Argon': '🎈', 'Manganese': '⚙️', 'Cobalt': '🔵',
+                'Zirconium': '💎', 'Tungsten': '⚡', 'Vanadium': '🔧', 'Molybdenum': '🔩',
+                'TitaniumAlloy': '🔷', 'Steel': '⚙️', 'CarbonFiber': '⚫',
+                'Kevlar': '🛡️', 'Polymer': '🧴', 'Ceramic': '🏺', 'Superconductor': '❄️',
+                'ComputerChip': '💻', 'OpticalLens': '🔍', 'RareEarthMagnets': '🧲',
+                'default': '🔹'
+            };
+            return icons[elementName] || icons.default;
+        }
+
+        // ===== RETURN TO EARTH HUB =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
