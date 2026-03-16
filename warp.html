@@ -249,6 +249,65 @@
             opacity: 1;
         }
         
+        /* Claim Info Panel - NEW: Shows owner and fee for claimed planets */
+        .claim-info-panel {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,10,26,0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 24px;
+            color: white;
+            z-index: 35;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            pointer-events: none;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+            animation: glow-pulse 2s infinite alternate;
+        }
+        
+        @keyframes glow-pulse {
+            from { box-shadow: 0 0 15px rgba(255, 215, 0, 0.3); }
+            to { box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); }
+        }
+        
+        .claim-info-panel.visible {
+            display: flex;
+        }
+        
+        .claim-icon {
+            font-size: 24px;
+            color: gold;
+        }
+        
+        .claim-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .claim-owner {
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .claim-fee {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        .claim-warning {
+            font-size: 11px;
+            color: #a0c0ff;
+            margin-top: 2px;
+        }
+        
         /* Destination info - very bottom center */
         .dest-info {
             position: absolute;
@@ -269,7 +328,7 @@
         /* Planet Info Preview (for surface) */
         .planet-preview {
             position: absolute;
-            top: 120px;
+            top: 180px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10,10,26,0.6);
@@ -309,8 +368,9 @@
             .journey-panel { top: max(20px, env(safe-area-inset-top)); }
             .stats-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); left: max(20px, env(safe-area-inset-left)); }
             .cycle-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); right: max(20px, env(safe-area-inset-right)); }
+            .claim-info-panel { top: 120px; }
+            .planet-preview { top: 180px; }
             .dest-info { bottom: max(10px, env(safe-area-inset-bottom)); }
-            .planet-preview { top: 120px; }
         }
     </style>
 </head>
@@ -339,6 +399,16 @@
                         <span class="point-icon" id="destIcon">🪐</span>
                         <span class="point-name" id="destName">Loading...</span>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Claim Info Panel - NEW: Shows when destination is a claimed planet -->
+            <div class="claim-info-panel" id="claimInfoPanel">
+                <span class="claim-icon">👑</span>
+                <div class="claim-details">
+                    <div><span class="claim-owner" id="claimOwner">Unknown</span> owns this planet</div>
+                    <div>Mining fee: <span class="claim-fee" id="claimFee">10%</span></div>
+                    <div class="claim-warning">Fee will be deducted from extractions</div>
                 </div>
             </div>
             
@@ -389,9 +459,12 @@
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/migration.js"></script>
     <script type="module" src="js/planet-utils.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
+    <script type="module" src="js/claim-system.js"></script>
 
     <script type="module">
         import { PLANET_TYPE_DATA } from './js/planet-utils.js';
+        import { isPlanetClaimed, getPlanetClaim } from './js/planet-status.js';
 
         // ===== CANVAS ELEMENTS =====
         const starfieldCanvas = document.getElementById('starfieldCanvas');
@@ -415,6 +488,11 @@
         const previewIcon = document.getElementById('previewIcon');
         const previewName = document.getElementById('previewName');
         const previewType = document.getElementById('previewType');
+        
+        // NEW: Claim info elements
+        const claimInfoPanel = document.getElementById('claimInfoPanel');
+        const claimOwner = document.getElementById('claimOwner');
+        const claimFee = document.getElementById('claimFee');
 
         // ===== WARP STATE =====
         let warpData = {
@@ -477,8 +555,35 @@
             highlight: '#5a9ac0'
         };
 
+        // ===== CHECK IF DESTINATION IS CLAIMED =====
+        async function checkDestinationClaimed() {
+            try {
+                // Only check if destination is a planet and not a hub return
+                if (warpData.destPlanet && !warpData.isHubReturn) {
+                    const claimed = await isPlanetClaimed(warpData.destPlanet);
+                    
+                    if (claimed) {
+                        const claimData = await getPlanetClaim(warpData.destPlanet);
+                        if (claimData) {
+                            claimOwner.textContent = claimData.ownerName || 'Unknown';
+                            claimFee.textContent = claimData.currentFee + '%';
+                            claimInfoPanel.classList.add('visible');
+                            console.log(`Destination planet ${warpData.destPlanet} is claimed by ${claimData.ownerName}`);
+                        }
+                    } else {
+                        claimInfoPanel.classList.remove('visible');
+                    }
+                } else {
+                    claimInfoPanel.classList.remove('visible');
+                }
+            } catch (error) {
+                console.error('Error checking if destination is claimed:', error);
+                claimInfoPanel.classList.remove('visible');
+            }
+        }
+
         // ===== LOAD WARP DATA =====
-        function loadWarpData() {
+        async function loadWarpData() {
             try {
                 const savedData = localStorage.getItem('voidfarer_warp_data');
                 if (savedData) {
@@ -582,6 +687,9 @@
                 } else {
                     planetPreview.classList.remove('visible');
                 }
+
+                // Check if destination is a claimed planet
+                await checkDestinationClaimed();
 
                 console.log('Warp data loaded:', warpData);
 
@@ -689,6 +797,19 @@
             mapCtx.beginPath();
             mapCtx.arc(destPos.x * w, destPos.y * h, 10, 0, Math.PI * 2);
             mapCtx.fill();
+            
+            // If destination is claimed, add a crown indicator
+            if (claimInfoPanel.classList.contains('visible')) {
+                const crownX = destPos.x * w;
+                const crownY = (destPos.y * h) - 25;
+                
+                mapCtx.shadowColor = 'gold';
+                mapCtx.shadowBlur = 15;
+                mapCtx.font = '20px "Exo 2", sans-serif';
+                mapCtx.fillStyle = 'gold';
+                mapCtx.globalAlpha = 0.9;
+                mapCtx.fillText('👑', crownX - 10, crownY);
+            }
             
             // Draw ship with trail
             const shipX = shipPos.x * w;
@@ -1019,9 +1140,9 @@
         }
 
         // ===== INITIALIZE =====
-        function init() {
+        async function init() {
             try {
-                loadWarpData();
+                await loadWarpData();
                 
                 startPos = { x: 0.15, y: 0.5 + (Math.random() * 0.2 - 0.1) };
                 destPos = { x: 0.85, y: 0.5 + (Math.random() * 0.2 - 0.1) };
