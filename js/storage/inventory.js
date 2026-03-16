@@ -2,7 +2,6 @@
 // Inventory management for Voidfarer
 // Tracks both raw elements AND crafted materials separately
 
-import { getElementMass } from './storage.js';
 
 // ===== STORAGE KEYS =====
 const STORAGE_KEYS = {
