@@ -1,10 +1,12 @@
-// js/storage/storage.js - ULTRA MINIMAL VERSION
-// NO DUPLICATES - Fixed
+// js/storage/storage.js - Complete version with all needed functions
+// NO DUPLICATE EXPORTS - Fixed
 
 // Storage keys
 const STORAGE_KEYS = {
     PLAYER: 'voidfarer_player',
+    PLAYER_ID: 'voidfarer_player_id',
     COLLECTION: 'voidfarer_collection',
+    CREDITS: 'voidfarer_credits',
     LAST_SAVE: 'voidfarer_last_save'
 };
 
@@ -13,9 +15,18 @@ export async function getPlayer(playerId = 'main') {
     try {
         const key = `${STORAGE_KEYS.PLAYER}_${playerId}`;
         const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : { name: 'Voidfarer', credits: 5000 };
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        // Return default player
+        return { 
+            name: 'Voidfarer', 
+            credits: 5000,
+            id: playerId
+        };
     } catch (error) {
-        return { name: 'Voidfarer', credits: 5000 };
+        console.error('Error getting player:', error);
+        return { name: 'Voidfarer', credits: 5000, id: playerId };
     }
 }
 
@@ -26,6 +37,7 @@ export async function savePlayer(playerData, playerId = 'main') {
         saveTimestamp();
         return true;
     } catch (error) {
+        console.error('Error saving player:', error);
         return false;
     }
 }
@@ -37,6 +49,7 @@ export async function getCollection(playerId = 'main') {
         const saved = localStorage.getItem(key);
         return saved ? JSON.parse(saved) : {};
     } catch (error) {
+        console.error('Error getting collection:', error);
         return {};
     }
 }
@@ -46,23 +59,65 @@ export async function addElementToCollection(elementName, quantity = 1, location
         const collection = await getCollection(playerId);
         
         if (!collection[elementName]) {
-            collection[elementName] = { count: 0, firstFound: Date.now() };
+            collection[elementName] = { 
+                count: 0, 
+                firstFound: Date.now(),
+                locations: []
+            };
         }
         
         collection[elementName].count += quantity;
         collection[elementName].lastFound = Date.now();
         
+        if (locationData.planet) {
+            if (!collection[elementName].locations) {
+                collection[elementName].locations = [];
+            }
+            collection[elementName].locations.push({
+                planet: locationData.planet,
+                planetType: locationData.planetType,
+                quantity: quantity,
+                timestamp: locationData.timestamp || Date.now()
+            });
+        }
+        
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         localStorage.setItem(key, JSON.stringify(collection));
         saveTimestamp();
         
-        return { success: true };
+        return { success: true, collection };
     } catch (error) {
+        console.error('Error adding element to collection:', error);
         return { success: false };
     }
 }
 
 // ===== CREDITS FUNCTIONS =====
+export async function getCredits(playerId = 'main') {
+    try {
+        const player = await getPlayer(playerId);
+        return player?.credits || 5000;
+    } catch (error) {
+        console.error('Error getting credits:', error);
+        return 5000;
+    }
+}
+
+export async function saveCredits(credits, playerId = 'main') {
+    try {
+        const player = await getPlayer(playerId);
+        if (player) {
+            player.credits = credits;
+            await savePlayer(player, playerId);
+        }
+        saveTimestamp();
+        return true;
+    } catch (error) {
+        console.error('Error saving credits:', error);
+        return false;
+    }
+}
+
 export async function addCreditsToOwner(ownerId, amount) {
     try {
         const owner = await getPlayer(ownerId);
@@ -72,6 +127,7 @@ export async function addCreditsToOwner(ownerId, amount) {
         }
         return true;
     } catch (error) {
+        console.error('Error adding credits to owner:', error);
         return false;
     }
 }
@@ -81,14 +137,18 @@ export function saveTimestamp() {
     localStorage.setItem(STORAGE_KEYS.LAST_SAVE, new Date().toISOString());
 }
 
-// ===== TEST FUNCTION =====
-export function test() {
-    console.log('✅ storage.js loaded successfully - NO DUPLICATES');
-    return true;
+// ===== PLAYER ID =====
+export function getPlayerId() {
+    let playerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
+    if (!playerId) {
+        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem(STORAGE_KEYS.PLAYER_ID, playerId);
+    }
+    return playerId;
 }
 
 // ============================================================================
-// SINGLE EXPORT SECTION - ONE EXPORT OF EACH FUNCTION
+// SINGLE EXPORT SECTION - NO DUPLICATES
 // ============================================================================
 
 // Named exports - each function appears exactly ONCE
@@ -98,9 +158,11 @@ export {
     savePlayer,
     getCollection,
     addElementToCollection,
+    getCredits,
+    saveCredits,
     addCreditsToOwner,
-    saveTimestamp,
-    test  // test appears ONLY HERE in named exports
+    getPlayerId,
+    saveTimestamp
 };
 
 // Default export - separate from named exports, this is allowed
@@ -110,7 +172,9 @@ export default {
     savePlayer,
     getCollection,
     addElementToCollection,
+    getCredits,
+    saveCredits,
     addCreditsToOwner,
-    saveTimestamp,
-    test  // test appears HERE in default export (this is OK - different export type)
+    getPlayerId,
+    saveTimestamp
 };
