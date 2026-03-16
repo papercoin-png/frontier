@@ -1206,7 +1206,7 @@ export {
     // System
     initializeStorage,
     resetGame,
-    saveTimestamp
+    saveTimestamp,
 };
 
 // Default export for backward compatibility
