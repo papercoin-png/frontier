@@ -193,6 +193,25 @@
             font-weight: 600;
         }
         
+        /* Claim Status Badge (for current planet if claimed) */
+        .claim-badge {
+            background: rgba(255, 215, 0, 0.15);
+            border: 1px solid gold;
+            border-radius: 30px 5px 30px 5px;
+            padding: 4px 10px;
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: gold;
+        }
+        
+        .claim-badge .owner {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
         /* Window Frame */
         .window-frame {
             background: #1a2a3a;
@@ -249,9 +268,18 @@
             backdrop-filter: blur(5px);
             border: 1px solid #8ac0d0;
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        /* Action Grid */
+        .window-label .crown-icon {
+            color: gold;
+            font-size: 16px;
+            filter: drop-shadow(0 0 5px gold);
+        }
+        
+        /* Action Grid - UPDATED with Claims Board */
         .action-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -271,12 +299,51 @@
             gap: 10px;
             cursor: pointer;
             transition: all 0.1s;
+            position: relative;
+            overflow: hidden;
         }
         
         .action-card:active {
             background: rgba(60, 90, 140, 0.8);
             transform: scale(0.97);
             border-color: #8ac0ff;
+        }
+        
+        .action-card .notification-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ffaa4a;
+            color: #0a0a1a;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 6px;
+            border-radius: 20px;
+            min-width: 18px;
+            text-align: center;
+            border: 1px solid white;
+            box-shadow: 0 0 10px #ffaa4a;
+            animation: pulse-badge 2s infinite;
+        }
+        
+        @keyframes pulse-badge {
+            0% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.7; transform: scale(1); }
+        }
+        
+        /* Claims card special styling */
+        .action-card.claims-card {
+            border-color: gold;
+            background: rgba(50, 40, 20, 0.7);
+        }
+        
+        .action-card.claims-card .action-icon {
+            filter: drop-shadow(0 0 10px gold);
+        }
+        
+        .action-card.claims-card .action-label {
+            color: gold;
         }
         
         .action-icon {
@@ -442,6 +509,56 @@
             font-size: 12px;
         }
         
+        /* Earnings Summary (for claim owners) */
+        .earnings-summary {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid gold;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        
+        .earnings-summary:active {
+            background: rgba(255, 215, 0, 0.2);
+            transform: scale(0.99);
+        }
+        
+        .earnings-icon {
+            font-size: 24px;
+            color: gold;
+        }
+        
+        .earnings-content {
+            flex: 1;
+        }
+        
+        .earnings-title {
+            color: gold;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .earnings-stats {
+            color: #ffffff;
+            font-size: 12px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .earnings-amount {
+            color: #4affaa;
+            font-weight: 600;
+        }
+        
+        .earnings-count {
+            color: #a0c0ff;
+        }
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -480,6 +597,13 @@
                 </div>
             </div>
             
+            <!-- Claim Badge (visible if current planet is claimed) -->
+            <div class="claim-badge" id="claimBadge" style="display: none;">
+                <span>👑</span>
+                <span>Claimed by: <span class="owner" id="claimOwner">Loading...</span></span>
+                <span>| Fee: <span id="claimFee">10%</span></span>
+            </div>
+            
             <!-- Labor Pool Banner -->
             <div class="labor-banner" onclick="window.navigateTo('labor-exchange.html')">
                 <div class="labor-icon">💰</div>
@@ -490,16 +614,31 @@
                 <div class="labor-icon">→</div>
             </div>
             
+            <!-- Earnings Summary (for players who own planets) -->
+            <div class="earnings-summary" id="earningsSummary" style="display: none;" onclick="window.navigateTo('my-claims.html')">
+                <div class="earnings-icon">👑</div>
+                <div class="earnings-content">
+                    <div class="earnings-title">Mining Fee Earnings</div>
+                    <div class="earnings-stats">
+                        <span>Total: <span class="earnings-amount" id="totalEarnings">0⭐</span></span>
+                        <span class="earnings-count" id="planetsOwned">0 planets</span>
+                    </div>
+                </div>
+                <div class="earnings-icon">→</div>
+            </div>
+            
             <!-- Window with Planet View -->
             <div class="window-frame">
                 <div class="window-view">
                     <img src="assets/images/earth-view.jpg" class="planet-image" id="planetImage" alt="Planet view" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
                     <div class="window-overlay"></div>
-                    <div class="window-label" id="planetLabel">Loading...</div>
+                    <div class="window-label" id="planetLabel">
+                        <span>Loading...</span>
+                    </div>
                 </div>
             </div>
             
-            <!-- Action Grid -->
+            <!-- Action Grid - UPDATED with Claims Board -->
             <div class="action-grid">
                 <div class="action-card" onclick="window.goToSurface()">
                     <div class="action-icon">🪐</div>
@@ -521,6 +660,22 @@
                     <div class="action-label">JOURNAL</div>
                     <div class="action-desc">Discovered elements</div>
                 </div>
+                
+                <!-- CLAIMS BOARD CARD - NEW -->
+                <div class="action-card claims-card" id="claimsBoardCard" onclick="window.goToClaimsBoard()">
+                    <div class="action-icon">📋</div>
+                    <div class="action-label">CLAIMS BOARD</div>
+                    <div class="action-desc">Claimed planets & fees</div>
+                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
+                </div>
+                
+                <!-- MY CLAIMS CARD - NEW -->
+                <div class="action-card" id="myClaimsCard" onclick="window.goToMyClaims()">
+                    <div class="action-icon">👑</div>
+                    <div class="action-label">MY CLAIMS</div>
+                    <div class="action-desc" id="myClaimsDesc">Your claimed planets</div>
+                </div>
+                
                 <div class="action-card" onclick="window.goToAlchemyLab()">
                     <div class="action-icon">⚗️</div>
                     <div class="action-label">ALCHEMY LAB</div>
@@ -593,8 +748,14 @@
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/migration.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
+    <script type="module" src="js/claim-system.js"></script>
+    <script type="module" src="js/claim-notifications.js"></script>
 
     <script type="module">
+        import { isPlanetClaimed, getPlanetClaim, getPlayerClaims, getPlayerClaimStats } from './js/planet-status.js';
+        import { getUnreadClaimNotifications } from './js/claim-notifications.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -609,6 +770,15 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const laborEarningsSpan = document.getElementById('laborEarnings');
+        const claimBadge = document.getElementById('claimBadge');
+        const claimOwner = document.getElementById('claimOwner');
+        const claimFee = document.getElementById('claimFee');
+        const planetLabel = document.getElementById('planetLabel');
+        const earningsSummary = document.getElementById('earningsSummary');
+        const totalEarnings = document.getElementById('totalEarnings');
+        const planetsOwned = document.getElementById('planetsOwned');
+        const claimsNotificationBadge = document.getElementById('claimsNotificationBadge');
+        const myClaimsDesc = document.getElementById('myClaimsDesc');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.goToSurface = goToSurface;
@@ -617,6 +787,8 @@
         window.goToJournal = goToJournal;
         window.goToAlchemyLab = goToAlchemyLab;
         window.goToUniversity = goToUniversity;
+        window.goToClaimsBoard = goToClaimsBoard;
+        window.goToMyClaims = goToMyClaims;
         window.warpHome = warpHome;
         window.quickRefuel = quickRefuel;
         window.quickRepair = quickRepair;
@@ -675,6 +847,71 @@
                 
             } catch (error) {
                 console.error('Error loading ship data:', error);
+            }
+        }
+
+        // ===== LOAD CLAIM DATA =====
+        async function loadClaimData() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                
+                // Check if current planet is claimed
+                const currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+                const claimed = await isPlanetClaimed(currentPlanet);
+                
+                if (claimed) {
+                    const claimData = await getPlanetClaim(currentPlanet);
+                    if (claimData) {
+                        claimOwner.textContent = claimData.ownerName || 'Unknown';
+                        claimFee.textContent = claimData.currentFee + '%';
+                        claimBadge.style.display = 'inline-flex';
+                        
+                        // Update planet label to show crown if claimed
+                        const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                        const typeDisplay = planetType.charAt(0).toUpperCase() + planetType.slice(1);
+                        planetLabel.innerHTML = `<span>${currentPlanet} • ${typeDisplay}</span> <span class="crown-icon">👑</span>`;
+                    }
+                } else {
+                    claimBadge.style.display = 'none';
+                    // Reset planet label without crown
+                    const planetType = localStorage.getItem('voidfarer_current_planet_type') || 'lush';
+                    const typeDisplay = planetType.charAt(0).toUpperCase() + planetType.slice(1);
+                    planetLabel.innerHTML = `<span>${currentPlanet} • ${typeDisplay}</span>`;
+                }
+                
+                // Get player's claim statistics
+                const playerClaims = await getPlayerClaims(playerId);
+                const claimCount = playerClaims ? playerClaims.length : 0;
+                
+                if (claimCount > 0) {
+                    // Update My Claims card description
+                    myClaimsDesc.textContent = `${claimCount} planet${claimCount !== 1 ? 's' : ''}`;
+                    
+                    // Get earnings stats
+                    const stats = await getPlayerClaimStats(playerId);
+                    if (stats && stats.totalEarned > 0) {
+                        totalEarnings.textContent = stats.totalEarned.toLocaleString() + '⭐';
+                        planetsOwned.textContent = stats.planetsOwned + (stats.planetsOwned === 1 ? ' planet' : ' planets');
+                        earningsSummary.style.display = 'flex';
+                    } else {
+                        earningsSummary.style.display = 'none';
+                    }
+                } else {
+                    myClaimsDesc.textContent = 'Your claimed planets';
+                    earningsSummary.style.display = 'none';
+                }
+                
+                // Check for unread claim notifications
+                const unread = await getUnreadClaimNotifications(playerId);
+                if (unread && unread.length > 0) {
+                    claimsNotificationBadge.style.display = 'block';
+                    claimsNotificationBadge.textContent = unread.length > 9 ? '9+' : unread.length;
+                } else {
+                    claimsNotificationBadge.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading claim data:', error);
             }
         }
 
@@ -742,9 +979,8 @@
                 localStorage.setItem('voidfarer_current_star', 'Sol');
             }
             
-            // Update display
+            // Update display - we'll let loadClaimData handle the label with crown
             document.getElementById('currentPlanet').textContent = planet;
-            document.getElementById('planetLabel').textContent = planet + ' • ' + planetType;
             
             // Update image
             const imgElement = document.getElementById('planetImage');
@@ -784,6 +1020,18 @@
             }
             
             window.location.href = 'surface.html';
+        }
+
+        // ===== GO TO CLAIMS BOARD =====
+        function goToClaimsBoard() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'claims-board.html';
+        }
+
+        // ===== GO TO MY CLAIMS =====
+        function goToMyClaims() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'my-claims.html';
         }
 
         // ===== GO TO ALCHEMY LAB =====
@@ -1001,10 +1249,12 @@
                 // Load all data
                 await loadShipData();
                 loadCurrentLocation();
+                await loadClaimData();
                 
-                // Refresh labor earnings every 30 seconds
+                // Refresh data every 30 seconds
                 setInterval(async () => {
                     await loadLaborEarnings();
+                    await loadClaimData();
                 }, 30000);
                 
                 setTimeout(() => {
