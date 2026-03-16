@@ -517,61 +517,6 @@ export async function updateFieldMastery(playerId, field, levelData) {
 }
 
 // ============================================================================
-// CARGO MASS UTILITIES
-// ============================================================================
-
-/**
- * Get total cargo mass
- * @param {string} playerId - Player ID
- * @returns {Promise<number>} Total mass
- */
-export async function getTotalCargoMass(playerId = 'main') {
-    try {
-        // Import dynamically to avoid circular dependency
-        const { getElementInventory, getMaterialInventory } = await import('./inventory.js');
-        
-        const elements = await getElementInventory(playerId);
-        const materials = await getMaterialInventory(playerId);
-        
-        let totalMass = 0;
-        
-        // Calculate element mass
-        for (const [name, data] of Object.entries(elements)) {
-            const count = typeof data === 'object' ? data.count : data;
-            totalMass += count * getElementMass(name);
-        }
-        
-        // Calculate material mass (materials have their own mass)
-        for (const [materialId, data] of Object.entries(materials)) {
-            // Default material mass - could be customized per material
-            totalMass += data.count * 10; // Placeholder: 10 AMU per material unit
-        }
-        
-        return totalMass;
-    } catch (error) {
-        console.error('Error calculating total cargo mass:', error);
-        return 0;
-    }
-}
-
-/**
- * Get remaining cargo mass
- * @param {string} playerId - Player ID
- * @returns {Promise<number>} Remaining mass
- */
-export async function getRemainingCargoMass(playerId = 'main') {
-    try {
-        const totalMass = await getTotalCargoMass(playerId);
-        const player = await getPlayer(playerId);
-        const massLimit = player?.cargoMassLimit || getCargoMassLimit();
-        return Math.max(0, massLimit - totalMass);
-    } catch (error) {
-        console.error('Error calculating remaining cargo mass:', error);
-        return getCargoMassLimit();
-    }
-}
-
-// ============================================================================
 // CREDITS
 // ============================================================================
 
@@ -1160,8 +1105,6 @@ export {
     updateFieldMastery,
     
     // Cargo
-    getTotalCargoMass,
-    getRemainingCargoMass,
     getElementMass,
     
     // Credits
@@ -1238,8 +1181,6 @@ export default {
     updateFieldMastery,
     
     // Cargo
-    getTotalCargoMass,
-    getRemainingCargoMass,
     getElementMass,
     
     // Credits
