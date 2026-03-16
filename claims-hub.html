@@ -1,1 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Claims Hub</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/crafting.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .hub-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid gold;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px gold;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .hub-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .hub-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: gold;
+            text-shadow: 0 0 20px gold, 0 0 40px #aa8c00;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .hub-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .location {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .location span {
+            color: gold;
+            font-weight: 600;
+        }
+        
+        /* Claims Stats Card */
+        .claims-stats {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .stats-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .stats-title span {
+            color: gold;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px;
+        }
+        
+        .stat-value {
+            color: gold;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            color: #a0c0ff;
+            font-size: 10px;
+        }
+        
+        /* Earnings Card */
+        .earnings-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        
+        .earnings-card:active {
+            transform: scale(0.99);
+            background: rgba(74, 255, 170, 0.1);
+        }
+        
+        .earnings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .earnings-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .earnings-title span {
+            color: #4affaa;
+        }
+        
+        .earnings-amount {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .earnings-details {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        
+        /* Section Header */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+        
+        .section-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title span {
+            color: gold;
+            font-size: 24px;
+        }
+        
+        .back-link {
+            color: #a0c0ff;
+            font-size: 12px;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255, 215, 0, 0.2);
+            cursor: pointer;
+        }
+        
+        .back-link:active {
+            background: gold;
+            color: #0a0a1a;
+        }
+        
+        /* Hub Cards Grid - 2 columns */
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .hub-card {
+            background: rgba(30, 45, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            border-radius: 40px 15px 40px 15px;
+            padding: 25px 10px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: center;
+        }
+        
+        .hub-card:active {
+            transform: scale(0.97);
+            background: rgba(255, 215, 0, 0.2);
+        }
+        
+        .hub-card.claims-board {
+            border-color: gold;
+        }
+        
+        .hub-card.my-claims {
+            border-color: #4affaa;
+        }
+        
+        .hub-card.real-estate {
+            border-color: #4a8ac0;
+        }
+        
+        .hub-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        
+        .hub-label {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 4px;
+        }
+        
+        .hub-desc {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        /* Notification Badge */
+        .hub-card {
+            position: relative;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ffaa4a;
+            color: #0a0a1a;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 20px;
+            min-width: 24px;
+            text-align: center;
+            border: 2px solid white;
+            box-shadow: 0 0 15px #ffaa4a;
+            animation: pulse-badge 2s infinite;
+            z-index: 10;
+        }
+        
+        @keyframes pulse-badge {
+            0% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.8; transform: scale(1); }
+        }
+        
+        /* Claim Preview */
+        .claim-preview {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .preview-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .view-all {
+            color: gold;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .claim-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        
+        .claim-item:last-child {
+            border-bottom: none;
+        }
+        
+        .claim-planet {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .claim-planet-icon {
+            font-size: 20px;
+        }
+        
+        .claim-planet-name {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .claim-planet-type {
+            font-size: 10px;
+            color: #a0c0ff;
+            margin-left: 5px;
+        }
+        
+        .claim-owner {
+            color: #4affaa;
+            font-size: 12px;
+        }
+        
+        .claim-fee {
+            color: gold;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed gold;
+            font-style: italic;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 16px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 240px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 24px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="hub-view" id="hubView">
+            <!-- Header -->
+            <div class="hub-header">
+                <div class="hub-title">👑 Claims Hub</div>
+                <div class="hub-subtitle">✦ your planetary empire ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="location" id="locationDisplay">
+                    <span id="currentLocation">Earth Hub</span>
+                </div>
+            </div>
+            
+            <!-- Claims Stats Card -->
+            <div class="claims-stats">
+                <div class="stats-header">
+                    <div class="stats-title">
+                        <span>👑</span> Your Empire
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="planetsOwned">0</div>
+                        <div class="stat-label">Planets Owned</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalEarned">0⭐</div>
+                        <div class="stat-label">Total Earned</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="uniqueMiners">0</div>
+                        <div class="stat-label">Unique Miners</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalTransactions">0</div>
+                        <div class="stat-label">Transactions</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Earnings Card (shows if you have unclaimed notifications) -->
+            <div class="earnings-card" id="earningsCard" style="display: none;" onclick="navigateTo('my-claims.html')">
+                <div class="earnings-header">
+                    <div class="earnings-title">
+                        <span>💰</span> Recent Earnings
+                    </div>
+                    <div class="earnings-amount" id="recentEarnings">0⭐</div>
+                </div>
+                <div class="earnings-details">
+                    <span>New mining fees received</span>
+                    <span>Click to view →</span>
+                </div>
+            </div>
+            
+            <!-- Section Header -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>👑</span> Claims Management
+                </div>
+                <div class="back-link" onclick="returnToEarthHub()">← BACK</div>
+            </div>
+            
+            <!-- Main Claims Grid -->
+            <div class="hub-grid">
+                <!-- Claims Board -->
+                <div class="hub-card claims-board" id="claimsBoardCard" onclick="navigateTo('claims-board.html')">
+                    <div class="hub-icon">📋</div>
+                    <div class="hub-label">Claims Board</div>
+                    <div class="hub-desc">All claimed planets</div>
+                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
+                </div>
+                
+                <!-- My Claims -->
+                <div class="hub-card my-claims" onclick="navigateTo('my-claims.html')">
+                    <div class="hub-icon">👑</div>
+                    <div class="hub-label">My Claims</div>
+                    <div class="hub-desc" id="myClaimsDesc">Your planets</div>
+                </div>
+                
+                <!-- Real Estate -->
+                <div class="hub-card real-estate" onclick="navigateTo('real-estate.html')">
+                    <div class="hub-icon">🏢</div>
+                    <div class="hub-label">Real Estate</div>
+                    <div class="hub-desc">Hub storage</div>
+                </div>
+            </div>
+            
+            <!-- Recent Claims Preview -->
+            <div class="claim-preview">
+                <div class="preview-header">
+                    <div class="preview-title">🔥 Recent Claims</div>
+                    <div class="view-all" onclick="navigateTo('claims-board.html')">VIEW ALL →</div>
+                </div>
+                <div id="claimsPreview">
+                    <div class="claim-item">
+                        <div class="claim-planet">
+                            <span class="claim-planet-icon">🪐</span>
+                            <span class="claim-planet-name">Loading...</span>
+                        </div>
+                        <div class="claim-fee">--%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Back button to Earth Hub -->
+            <button class="back-button" onclick="returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading...</div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Simple scripts - no modules -->
+    <script src="js/db.js"></script>
+    
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const claimsNotificationBadge = document.getElementById('claimsNotificationBadge');
+        const myClaimsDesc = document.getElementById('myClaimsDesc');
+        const earningsCard = document.getElementById('earningsCard');
+
+        // ===== LOAD CREDITS =====
+        function loadCredits() {
+            try {
+                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading credits:', error);
+            }
+        }
+
+        // ===== LOAD LOCATION =====
+        function loadLocation() {
+            document.getElementById('currentLocation').textContent = 'Earth • Claims Hub';
+        }
+
+        // ===== LOAD CLAIMS DATA =====
+        function loadClaimsData() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
+                
+                // Get player's claims
+                const planetClaims = JSON.parse(localStorage.getItem('voidfarer_planet_claims') || '{}');
+                const playerClaimsIndex = JSON.parse(localStorage.getItem('voidfarer_player_claims') || '{}');
+                const playerPlanets = playerClaimsIndex[playerId] || [];
+                
+                // Update stats
+                document.getElementById('planetsOwned').textContent = playerPlanets.length;
+                
+                // Calculate total earnings
+                let totalEarned = 0;
+                let uniqueMiners = new Set();
+                let transactions = 0;
+                
+                playerPlanets.forEach(planetName => {
+                    const claim = planetClaims[planetName];
+                    if (claim) {
+                        totalEarned += claim.totalEarned || 0;
+                        transactions += claim.transactionCount || 0;
+                        // Miners would be tracked separately
+                    }
+                });
+                
+                document.getElementById('totalEarned').textContent = totalEarned.toLocaleString() + '⭐';
+                document.getElementById('uniqueMiners').textContent = Math.floor(Math.random() * 20) + 5; // Placeholder
+                document.getElementById('totalTransactions').textContent = transactions;
+                
+                // Update My Claims description
+                if (playerPlanets.length > 0) {
+                    myClaimsDesc.textContent = `${playerPlanets.length} planet${playerPlanets.length !== 1 ? 's' : ''}`;
+                } else {
+                    myClaimsDesc.textContent = 'Your planets';
+                }
+                
+                // Check for unread notifications (simulated)
+                const hasUnread = Math.random() > 0.7; // 30% chance of notification for demo
+                if (hasUnread) {
+                    claimsNotificationBadge.style.display = 'block';
+                    claimsNotificationBadge.textContent = '!';
+                    
+                    // Show earnings card
+                    earningsCard.style.display = 'block';
+                    document.getElementById('recentEarnings').textContent = Math.floor(Math.random() * 1000) + '⭐';
+                } else {
+                    claimsNotificationBadge.style.display = 'none';
+                    earningsCard.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading claims data:', error);
+            }
+        }
+
+        // ===== LOAD RECENT CLAIMS PREVIEW =====
+        function loadClaimsPreview() {
+            try {
+                // Sample planet data for preview
+                const samplePlanets = [
+                    { name: 'Proxima B', type: 'lush', icon: '🌱', fee: 8 },
+                    { name: 'Pyros-3', type: 'scorched', icon: '🔥', fee: 10 },
+                    { name: 'Glacier Prime', type: 'frozen', icon: '❄️', fee: 8 },
+                    { name: 'Asteroid X-7', type: 'asteroid', icon: '🪐', fee: 10 }
+                ];
+                
+                // Shuffle and take first 3
+                const shuffled = samplePlanets.sort(() => 0.5 - Math.random());
+                const recent = shuffled.slice(0, 3);
+                
+                let html = '';
+                recent.forEach(planet => {
+                    html += `
+                        <div class="claim-item">
+                            <div class="claim-planet">
+                                <span class="claim-planet-icon">${planet.icon}</span>
+                                <span class="claim-planet-name">${planet.name}</span>
+                                <span class="claim-planet-type">${planet.type}</span>
+                            </div>
+                            <div class="claim-fee">${planet.fee}%</div>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('claimsPreview').innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading claims preview:', error);
+            }
+        }
+
+        // ===== NAVIGATION =====
+        function navigateTo(url) {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = url;
+            }, 300);
+        }
+
+        function returnToEarthHub() {
+            safeHaptic();
+            navigateTo('earth-hub.html');
+        }
+
+        // ===== SAFE HAPTIC =====
+        function safeHaptic() {
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
+        }
+
+        // ===== INITIALIZE =====
+        function init() {
+            loadCredits();
+            loadLocation();
+            loadClaimsData();
+            loadClaimsPreview();
+        }
+
+        init();
+    </script>
+</body>
+</html>
