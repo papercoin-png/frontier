@@ -1131,6 +1131,85 @@ function setAmbientVolume(volume) {
 // EXPORTS
 // ============================================================================
 
+// Named exports - ADDED getElementMass here!
+export {
+    // Constants
+    STORAGE_KEYS,
+    ELEMENT_MASS,
+    
+    // Player
+    getPlayer,
+    savePlayer,
+    createDefaultPlayer,
+    getPlayerId,
+    
+    // Field progression
+    getFieldProgress,
+    saveFieldProgress,
+    updateFieldProgress,
+    
+    // Recipe unlocks
+    getUnlockedRecipes,
+    saveUnlockedRecipes,
+    unlockRecipe,
+    isRecipeUnlocked,
+    
+    // Field mastery
+    getFieldMastery,
+    saveFieldMastery,
+    updateFieldMastery,
+    
+    // Cargo
+    getTotalCargoMass,
+    getRemainingCargoMass,
+    getElementMass,  // <-- THIS WAS MISSING! Now added.
+    
+    // Credits
+    getCredits,
+    saveCredits,
+    addCredits,
+    spendCredits,
+    
+    // Location
+    isAtEarth,
+    getCurrentPlanetName,
+    getCurrentPlanetType,
+    getCurrentPlanetResources,
+    getCurrentSector,
+    getCurrentRegion,
+    setCurrentLocation,
+    setCurrentPlanet,
+    
+    // Ship
+    getShipFuel,
+    saveShipFuel,
+    getShipPower,
+    saveShipPower,
+    
+    // Warp
+    setWarpData,
+    getWarpData,
+    clearWarpData,
+    
+    // Settings
+    getHapticsEnabled,
+    setHapticsEnabled,
+    getAutoGatherEnabled,
+    setAutoGatherEnabled,
+    getOrbitSpeed,
+    setOrbitSpeed,
+    getMusicVolume,
+    setMusicVolume,
+    getAmbientVolume,
+    setAmbientVolume,
+    
+    // System
+    initializeStorage,
+    resetGame,
+    saveTimestamp
+};
+
+// Also keep the default export for backward compatibility
 export default {
     // Constants
     STORAGE_KEYS,
@@ -1142,18 +1221,18 @@ export default {
     createDefaultPlayer,
     getPlayerId,
     
-    // Field progression (NEW)
+    // Field progression
     getFieldProgress,
     saveFieldProgress,
     updateFieldProgress,
     
-    // Recipe unlocks (NEW)
+    // Recipe unlocks
     getUnlockedRecipes,
     saveUnlockedRecipes,
     unlockRecipe,
     isRecipeUnlocked,
     
-    // Field mastery (NEW)
+    // Field mastery
     getFieldMastery,
     saveFieldMastery,
     updateFieldMastery,
