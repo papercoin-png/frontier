@@ -7,11 +7,27 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/university.css">
+    <link rel="stylesheet" href="css/crafting.css">
     
     <style>
-        /* Additional styles not covered in university.css */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
         .phone-frame {
             width: 100%;
             max-width: 390px;
@@ -21,7 +37,6 @@
             border-radius: 40px;
             box-shadow: 0 30px 60px rgba(0,0,0,0.5);
             background: #0a0a1a;
-            margin: 0 auto;
         }
         
         .university-view {
@@ -36,69 +51,7 @@
             -webkit-overflow-scrolling: touch;
         }
         
-        .back-button {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
-            border: 3px solid #ffaa4a;
-            color: #ffffff;
-            padding: 18px 35px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            width: fit-content;
-            min-width: 280px;
-            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            letter-spacing: 1px;
-            margin: 0;
-            animation: subtle-pulse 3s infinite;
-        }
-        
-        @keyframes subtle-pulse {
-            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
-            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-        }
-        
-        .back-button:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #3a5a8a;
-        }
-        
-        .back-arrow {
-            font-size: 28px;
-            color: #ffd966;
-            font-weight: bold;
-        }
-        
-        .back-icon {
-            font-size: 24px;
-            filter: drop-shadow(0 0 5px #ffaa4a);
-        }
-        
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
-            display: none;
-        }
-        
+        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -150,6 +103,613 @@
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
         }
+        
+        /* Header */
+        .university-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .university-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #ffd966;
+            text-shadow: 0 0 20px #ffd966, 0 0 40px #ccaa33;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .university-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffd966;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .university-stats {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .university-stats span {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        /* Overall Mastery Card */
+        .overall-mastery {
+            background: linear-gradient(135deg, rgba(30, 45, 70, 0.8), rgba(50, 40, 20, 0.8));
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffd700;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .overall-mastery::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+        
+        .overall-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .overall-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .overall-title span {
+            color: #ffd700;
+            font-size: 24px;
+        }
+        
+        .overall-level {
+            color: #ffd700;
+            font-size: 20px;
+            font-weight: 700;
+            text-shadow: 0 0 10px #ffd700;
+        }
+        
+        .overall-progress {
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            border-radius: 5px;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px #ffd700;
+        }
+        
+        .overall-footer {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 12px;
+            margin-top: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .overall-multiplier {
+            color: #ffd966;
+            font-weight: 600;
+        }
+        
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            padding: 5px;
+            border: 1px solid #ffd966;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 12px 5px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #a0c0ff;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .tab-btn.active {
+            background: #ffd966;
+            color: #0a1a2a;
+            box-shadow: 0 0 15px #ffd966;
+        }
+        
+        .tab-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Field Navigation */
+        .field-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+        
+        .field-nav-btn {
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #ffd966;
+            color: #e0f0ff;
+            cursor: pointer;
+            transition: all 0.1s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .field-nav-btn.active {
+            background: #ffd966;
+            border-color: #ffd966;
+            color: #0a1a2a;
+        }
+        
+        .field-nav-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Field color classes */
+        .field-nav-btn.alchemy { border-color: #4affaa; }
+        .field-nav-btn.metallurgy { border-color: #ffaa4a; }
+        .field-nav-btn.materials { border-color: #e0b0ff; }
+        .field-nav-btn.pharma { border-color: #ff6b6b; }
+        .field-nav-btn.textiles { border-color: #ff69b4; }
+        .field-nav-btn.construction { border-color: #8a6aff; }
+        .field-nav-btn.aerospace { border-color: #4a8ac0; }
+        .field-nav-btn.nuclear { border-color: #ffd966; }
+        .field-nav-btn.optical { border-color: #b0b0ff; }
+        .field-nav-btn.magnetic { border-color: #c0a0ff; }
+        .field-nav-btn.cryogenic { border-color: #b0ffb0; }
+        .field-nav-btn.polymers { border-color: #ffd700; }
+        
+        .field-nav-btn.alchemy.active { background: #4affaa; color: #0a1a2a; }
+        .field-nav-btn.metallurgy.active { background: #ffaa4a; color: #0a1a2a; }
+        .field-nav-btn.materials.active { background: #e0b0ff; color: #0a1a2a; }
+        .field-nav-btn.pharma.active { background: #ff6b6b; color: #0a1a2a; }
+        .field-nav-btn.textiles.active { background: #ff69b4; color: #0a1a2a; }
+        .field-nav-btn.construction.active { background: #8a6aff; color: #0a1a2a; }
+        .field-nav-btn.aerospace.active { background: #4a8ac0; color: #0a1a2a; }
+        .field-nav-btn.nuclear.active { background: #ffd966; color: #0a1a2a; }
+        .field-nav-btn.optical.active { background: #b0b0ff; color: #0a1a2a; }
+        .field-nav-btn.magnetic.active { background: #c0a0ff; color: #0a1a2a; }
+        .field-nav-btn.cryogenic.active { background: #b0ffb0; color: #0a1a2a; }
+        .field-nav-btn.polymers.active { background: #ffd700; color: #0a1a2a; }
+        
+        /* Field Mastery Card */
+        .field-mastery-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 40px 15px 40px 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .field-mastery-card.alchemy { border-color: #4affaa; }
+        .field-mastery-card.metallurgy { border-color: #ffaa4a; }
+        .field-mastery-card.materials { border-color: #e0b0ff; }
+        .field-mastery-card.pharma { border-color: #ff6b6b; }
+        .field-mastery-card.textiles { border-color: #ff69b4; }
+        .field-mastery-card.construction { border-color: #8a6aff; }
+        .field-mastery-card.aerospace { border-color: #4a8ac0; }
+        .field-mastery-card.nuclear { border-color: #ffd966; }
+        .field-mastery-card.optical { border-color: #b0b0ff; }
+        .field-mastery-card.magnetic { border-color: #c0a0ff; }
+        .field-mastery-card.cryogenic { border-color: #b0ffb0; }
+        .field-mastery-card.polymers { border-color: #ffd700; }
+        
+        .field-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .field-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .field-icon {
+            font-size: 28px;
+        }
+        
+        .field-level {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .field-progress {
+            margin-bottom: 15px;
+        }
+        
+        .field-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 5px;
+        }
+        
+        .field-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, currentColor, #ffffff);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .field-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .field-stat {
+            text-align: center;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px;
+        }
+        
+        .field-stat-label {
+            color: #a0c0ff;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+        
+        .field-stat-value {
+            color: #ffd966;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .field-stat-value.small {
+            font-size: 12px;
+        }
+        
+        /* Milestones Grid */
+        .milestones-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .milestone-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .milestone-card.achieved {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+        
+        .milestone-card.pending {
+            border-color: #6a8ac0;
+            opacity: 0.7;
+        }
+        
+        .milestone-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .milestone-name {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        
+        .milestone-threshold {
+            color: #a0c0ff;
+            font-size: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .milestone-progress {
+            height: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .milestone-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffd966, #ffd700);
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+        
+        .milestone-progress-fill.achieved {
+            width: 100%;
+        }
+        
+        /* Research Tree */
+        .research-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .research-tier {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffd966;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+        }
+        
+        .tier-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .tier-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffd966;
+        }
+        
+        .tier-progress {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        .research-items {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .research-item {
+            background: rgba(0,0,0,0.3);
+            border: 2px solid;
+            border-radius: 30px 8px 30px 8px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .research-item:active {
+            transform: scale(0.97);
+        }
+        
+        .research-item.unlocked {
+            border-color: #4affaa;
+            opacity: 0.8;
+        }
+        
+        .research-item.available {
+            border-color: #ffaa4a;
+        }
+        
+        .research-item.locked {
+            border-color: #6a8ac0;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .research-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .research-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        
+        .research-desc {
+            font-size: 9px;
+            color: #a0c0ff;
+            margin-bottom: 5px;
+        }
+        
+        .research-unlock {
+            font-size: 9px;
+            color: #ffd966;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 5px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .research-unlock.achieved {
+            color: #4affaa;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #ffd966;
+            font-style: italic;
+        }
+        
+        /* Migration status (debug) */
+        .migration-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: #a0c0ff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -157,164 +717,60 @@
         <div class="university-view" id="universityView">
             <!-- Header -->
             <div class="university-header">
-                <div class="university-title">University of Alchemy</div>
-                <div class="university-subtitle">✦ knowledge is power ✦</div>
+                <div class="university-title">🎓 University</div>
+                <div class="university-subtitle">✦ knowledge & mastery ✦</div>
             </div>
             
             <!-- Stats Bar -->
-            <div class="university-stats-bar">
-                <div class="credits-display" id="creditsDisplay">
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
-                <div class="stats-display">
-                    <span>Donated: <span class="stat-highlight" id="totalDonated">0</span></span>
-                    <span>Mastery: <span class="stat-highlight" id="masteryLevel">Untrained</span></span>
+                <div class="university-stats" id="universityStats">
+                    Total Crafts: <span id="totalCrafts">0</span>
                 </div>
             </div>
             
-            <!-- Hall of Fame Banner -->
-            <div class="hall-of-fame-banner" onclick="window.scrollToHall()">
-                <div class="hall-icon">🏆</div>
-                <div class="hall-content">
-                    <div class="hall-title">Hall of Fame</div>
-                    <div class="hall-description">View the greatest alchemists in history</div>
+            <!-- Overall Mastery Card -->
+            <div class="overall-mastery" id="overallMastery">
+                <div class="overall-header">
+                    <div class="overall-title">
+                        <span>✨</span> Overall Mastery
+                    </div>
+                    <div class="overall-level" id="overallLevel">Untrained</div>
                 </div>
-                <div class="hall-arrow">→</div>
+                <div class="overall-progress">
+                    <div class="progress-header">
+                        <span>Progress to next level</span>
+                        <span id="overallProgressText">0/0</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="overallProgressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="overall-footer">
+                    <span>Global Labor Multiplier</span>
+                    <span class="overall-multiplier" id="overallMultiplier">1.0x</span>
+                </div>
             </div>
             
-            <!-- Tab Navigation -->
-            <div class="university-tabs">
-                <button class="university-tab active" onclick="window.switchTab('mastery')">MASTERY</button>
-                <button class="university-tab" onclick="window.switchTab('skills')">SKILL TREE</button>
-                <button class="university-tab" onclick="window.switchTab('history')">HISTORY</button>
-                <button class="university-tab" onclick="window.switchTab('hall')">HALL OF FAME</button>
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <button class="tab-btn active" id="masteryTab" onclick="window.switchTab('mastery')">📊 MASTERY</button>
+                <button class="tab-btn" id="milestonesTab" onclick="window.switchTab('milestones')">🏆 MILESTONES</button>
+                <button class="tab-btn" id="researchTab" onclick="window.switchTab('research')">🔬 RESEARCH</button>
+            </div>
+            
+            <!-- Field Navigation (Mastery Tab) -->
+            <div class="field-nav" id="fieldNav">
+                <!-- Filled by JavaScript -->
             </div>
             
             <!-- Content Container -->
             <div id="contentContainer">
                 <!-- Mastery Tab Content (default) -->
-                <div id="masteryContent">
-                    <!-- Mastery Overview Card -->
-                    <div class="mastery-overview-card">
-                        <div class="overview-header">
-                            <div class="overview-title">
-                                <span>🎓</span> Your Mastery
-                            </div>
-                            <div class="overview-level" id="overviewMasteryLevel">Untrained</div>
-                        </div>
-                        
-                        <div class="overview-grid">
-                            <div class="overview-stat">
-                                <div class="overview-stat-value" id="totalCrafts">0</div>
-                                <div class="overview-stat-label">Total Crafts</div>
-                            </div>
-                            <div class="overview-stat">
-                                <div class="overview-stat-value" id="uniqueRecipes">0</div>
-                                <div class="overview-stat-label">Recipes Mastered</div>
-                            </div>
-                            <div class="overview-stat">
-                                <div class="overview-stat-value" id="laborMultiplier">1.0x</div>
-                                <div class="overview-stat-label">Labor Multiplier</div>
-                            </div>
-                            <div class="overview-stat">
-                                <div class="overview-stat-value" id="skillCategories">0</div>
-                                <div class="overview-stat-label">Skill Categories</div>
-                            </div>
-                        </div>
-                        
-                        <div class="overview-progress">
-                            <div class="overview-progress-bar">
-                                <div class="overview-progress-fill" id="masteryProgressFill" style="width: 0%"></div>
-                            </div>
-                            <div class="overview-next-level">
-                                <span id="nextLevelText">Progress to Novice</span>
-                                <span id="nextLevelProgress">0/100</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Category Navigation -->
-                    <div class="university-category-nav" id="categoryNav">
-                        <!-- Filled by JavaScript -->
-                    </div>
-                    
-                    <!-- Category Cards -->
-                    <div id="categoryCards">
-                        <!-- Filled by JavaScript -->
-                    </div>
-                </div>
-                
-                <!-- Skills Tab Content (hidden by default) -->
-                <div id="skillsContent" style="display: none;">
-                    <div class="skill-tree-container">
-                        <div class="skill-tree-title">
-                            <span>🌳</span> Alchemy Skill Tree
-                        </div>
-                        <div id="skillTreeVisualization">
-                            <!-- Filled by JavaScript -->
-                            <div class="university-empty-state">Loading skill tree...</div>
-                        </div>
-                    </div>
-                    
-                    <div class="next-level-card">
-                        <div class="next-level-header">
-                            <span class="next-level-title">Next Milestone</span>
-                            <span class="next-level-badge" id="nextMilestone">Novice</span>
-                        </div>
-                        <div class="next-level-progress">
-                            <div class="next-level-bar">
-                                <div class="next-level-fill" id="nextMilestoneFill" style="width: 0%"></div>
-                            </div>
-                            <div class="next-level-stats">
-                                <span id="nextMilestoneCurrent">0</span>
-                                <span id="nextMilestoneTarget">100</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- History Tab Content (hidden by default) -->
-                <div id="historyContent" style="display: none;">
-                    <div class="donation-history">
-                        <div class="history-filters">
-                            <button class="history-filter-btn active" onclick="window.filterHistory('all')">ALL</button>
-                            <button class="history-filter-btn" onclick="window.filterHistory('donation')">DONATIONS</button>
-                            <button class="history-filter-btn" onclick="window.filterHistory('craft')">CRAFTS</button>
-                            <button class="history-filter-btn" onclick="window.filterHistory('milestone')">MILESTONES</button>
-                        </div>
-                        
-                        <div class="history-list" id="historyList">
-                            <!-- Filled by JavaScript -->
-                            <div class="university-empty-state">No history yet. Start crafting!</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Hall of Fame Tab Content (hidden by default) -->
-                <div id="hallContent" style="display: none;">
-                    <div class="hall-of-fame">
-                        <div class="hall-category">
-                            <div class="hall-category-title">🏆 Top Crafters</div>
-                            <div class="hall-entries" id="topCrafters">
-                                <!-- Filled by JavaScript -->
-                                <div class="university-empty-state">Loading Hall of Fame...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="hall-category">
-                            <div class="hall-category-title">⚗️ Master Alchemists</div>
-                            <div class="hall-entries" id="masterAlchemists">
-                                <!-- Filled by JavaScript -->
-                            </div>
-                        </div>
-                        
-                        <div class="hall-category">
-                            <div class="hall-category-title">🔬 Legendary Discoveries</div>
-                            <div class="hall-entries" id="legendaryDiscoveries">
-                                <!-- Filled by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
+                <div id="fieldMasteryContainer">
+                    <!-- Filled by JavaScript -->
                 </div>
             </div>
             
@@ -337,15 +793,32 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
-    <script src="js/alchemy.js"></script>
-    <script src="js/skill-tree.js"></script>
-    <script src="js/skill-multipliers.js"></script>
-    <script src="js/ui-helpers.js"></script>
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage/storage.js"></script>
+    <script type="module" src="js/storage/inventory.js"></script>
+    <script type="module" src="js/storage/progression.js"></script>
+    <script type="module" src="js/crafting/recipe-index.js"></script>
+    <script type="module" src="js/crafting/crafting-core.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
-    <script>
+    <script type="module">
+        import { 
+            MASTERY_LEVELS, 
+            FIELDS,
+            getTotalFieldProgress,
+            getAllFieldMastery,
+            getProgressToNextLevel,
+            getTotalCrafts,
+            getOverallMastery,
+            getMilestones,
+            getProgressionReport
+        } from './js/storage/progression.js';
+        
+        import { 
+            getCredits,
+            getPlayer
+        } from './js/storage/storage.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -357,439 +830,70 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const contentContainer = document.getElementById('contentContainer');
-        const masteryContent = document.getElementById('masteryContent');
-        const skillsContent = document.getElementById('skillsContent');
-        const historyContent = document.getElementById('historyContent');
-        const hallContent = document.getElementById('hallContent');
-        const categoryNav = document.getElementById('categoryNav');
-        const categoryCards = document.getElementById('categoryCards');
-        const skillTreeViz = document.getElementById('skillTreeVisualization');
-        const historyList = document.getElementById('historyList');
+        const fieldNav = document.getElementById('fieldNav');
+        
+        // Tab elements
+        const masteryTab = document.getElementById('masteryTab');
+        const milestonesTab = document.getElementById('milestonesTab');
+        const researchTab = document.getElementById('researchTab');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.returnToEarthHub = returnToEarthHub;
         window.switchTab = switchTab;
-        window.filterHistory = filterHistory;
-        window.scrollToHall = scrollToHall;
-        window.viewSkillDetails = viewSkillDetails;
+        window.selectField = selectField;
 
         // ===== STATE =====
-        let currentTab = 'mastery';
-        let historyFilter = 'all';
-        let alchemyProgress = {};
+        let playerId = null;
+        let playerCredits = 0;
         let totalCrafts = 0;
-        let masteryLevel = { name: 'Untrained', multiplier: 1.0 };
-        let categoryData = [];
-        let skillNodes = [];
-        let donationHistory = [];
+        let overallMastery = null;
+        let fieldMastery = {};
+        let milestones = [];
+        let progressionReport = [];
+        let currentTab = 'mastery';
+        let selectedField = 'alchemy';
 
-        // ===== LOAD UNIVERSITY DATA =====
-        async function loadUniversityData() {
-            try {
-                loadingText.textContent = 'loading university data...';
-                
-                // Get credits
-                let credits = 5000;
-                if (typeof window.getCredits === 'function') {
-                    credits = await window.getCredits();
-                }
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-                
-                // Get alchemy progress
-                if (typeof window.getAlchemyProgress === 'function') {
-                    alchemyProgress = await window.getAlchemyProgress();
-                } else {
-                    alchemyProgress = JSON.parse(localStorage.getItem('voidfarer_alchemy_progress') || '{}');
-                }
-                
-                // Calculate total crafts
-                totalCrafts = Object.values(alchemyProgress).reduce((sum, val) => sum + val, 0);
-                document.getElementById('totalDonated').textContent = totalCrafts.toLocaleString();
-                
-                // Get mastery level
-                if (typeof window.getLevelFromProgress === 'function') {
-                    masteryLevel = window.getLevelFromProgress(totalCrafts);
-                } else {
-                    masteryLevel = { name: 'Untrained', multiplier: 1.0 };
-                }
-                document.getElementById('masteryLevel').textContent = masteryLevel.name;
-                document.getElementById('overviewMasteryLevel').textContent = masteryLevel.name;
-                
-                // Update mastery stats
-                document.getElementById('totalCrafts').textContent = totalCrafts.toLocaleString();
-                document.getElementById('uniqueRecipes').textContent = Object.keys(alchemyProgress).length;
-                document.getElementById('laborMultiplier').textContent = masteryLevel.multiplier.toFixed(1) + 'x';
-                
-                // Calculate skill categories
-                const categories = new Set();
-                Object.keys(alchemyProgress).forEach(recipe => {
-                    // In a real implementation, you'd map recipe IDs to categories
-                    categories.add('Basic'); // Placeholder
-                });
-                document.getElementById('skillCategories').textContent = categories.size;
-                
-                // Calculate next level progress
-                const nextLevel = getNextLevelProgress(totalCrafts);
-                document.getElementById('masteryProgressFill').style.width = nextLevel.percentage + '%';
-                document.getElementById('nextLevelText').textContent = `Progress to ${nextLevel.nextName}`;
-                document.getElementById('nextLevelProgress').textContent = `${nextLevel.current}/${nextLevel.total}`;
-                
-                // Load category data
-                loadCategoryData();
-                
-                // Load skill tree
-                loadSkillTree();
-                
-                // Load donation history
-                loadDonationHistory();
-                
-                // Load Hall of Fame
-                loadHallOfFame();
-                
-            } catch (error) {
-                console.error('Error loading university data:', error);
-            }
-        }
+        // ===== FIELD ORDER FOR DISPLAY =====
+        const FIELD_ORDER = [
+            'alchemy', 'metallurgy', 'materials-science', 'pharmaceuticals',
+            'textiles', 'construction', 'aerospace', 'nuclear',
+            'optical', 'magnetic', 'cryogenic', 'polymers'
+        ];
 
-        // ===== GET NEXT LEVEL PROGRESS =====
-        function getNextLevelProgress(progress) {
-            const thresholds = [
-                { name: 'Untrained', threshold: 0 },
-                { name: 'Novice', threshold: 100 },
-                { name: 'Apprentice', threshold: 1000 },
-                { name: 'Journeyman', threshold: 5000 },
-                { name: 'Expert', threshold: 10000 },
-                { name: 'Master', threshold: 25000 },
-                { name: 'Grand Master', threshold: 50000 },
-                { name: 'Sage', threshold: 100000 },
-                { name: 'Legendary', threshold: 250000 },
-                { name: 'Mythic', threshold: 500000 },
-                { name: 'Transcendent', threshold: 1000000 }
-            ];
-            
-            for (let i = 0; i < thresholds.length - 1; i++) {
-                const current = thresholds[i];
-                const next = thresholds[i + 1];
-                
-                if (progress >= current.threshold && progress < next.threshold) {
-                    const currentProgress = progress - current.threshold;
-                    const totalNeeded = next.threshold - current.threshold;
-                    const percentage = (currentProgress / totalNeeded) * 100;
-                    
-                    return {
-                        currentLevel: current.name,
-                        nextName: next.name,
-                        current: currentProgress,
-                        total: totalNeeded,
-                        percentage: percentage
-                    };
-                }
-            }
-            
-            return {
-                currentLevel: 'Transcendent',
-                nextName: 'MAX',
-                current: 0,
-                total: 0,
-                percentage: 100
-            };
-        }
-
-        // ===== LOAD CATEGORY DATA =====
-        function loadCategoryData() {
-            // This would come from skill-multipliers.js in a real implementation
-            const categories = [
-                { name: 'Basic Compounds', progress: 450, target: 1000, icon: '💧', color: 'default' },
-                { name: 'Acids & Bases', progress: 320, target: 800, icon: '🧪', color: 'uncommon' },
-                { name: 'Salts & Minerals', progress: 280, target: 600, icon: '🧂', color: 'uncommon' },
-                { name: 'Hydrocarbons', progress: 150, target: 500, icon: '🔥', color: 'rare' },
-                { name: 'Alcohols', progress: 120, target: 500, icon: '🍶', color: 'rare' },
-                { name: 'Polymers', progress: 50, target: 1000, icon: '🧴', color: 'very-rare' },
-                { name: 'Basic Alloys', progress: 30, target: 2000, icon: '⚙️', color: 'very-rare' }
-            ];
-            
-            // Build category navigation
-            let navHtml = '';
-            categories.forEach(cat => {
-                navHtml += `<button class="university-category-btn" onclick="window.viewSkillDetails('${cat.name}')">${cat.icon} ${cat.name}</button>`;
-            });
-            categoryNav.innerHTML = navHtml;
-            
-            // Build category cards
-            let cardsHtml = '';
-            categories.forEach(cat => {
-                const percent = (cat.progress / cat.target) * 100;
-                cardsHtml += `
-                    <div class="university-category-card">
-                        <div class="category-card-header" onclick="window.toggleCategory('${cat.name}')">
-                            <div class="category-card-title">
-                                <span class="category-card-icon">${cat.icon}</span>
-                                <span class="category-card-name">${cat.name}</span>
-                            </div>
-                            <div class="category-card-stats">${Math.round(percent)}%</div>
-                            <div class="category-card-arrow">▶</div>
-                        </div>
-                        <div class="category-card-progress">
-                            <div class="category-progress-bar">
-                                <div class="category-progress-fill" style="width: ${percent}%"></div>
-                            </div>
-                            <div class="category-progress-text">
-                                <span>${cat.progress}</span>
-                                <span class="category-progress-value">/${cat.target}</span>
-                            </div>
-                        </div>
-                        <div class="skill-list" id="skillList-${cat.name.replace(/\s+/g, '')}" style="display: none;">
-                            <!-- Skills would be listed here -->
-                        </div>
-                    </div>
-                `;
-            });
-            categoryCards.innerHTML = cardsHtml;
-        }
-
-        // ===== LOAD SKILL TREE =====
-        function loadSkillTree() {
-            // This would come from skill-tree.js in a real implementation
-            const nodes = [
-                { id: 'water', name: 'Water', tier: 1, icon: '💧', progress: 450, target: 1000 },
-                { id: 'methane', name: 'Methane', tier: 1, icon: '🔥', progress: 380, target: 1000 },
-                { id: 'ammonia', name: 'Ammonia', tier: 1, icon: '⚗️', progress: 420, target: 1000 },
-                { id: 'sulfuric_acid', name: 'Sulfuric Acid', tier: 2, icon: '🧪', progress: 120, target: 500 },
-                { id: 'nitric_acid', name: 'Nitric Acid', tier: 2, icon: '🧪', progress: 90, target: 500 }
-            ];
-            
-            let treeHtml = '<div class="skill-tree-grid">';
-            nodes.forEach(node => {
-                const percent = (node.progress / node.target) * 100;
-                const unlocked = node.progress > 0;
-                const current = node.progress >= node.target;
-                
-                treeHtml += `
-                    <div class="skill-tree-node ${unlocked ? 'unlocked' : 'locked'} ${current ? 'current' : ''}" data-id="${node.id}">
-                        <div class="skill-tree-node-header">
-                            <span class="skill-tree-node-icon">${node.icon}</span>
-                            <span class="skill-tree-node-name">${node.name}</span>
-                            <span class="skill-tree-node-level">Tier ${node.tier}</span>
-                        </div>
-                        <div class="skill-tree-node-progress">
-                            <div class="skill-tree-progress-bar">
-                                <div class="skill-tree-progress-fill" style="width: ${percent}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            treeHtml += '</div>';
-            
-            skillTreeViz.innerHTML = treeHtml;
-            
-            // Update next milestone
-            const next = getNextLevelProgress(totalCrafts);
-            document.getElementById('nextMilestone').textContent = next.nextName;
-            document.getElementById('nextMilestoneFill').style.width = next.percentage + '%';
-            document.getElementById('nextMilestoneCurrent').textContent = next.current;
-            document.getElementById('nextMilestoneTarget').textContent = next.total;
-        }
-
-        // ===== LOAD DONATION HISTORY =====
-        function loadDonationHistory() {
-            // Simulated history data
-            donationHistory = [
-                { type: 'donation', item: 'Water', quantity: 10, date: new Date(Date.now() - 86400000).toISOString() },
-                { type: 'donation', item: 'Methane', quantity: 5, date: new Date(Date.now() - 172800000).toISOString() },
-                { type: 'craft', item: 'Water', quantity: 1, date: new Date(Date.now() - 259200000).toISOString() },
-                { type: 'milestone', item: 'Novice', description: 'Reached Novice level', date: new Date(Date.now() - 604800000).toISOString() }
-            ];
-            
-            filterHistory('all');
-        }
-
-        // ===== FILTER HISTORY =====
-        function filterHistory(filter) {
-            historyFilter = filter;
-            
-            // Update active button
-            document.querySelectorAll('.history-filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            let filtered = donationHistory;
-            if (filter !== 'all') {
-                filtered = donationHistory.filter(h => h.type === filter);
-            }
-            
-            if (filtered.length === 0) {
-                historyList.innerHTML = '<div class="university-empty-state">No history entries found</div>';
-                return;
-            }
-            
-            let html = '';
-            filtered.forEach(entry => {
-                const date = new Date(entry.date).toLocaleDateString();
-                const icon = entry.type === 'donation' ? '📦' : entry.type === 'craft' ? '⚗️' : '🏆';
-                
-                html += `
-                    <div class="history-entry">
-                        <div class="history-icon">${icon}</div>
-                        <div class="history-content">
-                            <div class="history-item-name">${entry.item || entry.description}</div>
-                            <div class="history-date">${date}</div>
-                        </div>
-                        <div class="history-quantity">${entry.quantity ? '+' + entry.quantity : ''}</div>
-                    </div>
-                `;
-            });
-            
-            historyList.innerHTML = html;
-        }
-
-        // ===== LOAD HALL OF FAME =====
-        function loadHallOfFame() {
-            // Simulated Hall of Fame data
-            const topCrafters = [
-                { name: 'Alex', crafts: 15420, title: 'Grand Master' },
-                { name: 'Jamie', crafts: 12350, title: 'Master' },
-                { name: 'Taylor', crafts: 10890, title: 'Master' },
-                { name: 'Jordan', crafts: 9540, title: 'Expert' },
-                { name: 'Casey', crafts: 8320, title: 'Expert' }
-            ];
-            
-            const masterAlchemists = [
-                { name: 'Morgan', title: 'Transcendent', achievement: 'First to craft Room Temp Superconductor' },
-                { name: 'Riley', title: 'Mythic', achievement: 'Mastered all Tier 8 recipes' },
-                { name: 'Quinn', title: 'Legendary', achievement: '100,000 total crafts' }
-            ];
-            
-            const discoveries = [
-                { name: 'Sam', discovery: 'Room Temperature Superconductor', date: '2345.03.15' },
-                { name: 'Casey', discovery: 'Graphene Synthesis', date: '2345.02.28' },
-                { name: 'Taylor', discovery: 'Antimatter Containment', date: '2345.01.07' }
-            ];
-            
-            let craftersHtml = '';
-            topCrafters.forEach((crafter, index) => {
-                craftersHtml += `
-                    <div class="hall-entry">
-                        <div class="hall-rank">#${index + 1}</div>
-                        <div class="hall-avatar">👤</div>
-                        <div class="hall-info">
-                            <div class="hall-player-name">${crafter.name}</div>
-                            <div class="hall-player-title">${crafter.title}</div>
-                        </div>
-                        <div class="hall-value">${crafter.crafts.toLocaleString()}</div>
-                    </div>
-                `;
-            });
-            document.getElementById('topCrafters').innerHTML = craftersHtml;
-            
-            let mastersHtml = '';
-            masterAlchemists.forEach(master => {
-                mastersHtml += `
-                    <div class="hall-entry">
-                        <div class="hall-avatar">👑</div>
-                        <div class="hall-info">
-                            <div class="hall-player-name">${master.name}</div>
-                            <div class="hall-player-title">${master.title}</div>
-                            <div style="font-size: 11px; color: #a0c0ff;">${master.achievement}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            document.getElementById('masterAlchemists').innerHTML = mastersHtml;
-            
-            let discoveriesHtml = '';
-            discoveries.forEach(d => {
-                discoveriesHtml += `
-                    <div class="hall-entry">
-                        <div class="hall-avatar">🔬</div>
-                        <div class="hall-info">
-                            <div class="hall-player-name">${d.name}</div>
-                            <div class="hall-player-title">${d.discovery}</div>
-                            <div style="font-size: 11px; color: #a0c0ff;">${d.date}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            document.getElementById('legendaryDiscoveries').innerHTML = discoveriesHtml;
-        }
-
-        // ===== SWITCH TAB =====
-        function switchTab(tab) {
-            currentTab = tab;
-            
-            // Update tab buttons
-            document.querySelectorAll('.university-tab').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Show corresponding content
-            masteryContent.style.display = 'none';
-            skillsContent.style.display = 'none';
-            historyContent.style.display = 'none';
-            hallContent.style.display = 'none';
-            
-            switch(tab) {
-                case 'mastery':
-                    masteryContent.style.display = 'block';
-                    break;
-                case 'skills':
-                    skillsContent.style.display = 'block';
-                    break;
-                case 'history':
-                    historyContent.style.display = 'block';
-                    break;
-                case 'hall':
-                    hallContent.style.display = 'block';
-                    break;
-            }
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-
-        // ===== TOGGLE CATEGORY =====
-        window.toggleCategory = function(categoryName) {
-            const card = event.target.closest('.university-category-card');
-            const arrow = card.querySelector('.category-card-arrow');
-            const skillList = document.getElementById(`skillList-${categoryName.replace(/\s+/g, '')}`);
-            
-            if (skillList.style.display === 'none') {
-                skillList.style.display = 'block';
-                arrow.classList.add('expanded');
-            } else {
-                skillList.style.display = 'none';
-                arrow.classList.remove('expanded');
-            }
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        // ===== FIELD COLORS =====
+        const FIELD_COLORS = {
+            'alchemy': '#4affaa',
+            'metallurgy': '#ffaa4a',
+            'materials-science': '#e0b0ff',
+            'pharmaceuticals': '#ff6b6b',
+            'textiles': '#ff69b4',
+            'construction': '#8a6aff',
+            'aerospace': '#4a8ac0',
+            'nuclear': '#ffd966',
+            'optical': '#b0b0ff',
+            'magnetic': '#c0a0ff',
+            'cryogenic': '#b0ffb0',
+            'polymers': '#ffd700'
         };
 
-        // ===== VIEW SKILL DETAILS =====
-        function viewSkillDetails(skillName) {
-            // Navigate to alchemy lab with skill filter
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = `alchemy-lab.html?skill=${encodeURIComponent(skillName)}`;
-        }
-
-        // ===== SCROLL TO HALL =====
-        function scrollToHall() {
-            switchTab('hall');
-        }
-
-        // ===== NAVIGATION =====
-        function returnToEarthHub() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'earth-hub.html';
-        }
-
-        // ===== INITIALIZE =====
+        // ===== INITIALIZATION =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
-                loadingText.textContent = 'opening university...';
+                loadingText.textContent = 'loading university...';
                 
-                await loadUniversityData();
+                // Get player ID
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                
+                // Load player data
+                await loadPlayerData();
+                
+                // Load progression data
+                await loadProgressionData();
+                
+                // Render initial view
+                renderFieldNav();
+                renderMasteryTab();
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -802,6 +906,356 @@
                     loadingOverlay.classList.remove('active');
                 }, 2000);
             }
+        }
+
+        // ===== LOAD PLAYER DATA =====
+        async function loadPlayerData() {
+            try {
+                // Get credits
+                playerCredits = await getCredits(playerId);
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                
+            } catch (error) {
+                console.error('Error loading player data:', error);
+            }
+        }
+
+        // ===== LOAD PROGRESSION DATA =====
+        async function loadProgressionData() {
+            try {
+                // Get total crafts
+                totalCrafts = await getTotalCrafts(playerId);
+                document.getElementById('totalCrafts').textContent = totalCrafts;
+                
+                // Get overall mastery
+                overallMastery = await getOverallMastery(playerId);
+                updateOverallMastery();
+                
+                // Get field mastery
+                fieldMastery = await getAllFieldMastery(playerId);
+                
+                // Get milestones
+                milestones = await getMilestones(playerId);
+                
+                // Get progression report
+                progressionReport = await getProgressionReport(playerId);
+                
+            } catch (error) {
+                console.error('Error loading progression data:', error);
+            }
+        }
+
+        // ===== UPDATE OVERALL MASTERY DISPLAY =====
+        function updateOverallMastery() {
+            const progress = getProgressToNextLevel(totalCrafts);
+            
+            document.getElementById('overallLevel').textContent = progress.currentLevel;
+            document.getElementById('overallMultiplier').textContent = progress.currentMultiplier.toFixed(1) + 'x';
+            
+            if (progress.nextLevel) {
+                document.getElementById('overallProgressText').textContent = 
+                    `${progress.progress}/${progress.totalNeeded}`;
+                document.getElementById('overallProgressFill').style.width = `${progress.percentage}%`;
+            } else {
+                document.getElementById('overallProgressText').textContent = 'MAX';
+                document.getElementById('overallProgressFill').style.width = '100%';
+            }
+        }
+
+        // ===== RENDER FIELD NAVIGATION =====
+        function renderFieldNav() {
+            let html = '';
+            
+            for (const fieldId of FIELD_ORDER) {
+                const field = FIELDS[fieldId];
+                if (!field) continue;
+                
+                const mastery = fieldMastery[fieldId] || { name: 'Untrained', progress: 0 };
+                const isActive = selectedField === fieldId;
+                
+                html += `
+                    <button class="field-nav-btn ${fieldId} ${isActive ? 'active' : ''}" 
+                            onclick="window.selectField('${fieldId}')">
+                        <span>${field.icon}</span>
+                        <span>${field.name}</span>
+                    </button>
+                `;
+            }
+            
+            fieldNav.innerHTML = html;
+        }
+
+        // ===== SELECT FIELD =====
+        function selectField(fieldId) {
+            selectedField = fieldId;
+            
+            // Update active button
+            document.querySelectorAll('.field-nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Re-render mastery tab
+            if (currentTab === 'mastery') {
+                renderMasteryTab();
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== SWITCH TAB =====
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            masteryTab.classList.remove('active');
+            milestonesTab.classList.remove('active');
+            researchTab.classList.remove('active');
+            
+            if (tab === 'mastery') {
+                masteryTab.classList.add('active');
+                renderMasteryTab();
+            } else if (tab === 'milestones') {
+                milestonesTab.classList.add('active');
+                renderMilestonesTab();
+            } else if (tab === 'research') {
+                researchTab.classList.add('active');
+                renderResearchTab();
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ===== RENDER MASTERY TAB =====
+        function renderMasteryTab() {
+            const field = FIELDS[selectedField];
+            if (!field) return;
+            
+            const mastery = fieldMastery[selectedField] || { 
+                name: 'Untrained', 
+                multiplier: 1.0, 
+                progress: 0 
+            };
+            
+            const progress = getProgressToNextLevel(mastery.progress);
+            
+            // Find field in progression report
+            const report = progressionReport.find(r => r.field === selectedField) || {
+                totalProgress: 0,
+                mastery: 'Untrained',
+                multiplier: 1.0,
+                progressToNext: 0,
+                progressCurrent: 0,
+                progressTotal: 0
+            };
+            
+            const color = FIELD_COLORS[selectedField] || '#ffffff';
+            
+            let html = `
+                <div class="field-mastery-card ${selectedField}">
+                    <div class="field-header">
+                        <div class="field-title">
+                            <span class="field-icon">${field.icon}</span>
+                            <span>${field.name}</span>
+                        </div>
+                        <div class="field-level" style="color: ${color}">${mastery.name}</div>
+                    </div>
+                    
+                    <div class="field-progress">
+                        <div class="progress-header">
+                            <span>Progress to next level</span>
+                            <span>${progress.nextLevel ? progress.progress + '/' + progress.totalNeeded : 'MAX'}</span>
+                        </div>
+                        <div class="field-progress-bar">
+                            <div class="field-progress-fill" style="width: ${progress.percentage}%; background-color: ${color}"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="field-stats">
+                        <div class="field-stat">
+                            <div class="field-stat-label">Total Crafts</div>
+                            <div class="field-stat-value">${report.totalProgress}</div>
+                        </div>
+                        <div class="field-stat">
+                            <div class="field-stat-label">Mastery Multiplier</div>
+                            <div class="field-stat-value">${mastery.multiplier.toFixed(1)}x</div>
+                        </div>
+                        <div class="field-stat">
+                            <div class="field-stat-label">Labor Share</div>
+                            <div class="field-stat-value">+${Math.round((mastery.multiplier - 1) * 100)}%</div>
+                        </div>
+                        <div class="field-stat">
+                            <div class="field-stat-label">Next Level</div>
+                            <div class="field-stat-value small">${progress.nextLevel || 'MAX'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add field description
+            html += `
+                <div style="background: rgba(30,45,70,0.4); border-radius: 30px; padding: 15px; margin-bottom: 20px;">
+                    <div style="color: #a0c0ff; font-size: 12px; margin-bottom: 5px;">About this field</div>
+                    <div style="color: #ffffff; font-size: 14px;">${field.description}</div>
+                </div>
+            `;
+            
+            // Add quick stats for all fields
+            html += `
+                <div style="background: rgba(30,45,70,0.4); border-radius: 30px; padding: 15px;">
+                    <div style="color: #a0c0ff; font-size: 12px; margin-bottom: 10px;">All Fields Overview</div>
+            `;
+            
+            for (const fieldId of FIELD_ORDER) {
+                const f = FIELDS[fieldId];
+                if (!f) continue;
+                
+                const m = fieldMastery[fieldId] || { name: 'Untrained', progress: 0 };
+                const r = progressionReport.find(r => r.field === fieldId) || { totalProgress: 0 };
+                
+                html += `
+                    <div style="display: flex; justify-content: space-between; margin: 8px 0; font-size: 12px;">
+                        <span style="display: flex; align-items: center; gap: 5px;">
+                            <span>${f.icon}</span>
+                            <span style="color: #ffffff;">${f.name}</span>
+                        </span>
+                        <span>
+                            <span style="color: #ffd966;">${r.totalProgress}</span>
+                            <span style="color: #a0c0ff; margin-left: 5px;">(${m.name})</span>
+                        </span>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            
+            contentContainer.innerHTML = html;
+        }
+
+        // ===== RENDER MILESTONES TAB =====
+        function renderMilestonesTab() {
+            let html = '<div class="milestones-grid">';
+            
+            milestones.forEach(milestone => {
+                const achievedClass = milestone.achieved ? 'achieved' : 'pending';
+                const progressWidth = milestone.achieved ? 100 : (milestone.progress || 0);
+                
+                html += `
+                    <div class="milestone-card ${achievedClass}">
+                        <div class="milestone-icon">${milestone.icon}</div>
+                        <div class="milestone-name">${milestone.name}</div>
+                        <div class="milestone-threshold">${milestone.threshold.toLocaleString()} crafts</div>
+                        <div class="milestone-progress">
+                            <div class="milestone-progress-fill ${milestone.achieved ? 'achieved' : ''}" 
+                                 style="width: ${progressWidth}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            if (milestones.length === 0) {
+                html = '<div class="empty-state">No milestones achieved yet</div>';
+            }
+            
+            contentContainer.innerHTML = html;
+        }
+
+        // ===== RENDER RESEARCH TAB =====
+        function renderResearchTab() {
+            // Group fields by tier
+            const tiers = {
+                1: [],
+                2: [],
+                3: [],
+                4: [],
+                5: []
+            };
+            
+            // Simulate research items (in real implementation, this would come from a research database)
+            const researchItems = [
+                { id: 'basic_compounds', name: 'Basic Compounds', field: 'alchemy', tier: 1, icon: '⚗️', desc: 'Unlock basic alchemy recipes', crafts: 0 },
+                { id: 'ore_processing', name: 'Ore Processing', field: 'metallurgy', tier: 1, icon: '⛏️', desc: 'Unlock ore smelting', crafts: 0 },
+                { id: 'clay_processing', name: 'Clay Processing', field: 'materials', tier: 1, icon: '🧱', desc: 'Unlock ceramics', crafts: 0 },
+                { id: 'pain_relievers', name: 'Pain Relievers', field: 'pharma', tier: 1, icon: '💊', desc: 'Unlock basic medicines', crafts: 0 },
+                { id: 'plant_fibers', name: 'Plant Fibers', field: 'textiles', tier: 1, icon: '🌿', desc: 'Unlock natural fibers', crafts: 0 },
+                { id: 'masonry', name: 'Masonry', field: 'construction', tier: 1, icon: '🧱', desc: 'Unlock stone and brick', crafts: 0 },
+                
+                { id: 'alloys', name: 'Alloys', field: 'metallurgy', tier: 2, icon: '🔨', desc: 'Unlock bronze and brass', crafts: 100 },
+                { id: 'glassmaking', name: 'Glassmaking', field: 'materials', tier: 2, icon: '🥃', desc: 'Unlock glass', crafts: 100 },
+                { id: 'antibiotics', name: 'Antibiotics', field: 'pharma', tier: 2, icon: '💊', desc: 'Unlock penicillin', crafts: 200 },
+                { id: 'spinning', name: 'Spinning', field: 'textiles', tier: 2, icon: '🧵', desc: 'Unlock yarn making', crafts: 150 },
+                
+                { id: 'steel', name: 'Steel Production', field: 'metallurgy', tier: 3, icon: '⚙️', desc: 'Unlock steel', crafts: 500 },
+                { id: 'composites', name: 'Composites', field: 'materials', tier: 3, icon: '🛡️', desc: 'Unlock carbon fiber', crafts: 800 },
+                { id: 'vaccines', name: 'Vaccines', field: 'pharma', tier: 3, icon: '💉', desc: 'Unlock vaccine production', crafts: 1000 },
+                { id: 'technical_textiles', name: 'Technical Textiles', field: 'textiles', tier: 3, icon: '⚙️', desc: 'Unlock performance fabrics', crafts: 600 },
+                
+                { id: 'superalloys', name: 'Superalloys', field: 'metallurgy', tier: 4, icon: '🔥', desc: 'Unlock Inconel', crafts: 5000 },
+                { id: 'aerogels', name: 'Aerogels', field: 'materials', tier: 4, icon: '☁️', desc: 'Unlock aerogel insulation', crafts: 8000 },
+                { id: 'gene_therapy', name: 'Gene Therapy', field: 'pharma', tier: 4, icon: '🧬', desc: 'Unlock CRISPR', crafts: 10000 },
+                { id: 'smart_textiles', name: 'Smart Textiles', field: 'textiles', tier: 4, icon: '💡', desc: 'Unlock conductive fabrics', crafts: 5000 },
+                
+                { id: 'exotic_matter', name: 'Exotic Matter', field: 'materials', tier: 5, icon: '✨', desc: 'Unlock room-temperature superconductors', crafts: 50000 }
+            ];
+            
+            // Group by tier
+            researchItems.forEach(item => {
+                if (tiers[item.tier]) {
+                    tiers[item.tier].push(item);
+                }
+            });
+            
+            let html = '<div class="research-tree">';
+            
+            for (let tier = 1; tier <= 5; tier++) {
+                const items = tiers[tier];
+                if (items.length === 0) continue;
+                
+                // Count unlocked in this tier
+                const unlockedCount = items.filter(item => totalCrafts >= item.crafts).length;
+                
+                html += `
+                    <div class="research-tier">
+                        <div class="tier-header">
+                            <span class="tier-title">Tier ${tier}</span>
+                            <span class="tier-progress">${unlockedCount}/${items.length}</span>
+                        </div>
+                        <div class="research-items">
+                `;
+                
+                items.forEach(item => {
+                    const unlocked = totalCrafts >= item.crafts;
+                    const status = unlocked ? 'unlocked' : (totalCrafts >= item.crafts * 0.7 ? 'available' : 'locked');
+                    
+                    html += `
+                        <div class="research-item ${status}" onclick="${unlocked ? '' : 'event.stopPropagation()'}">
+                            <div class="research-icon">${item.icon}</div>
+                            <div class="research-name">${item.name}</div>
+                            <div class="research-desc">${item.desc}</div>
+                            <div class="research-unlock ${unlocked ? 'achieved' : ''}">
+                                ${unlocked ? '✓ UNLOCKED' : `${item.crafts.toLocaleString()} crafts`}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            
+            contentContainer.innerHTML = html;
+        }
+
+        // ===== RETURN TO EARTH HUB =====
+        function returnToEarthHub() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
         }
 
         // ===== START =====
