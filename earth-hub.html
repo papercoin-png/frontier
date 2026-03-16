@@ -897,11 +897,36 @@
             cursor: pointer;
             transition: all 0.1s;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
         
         .hub-card:active {
             background: rgba(50, 100, 110, 0.8);
             transform: scale(0.97);
+        }
+        
+        .hub-card .notification-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ffaa4a;
+            color: #0a0a1a;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 6px;
+            border-radius: 20px;
+            min-width: 18px;
+            text-align: center;
+            border: 1px solid white;
+            box-shadow: 0 0 10px #ffaa4a;
+            animation: pulse-badge 2s infinite;
+        }
+        
+        @keyframes pulse-badge {
+            0% { opacity: 0.7; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.7; transform: scale(1); }
         }
         
         .hub-icon {
@@ -920,6 +945,21 @@
             color: #a0d0c0;
             font-size: 11px;
             margin-top: 4px;
+        }
+        
+        /* Claims Board specific card styling */
+        .hub-card.claims-card {
+            border-color: gold;
+            background: rgba(50, 40, 20, 0.6);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        
+        .hub-card.claims-card .hub-icon {
+            filter: drop-shadow(0 0 10px gold);
+        }
+        
+        .hub-card.claims-card .hub-label {
+            color: gold;
         }
         
         /* Tax Banner */
@@ -1166,7 +1206,7 @@
                 </div>
             </div>
             
-            <!-- HUB CARDS GRID -->
+            <!-- HUB CARDS GRID - INCLUDING CLAIMS BOARD -->
             <div class="hub-grid">
                 <div class="hub-card" onclick="window.navigateTo('ship-bridge.html')">
                     <div class="hub-icon">🚀</div>
@@ -1178,6 +1218,21 @@
                     <div class="hub-icon">📦</div>
                     <div class="hub-label">Hub Storage</div>
                     <div class="hub-desc">Earth-based inventory</div>
+                </div>
+                
+                <!-- CLAIMS BOARD CARD - NEW -->
+                <div class="hub-card claims-card" id="claimsBoardCard" onclick="window.navigateTo('claims-board.html')">
+                    <div class="hub-icon">📋</div>
+                    <div class="hub-label">Claims Board</div>
+                    <div class="hub-desc">Claimed planets & fees</div>
+                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
+                </div>
+                
+                <!-- MY CLAIMS CARD - NEW (for personal dashboard) -->
+                <div class="hub-card" id="myClaimsCard" onclick="window.navigateTo('my-claims.html')">
+                    <div class="hub-icon">👑</div>
+                    <div class="hub-label">My Claims</div>
+                    <div class="hub-desc" id="myClaimsCount">Your claimed planets</div>
                 </div>
                 
                 <div class="hub-card" onclick="window.navigateTo('real-estate.html')">
@@ -1293,6 +1348,9 @@
     <script src="js/migration.js"></script>
     <script src="js/element-prices.js"></script>
     <script src="js/market-engine.js"></script>
+    <script src="js/planet-status.js"></script>
+    <script src="js/claim-system.js"></script>
+    <script src="js/claim-notifications.js"></script>
 
     <script>
         // Chart is available globally from the UMD script
@@ -1326,6 +1384,10 @@
         const tradeConfirmBtn = document.getElementById('tradeConfirmBtn');
         const tradeDecrementBtn = document.getElementById('tradeDecrementBtn');
         const tradeIncrementBtn = document.getElementById('tradeIncrementBtn');
+        
+        // Claim-related elements
+        const claimsNotificationBadge = document.getElementById('claimsNotificationBadge');
+        const myClaimsCount = document.getElementById('myClaimsCount');
 
         // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
         window.navigateTo = navigateTo;
@@ -1352,6 +1414,7 @@
         let currentLaborPool = 0;
         let currentLaborEarnings = 0;
         let currentLaborMultiplier = 1.0;
+        let currentPlayerId = null;
         
         // Trading state
         let currentTradeElement = null;
@@ -1536,6 +1599,39 @@
             navigateTo('index.html');
         }
 
+        // ===== LOAD CLAIM DATA =====
+        async function loadClaimData() {
+            try {
+                currentPlayerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
+                
+                // Check for unread claim notifications
+                if (typeof window.getUnreadClaimNotifications === 'function') {
+                    const unread = await window.getUnreadClaimNotifications(currentPlayerId);
+                    if (unread && unread.length > 0) {
+                        claimsNotificationBadge.style.display = 'block';
+                        claimsNotificationBadge.textContent = unread.length > 9 ? '9+' : unread.length;
+                    } else {
+                        claimsNotificationBadge.style.display = 'none';
+                    }
+                }
+                
+                // Get player's claims count
+                if (typeof window.getPlayerClaims === 'function') {
+                    const playerClaims = await window.getPlayerClaims(currentPlayerId);
+                    const claimCount = playerClaims ? playerClaims.length : 0;
+                    
+                    if (claimCount > 0) {
+                        myClaimsCount.textContent = `${claimCount} planet${claimCount !== 1 ? 's' : ''}`;
+                    } else {
+                        myClaimsCount.textContent = 'Your claimed planets';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error loading claim data:', error);
+            }
+        }
+
         // ===== LOAD LABOR POOL DATA =====
         async function loadLaborPoolData() {
             try {
@@ -1662,6 +1758,9 @@
                 
                 // Load labor pool data
                 await loadLaborPoolData();
+                
+                // Load claim data
+                await loadClaimData();
 
                 // Store in global state
                 currentCredits = credits;
@@ -2070,6 +2169,8 @@
                     }
                     // Refresh labor pool data
                     await loadLaborPoolData();
+                    // Refresh claim data
+                    await loadClaimData();
                     // Refresh market prices
                     renderMarket();
                 }, 60000);
