@@ -96,7 +96,12 @@ const STORAGE_KEYS = {
     MARKET_PRICES: 'voidfarer_market_prices',
     MARKET_HISTORY: 'voidfarer_market_history',
     MARKET_VOLUME: 'voidfarer_market_volume',
-    MARKET_ORDERS: 'voidfarer_market_orders'
+    MARKET_ORDERS: 'voidfarer_market_orders',
+    // PLANET CLAIM KEYS - NEW
+    PLANET_CLAIMS: 'voidfarer_planet_claims',           // All claims by planet name
+    PLAYER_CLAIMS: 'voidfarer_player_claims',           // Claims by player ID
+    CLAIM_HISTORY: 'voidfarer_claim_history',           // All claim/mining transactions
+    CLAIM_NOTIFICATIONS: 'voidfarer_claim_notifications' // Global notifications
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE (ALL 118 ELEMENTS) =====
@@ -1035,6 +1040,20 @@ async function initializeStorage() {
         localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, '0');
     }
     
+    // Initialize planet claim storage if not present
+    if (!localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS)) {
+        localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.PLAYER_CLAIMS)) {
+        localStorage.setItem(STORAGE_KEYS.PLAYER_CLAIMS, '{}');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY)) {
+        localStorage.setItem(STORAGE_KEYS.CLAIM_HISTORY, '[]');
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS)) {
+        localStorage.setItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS, '[]');
+    }
+    
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
@@ -1085,7 +1104,10 @@ async function createDefaultPlayer(name = 'Voidfarer') {
             alchemyOverallLevel: 'Untrained',
             alchemyOverallMultiplier: 1.0,
             // Product ownership
-            ownedProducts: []
+            ownedProducts: [],
+            // Planet ownership stats
+            planetsOwned: 0,
+            totalMiningEarnings: 0
         };
         await savePlayer(player);
         console.log('Created default player');
@@ -1655,6 +1677,39 @@ async function spendCredits(amount) {
     }
 }
 
+// ===== ADD CREDITS TO OWNER (for mining fees) =====
+async function addCreditsToOwner(ownerId, amount) {
+    try {
+        console.log(`Adding ${amount}⭐ to owner ${ownerId} from mining fee`);
+        
+        // This is a simplified version - in a full implementation,
+        // you would have a mapping of player IDs to their credit balances
+        // For now, we'll just add to the current player's credits
+        // In a multi-player system, you'd need a proper database
+        
+        // For demo purposes, if the owner is the current player, add to their credits
+        const currentPlayerId = localStorage.getItem('voidfarer_player_id');
+        
+        if (ownerId === currentPlayerId) {
+            // Add to current player's credits
+            const newTotal = await addCredits(amount);
+            console.log(`Added ${amount}⭐ to current player (self-mining fee)`);
+            return newTotal;
+        } else {
+            // In a real implementation, you'd add to the owner's account in a database
+            // For now, store in a separate "owner earnings" object
+            const ownerEarnings = JSON.parse(localStorage.getItem('voidfarer_owner_earnings') || '{}');
+            ownerEarnings[ownerId] = (ownerEarnings[ownerId] || 0) + amount;
+            localStorage.setItem('voidfarer_owner_earnings', JSON.stringify(ownerEarnings));
+            console.log(`Stored ${amount}⭐ for owner ${ownerId} in owner earnings`);
+            return amount;
+        }
+    } catch (error) {
+        console.error('Error adding credits to owner:', error);
+        return 0;
+    }
+}
+
 // ===== SHIP FUEL =====
 function getShipFuel() {
     try {
@@ -1981,6 +2036,12 @@ async function resetGame() {
     localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_MAX);
     localStorage.removeItem(STORAGE_KEYS.SHIP_STORAGE_USED);
     
+    // Clear planet claim data
+    localStorage.removeItem(STORAGE_KEYS.PLANET_CLAIMS);
+    localStorage.removeItem(STORAGE_KEYS.PLAYER_CLAIMS);
+    localStorage.removeItem(STORAGE_KEYS.CLAIM_HISTORY);
+    localStorage.removeItem(STORAGE_KEYS.CLAIM_NOTIFICATIONS);
+    
     setHapticsEnabled(settings.haptics);
     setAutoGatherEnabled(settings.autoGather);
     setOrbitSpeed(settings.orbitSpeed);
@@ -2042,6 +2103,7 @@ window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
+window.addCreditsToOwner = addCreditsToOwner;
 window.safeSellElement = safeSellElement;
 window.getShipFuel = getShipFuel;
 window.saveShipFuel = saveShipFuel;
