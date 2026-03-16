@@ -796,6 +796,33 @@
         </div>
     </div>
 
+    <!-- DEBUG SCRIPT - Check for duplicate script tags -->
+    <script>
+        console.log('🔍 === SCRIPT TAG DEBUG ===');
+        console.log('🔍 Time:', new Date().toLocaleTimeString());
+        
+        // Check for duplicate storage.js script tags
+        const storageScripts = document.querySelectorAll('script[src*="storage.js"]');
+        console.log('🔍 Number of storage.js script tags:', storageScripts.length);
+        
+        if (storageScripts.length > 1) {
+            console.error('🔍 ❌ FOUND DUPLICATE SCRIPT TAGS!');
+            storageScripts.forEach((script, i) => {
+                console.log(`🔍 Script ${i + 1}:`, script.src);
+            });
+        } else if (storageScripts.length === 1) {
+            console.log('🔍 ✅ Only one storage.js script tag found');
+        } else {
+            console.warn('🔍 ⚠️ No storage.js script tag found!');
+        }
+        
+        // Check all module scripts
+        const moduleScripts = document.querySelectorAll('script[type="module"]');
+        console.log('🔍 Total module scripts:', moduleScripts.length);
+        
+        console.log('🔍 === END DEBUG ===');
+    </script>
+
     <!-- Script files - each loaded once -->
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage/storage.js"></script>
@@ -806,8 +833,17 @@
     <script type="module" src="js/claim-notifications.js"></script>
     <script type="module" src="js/storage/inventory.js"></script>
 
+    <!-- Additional debug for module loading -->
+    <script>
+        console.log('🔍 Checking if storage.js appears in module list...');
+        // This will run after modules start loading
+        setTimeout(() => {
+            console.log('🔍 Module load check complete');
+        }, 100);
+    </script>
+
     <script type="module">
-        // ===== CORRECTED IMPORTS =====
+        // ===== IMPORTS =====
         import { getPlanetStatus, claimPlanet, isPlanetClaimed } from './js/planet-status.js';
         import { getPlanetClaim, calculateMiningFee, recordMiningActivity } from './js/claim-system.js';
         import { addClaimNotification } from './js/claim-notifications.js';
@@ -818,8 +854,11 @@
             addElementToCollection,
             addCreditsToOwner,
             getCredits,
-            saveCredits
+            saveCredits,
+            getPlayerId
         } from './js/storage/storage.js';
+
+        console.log('✅ All modules imported successfully');
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -831,7 +870,7 @@
         const EXTRACTION_INTERVAL = 5000;
         const CARGO_MASS_LIMIT = 5000;
         let extractionAttempts = 0;
-        const MAX_EXTRACTION_ATTEMPTS = 1000; // High limit for normal play
+        const MAX_EXTRACTION_ATTEMPTS = 1000;
         
         const RARITY_CONFIG = {
             'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', feePercent: 0 },
@@ -923,7 +962,6 @@
             feeBreakdown.style.display = 'none';
             
             if (result.type === 'fee') {
-                // Fee notification
                 extractionNotification.classList.add('fee', 'show');
                 
                 notificationIcon.textContent = '💰';
@@ -942,7 +980,6 @@
                 notificationPity.textContent = '';
                 
             } else if (result.success) {
-                // Success notification
                 extractionNotification.classList.add('success', 'show');
                 const rarity = getElementRarity(result.resource);
                 extractionNotification.classList.add(`rarity-${rarity}`);
@@ -962,7 +999,6 @@
                     notificationPity.textContent = '';
                 }
             } else {
-                // Fail notification
                 extractionNotification.classList.add('fail', 'show');
                 notificationIcon.textContent = '⚠️';
                 notificationTitle.textContent = 'FAIL';
@@ -1165,7 +1201,7 @@
         // ===== CLAIM DATA FUNCTIONS =====
         async function loadClaimData() {
             try {
-                playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
+                playerId = getPlayerId();
                 
                 const claimed = await isPlanetClaimed(currentPlanet.name);
                 
