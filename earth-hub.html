@@ -7,9 +7,7 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/crafting.css">
     
     <style>
         * {
@@ -152,13 +150,13 @@
             font-size: 22px;
         }
         
-        .hub-storage {
+        .location {
             font-size: 14px;
             color: #a0d0c0;
             text-align: right;
         }
         
-        .hub-storage span {
+        .location span {
             color: #4affaa;
             font-weight: 600;
         }
@@ -178,6 +176,123 @@
             font-size: 14px;
         }
         
+        /* Section Header */
+        .section-header {
+            margin-bottom: 15px;
+            margin-top: 20px;
+        }
+        
+        .section-header:first-of-type {
+            margin-top: 0;
+        }
+        
+        .section-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title span {
+            color: #4affaa;
+            font-size: 24px;
+        }
+        
+        /* Hub Cards Grid - 2 columns for main navigation */
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .hub-card {
+            background: rgba(30, 60, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a9a8a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 25px 15px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: center;
+        }
+        
+        .hub-card:active {
+            transform: scale(0.97);
+            background: rgba(74, 154, 138, 0.3);
+        }
+        
+        .hub-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 10px #4a9a8a);
+        }
+        
+        .hub-label {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 5px;
+        }
+        
+        .hub-desc {
+            color: #a0d0c0;
+            font-size: 12px;
+        }
+        
+        /* Color-coded cards */
+        .hub-card.manufacturing {
+            border-color: #4affaa;
+        }
+        
+        .hub-card.shipyard {
+            border-color: #4a8ac0;
+        }
+        
+        .hub-card.market {
+            border-color: #ffaa4a;
+        }
+        
+        .hub-card.claims {
+            border-color: gold;
+        }
+        
+        .hub-card.services {
+            border-color: #6a8ac0;
+        }
+        
+        /* Notification badge */
+        .hub-card {
+            position: relative;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ffaa4a;
+            color: #0a0a1a;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 20px;
+            min-width: 24px;
+            text-align: center;
+            border: 2px solid white;
+            box-shadow: 0 0 15px #ffaa4a;
+            animation: pulse-badge 2s infinite;
+            z-index: 10;
+        }
+        
+        @keyframes pulse-badge {
+            0% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.8; transform: scale(1); }
+        }
+        
         /* Labor Pool Card */
         .labor-pool-card {
             background: rgba(30, 60, 70, 0.7);
@@ -193,7 +308,7 @@
         
         .labor-pool-card:active {
             transform: scale(0.99);
-            background: rgba(50, 100, 110, 0.8);
+            background: rgba(255, 170, 74, 0.1);
         }
         
         .labor-pool-header {
@@ -215,717 +330,21 @@
         
         .labor-pool-title span {
             font-size: 24px;
+            color: #ffaa4a;
         }
         
         .labor-pool-amount {
-            font-size: 22px;
+            font-size: 24px;
             font-weight: 700;
             color: #ffd966;
         }
         
         .labor-pool-details {
             display: flex;
-            gap: 15px;
-            margin-bottom: 10px;
+            justify-content: space-between;
             color: #a0d0c0;
             font-size: 13px;
-        }
-        
-        .labor-pool-multiplier {
-            color: #4affaa;
-            font-weight: 600;
-        }
-        
-        .labor-pool-footer {
-            display: flex;
-            justify-content: space-between;
-            color: #ffaa4a;
-            font-size: 12px;
-            border-top: 1px solid rgba(255, 170, 74, 0.3);
-            padding-top: 8px;
-        }
-        
-        /* Economic Alert Banner */
-        .alert-banner {
-            background: rgba(255, 170, 74, 0.15);
-            border: 2px solid #ffaa4a;
-            border-radius: 40px 10px 40px 10px;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            display: none;
-            align-items: center;
-            gap: 12px;
-            animation: glow 2s infinite alternate;
-            cursor: pointer;
-        }
-        
-        .alert-banner:active {
-            background: rgba(255, 170, 74, 0.3);
-            transform: scale(0.99);
-        }
-        
-        @keyframes glow {
-            from { box-shadow: 0 0 5px #ffaa4a; }
-            to { box-shadow: 0 0 15px #ffaa4a; }
-        }
-        
-        .alert-icon {
-            font-size: 24px;
-        }
-        
-        .alert-content {
-            flex: 1;
-        }
-        
-        .alert-title {
-            color: #ffaa4a;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-        
-        .alert-message {
-            color: #ffffff;
-            font-size: 12px;
-        }
-        
-        /* Section Headers */
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            margin-top: 25px;
-        }
-        
-        .section-header:first-of-type {
-            margin-top: 0;
-        }
-        
-        .section-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 20px;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .section-title span {
-            color: #4affaa;
-            font-size: 24px;
-        }
-        
-        .section-link {
-            color: #a0c0ff;
-            font-size: 12px;
-            text-decoration: none;
-            padding: 4px 10px;
-            border-radius: 20px;
-            background: rgba(74, 154, 138, 0.2);
-            cursor: pointer;
-        }
-        
-        .section-link:active {
-            background: #4a9a8a;
-            color: #ffffff;
-        }
-        
-        /* Hub Cards Grid */
-        .hub-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .hub-card {
-            background: rgba(30, 60, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 30% 10% 30% 10%;
-            padding: 15px 8px;
-            cursor: pointer;
-            transition: all 0.1s;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .hub-card:active {
-            background: rgba(50, 100, 110, 0.8);
-            transform: scale(0.97);
-        }
-        
-        .hub-card .notification-badge {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: #ffaa4a;
-            color: #0a0a1a;
-            font-size: 10px;
-            font-weight: bold;
-            padding: 3px 6px;
-            border-radius: 20px;
-            min-width: 18px;
-            text-align: center;
-            border: 1px solid white;
-            box-shadow: 0 0 10px #ffaa4a;
-            animation: pulse-badge 2s infinite;
-        }
-        
-        @keyframes pulse-badge {
-            0% { opacity: 0.7; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-            100% { opacity: 0.7; transform: scale(1); }
-        }
-        
-        .hub-icon {
-            font-size: 28px;
-            margin-bottom: 5px;
-            filter: drop-shadow(0 0 8px #4a9a8a);
-        }
-        
-        .hub-label {
-            color: #ffffff;
-            font-size: 12px;
-            font-weight: 600;
-            line-height: 1.3;
-        }
-        
-        .hub-desc {
-            color: #a0d0c0;
-            font-size: 9px;
-            margin-top: 3px;
-        }
-        
-        /* Field-specific card styling */
-        .hub-card.alchemy { border-color: #4affaa; }
-        .hub-card.metallurgy { border-color: #ffaa4a; }
-        .hub-card.materials { border-color: #e0b0ff; }
-        .hub-card.pharma { border-color: #ff6b6b; }
-        .hub-card.textiles { border-color: #ff69b4; }
-        .hub-card.construction { border-color: #8a6aff; }
-        .hub-card.aerospace { border-color: #4a8ac0; }
-        .hub-card.nuclear { border-color: #ffd966; }
-        .hub-card.optical { border-color: #b0b0ff; }
-        .hub-card.magnetic { border-color: #c0a0ff; }
-        .hub-card.cryogenic { border-color: #b0ffb0; }
-        .hub-card.polymers { border-color: #ffd700; }
-        .hub-card.shipyard { border-color: #4affaa; }
-        .hub-card.claims { border-color: #ffd700; }
-        
-        /* Market Tabs */
-        .market-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            background: rgba(30, 60, 70, 0.4);
-            border-radius: 60px 20px 60px 20px;
-            padding: 5px;
-            border: 1px solid #4a9a8a;
-        }
-        
-        .market-tab {
-            flex: 1;
-            padding: 12px 5px;
-            border-radius: 40px 10px 40px 10px;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: #a0d0c0;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-        
-        .market-tab.active {
-            background: #4a9a8a;
-            color: #ffffff;
-            box-shadow: 0 0 15px #2a5a4a;
-        }
-        
-        .market-tab:active {
-            transform: scale(0.95);
-        }
-        
-        /* Market Card */
-        .market-card {
-            background: rgba(30, 60, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 40px 15px 40px 15px;
-            padding: 20px;
-            margin-bottom: 25px;
-            box-shadow: 0 0 20px #2a5a5a;
-        }
-        
-        .market-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .market-title {
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .market-title span {
-            font-size: 24px;
-        }
-        
-        .market-value {
-            color: #ffd966;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        
-        /* Search Bar */
-        .market-search {
-            margin-bottom: 15px;
-        }
-        
-        .search-input {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(20, 50, 60, 0.6);
-            border: 2px solid #4a9a8a;
-            border-radius: 60px 20px 60px 20px;
-            color: #ffffff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            outline: none;
-        }
-        
-        .search-input::placeholder {
-            color: #a0d0c0;
-            opacity: 0.6;
-        }
-        
-        .search-input:focus {
-            border-color: #4affaa;
-        }
-        
-        /* Filter Bar */
-        .filter-bar {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .filter-btn {
-            padding: 6px 10px;
-            border-radius: 40px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(30, 60, 70, 0.7);
-            border: 2px solid #4a9a8a;
-            color: #e0f0ff;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        
-        .filter-btn.active {
-            background: #4a9a8a;
-            color: #ffffff;
-            border-color: #7ac0b0;
-            box-shadow: 0 0 15px #2a5a5a;
-        }
-        
-        .filter-btn:active {
-            transform: scale(0.95);
-        }
-        
-        /* Elements Grid */
-        .elements-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-        
-        .element-row {
-            background: rgba(30, 60, 70, 0.4);
-            border: 2px solid;
-            border-radius: 40px 10px 40px 10px;
-            padding: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.1s;
-        }
-        
-        .element-row:active {
-            transform: scale(0.99);
-            background: rgba(50, 80, 90, 0.6);
-        }
-        
-        .element-icon {
-            font-size: 22px;
-            min-width: 32px;
-            text-align: center;
-        }
-        
-        .element-info {
-            flex: 1;
-        }
-        
-        .element-name-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 2px;
-        }
-        
-        .element-name {
-            font-size: 14px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .element-symbol {
-            font-size: 10px;
-            color: #a0d0c0;
-            background: rgba(0,0,0,0.3);
-            padding: 2px 5px;
-            border-radius: 20px;
-        }
-        
-        .element-details {
-            display: flex;
-            gap: 10px;
-            font-size: 10px;
-        }
-        
-        .element-amount {
-            color: #ffd966;
-        }
-        
-        .element-price {
-            color: #4affaa;
-        }
-        
-        .element-trend {
-            font-size: 11px;
-        }
-        
-        .trend-up { color: #4affaa; }
-        .trend-down { color: #ff6b6b; }
-        .trend-neutral { color: #a0d0c0; }
-        
-        .element-actions {
-            display: flex;
-            gap: 4px;
-        }
-        
-        .market-btn {
-            padding: 4px 8px;
-            border-radius: 30px 5px 30px 5px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.1s;
-            border: 2px solid;
-            min-width: 40px;
-            text-align: center;
-        }
-        
-        .buy-btn {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #4affaa;
-        }
-        
-        .buy-btn:active {
-            background: #4affaa;
-            color: #0a2a3a;
-        }
-        
-        .sell-btn {
-            background: rgba(255, 170, 74, 0.2);
-            border-color: #ffaa4a;
-            color: #ffaa4a;
-        }
-        
-        .sell-btn:active {
-            background: #ffaa4a;
-            color: #0a2a3a;
-        }
-        
-        .market-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        /* Quick Trade Bar */
-        .quick-trade {
-            display: flex;
-            gap: 8px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #4a9a8a;
-        }
-        
-        .quick-trade-btn {
-            flex: 1;
-            background: rgba(74, 154, 138, 0.2);
-            border: 1px solid #4a9a8a;
-            color: #ffffff;
-            padding: 8px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 11px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.1s;
-        }
-        
-        .quick-trade-btn:active {
-            background: #4a9a8a;
-            transform: scale(0.96);
-        }
-        
-        .quick-trade-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        /* Total Value Row */
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-            padding: 8px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 30px 8px 30px 8px;
-            color: #ffffff;
-            font-size: 12px;
-        }
-        
-        .total-label {
-            color: #a0d0c0;
-        }
-        
-        .total-amount {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        /* Trade Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(5px);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-        }
-        
-        .modal-overlay.active {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: rgba(20, 30, 50, 0.95);
-            backdrop-filter: blur(15px);
-            border: 3px solid;
-            border-radius: 60px 20px 60px 20px;
-            padding: 25px;
-            width: 280px;
-            text-align: center;
-            color: #ffffff;
-            box-shadow: 0 0 30px;
-        }
-        
-        .modal-content.buy {
-            border-color: #4affaa;
-            box-shadow: 0 0 30px #4affaa;
-        }
-        
-        .modal-content.sell {
-            border-color: #ffaa4a;
-            box-shadow: 0 0 30px #ffaa4a;
-        }
-        
-        .modal-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        
-        .modal-subtitle {
-            font-size: 14px;
-            color: #a0d0c0;
-            margin-bottom: 15px;
-        }
-        
-        .modal-icon {
-            font-size: 48px;
-            margin: 10px 0;
-        }
-        
-        .modal-stats {
-            background: rgba(0,0,0,0.3);
-            border-radius: 30px 8px 30px 8px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        
-        .modal-stat-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-            font-size: 14px;
-        }
-        
-        .modal-stat-label {
-            color: #a0d0c0;
-        }
-        
-        .modal-stat-value {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        .modal-price {
-            font-size: 18px;
-            color: #4affaa;
-        }
-        
-        .modal-quantity {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin: 20px 0;
-        }
-        
-        .qty-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(74, 154, 138, 0.3);
-            border: 2px solid #4a9a8a;
-            color: white;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.1s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .qty-btn:active {
-            background: #4a9a8a;
-            transform: scale(0.9);
-        }
-        
-        .qty-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        #tradeQuantity {
-            width: 60px;
-            height: 40px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #4a9a8a;
-            border-radius: 30px 8px 30px 8px;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            text-align: center;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .total-cost {
-            font-size: 16px;
-            margin: 15px 0;
-            padding: 10px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 30px 8px 30px 8px;
-        }
-        
-        .total-cost span {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        .warning-text {
-            color: #ffaa4a;
-            font-size: 11px;
-            margin: 8px 0;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        .modal-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 40px 10px 40px 10px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.1s;
-            font-family: 'Exo 2', sans-serif;
-            font-weight: 600;
-            border: 2px solid;
-        }
-        
-        .modal-btn.buy {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #4affaa;
-        }
-        
-        .modal-btn.buy:active {
-            background: #4affaa;
-            color: #0a2a3a;
-        }
-        
-        .modal-btn.sell {
-            background: rgba(255, 170, 74, 0.2);
-            border-color: #ffaa4a;
-            color: #ffaa4a;
-        }
-        
-        .modal-btn.sell:active {
-            background: #ffaa4a;
-            color: #0a2a3a;
-        }
-        
-        .modal-btn.cancel {
-            background: rgba(106, 138, 192, 0.2);
-            border-color: #6a8ac0;
-            color: #a0c0ff;
-        }
-        
-        .modal-btn.cancel:active {
-            background: #6a8ac0;
-            color: #ffffff;
+            margin-top: 8px;
         }
         
         /* Back button */
@@ -937,22 +356,21 @@
             background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
             border: 3px solid #ffaa4a;
             color: #ffffff;
-            padding: 18px 35px;
+            padding: 16px 30px;
             border-radius: 60px 20px 60px 20px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
             cursor: pointer;
             font-family: 'Exo 2', sans-serif;
             transition: all 0.2s;
             width: fit-content;
-            min-width: 280px;
+            min-width: 240px;
             box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
             z-index: 100;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 15px;
-            letter-spacing: 1px;
+            gap: 10px;
             margin: 0;
             animation: subtle-pulse 3s infinite;
         }
@@ -969,39 +387,14 @@
         }
         
         .back-arrow {
-            font-size: 28px;
+            font-size: 24px;
             color: #ffd966;
             font-weight: bold;
         }
         
         .back-icon {
-            font-size: 24px;
+            font-size: 22px;
             filter: drop-shadow(0 0 5px #ffaa4a);
-        }
-        
-        .back-text {
-            flex: 0 1 auto;
-        }
-        
-        /* Rarity colors */
-        .rarity-common { border-color: #ffffff; color: #ffffff; }
-        .rarity-uncommon { border-color: #b0ffb0; color: #b0ffb0; }
-        .rarity-rare { border-color: #b0b0ff; color: #b0b0ff; }
-        .rarity-very-rare { border-color: #e0b0ff; color: #e0b0ff; }
-        .rarity-legendary { border-color: #ffd700; color: #ffd700; }
-
-        /* Migration status (debug) */
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
-            display: none;
         }
     </style>
 </head>
@@ -1015,13 +408,19 @@
             </div>
             
             <!-- Stats Bar -->
-            <div class="stats-bar" id="statsBar">
+            <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
-                <div class="hub-storage" id="hubStorageDisplay">
-                    Hub Storage: <span id="hubUsed">--</span>/<span id="hubMax">--</span> AMU
+                <div class="location" id="locationDisplay">
+                    <span>Earth • Sol System</span>
                 </div>
+            </div>
+            
+            <!-- Location Bar -->
+            <div class="location-bar">
+                <span>📍 Earth Central</span>
+                <span class="coordinates">Orion Arm • Sector B2</span>
             </div>
             
             <!-- Labor Pool Card -->
@@ -1030,252 +429,102 @@
                     <div class="labor-pool-title">
                         <span>💰</span> Labor Pool
                     </div>
-                    <div class="labor-pool-amount" id="laborPoolAmount">--⭐</div>
+                    <div class="labor-pool-amount" id="laborPoolAmount">0⭐</div>
                 </div>
                 <div class="labor-pool-details">
-                    <span id="laborPoolEarnings">Your earnings: --⭐</span>
-                    <span class="labor-pool-multiplier" id="laborPoolMultiplier">1.0x</span>
-                </div>
-                <div class="labor-pool-footer">
-                    <span id="laborPoolParticipants">-- skilled workers</span>
-                    <span>Click to claim →</span>
+                    <span>Your earnings: <span id="laborEarnings">0⭐</span></span>
+                    <span>Multiplier: <span id="laborMultiplier">1.0x</span></span>
                 </div>
             </div>
             
-            <!-- Location Bar -->
-            <div class="location-bar">
-                <span id="locationText">📍 Earth Central • Sol System</span>
-                <span class="coordinates" id="sectorText">Orion Arm • Sector B2</span>
-            </div>
+            <!-- Main Navigation Sections -->
             
-            <!-- Economic Alert Banner (dynamic) -->
-            <div class="alert-banner" id="alertBanner" style="display: none;" onclick="navigateTo('economy-dashboard.html')">
-                <div class="alert-icon">📈</div>
-                <div class="alert-content">
-                    <div class="alert-title" id="alertTitle">Economic Alert</div>
-                    <div class="alert-message" id="alertMessage">Loading...</div>
-                </div>
-            </div>
-            
-            <!-- MANUFACTURING DISTRICT -->
+            <!-- Section: Manufacturing -->
             <div class="section-header">
                 <div class="section-title">
-                    <span>🏭</span> Manufacturing District
+                    <span>🏭</span> Manufacturing
                 </div>
-                <div class="section-link" onclick="navigateTo('crafting-overview.html')">VIEW ALL →</div>
             </div>
             
             <div class="hub-grid">
-                <!-- Alchemy Lab -->
-                <div class="hub-card alchemy" onclick="navigateTo('alchemy-lab.html')">
+                <div class="hub-card manufacturing" onclick="navigateTo('manufacturing-hub.html')">
                     <div class="hub-icon">⚗️</div>
-                    <div class="hub-label">Alchemy Lab</div>
-                    <div class="hub-desc">Compounds & organics</div>
+                    <div class="hub-label">Crafting Labs</div>
+                    <div class="hub-desc">12 fields • Alchemy to Polymers</div>
                 </div>
                 
-                <!-- Metallurgy Forge -->
-                <div class="hub-card metallurgy" onclick="navigateTo('metallurgy-forge.html')">
-                    <div class="hub-icon">🔨</div>
-                    <div class="hub-label">Metallurgy Forge</div>
-                    <div class="hub-desc">Smelting & alloys</div>
-                </div>
-                
-                <!-- Materials Lab -->
-                <div class="hub-card materials" onclick="navigateTo('materials-lab.html')">
-                    <div class="hub-icon">🧪</div>
-                    <div class="hub-label">Materials Lab</div>
-                    <div class="hub-desc">Ceramics & glass</div>
-                </div>
-                
-                <!-- Pharmaceuticals -->
-                <div class="hub-card pharma" onclick="navigateTo('pharma-lab.html')">
-                    <div class="hub-icon">💊</div>
-                    <div class="hub-label">Pharmaceuticals</div>
-                    <div class="hub-desc">Medicines & vaccines</div>
-                </div>
-                
-                <!-- Textile Mill -->
-                <div class="hub-card textiles" onclick="navigateTo('textile-mill.html')">
-                    <div class="hub-icon">🧵</div>
-                    <div class="hub-label">Textile Mill</div>
-                    <div class="hub-desc">Fibers & fabrics</div>
-                </div>
-                
-                <!-- Construction Lab -->
-                <div class="hub-card construction" onclick="navigateTo('construction-lab.html')">
-                    <div class="hub-icon">🏗️</div>
-                    <div class="hub-label">Construction Lab</div>
-                    <div class="hub-desc">Building materials</div>
-                </div>
-                
-                <!-- Aerospace Lab -->
-                <div class="hub-card aerospace" onclick="navigateTo('aerospace-lab.html')">
-                    <div class="hub-icon">🚀</div>
-                    <div class="hub-label">Aerospace Lab</div>
-                    <div class="hub-desc">Spacecraft materials</div>
-                </div>
-                
-                <!-- Nuclear Lab -->
-                <div class="hub-card nuclear" onclick="navigateTo('nuclear-lab.html')">
-                    <div class="hub-icon">☢️</div>
-                    <div class="hub-label">Nuclear Lab</div>
-                    <div class="hub-desc">Shielding & fuel</div>
-                </div>
-                
-                <!-- Optical Lab -->
-                <div class="hub-card optical" onclick="navigateTo('optical-lab.html')">
-                    <div class="hub-icon">🔍</div>
-                    <div class="hub-label">Optical Lab</div>
-                    <div class="hub-desc">Lenses & fiber optics</div>
-                </div>
-                
-                <!-- Magnetic Lab -->
-                <div class="hub-card magnetic" onclick="navigateTo('magnetic-lab.html')">
-                    <div class="hub-icon">🧲</div>
-                    <div class="hub-label">Magnetic Lab</div>
-                    <div class="hub-desc">Magnets & spintronics</div>
-                </div>
-                
-                <!-- Cryogenic Lab -->
-                <div class="hub-card cryogenic" onclick="navigateTo('cryogenic-lab.html')">
-                    <div class="hub-icon">❄️</div>
-                    <div class="hub-label">Cryogenic Lab</div>
-                    <div class="hub-desc">Superconductors</div>
-                </div>
-                
-                <!-- Polymers Lab -->
-                <div class="hub-card polymers" onclick="navigateTo('polymers-lab.html')">
-                    <div class="hub-icon">🧴</div>
-                    <div class="hub-label">Polymers Lab</div>
-                    <div class="hub-desc">Plastics & composites</div>
-                </div>
-            </div>
-            
-            <!-- SHIPYARD & FLEET -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>🚀</span> Shipyard & Fleet
-                </div>
-                <div class="section-link" onclick="navigateTo('shipyard.html')">BUILD SHIPS →</div>
-            </div>
-            
-            <div class="hub-grid">
-                <!-- Shipyard -->
-                <div class="hub-card shipyard" onclick="navigateTo('shipyard.html')">
-                    <div class="hub-icon">🚀</div>
-                    <div class="hub-label">Shipyard</div>
-                    <div class="hub-desc">Build & purchase ships</div>
-                </div>
-                
-                <!-- Equipment Fabricator -->
-                <div class="hub-card" onclick="navigateTo('equipment-fabricator.html')">
+                <div class="hub-card manufacturing" onclick="navigateTo('equipment-fabricator.html')">
                     <div class="hub-icon">⚙️</div>
                     <div class="hub-label">Equipment Fab</div>
                     <div class="hub-desc">Craft tools & gear</div>
                 </div>
+            </div>
+            
+            <!-- Section: Shipyard & Fleet -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🚀</span> Shipyard & Fleet
+                </div>
+            </div>
+            
+            <div class="hub-grid">
+                <div class="hub-card shipyard" onclick="navigateTo('shipyard-fleet.html')">
+                    <div class="hub-icon">🚀</div>
+                    <div class="hub-label">Shipyard</div>
+                    <div class="hub-desc">Build & manage ships</div>
+                </div>
                 
-                <!-- Colony Planner -->
-                <div class="hub-card construction" onclick="navigateTo('colony-planner.html')">
+                <div class="hub-card shipyard" onclick="navigateTo('colony-planner.html')">
                     <div class="hub-icon">🏗️</div>
                     <div class="hub-label">Colony Planner</div>
                     <div class="hub-desc">Build settlements</div>
                 </div>
             </div>
             
-            <!-- CLAIMS & OWNERSHIP -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>👑</span> Claims & Ownership
-                </div>
-                <div class="section-link" onclick="navigateTo('claims-board.html')">VIEW BOARD →</div>
-            </div>
-            
-            <div class="hub-grid">
-                <!-- Claims Board -->
-                <div class="hub-card claims" id="claimsBoardCard" onclick="navigateTo('claims-board.html')">
-                    <div class="hub-icon">📋</div>
-                    <div class="hub-label">Claims Board</div>
-                    <div class="hub-desc">Claimed planets & fees</div>
-                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
-                </div>
-                
-                <!-- My Claims -->
-                <div class="hub-card claims" id="myClaimsCard" onclick="navigateTo('my-claims.html')">
-                    <div class="hub-icon">👑</div>
-                    <div class="hub-label">My Claims</div>
-                    <div class="hub-desc" id="myClaimsDesc">Your claimed planets</div>
-                </div>
-                
-                <!-- Real Estate -->
-                <div class="hub-card" onclick="navigateTo('real-estate.html')">
-                    <div class="hub-icon">🏢</div>
-                    <div class="hub-label">Real Estate</div>
-                    <div class="hub-desc">Expand hub storage</div>
-                </div>
-            </div>
-            
-            <!-- MARKETPLACE -->
+            <!-- Section: Marketplace -->
             <div class="section-header">
                 <div class="section-title">
                     <span>🏪</span> Marketplace
                 </div>
-                <div class="section-link" onclick="navigateTo('market-overview.html')">VIEW ALL →</div>
             </div>
             
-            <!-- Market Tabs -->
-            <div class="market-tabs">
-                <button class="market-tab active" id="buyTab" onclick="switchMarketTab('buy')">🛒 BUY</button>
-                <button class="market-tab" id="sellTab" onclick="switchMarketTab('sell')">💰 SELL</button>
-            </div>
-            
-            <!-- MARKET CARD -->
-            <div class="market-card">
-                <div class="market-header">
-                    <div class="market-title">
-                        <span>🏪</span> Element Market
-                    </div>
-                    <div class="market-value" id="totalMarketValue">--⭐</div>
+            <div class="hub-grid">
+                <div class="hub-card market" onclick="navigateTo('market-hub.html')">
+                    <div class="hub-icon">🏪</div>
+                    <div class="hub-label">Market Hub</div>
+                    <div class="hub-desc">Trade & economy</div>
                 </div>
                 
-                <!-- Search Bar -->
-                <div class="market-search">
-                    <input type="text" class="search-input" id="marketSearch" placeholder="🔍 Search elements..." oninput="searchElements()">
-                </div>
-                
-                <!-- Filter Bar -->
-                <div class="filter-bar" id="filterBar">
-                    <span class="filter-btn active" onclick="filterElements('all')">ALL</span>
-                    <span class="filter-btn" onclick="filterElements('common')">COMMON</span>
-                    <span class="filter-btn" onclick="filterElements('uncommon')">UNCOMMON</span>
-                    <span class="filter-btn" onclick="filterElements('rare')">RARE</span>
-                    <span class="filter-btn" onclick="filterElements('very-rare')">VERY RARE</span>
-                    <span class="filter-btn" onclick="filterElements('legendary')">LEGENDARY</span>
-                </div>
-                
-                <!-- Elements Grid Container -->
-                <div id="elementsContainer">
-                    <div class="elements-grid" id="elementsGrid">
-                        <!-- Filled by JavaScript -->
-                        <div style="color:#a0d0c0; text-align:center; padding:20px;">Loading market data...</div>
-                    </div>
-                </div>
-                
-                <!-- Quick Trade Bar -->
-                <div class="quick-trade">
-                    <button class="quick-trade-btn" id="quickBuy1" onclick="quickTrade('buy', 100)">100⭐ BUY</button>
-                    <button class="quick-trade-btn" id="quickBuy2" onclick="quickTrade('buy', 500)">500⭐ BUY</button>
-                    <button class="quick-trade-btn" id="quickBuy3" onclick="quickTrade('buy', 1000)">1000⭐ BUY</button>
-                    <button class="quick-trade-btn" id="quickSell" onclick="quickTrade('sell', 'all')">SELL ALL</button>
-                </div>
-                
-                <!-- Total Value Row -->
-                <div class="total-row">
-                    <span class="total-label">Your Credits:</span>
-                    <span class="total-amount" id="creditsAmount">--⭐</span>
+                <div class="hub-card market" onclick="navigateTo('labor-exchange.html')">
+                    <div class="hub-icon">💰</div>
+                    <div class="hub-label">Labor Exchange</div>
+                    <div class="hub-desc">Claim earnings</div>
                 </div>
             </div>
             
-            <!-- SERVICES -->
+            <!-- Section: Claims & Ownership -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>👑</span> Claims & Ownership
+                </div>
+            </div>
+            
+            <div class="hub-grid">
+                <div class="hub-card claims" id="claimsCard" onclick="navigateTo('claims-hub.html')">
+                    <div class="hub-icon">👑</div>
+                    <div class="hub-label">Claims Hub</div>
+                    <div class="hub-desc">Planet ownership</div>
+                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
+                </div>
+                
+                <div class="hub-card claims" onclick="navigateTo('real-estate.html')">
+                    <div class="hub-icon">🏢</div>
+                    <div class="hub-label">Real Estate</div>
+                    <div class="hub-desc">Hub storage</div>
+                </div>
+            </div>
+            
+            <!-- Section: Services -->
             <div class="section-header">
                 <div class="section-title">
                     <span>⚡</span> Services
@@ -1283,46 +532,16 @@
             </div>
             
             <div class="hub-grid">
-                <!-- Ship Bridge -->
-                <div class="hub-card" onclick="navigateTo('ship-bridge.html')">
+                <div class="hub-card services" onclick="navigateTo('services-hub.html')">
+                    <div class="hub-icon">⚡</div>
+                    <div class="hub-label">Services Hub</div>
+                    <div class="hub-desc">Ship, storage, university</div>
+                </div>
+                
+                <div class="hub-card services" onclick="navigateTo('ship-bridge.html')">
                     <div class="hub-icon">🚀</div>
                     <div class="hub-label">Ship Bridge</div>
                     <div class="hub-desc">Return to your ship</div>
-                </div>
-                
-                <!-- Hub Storage -->
-                <div class="hub-card" onclick="navigateTo('hub-inventory.html')">
-                    <div class="hub-icon">📦</div>
-                    <div class="hub-label">Hub Storage</div>
-                    <div class="hub-desc">Earth-based inventory</div>
-                </div>
-                
-                <!-- University -->
-                <div class="hub-card" onclick="navigateTo('university.html')">
-                    <div class="hub-icon">🎓</div>
-                    <div class="hub-label">University</div>
-                    <div class="hub-desc">View skills and mastery</div>
-                </div>
-                
-                <!-- Labor Exchange -->
-                <div class="hub-card" onclick="navigateTo('labor-exchange.html')">
-                    <div class="hub-icon">💰</div>
-                    <div class="hub-label">Labor Exchange</div>
-                    <div class="hub-desc">Claim labor earnings</div>
-                </div>
-                
-                <!-- Economy Dashboard -->
-                <div class="hub-card" onclick="navigateTo('economy-dashboard.html')">
-                    <div class="hub-icon">📊</div>
-                    <div class="hub-label">Economy</div>
-                    <div class="hub-desc">Galactic economic stats</div>
-                </div>
-                
-                <!-- Tax Center -->
-                <div class="hub-card" onclick="navigateTo('tax-center.html')">
-                    <div class="hub-icon">💰</div>
-                    <div class="hub-label">Tax Center</div>
-                    <div class="hub-desc">View taxes paid</div>
                 </div>
             </div>
             
@@ -1338,87 +557,13 @@
                 <div class="loading-spinner"></div>
                 <div class="loading-text" id="loadingText">loading Earth Hub...</div>
             </div>
-
-            <!-- Migration status (debug) -->
-            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
+
+    <!-- Simple scripts - no modules -->
+    <script src="js/db.js"></script>
     
-    <!-- Trade Modal -->
-    <div class="modal-overlay" id="tradeModal">
-        <div class="modal-content" id="tradeModalContent">
-            <div class="modal-title" id="tradeModalTitle">Buy</div>
-            <div class="modal-subtitle" id="tradeModalElement">Element</div>
-            <div class="modal-icon" id="tradeModalIcon">🔹</div>
-            
-            <div class="modal-stats">
-                <div class="modal-stat-row">
-                    <span class="modal-stat-label">Current Price:</span>
-                    <span class="modal-stat-value" id="tradeModalPrice">0⭐</span>
-                </div>
-                <div class="modal-stat-row">
-                    <span class="modal-stat-label">You Own:</span>
-                    <span class="modal-stat-value" id="tradeModalOwned">0</span>
-                </div>
-                <div class="modal-stat-row">
-                    <span class="modal-stat-label">Hub Available:</span>
-                    <span class="modal-stat-value" id="tradeModalHubSpace">0 AMU</span>
-                </div>
-            </div>
-            
-            <div class="modal-quantity">
-                <button class="qty-btn" id="tradeDecrementBtn" onclick="tradeDecrementQty()">−</button>
-                <input type="number" id="tradeQuantity" value="1" min="1" max="99" readonly>
-                <button class="qty-btn" id="tradeIncrementBtn" onclick="tradeIncrementQty()">+</button>
-            </div>
-            
-            <div class="total-cost">
-                Total: <span id="tradeTotal">0</span>⭐
-            </div>
-            
-            <div class="warning-text" id="tradeWarning"></div>
-            
-            <div class="modal-buttons">
-                <button class="modal-btn" id="tradeConfirmBtn" onclick="confirmTrade()">CONFIRM</button>
-                <button class="modal-btn cancel" onclick="closeTradeModal()">CANCEL</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Load all JavaScript files with type="module" -->
-    <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/storage/storage.js"></script>
-    <script type="module" src="js/storage/inventory.js"></script>
-    <script type="module" src="js/storage/progression.js"></script>
-    <script type="module" src="js/market-dynamics.js"></script>
-    <script type="module" src="js/economic-events.js"></script>
-    <script type="module" src="js/tax-system.js"></script>
-    <script type="module" src="js/migration.js"></script>
-    <script type="module" src="js/element-prices.js"></script>
-    <script type="module" src="js/market-engine.js"></script>
-    <script type="module" src="js/crafting/recipe-index.js"></script>
-    <script type="module" src="js/crafting/crafting-core.js"></script>
-    <script type="module" src="js/crafting/helpers/validation.js"></script>
-    <script type="module" src="js/crafting/fields/alchemy.js"></script>
-    <script type="module" src="js/crafting/fields/metallurgy.js"></script>
-    <script type="module" src="js/crafting/fields/materials-science.js"></script>
-    <script type="module" src="js/crafting/fields/pharmaceuticals.js"></script>
-    <script type="module" src="js/crafting/fields/textiles.js"></script>
-    <script type="module" src="js/crafting/fields/construction.js"></script>
-    <script type="module" src="js/crafting/fields/aerospace.js"></script>
-    <script type="module" src="js/crafting/fields/nuclear.js"></script>
-    <script type="module" src="js/crafting/fields/optical.js"></script>
-    <script type="module" src="js/crafting/fields/magnetic.js"></script>
-    <script type="module" src="js/crafting/fields/cryogenic.js"></script>
-    <script type="module" src="js/crafting/fields/polymers.js"></script>
-    <script type="module" src="js/planet-status.js"></script>
-    <script type="module" src="js/claim-system.js"></script>
-    <script type="module" src="js/claim-notifications.js"></script>
-
-    <script type="module">
-        // Chart is available globally from the UMD script
-        const Chart = window.Chart;
-
+    <script>
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -1426,667 +571,114 @@
             tg.expand();
         }
 
-        // Safe haptic feedback function
-        function safeHaptic(type) {
-            if (tg?.HapticFeedback) {
-                try {
-                    tg.HapticFeedback.impactOccurred(type);
-                } catch (e) {
-                    // Ignore - haptic feedback not supported
-                }
-            }
-        }
-
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
-        const elementsGrid = document.getElementById('elementsGrid');
-        const buyTab = document.getElementById('buyTab');
-        const sellTab = document.getElementById('sellTab');
-        const tradeModal = document.getElementById('tradeModal');
-        const tradeModalContent = document.getElementById('tradeModalContent');
-        const tradeModalTitle = document.getElementById('tradeModalTitle');
-        const tradeModalElement = document.getElementById('tradeModalElement');
-        const tradeModalIcon = document.getElementById('tradeModalIcon');
-        const tradeModalPrice = document.getElementById('tradeModalPrice');
-        const tradeModalOwned = document.getElementById('tradeModalOwned');
-        const tradeModalHubSpace = document.getElementById('tradeModalHubSpace');
-        const tradeQuantity = document.getElementById('tradeQuantity');
-        const tradeTotal = document.getElementById('tradeTotal');
-        const tradeWarning = document.getElementById('tradeWarning');
-        const tradeConfirmBtn = document.getElementById('tradeConfirmBtn');
-        const tradeDecrementBtn = document.getElementById('tradeDecrementBtn');
-        const tradeIncrementBtn = document.getElementById('tradeIncrementBtn');
-        
-        // Claim-related elements
         const claimsNotificationBadge = document.getElementById('claimsNotificationBadge');
-        const myClaimsDesc = document.getElementById('myClaimsDesc');
 
-        // ===== STATE =====
-        let currentMarketTab = 'buy';
-        let currentFilter = 'all';
-        let searchTerm = '';
-        let currentCredits = 0;
-        let currentHubMax = 0;
-        let currentHubUsed = 0;
-        let currentLaborPool = 0;
-        let currentLaborEarnings = 0;
-        let currentLaborMultiplier = 1.0;
-        let currentPlayerId = null;
-        
-        // Trading state
-        let currentTradeElement = null;
-        let currentTradeMode = 'buy';
-        let currentTradePrice = 0;
-        let currentTradeMax = 0;
-        let currentTradeMassPerUnit = 0;
-
-        // ===== COMPLETE ELEMENT DATABASE (118 elements) =====
-        const ELEMENT_DATABASE = {
-            // Period 1
-            'Hydrogen': { symbol: 'H', rarity: 'common', value: 100, mass: 1.008, icon: '💧' },
-            'Helium': { symbol: 'He', rarity: 'common', value: 100, mass: 4.003, icon: '🎈' },
-            
-            // Period 2
-            'Lithium': { symbol: 'Li', rarity: 'common', value: 100, mass: 6.94, icon: '🔋' },
-            'Beryllium': { symbol: 'Be', rarity: 'common', value: 100, mass: 9.012, icon: '💎' },
-            'Boron': { symbol: 'B', rarity: 'common', value: 100, mass: 10.81, icon: '🧪' },
-            'Carbon': { symbol: 'C', rarity: 'uncommon', value: 250, mass: 12.011, icon: '⚫' },
-            'Nitrogen': { symbol: 'N', rarity: 'uncommon', value: 250, mass: 14.007, icon: '🌬️' },
-            'Oxygen': { symbol: 'O', rarity: 'uncommon', value: 250, mass: 16.00, icon: '💨' },
-            'Fluorine': { symbol: 'F', rarity: 'uncommon', value: 250, mass: 19.00, icon: '🧪' },
-            'Neon': { symbol: 'Ne', rarity: 'uncommon', value: 250, mass: 20.18, icon: '💡' },
-            
-            // Period 3
-            'Sodium': { symbol: 'Na', rarity: 'common', value: 100, mass: 22.99, icon: '🧂' },
-            'Magnesium': { symbol: 'Mg', rarity: 'common', value: 100, mass: 24.31, icon: '✨' },
-            'Aluminum': { symbol: 'Al', rarity: 'common', value: 100, mass: 26.98, icon: '🥫' },
-            'Silicon': { symbol: 'Si', rarity: 'common', value: 100, mass: 28.09, icon: '💻' },
-            'Phosphorus': { symbol: 'P', rarity: 'uncommon', value: 250, mass: 30.97, icon: '🔥' },
-            'Sulfur': { symbol: 'S', rarity: 'uncommon', value: 250, mass: 32.06, icon: '🟡' },
-            'Chlorine': { symbol: 'Cl', rarity: 'uncommon', value: 250, mass: 35.45, icon: '🧪' },
-            'Argon': { symbol: 'Ar', rarity: 'uncommon', value: 250, mass: 39.95, icon: '🎈' },
-            
-            // Period 4
-            'Potassium': { symbol: 'K', rarity: 'common', value: 100, mass: 39.10, icon: '🍌' },
-            'Calcium': { symbol: 'Ca', rarity: 'common', value: 100, mass: 40.08, icon: '🥛' },
-            'Scandium': { symbol: 'Sc', rarity: 'rare', value: 1000, mass: 44.96, icon: '✨' },
-            'Titanium': { symbol: 'Ti', rarity: 'rare', value: 1000, mass: 47.87, icon: '🔷' },
-            'Vanadium': { symbol: 'V', rarity: 'rare', value: 1000, mass: 50.94, icon: '⚙️' },
-            'Chromium': { symbol: 'Cr', rarity: 'rare', value: 1000, mass: 52.00, icon: '🔩' },
-            'Manganese': { symbol: 'Mn', rarity: 'rare', value: 1000, mass: 54.94, icon: '⚙️' },
-            'Iron': { symbol: 'Fe', rarity: 'uncommon', value: 250, mass: 55.85, icon: '⚙️' },
-            'Cobalt': { symbol: 'Co', rarity: 'rare', value: 1000, mass: 58.93, icon: '🔵' },
-            'Nickel': { symbol: 'Ni', rarity: 'uncommon', value: 250, mass: 58.69, icon: '🔩' },
-            'Copper': { symbol: 'Cu', rarity: 'rare', value: 1000, mass: 63.55, icon: '🔴' },
-            'Zinc': { symbol: 'Zn', rarity: 'rare', value: 1000, mass: 65.38, icon: '⚪' },
-            'Gallium': { symbol: 'Ga', rarity: 'rare', value: 1000, mass: 69.72, icon: '🧪' },
-            'Germanium': { symbol: 'Ge', rarity: 'rare', value: 1000, mass: 72.63, icon: '💻' },
-            'Arsenic': { symbol: 'As', rarity: 'rare', value: 1000, mass: 74.92, icon: '☠️' },
-            'Selenium': { symbol: 'Se', rarity: 'rare', value: 1000, mass: 78.97, icon: '🟡' },
-            'Bromine': { symbol: 'Br', rarity: 'rare', value: 1000, mass: 79.90, icon: '🧪' },
-            'Krypton': { symbol: 'Kr', rarity: 'rare', value: 1000, mass: 83.80, icon: '💨' },
-            
-            // Period 5
-            'Rubidium': { symbol: 'Rb', rarity: 'rare', value: 1000, mass: 85.47, icon: '✨' },
-            'Strontium': { symbol: 'Sr', rarity: 'rare', value: 1000, mass: 87.62, icon: '✨' },
-            'Yttrium': { symbol: 'Y', rarity: 'rare', value: 1000, mass: 88.91, icon: '✨' },
-            'Zirconium': { symbol: 'Zr', rarity: 'rare', value: 1000, mass: 91.22, icon: '💎' },
-            'Niobium': { symbol: 'Nb', rarity: 'rare', value: 1000, mass: 92.91, icon: '🔷' },
-            'Molybdenum': { symbol: 'Mo', rarity: 'rare', value: 1000, mass: 95.95, icon: '⚙️' },
-            'Technetium': { symbol: 'Tc', rarity: 'very-rare', value: 5000, mass: 98.0, icon: '☢️' },
-            'Ruthenium': { symbol: 'Ru', rarity: 'rare', value: 1000, mass: 101.1, icon: '🔷' },
-            'Rhodium': { symbol: 'Rh', rarity: 'rare', value: 1000, mass: 102.9, icon: '⬜' },
-            'Palladium': { symbol: 'Pd', rarity: 'rare', value: 1000, mass: 106.4, icon: '⬜' },
-            'Silver': { symbol: 'Ag', rarity: 'rare', value: 1000, mass: 107.9, icon: '⚪' },
-            'Cadmium': { symbol: 'Cd', rarity: 'rare', value: 1000, mass: 112.4, icon: '🔩' },
-            'Indium': { symbol: 'In', rarity: 'rare', value: 1000, mass: 114.8, icon: '✨' },
-            'Tin': { symbol: 'Sn', rarity: 'rare', value: 1000, mass: 118.7, icon: '🥫' },
-            'Antimony': { symbol: 'Sb', rarity: 'rare', value: 1000, mass: 121.8, icon: '⚙️' },
-            'Tellurium': { symbol: 'Te', rarity: 'rare', value: 1000, mass: 127.6, icon: '✨' },
-            'Iodine': { symbol: 'I', rarity: 'rare', value: 1000, mass: 126.9, icon: '🧪' },
-            'Xenon': { symbol: 'Xe', rarity: 'rare', value: 1000, mass: 131.3, icon: '💨' },
-            
-            // Period 6
-            'Cesium': { symbol: 'Cs', rarity: 'rare', value: 1000, mass: 132.9, icon: '✨' },
-            'Barium': { symbol: 'Ba', rarity: 'rare', value: 1000, mass: 137.3, icon: '⚖️' },
-            'Lanthanum': { symbol: 'La', rarity: 'rare', value: 1000, mass: 138.9, icon: '✨' },
-            'Cerium': { symbol: 'Ce', rarity: 'rare', value: 1000, mass: 140.1, icon: '✨' },
-            'Praseodymium': { symbol: 'Pr', rarity: 'rare', value: 1000, mass: 140.9, icon: '✨' },
-            'Neodymium': { symbol: 'Nd', rarity: 'rare', value: 1000, mass: 144.2, icon: '🧲' },
-            'Promethium': { symbol: 'Pm', rarity: 'legendary', value: 25000, mass: 145.0, icon: '✨' },
-            'Samarium': { symbol: 'Sm', rarity: 'rare', value: 1000, mass: 150.4, icon: '🧲' },
-            'Europium': { symbol: 'Eu', rarity: 'rare', value: 1000, mass: 152.0, icon: '✨' },
-            'Gadolinium': { symbol: 'Gd', rarity: 'rare', value: 1000, mass: 157.3, icon: '🧲' },
-            'Terbium': { symbol: 'Tb', rarity: 'rare', value: 1000, mass: 158.9, icon: '✨' },
-            'Dysprosium': { symbol: 'Dy', rarity: 'rare', value: 1000, mass: 162.5, icon: '🧲' },
-            'Holmium': { symbol: 'Ho', rarity: 'rare', value: 1000, mass: 164.9, icon: '✨' },
-            'Erbium': { symbol: 'Er', rarity: 'rare', value: 1000, mass: 167.3, icon: '✨' },
-            'Thulium': { symbol: 'Tm', rarity: 'rare', value: 1000, mass: 168.9, icon: '✨' },
-            'Ytterbium': { symbol: 'Yb', rarity: 'rare', value: 1000, mass: 173.0, icon: '✨' },
-            'Lutetium': { symbol: 'Lu', rarity: 'rare', value: 1000, mass: 175.0, icon: '✨' },
-            'Hafnium': { symbol: 'Hf', rarity: 'rare', value: 1000, mass: 178.5, icon: '🔩' },
-            'Tantalum': { symbol: 'Ta', rarity: 'rare', value: 1000, mass: 180.9, icon: '🔩' },
-            'Tungsten': { symbol: 'W', rarity: 'rare', value: 1000, mass: 183.8, icon: '💡' },
-            'Rhenium': { symbol: 'Re', rarity: 'rare', value: 1000, mass: 186.2, icon: '⚙️' },
-            'Osmium': { symbol: 'Os', rarity: 'rare', value: 1000, mass: 190.2, icon: '⚫' },
-            'Iridium': { symbol: 'Ir', rarity: 'rare', value: 1000, mass: 192.2, icon: '⬜' },
-            'Platinum': { symbol: 'Pt', rarity: 'rare', value: 1000, mass: 195.1, icon: '⬜' },
-            'Gold': { symbol: 'Au', rarity: 'rare', value: 1000, mass: 197.0, icon: '🟡' },
-            'Mercury': { symbol: 'Hg', rarity: 'rare', value: 1000, mass: 200.6, icon: '💧' },
-            'Thallium': { symbol: 'Tl', rarity: 'rare', value: 1000, mass: 204.4, icon: '☠️' },
-            'Lead': { symbol: 'Pb', rarity: 'rare', value: 1000, mass: 207.2, icon: '⚖️' },
-            'Bismuth': { symbol: 'Bi', rarity: 'rare', value: 1000, mass: 209.0, icon: '🌈' },
-            
-            // Period 7 (Very Rare)
-            'Polonium': { symbol: 'Po', rarity: 'very-rare', value: 5000, mass: 209.0, icon: '☢️' },
-            'Astatine': { symbol: 'At', rarity: 'very-rare', value: 5000, mass: 210.0, icon: '☢️' },
-            'Radon': { symbol: 'Rn', rarity: 'very-rare', value: 5000, mass: 222.0, icon: '💨' },
-            'Francium': { symbol: 'Fr', rarity: 'very-rare', value: 5000, mass: 223.0, icon: '✨' },
-            'Radium': { symbol: 'Ra', rarity: 'very-rare', value: 5000, mass: 226.0, icon: '☢️' },
-            'Actinium': { symbol: 'Ac', rarity: 'very-rare', value: 5000, mass: 227.0, icon: '☢️' },
-            'Thorium': { symbol: 'Th', rarity: 'very-rare', value: 5000, mass: 232.0, icon: '🔮' },
-            'Protactinium': { symbol: 'Pa', rarity: 'very-rare', value: 5000, mass: 231.0, icon: '☢️' },
-            'Uranium': { symbol: 'U', rarity: 'very-rare', value: 5000, mass: 238.0, icon: '☢️' },
-            
-            // Period 7 (Legendary)
-            'Neptunium': { symbol: 'Np', rarity: 'legendary', value: 25000, mass: 237.0, icon: '☢️' },
-            'Plutonium': { symbol: 'Pu', rarity: 'legendary', value: 25000, mass: 244.0, icon: '☢️' },
-            'Americium': { symbol: 'Am', rarity: 'legendary', value: 25000, mass: 243.0, icon: '☢️' },
-            'Curium': { symbol: 'Cm', rarity: 'legendary', value: 25000, mass: 247.0, icon: '☢️' },
-            'Berkelium': { symbol: 'Bk', rarity: 'legendary', value: 25000, mass: 247.0, icon: '☢️' },
-            'Californium': { symbol: 'Cf', rarity: 'legendary', value: 25000, mass: 251.0, icon: '☢️' },
-            'Einsteinium': { symbol: 'Es', rarity: 'legendary', value: 25000, mass: 252.0, icon: '☢️' },
-            'Fermium': { symbol: 'Fm', rarity: 'legendary', value: 25000, mass: 257.0, icon: '☢️' },
-            'Mendelevium': { symbol: 'Md', rarity: 'legendary', value: 25000, mass: 258.0, icon: '☢️' },
-            'Nobelium': { symbol: 'No', rarity: 'legendary', value: 25000, mass: 259.0, icon: '☢️' },
-            'Lawrencium': { symbol: 'Lr', rarity: 'legendary', value: 25000, mass: 262.0, icon: '☢️' },
-            'Rutherfordium': { symbol: 'Rf', rarity: 'legendary', value: 25000, mass: 267.0, icon: '☢️' },
-            'Dubnium': { symbol: 'Db', rarity: 'legendary', value: 25000, mass: 268.0, icon: '☢️' },
-            'Seaborgium': { symbol: 'Sg', rarity: 'legendary', value: 25000, mass: 269.0, icon: '☢️' },
-            'Bohrium': { symbol: 'Bh', rarity: 'legendary', value: 25000, mass: 270.0, icon: '☢️' },
-            'Hassium': { symbol: 'Hs', rarity: 'legendary', value: 25000, mass: 277.0, icon: '☢️' },
-            'Meitnerium': { symbol: 'Mt', rarity: 'legendary', value: 25000, mass: 278.0, icon: '☢️' },
-            'Darmstadtium': { symbol: 'Ds', rarity: 'legendary', value: 25000, mass: 281.0, icon: '☢️' },
-            'Roentgenium': { symbol: 'Rg', rarity: 'legendary', value: 25000, mass: 282.0, icon: '☢️' },
-            'Copernicium': { symbol: 'Cn', rarity: 'legendary', value: 25000, mass: 285.0, icon: '☢️' },
-            'Nihonium': { symbol: 'Nh', rarity: 'legendary', value: 25000, mass: 286.0, icon: '☢️' },
-            'Flerovium': { symbol: 'Fl', rarity: 'legendary', value: 25000, mass: 289.0, icon: '☢️' },
-            'Moscovium': { symbol: 'Mc', rarity: 'legendary', value: 25000, mass: 290.0, icon: '☢️' },
-            'Livermorium': { symbol: 'Lv', rarity: 'legendary', value: 25000, mass: 293.0, icon: '☢️' },
-            'Tennessine': { symbol: 'Ts', rarity: 'legendary', value: 25000, mass: 294.0, icon: '☢️' },
-            'Oganesson': { symbol: 'Og', rarity: 'legendary', value: 25000, mass: 294.0, icon: '☢️' }
-        };
-
-        // ===== CLEANUP ON LOAD =====
-        function cleanupHubData() {
-            console.log('Earth Hub: Cleaning up any lingering planet data');
-            
-            // Remove any planet-specific data that might interfere with hub display
-            localStorage.removeItem('voidfarer_warp_destination_planet');
-            localStorage.removeItem('voidfarer_warp_destination_planet_type');
-            localStorage.removeItem('voidfarer_warp_origin_planet');
-            
-            // Ensure current planet is Earth
-            localStorage.setItem('voidfarer_current_planet', 'Earth');
-            localStorage.setItem('voidfarer_current_planet_type', 'lush');
-            
-            // Ensure sector info is correct for Earth
-            localStorage.setItem('voidfarer_current_sector', 'B2');
-            localStorage.setItem('voidfarer_current_region', 'Orion Arm');
-            localStorage.setItem('voidfarer_current_starSector', 'Orion Molecular Cloud');
-            localStorage.setItem('voidfarer_current_star', 'Sol');
-        }
-
-        // ===== NAVIGATION FUNCTIONS =====
-        function navigateTo(screen) {
-            safeHaptic('light');
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'navigating...';
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = screen;
-            }, 300);
-        }
-
-        function returnToMenu() {
-            navigateTo('index.html');
-        }
-
-        // ===== LOAD CLAIM DATA =====
-        async function loadClaimData() {
+        // ===== LOAD CREDITS =====
+        function loadCredits() {
             try {
-                currentPlayerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
-                
-                // Check for unread claim notifications
-                if (typeof window.getUnreadClaimNotifications === 'function') {
-                    try {
-                        const unread = await window.getUnreadClaimNotifications(currentPlayerId);
-                        if (unread && unread.length > 0) {
-                            claimsNotificationBadge.style.display = 'block';
-                            claimsNotificationBadge.textContent = unread.length > 9 ? '9+' : unread.length;
-                        } else {
-                            claimsNotificationBadge.style.display = 'none';
-                        }
-                    } catch (e) {
-                        claimsNotificationBadge.style.display = 'none';
-                    }
-                }
-                
-                // Get player's claims count
-                if (typeof window.getPlayerClaims === 'function') {
-                    try {
-                        const playerClaims = await window.getPlayerClaims(currentPlayerId);
-                        const claimCount = playerClaims ? playerClaims.length : 0;
-                        
-                        if (claimCount > 0) {
-                            myClaimsDesc.textContent = `${claimCount} planet${claimCount !== 1 ? 's' : ''}`;
-                        } else {
-                            myClaimsDesc.textContent = 'Your claimed planets';
-                        }
-                    } catch (e) {
-                        myClaimsDesc.textContent = 'Your claimed planets';
-                    }
-                }
-                
+                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
             } catch (error) {
-                console.error('Error loading claim data:', error);
+                console.error('Error loading credits:', error);
             }
         }
 
-        // ===== LOAD LABOR POOL DATA =====
-        async function loadLaborPoolData() {
+        // ===== LOAD LABOR DATA =====
+        function loadLaborData() {
             try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
+                
                 // Get labor pool total
                 const laborPoolTotal = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
                 document.getElementById('laborPoolAmount').textContent = laborPoolTotal.toLocaleString() + '⭐';
                 
                 // Get player's labor earnings
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
                 const earningsData = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
                 const earnings = earningsData[playerId] || 0;
-                document.getElementById('laborPoolEarnings').textContent = `Your earnings: ${earnings.toLocaleString()}⭐`;
+                document.getElementById('laborEarnings').textContent = earnings.toLocaleString() + '⭐';
                 
-                // Get participant count (simulated)
-                const participants = Math.floor(Math.random() * 50) + 10;
-                document.getElementById('laborPoolParticipants').textContent = participants + ' skilled workers';
+                // Simulated multiplier
+                document.getElementById('laborMultiplier').textContent = '1.2x';
                 
             } catch (error) {
-                console.error('Error loading labor pool data:', error);
+                console.error('Error loading labor data:', error);
             }
         }
 
-        // ===== LOAD HUB STORAGE DATA =====
-        async function loadHubStorage() {
+        // ===== CHECK FOR NOTIFICATIONS =====
+        function checkNotifications() {
             try {
-                // Get hub max from real estate
-                const estateData = JSON.parse(localStorage.getItem('voidfarer_real_estate') || '{"properties":[]}');
-                const properties = estateData.properties || [];
-                const hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
+                // Simulated notification check
+                const hasUnread = Math.random() > 0.7; // 30% chance for demo
                 
-                // Get hub inventory
-                const hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
-                let hubUsed = 0;
-                
-                // Calculate used mass
-                for (const [name, data] of Object.entries(hubInventory)) {
-                    const count = data.count || 1;
-                    hubUsed += count * getElementMass(name);
-                }
-                
-                currentHubMax = hubMax;
-                currentHubUsed = hubUsed;
-                
-                // Update display
-                document.getElementById('hubUsed').textContent = hubUsed.toFixed(1);
-                document.getElementById('hubMax').textContent = hubMax;
-                
-                return { hubMax, hubUsed };
-            } catch (error) {
-                console.error('Error loading hub storage:', error);
-                document.getElementById('hubUsed').textContent = '0';
-                document.getElementById('hubMax').textContent = '0';
-                return { hubMax: 0, hubUsed: 0 };
-            }
-        }
-
-        // Helper function to get element mass
-        function getElementMass(elementName) {
-            const masses = {
-                'Hydrogen': 1.008, 'Helium': 4.003, 'Carbon': 12.011, 'Nitrogen': 14.007,
-                'Oxygen': 16.00, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
-                'Silicon': 28.09, 'Iron': 55.85, 'Copper': 63.55, 'Silver': 107.9,
-                'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87, 'Uranium': 238.0,
-                'Lead': 207.2, 'Tin': 118.7, 'Zinc': 65.38, 'Nickel': 58.69,
-                'default': 100.0
-            };
-            return masses[elementName] || masses.default;
-        }
-
-        // ===== GET MARKET PRICE =====
-        function getMarketPrice(elementName) {
-            const element = ELEMENT_DATABASE[elementName];
-            if (!element) return 100;
-            
-            // Add some random fluctuation ±20%
-            const basePrice = element.value;
-            const fluctuation = (Math.random() * 0.4) - 0.2;
-            return Math.max(1, Math.round(basePrice * (1 + fluctuation)));
-        }
-
-        // ===== GET PRICE TREND =====
-        function getPriceTrend(elementName) {
-            const random = Math.random();
-            if (random < 0.33) return { direction: 'up', icon: '📈', class: 'trend-up' };
-            if (random < 0.66) return { direction: 'down', icon: '📉', class: 'trend-down' };
-            return { direction: 'neutral', icon: '📊', class: 'trend-neutral' };
-        }
-
-        // ===== LOAD ALL DATA =====
-        async function loadAllData() {
-            try {
-                loadingText.textContent = 'loading market data...';
-                
-                // Load credits
-                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                currentCredits = credits;
-
-                // Load hub storage
-                await loadHubStorage();
-                
-                // Load labor pool data
-                await loadLaborPoolData();
-                
-                // Load claim data
-                await loadClaimData();
-
-                // Update UI
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-                document.getElementById('creditsAmount').textContent = credits.toLocaleString() + '⭐';
-                
-                renderMarket();
-
-            } catch (error) {
-                console.error('Error loading data:', error);
-                loadingText.textContent = 'error loading data';
-            }
-        }
-
-        // ===== RENDER MARKET =====
-        function renderMarket() {
-            const hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
-            const elements = Object.entries(ELEMENT_DATABASE);
-            
-            let filteredElements = elements.filter(([name, data]) => {
-                if (currentFilter !== 'all' && data.rarity !== currentFilter) return false;
-                if (searchTerm && !name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                return true;
-            });
-            
-            // Sort by rarity (legendary first) then name
-            const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
-            filteredElements.sort((a, b) => {
-                const rarityDiff = (rarityOrder[b[1].rarity] || 0) - (rarityOrder[a[1].rarity] || 0);
-                if (rarityDiff !== 0) return rarityDiff;
-                return a[0].localeCompare(b[0]);
-            });
-            
-            let html = '';
-            let totalMarketValue = 0;
-            
-            for (const [name, data] of filteredElements) {
-                const price = getMarketPrice(name);
-                const trend = getPriceTrend(name);
-                const owned = hubInventory[name]?.count || 0;
-                
-                totalMarketValue += price * 100;
-                
-                html += `
-                    <div class="element-row ${data.rarity}">
-                        <div class="element-icon">${data.icon}</div>
-                        <div class="element-info">
-                            <div class="element-name-row">
-                                <span class="element-name">${name}</span>
-                                <span class="element-symbol">${data.symbol}</span>
-                            </div>
-                            <div class="element-details">
-                                <span class="element-amount">Owned: ${owned}</span>
-                                <span class="element-price">${price}⭐</span>
-                                <span class="element-trend ${trend.class}">${trend.icon}</span>
-                            </div>
-                        </div>
-                        <div class="element-actions">
-                            ${currentMarketTab === 'buy' ? 
-                                `<button class="market-btn buy-btn" onclick="openTradeModal('buy', '${name}', ${price}, ${owned}, ${data.mass})">BUY</button>` : 
-                                `<button class="market-btn sell-btn" onclick="openTradeModal('sell', '${name}', ${price}, ${owned}, ${data.mass})" ${owned === 0 ? 'disabled' : ''}>SELL</button>`
-                            }
-                        </div>
-                    </div>
-                `;
-            }
-            
-            elementsGrid.innerHTML = html;
-            document.getElementById('totalMarketValue').textContent = totalMarketValue.toLocaleString() + '⭐';
-        }
-
-        // ===== SWITCH MARKET TAB =====
-        function switchMarketTab(tab) {
-            currentMarketTab = tab;
-            
-            if (tab === 'buy') {
-                buyTab.classList.add('active');
-                sellTab.classList.remove('active');
-            } else {
-                buyTab.classList.remove('active');
-                sellTab.classList.add('active');
-            }
-            
-            renderMarket();
-            
-            safeHaptic('light');
-        }
-
-        // ===== FILTER ELEMENTS =====
-        function filterElements(rarity) {
-            currentFilter = rarity;
-            
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            renderMarket();
-        }
-
-        // ===== SEARCH ELEMENTS =====
-        function searchElements() {
-            searchTerm = document.getElementById('marketSearch').value;
-            renderMarket();
-        }
-
-        // ===== OPEN TRADE MODAL =====
-        function openTradeModal(mode, elementName, price, owned, massPerUnit) {
-            currentTradeMode = mode;
-            currentTradeElement = elementName;
-            currentTradePrice = price;
-            currentTradeMassPerUnit = massPerUnit;
-            
-            const element = ELEMENT_DATABASE[elementName];
-            
-            // Set modal appearance
-            tradeModalContent.className = `modal-content ${mode}`;
-            tradeModalTitle.textContent = mode === 'buy' ? 'BUY' : 'SELL';
-            tradeModalTitle.style.color = mode === 'buy' ? '#4affaa' : '#ffaa4a';
-            tradeModalElement.textContent = elementName;
-            tradeModalIcon.textContent = element.icon;
-            tradeModalPrice.textContent = price + '⭐';
-            tradeModalOwned.textContent = owned;
-            
-            // Calculate max trade quantity
-            if (mode === 'buy') {
-                const remainingHub = currentHubMax - currentHubUsed;
-                const maxBySpace = Math.floor(remainingHub / massPerUnit);
-                const maxByCredits = Math.floor(currentCredits / price);
-                currentTradeMax = Math.min(maxBySpace, maxByCredits, 99);
-                tradeModalHubSpace.textContent = `${(remainingHub).toFixed(1)} AMU`;
-            } else {
-                currentTradeMax = Math.min(owned, 99);
-                tradeModalHubSpace.textContent = 'N/A';
-            }
-            
-            // Reset quantity
-            tradeQuantity.value = 1;
-            tradeQuantity.max = currentTradeMax;
-            tradeTotal.textContent = price;
-            tradeWarning.textContent = '';
-            
-            // Enable/disable buttons
-            tradeDecrementBtn.disabled = true;
-            tradeIncrementBtn.disabled = (currentTradeMax <= 1);
-            tradeConfirmBtn.disabled = (currentTradeMax <= 0);
-            tradeConfirmBtn.style.opacity = (currentTradeMax <= 0) ? '0.5' : '1';
-            
-            tradeModal.classList.add('active');
-            
-            safeHaptic('light');
-        }
-
-        // ===== CLOSE TRADE MODAL =====
-        function closeTradeModal() {
-            tradeModal.classList.remove('active');
-            currentTradeElement = null;
-        }
-
-        // ===== TRADE INCREMENT QUANTITY =====
-        function tradeIncrementQty() {
-            let current = parseInt(tradeQuantity.value);
-            if (current < currentTradeMax) {
-                current++;
-                tradeQuantity.value = current;
-                tradeTotal.textContent = (current * currentTradePrice).toLocaleString();
-                
-                tradeDecrementBtn.disabled = (current <= 1);
-                tradeIncrementBtn.disabled = (current >= currentTradeMax);
-            }
-        }
-
-        // ===== TRADE DECREMENT QUANTITY =====
-        function tradeDecrementQty() {
-            let current = parseInt(tradeQuantity.value);
-            if (current > 1) {
-                current--;
-                tradeQuantity.value = current;
-                tradeTotal.textContent = (current * currentTradePrice).toLocaleString();
-                
-                tradeDecrementBtn.disabled = (current <= 1);
-                tradeIncrementBtn.disabled = (current >= currentTradeMax);
-            }
-        }
-
-        // ===== CONFIRM TRADE =====
-        async function confirmTrade() {
-            if (!currentTradeElement) return;
-            
-            const quantity = parseInt(tradeQuantity.value);
-            const totalCost = quantity * currentTradePrice;
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = currentTradeMode === 'buy' ? 'purchasing...' : 'selling...';
-            
-            try {
-                if (currentTradeMode === 'buy') {
-                    // Check credits
-                    if (currentCredits < totalCost) {
-                        throw new Error('Insufficient credits');
-                    }
-                    
-                    // Check hub space
-                    const massToAdd = quantity * currentTradeMassPerUnit;
-                    if (currentHubUsed + massToAdd > currentHubMax) {
-                        throw new Error('Insufficient hub storage');
-                    }
-                    
-                    // Spend credits
-                    localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
-                    
-                    // Add to hub
-                    let hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
-                    if (!hubInventory[currentTradeElement]) {
-                        hubInventory[currentTradeElement] = { count: 0 };
-                    }
-                    hubInventory[currentTradeElement].count = (hubInventory[currentTradeElement].count || 0) + quantity;
-                    localStorage.setItem('voidfarer_hub_inventory', JSON.stringify(hubInventory));
-                    
+                if (hasUnread) {
+                    claimsNotificationBadge.style.display = 'block';
+                    claimsNotificationBadge.textContent = '!';
                 } else {
-                    // Remove from hub
-                    let hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
-                    if (hubInventory[currentTradeElement]) {
-                        hubInventory[currentTradeElement].count -= quantity;
-                        if (hubInventory[currentTradeElement].count <= 0) {
-                            delete hubInventory[currentTradeElement];
-                        }
-                        localStorage.setItem('voidfarer_hub_inventory', JSON.stringify(hubInventory));
-                    }
-                    
-                    // Add credits
-                    localStorage.setItem('voidfarer_credits', (currentCredits + totalCost).toString());
+                    claimsNotificationBadge.style.display = 'none';
                 }
-                
-                closeTradeModal();
-                await loadAllData();
-                await renderMarket();
-                
-                alert(`✅ ${currentTradeMode === 'buy' ? 'Purchased' : 'Sold'} ${quantity}x ${currentTradeElement} for ${totalCost}⭐`);
-                
             } catch (error) {
-                console.error('Trade error:', error);
-                tradeWarning.textContent = error.message || 'Transaction failed';
+                console.error('Error checking notifications:', error);
             }
-            
-            loadingOverlay.classList.remove('active');
         }
 
-        // ===== QUICK TRADE =====
-        function quickTrade(mode, amount) {
-            alert('Quick trade feature coming soon!');
+        // ===== NAVIGATION =====
+        function navigateTo(url) {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = url;
+            }, 300);
+        }
+
+        function returnToMenu() {
+            safeHaptic();
+            navigateTo('index.html');
+        }
+
+        // ===== SAFE HAPTIC =====
+        function safeHaptic() {
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
+        }
+
+        // ===== CLEANUP =====
+        function cleanupHubData() {
+            // Ensure current planet is Earth
+            localStorage.setItem('voidfarer_current_planet', 'Earth');
+            localStorage.setItem('voidfarer_current_planet_type', 'lush');
         }
 
         // ===== INITIALIZE =====
-        async function init() {
-            try {
-                // Show loading
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'connecting to Earth Hub...';
-
-                // Clean up any lingering planet data
-                cleanupHubData();
-
-                // Load all data
-                await loadAllData();
-
-                // Hide loading
-                setTimeout(() => {
-                    loadingOverlay.classList.remove('active');
-                }, 500);
-
-                // Set up periodic refresh
-                setInterval(async () => {
-                    await loadLaborPoolData();
-                    await loadClaimData();
-                    renderMarket();
-                }, 60000);
-
-            } catch (error) {
-                console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            }
+        function init() {
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'connecting to Earth Hub...';
+            
+            cleanupHubData();
+            loadCredits();
+            loadLaborData();
+            checkNotifications();
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+            }, 500);
+            
+            // Refresh data periodically
+            setInterval(() => {
+                loadLaborData();
+                checkNotifications();
+            }, 30000);
         }
 
-        // ===== START =====
         init();
     </script>
 </body>
