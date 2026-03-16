@@ -1128,7 +1128,7 @@ function setAmbientVolume(volume) {
 }
 
 // ============================================================================
-// EXPORTS - SINGLE EXPORT SECTION
+// EXPORTS - SIMPLIFIED SINGLE EXPORT
 // ============================================================================
 
 // Create a single export statement for all named exports
