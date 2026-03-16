@@ -1215,7 +1215,7 @@ export {
     saveTimestamp,
     initializeStorage,
     resetGame,
-    test
+    test  // test appears only ONCE in the exports
 };
 
 // Default export for backward compatibility
@@ -1280,5 +1280,5 @@ export default {
     saveTimestamp,
     initializeStorage,
     resetGame,
-    test
+    test  // test appears only ONCE in the default export
 };
