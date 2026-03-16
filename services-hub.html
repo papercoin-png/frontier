@@ -1,1 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Services Hub</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/crafting.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .hub-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #6a8ac0;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .hub-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .hub-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 36px;
+            color: #6a8ac0;
+            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .hub-subtitle {
+            color: #a0c0ff;
+            font-size: 14px;
+            letter-spacing: 2px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .location {
+            font-size: 14px;
+            color: #a0c0ff;
+            text-align: right;
+        }
+        
+        .location span {
+            color: #6a8ac0;
+            font-weight: 600;
+        }
+        
+        /* Ship Status Card */
+        .ship-status {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .status-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-title span {
+            color: #4affaa;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-value {
+            color: #ffd966;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .status-label {
+            color: #a0c0ff;
+            font-size: 9px;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 12px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #4affaa, #8affcc);
+            transition: width 0.3s;
+        }
+        
+        /* Hub Storage Card */
+        .storage-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        
+        .storage-card:active {
+            transform: scale(0.99);
+            background: rgba(255, 170, 74, 0.1);
+        }
+        
+        .storage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .storage-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .storage-title span {
+            color: #ffaa4a;
+        }
+        
+        .storage-amount {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .storage-bar {
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .storage-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffaa4a, #ffcc66);
+            transition: width 0.3s;
+        }
+        
+        .storage-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 11px;
+        }
+        
+        /* University Card */
+        .university-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffd966;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        
+        .university-card:active {
+            transform: scale(0.99);
+            background: rgba(255, 217, 102, 0.1);
+        }
+        
+        .university-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .university-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .university-title span {
+            color: #ffd966;
+        }
+        
+        .university-level {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .university-progress {
+            height: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .university-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffd966, #ffe066);
+            transition: width 0.3s;
+        }
+        
+        .university-stats {
+            display: flex;
+            justify-content: space-between;
+            color: #a0c0ff;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        
+        /* Section Header */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            margin-top: 10px;
+        }
+        
+        .section-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title span {
+            color: #6a8ac0;
+            font-size: 24px;
+        }
+        
+        .back-link {
+            color: #a0c0ff;
+            font-size: 12px;
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(106, 138, 192, 0.2);
+            cursor: pointer;
+        }
+        
+        .back-link:active {
+            background: #6a8ac0;
+            color: #ffffff;
+        }
+        
+        /* Hub Cards Grid - 2 columns */
+        .hub-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .hub-card {
+            background: rgba(30, 45, 70, 0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 25px 10px;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-align: center;
+        }
+        
+        .hub-card:active {
+            transform: scale(0.97);
+            background: rgba(106, 138, 192, 0.2);
+        }
+        
+        .hub-card.ship-bridge {
+            border-color: #4affaa;
+        }
+        
+        .hub-card.hub-storage {
+            border-color: #ffaa4a;
+        }
+        
+        .hub-card.university {
+            border-color: #ffd966;
+        }
+        
+        .hub-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        
+        .hub-label {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 4px;
+        }
+        
+        .hub-desc {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: sticky;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: #ffffff;
+            padding: 16px 30px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 240px;
+            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 0;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #3a5a8a;
+        }
+        
+        .back-arrow {
+            font-size: 24px;
+            color: #ffd966;
+            font-weight: bold;
+        }
+        
+        .back-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 5px #ffaa4a);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #a0b0c0;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #6a8ac0;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="hub-view" id="hubView">
+            <!-- Header -->
+            <div class="hub-header">
+                <div class="hub-title">⚡ Services Hub</div>
+                <div class="hub-subtitle">✦ essential utilities ✦</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="location" id="locationDisplay">
+                    <span id="currentLocation">Earth Hub</span>
+                </div>
+            </div>
+            
+            <!-- Ship Status Card -->
+            <div class="ship-status">
+                <div class="status-header">
+                    <div class="status-title">
+                        <span>🚀</span> Your Ship
+                    </div>
+                </div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-value" id="shipFuel">100</div>
+                        <div class="status-label">FUEL</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-value" id="shipPower">100</div>
+                        <div class="status-label">POWER</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-value" id="shipCargo">0</div>
+                        <div class="status-label">CARGO</div>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <span>Fuel</span>
+                        <span id="fuelPercent">100%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-fill" id="fuelBar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Hub Storage Card -->
+            <div class="storage-card" onclick="navigateTo('hub-inventory.html')">
+                <div class="storage-header">
+                    <div class="storage-title">
+                        <span>📦</span> Hub Storage
+                    </div>
+                    <div class="storage-amount" id="hubStorageUsed">0/<span id="hubStorageMax">0</span> AMU</div>
+                </div>
+                <div class="storage-bar">
+                    <div class="storage-fill" id="storageBar" style="width: 0%"></div>
+                </div>
+                <div class="storage-stats">
+                    <span>Earth-based inventory</span>
+                    <span>Click to manage →</span>
+                </div>
+            </div>
+            
+            <!-- University Card -->
+            <div class="university-card" onclick="navigateTo('university.html')">
+                <div class="university-header">
+                    <div class="university-title">
+                        <span>🎓</span> University
+                    </div>
+                    <div class="university-level" id="masteryLevel">Untrained</div>
+                </div>
+                <div class="university-progress">
+                    <div class="university-fill" id="masteryBar" style="width: 0%"></div>
+                </div>
+                <div class="university-stats">
+                    <span>Total Crafts: <span id="totalCrafts">0</span></span>
+                    <span>Multiplier: <span id="masteryMultiplier">1.0x</span></span>
+                </div>
+            </div>
+            
+            <!-- Section Header -->
+            <div class="section-header">
+                <div class="section-title">
+                    <span>⚡</span> Quick Access
+                </div>
+                <div class="back-link" onclick="returnToEarthHub()">← BACK</div>
+            </div>
+            
+            <!-- Quick Access Grid -->
+            <div class="hub-grid">
+                <!-- Ship Bridge -->
+                <div class="hub-card ship-bridge" onclick="navigateTo('ship-bridge.html')">
+                    <div class="hub-icon">🚀</div>
+                    <div class="hub-label">Ship Bridge</div>
+                    <div class="hub-desc">Return to your ship</div>
+                </div>
+                
+                <!-- Hub Storage (duplicate for quick access) -->
+                <div class="hub-card hub-storage" onclick="navigateTo('hub-inventory.html')">
+                    <div class="hub-icon">📦</div>
+                    <div class="hub-label">Hub Storage</div>
+                    <div class="hub-desc">Manage inventory</div>
+                </div>
+                
+                <!-- University (duplicate for quick access) -->
+                <div class="hub-card university" onclick="navigateTo('university.html')">
+                    <div class="hub-icon">🎓</div>
+                    <div class="hub-label">University</div>
+                    <div class="hub-desc">Skills & mastery</div>
+                </div>
+            </div>
+            
+            <!-- Back button to Earth Hub -->
+            <button class="back-button" onclick="returnToEarthHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+                <span class="back-icon">🌍</span>
+            </button>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading...</div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Simple scripts - no modules -->
+    <script src="js/db.js"></script>
+    
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== LOAD CREDITS =====
+        function loadCredits() {
+            try {
+                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+            } catch (error) {
+                console.error('Error loading credits:', error);
+            }
+        }
+
+        // ===== LOAD LOCATION =====
+        function loadLocation() {
+            document.getElementById('currentLocation').textContent = 'Earth • Services Hub';
+        }
+
+        // ===== LOAD SHIP DATA =====
+        function loadShipData() {
+            try {
+                // Get ship fuel
+                const fuel = parseInt(localStorage.getItem('voidfarer_ship_fuel')) || 100;
+                document.getElementById('shipFuel').textContent = fuel;
+                document.getElementById('fuelPercent').textContent = fuel + '%';
+                document.getElementById('fuelBar').style.width = fuel + '%';
+                
+                // Get ship power
+                const power = parseInt(localStorage.getItem('voidfarer_ship_power')) || 100;
+                document.getElementById('shipPower').textContent = power;
+                
+                // Get cargo mass (simplified)
+                const collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+                let cargoMass = 0;
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = typeof data === 'object' ? data.count : data;
+                    cargoMass += count * 10; // Simplified mass
+                }
+                document.getElementById('shipCargo').textContent = Math.round(cargoMass);
+                
+            } catch (error) {
+                console.error('Error loading ship data:', error);
+            }
+        }
+
+        // ===== LOAD HUB STORAGE DATA =====
+        function loadHubStorage() {
+            try {
+                // Get hub max from real estate
+                const estateData = JSON.parse(localStorage.getItem('voidfarer_real_estate') || '{"properties":[]}');
+                const properties = estateData.properties || [];
+                const hubMax = properties.reduce((sum, prop) => sum + (prop.capacity || 0), 0);
+                
+                // Get hub inventory
+                const hubInventory = JSON.parse(localStorage.getItem('voidfarer_hub_inventory') || '{}');
+                let hubUsed = 0;
+                
+                // Calculate used mass (simplified)
+                for (const [name, data] of Object.entries(hubInventory)) {
+                    const count = data.count || 1;
+                    hubUsed += count * 10; // Simplified mass
+                }
+                
+                const percent = hubMax > 0 ? (hubUsed / hubMax) * 100 : 0;
+                
+                document.getElementById('hubStorageUsed').textContent = Math.round(hubUsed);
+                document.getElementById('hubStorageMax').textContent = hubMax;
+                document.getElementById('storageBar').style.width = percent + '%';
+                
+            } catch (error) {
+                console.error('Error loading hub storage:', error);
+            }
+        }
+
+        // ===== LOAD UNIVERSITY DATA =====
+        function loadUniversityData() {
+            try {
+                // Get total crafts (simplified)
+                let totalCrafts = 0;
+                
+                // Sum up all field progress
+                const fieldKeys = [
+                    'alchemy', 'metallurgy', 'materials_science', 'pharmaceuticals',
+                    'textiles', 'construction', 'aerospace', 'nuclear',
+                    'optical', 'magnetic', 'cryogenic', 'polymers'
+                ];
+                
+                fieldKeys.forEach(field => {
+                    const progress = JSON.parse(localStorage.getItem(`voidfarer_${field}_progress`) || '{}');
+                    for (const val of Object.values(progress)) {
+                        totalCrafts += val;
+                    }
+                });
+                
+                document.getElementById('totalCrafts').textContent = totalCrafts;
+                
+                // Determine mastery level
+                let level = 'Untrained';
+                let multiplier = 1.0;
+                let progress = 0;
+                
+                if (totalCrafts >= 1000000) {
+                    level = 'Transcendent';
+                    multiplier = 50.0;
+                    progress = 100;
+                } else if (totalCrafts >= 500000) {
+                    level = 'Mythic';
+                    multiplier = 35.0;
+                    progress = (totalCrafts - 500000) / 500000 * 100;
+                } else if (totalCrafts >= 250000) {
+                    level = 'Legendary';
+                    multiplier = 20.0;
+                    progress = (totalCrafts - 250000) / 250000 * 100;
+                } else if (totalCrafts >= 100000) {
+                    level = 'Sage';
+                    multiplier = 12.0;
+                    progress = (totalCrafts - 100000) / 150000 * 100;
+                } else if (totalCrafts >= 50000) {
+                    level = 'Grand Master';
+                    multiplier = 8.0;
+                    progress = (totalCrafts - 50000) / 50000 * 100;
+                } else if (totalCrafts >= 25000) {
+                    level = 'Master';
+                    multiplier = 5.0;
+                    progress = (totalCrafts - 25000) / 25000 * 100;
+                } else if (totalCrafts >= 10000) {
+                    level = 'Expert';
+                    multiplier = 3.0;
+                    progress = (totalCrafts - 10000) / 15000 * 100;
+                } else if (totalCrafts >= 5000) {
+                    level = 'Journeyman';
+                    multiplier = 2.0;
+                    progress = (totalCrafts - 5000) / 5000 * 100;
+                } else if (totalCrafts >= 1000) {
+                    level = 'Apprentice';
+                    multiplier = 1.5;
+                    progress = (totalCrafts - 1000) / 4000 * 100;
+                } else if (totalCrafts >= 100) {
+                    level = 'Novice';
+                    multiplier = 1.2;
+                    progress = (totalCrafts - 100) / 900 * 100;
+                } else {
+                    progress = (totalCrafts / 100) * 100;
+                }
+                
+                document.getElementById('masteryLevel').textContent = level;
+                document.getElementById('masteryMultiplier').textContent = multiplier.toFixed(1) + 'x';
+                document.getElementById('masteryBar').style.width = Math.min(100, progress) + '%';
+                
+            } catch (error) {
+                console.error('Error loading university data:', error);
+            }
+        }
+
+        // ===== NAVIGATION =====
+        function navigateTo(url) {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'navigating...';
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+                window.location.href = url;
+            }, 300);
+        }
+
+        function returnToEarthHub() {
+            safeHaptic();
+            navigateTo('earth-hub.html');
+        }
+
+        // ===== SAFE HAPTIC =====
+        function safeHaptic() {
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
+        }
+
+        // ===== INITIALIZE =====
+        function init() {
+            loadCredits();
+            loadLocation();
+            loadShipData();
+            loadHubStorage();
+            loadUniversityData();
+        }
+
+        init();
+    </script>
+</body>
+</html>
