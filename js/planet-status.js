@@ -2,6 +2,7 @@
 // Planet exploration status tracking for Voidfarer
 // Handles determining planet colors based on highest rarity found
 // Tracks completion status for the calm, minimalist exploration system
+// Now includes claim status integration
 
 // ===== RARITY LEVELS (ordered from lowest to highest) =====
 export const RARITY_LEVELS = {
@@ -42,7 +43,15 @@ export const RARITY_CLASSES = {
 // ===== PLANET STATUS STORAGE KEYS =====
 const STORAGE_KEYS = {
     PLANET_STATUS: 'voidfarer_planet_status',
-    CLAIMED_PLANETS: 'voidfarer_claimed_planets'
+    CLAIMED_PLANETS: 'voidfarer_claimed_planets',
+    PLANET_CLAIMS: 'voidfarer_planet_claims',      // Added for detailed claim data
+    PLAYER_CLAIMS: 'voidfarer_player_claims'       // Added for player claim index
+};
+
+// ===== FEE CONFIGURATION =====
+export const FEE_CONFIG = {
+    [RARITY_LEVELS.VERY_RARE]: 8,   // 8% fee for Very Rare discoveries
+    [RARITY_LEVELS.LEGENDARY]: 10   // 10% fee for Legendary discoveries
 };
 
 // ===== COMPARE RARITIES =====
@@ -91,6 +100,7 @@ export async function getPlanetStatus(planetName, locations = null) {
                 resourceCount: 0,
                 fullyExplored: false,
                 claimed: false,
+                claimData: null,
                 color: null,
                 cssClass: 'unexplored'
             };
@@ -107,6 +117,7 @@ export async function getPlanetStatus(planetName, locations = null) {
                 resourceCount: 0,
                 fullyExplored: false,
                 claimed: false,
+                claimData: null,
                 color: null,
                 cssClass: 'unexplored'
             };
@@ -138,8 +149,9 @@ export async function getPlanetStatus(planetName, locations = null) {
         const totalResources = 4; // Default max
         const fullyExplored = resourcesFound.length >= totalResources;
         
-        // Check if claimed
+        // Check if claimed and get claim data
         const claimed = await isPlanetClaimed(planetName);
+        const claimData = claimed ? await getPlanetClaim(planetName) : null;
         
         return {
             explored: true,
@@ -149,6 +161,7 @@ export async function getPlanetStatus(planetName, locations = null) {
             totalResources: totalResources,
             fullyExplored: fullyExplored,
             claimed: claimed,
+            claimData: claimData,
             color: RARITY_COLORS[highestRarity] || null,
             cssClass: fullyExplored ? 'complete' : (RARITY_CLASSES[highestRarity] || 'explored')
         };
@@ -162,6 +175,7 @@ export async function getPlanetStatus(planetName, locations = null) {
             resourceCount: 0,
             fullyExplored: false,
             claimed: false,
+            claimData: null,
             color: null,
             cssClass: 'unexplored'
         };
@@ -211,44 +225,123 @@ export async function updatePlanetStatusAfterDiscovery(planetName, elementName, 
     // But we could trigger a cache update or event
     console.log(`Planet ${planetName} updated with new discovery: ${elementName} (${rarity})`);
     
+    // Check if all elements are now discovered
+    const status = await getPlanetStatus(planetName);
+    
     // You could dispatch a custom event for UI to update
     if (typeof window !== 'undefined') {
         const event = new CustomEvent('planet-status-updated', {
-            detail: { planetName, elementName, rarity }
+            detail: { planetName, elementName, rarity, fullyExplored: status.fullyExplored }
         });
         window.dispatchEvent(event);
     }
     
-    return true;
+    return status;
 }
 
 // ===== CLAIM PLANET =====
-export async function claimPlanet(planetName) {
+export async function claimPlanet(planetName, playerId, playerName, discoveryElement, discoveryRarity) {
     try {
-        // Get existing claimed planets
-        let claimed = [];
-        const saved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        console.log(`Attempting to claim planet ${planetName} for player ${playerName}`);
         
+        // Check if already claimed
+        const alreadyClaimed = await isPlanetClaimed(planetName);
+        if (alreadyClaimed) {
+            console.log(`Planet ${planetName} is already claimed`);
+            return false;
+        }
+        
+        // Get existing claims
+        let planetClaims = {};
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
         if (saved) {
             try {
-                claimed = JSON.parse(saved);
+                planetClaims = JSON.parse(saved);
             } catch (e) {
-                console.error('Failed to parse claimed planets:', e);
+                console.error('Failed to parse planet claims:', e);
             }
         }
         
-        // Add if not already claimed
-        if (!claimed.includes(planetName)) {
-            claimed.push(planetName);
-            localStorage.setItem(STORAGE_KEYS.CLAIMED_PLANETS, JSON.stringify(claimed));
+        // Get player claims index
+        let playerClaims = {};
+        const playerSaved = localStorage.getItem(STORAGE_KEYS.PLAYER_CLAIMS);
+        if (playerSaved) {
+            try {
+                playerClaims = JSON.parse(playerSaved);
+            } catch (e) {
+                console.error('Failed to parse player claims:', e);
+            }
         }
         
-        console.log(`Planet ${planetName} claimed!`);
+        // Get current sector coordinates
+        const sectorX = parseInt(localStorage.getItem('voidfarer_current_sector_x')) || 30;
+        const sectorY = parseInt(localStorage.getItem('voidfarer_current_sector_y')) || 40;
+        
+        // Determine base fee from discovery rarity
+        const baseFee = FEE_CONFIG[discoveryRarity] || 10;
+        
+        // Create claim record
+        const claimRecord = {
+            planetName: planetName,
+            planetType: localStorage.getItem('voidfarer_current_planet_type') || 'unknown',
+            ownerId: playerId,
+            ownerName: playerName,
+            discoveredElement: discoveryElement,
+            rarity: discoveryRarity,
+            baseFee: baseFee,
+            currentFee: baseFee,
+            claimedAt: Date.now(),
+            claimedDate: new Date().toISOString(),
+            lastFeeUpdate: Date.now(),
+            totalEarned: 0,
+            totalMiners: 0,
+            sectorX: sectorX,
+            sectorY: sectorY
+        };
+        
+        // Save to planet claims
+        planetClaims[planetName] = claimRecord;
+        localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, JSON.stringify(planetClaims));
+        
+        // Update player claims index
+        if (!playerClaims[playerId]) {
+            playerClaims[playerId] = [];
+        }
+        if (!playerClaims[playerId].includes(planetName)) {
+            playerClaims[playerId].push(planetName);
+        }
+        localStorage.setItem(STORAGE_KEYS.PLAYER_CLAIMS, JSON.stringify(playerClaims));
+        
+        // Update legacy claimed planets list for backward compatibility
+        let claimedPlanets = [];
+        const legacySaved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        if (legacySaved) {
+            try {
+                claimedPlanets = JSON.parse(legacySaved);
+            } catch (e) {}
+        }
+        if (!claimedPlanets.includes(planetName)) {
+            claimedPlanets.push(planetName);
+            localStorage.setItem(STORAGE_KEYS.CLAIMED_PLANETS, JSON.stringify(claimedPlanets));
+        }
+        
+        // Update player stats
+        try {
+            const player = await window.getPlayer();
+            if (player) {
+                player.planetsOwned = (player.planetsOwned || 0) + 1;
+                await window.savePlayer(player);
+            }
+        } catch (e) {
+            console.error('Error updating player stats:', e);
+        }
+        
+        console.log(`Planet ${planetName} successfully claimed by ${playerName}!`);
         
         // Dispatch event for UI update
         if (typeof window !== 'undefined') {
             const event = new CustomEvent('planet-claimed', {
-                detail: { planetName }
+                detail: { planetName, ownerName: playerName, discoveryElement, discoveryRarity }
             });
             window.dispatchEvent(event);
         }
@@ -261,14 +354,100 @@ export async function claimPlanet(planetName) {
     }
 }
 
+// ===== GET PLANET CLAIM DATA =====
+export async function getPlanetClaim(planetName) {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (!saved) return null;
+        
+        const planetClaims = JSON.parse(saved);
+        return planetClaims[planetName] || null;
+        
+    } catch (error) {
+        console.error(`Error getting claim for planet ${planetName}:`, error);
+        return null;
+    }
+}
+
+// ===== UPDATE PLANET CLAIM DATA =====
+export async function updatePlanetClaim(planetName, updates) {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (!saved) return false;
+        
+        const planetClaims = JSON.parse(saved);
+        if (!planetClaims[planetName]) return false;
+        
+        // Apply updates
+        planetClaims[planetName] = {
+            ...planetClaims[planetName],
+            ...updates,
+            lastFeeUpdate: Date.now()
+        };
+        
+        localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, JSON.stringify(planetClaims));
+        return true;
+        
+    } catch (error) {
+        console.error(`Error updating claim for planet ${planetName}:`, error);
+        return false;
+    }
+}
+
+// ===== ADD MINING EARNINGS TO CLAIM =====
+export async function addMiningEarnings(planetName, amount, minerId) {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (!saved) return false;
+        
+        const planetClaims = JSON.parse(saved);
+        if (!planetClaims[planetName]) return false;
+        
+        // Update earnings and miner count
+        planetClaims[planetName].totalEarned = (planetClaims[planetName].totalEarned || 0) + amount;
+        planetClaims[planetName].totalMiners = (planetClaims[planetName].totalMiners || 0) + 1;
+        
+        localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, JSON.stringify(planetClaims));
+        
+        // Update player stats for owner
+        try {
+            const ownerId = planetClaims[planetName].ownerId;
+            const currentPlayerId = localStorage.getItem('voidfarer_player_id');
+            
+            if (ownerId === currentPlayerId) {
+                const player = await window.getPlayer();
+                if (player) {
+                    player.totalMiningEarnings = (player.totalMiningEarnings || 0) + amount;
+                    await window.savePlayer(player);
+                }
+            }
+        } catch (e) {
+            console.error('Error updating player mining earnings:', e);
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error(`Error adding mining earnings for planet ${planetName}:`, error);
+        return false;
+    }
+}
+
 // ===== CHECK IF PLANET IS CLAIMED =====
 export async function isPlanetClaimed(planetName) {
     try {
-        const saved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        // First check detailed claims
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (saved) {
+            const planetClaims = JSON.parse(saved);
+            if (planetClaims[planetName]) return true;
+        }
         
-        if (!saved) return false;
+        // Fallback to legacy claimed planets list
+        const legacySaved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        if (!legacySaved) return false;
         
-        const claimed = JSON.parse(saved);
+        const claimed = JSON.parse(legacySaved);
         return claimed.includes(planetName);
         
     } catch (error) {
@@ -277,13 +456,77 @@ export async function isPlanetClaimed(planetName) {
     }
 }
 
-// ===== GET ALL CLAIMED PLANETS =====
+// ===== GET ALL CLAIMED PLANETS (with full data) =====
 export function getClaimedPlanets() {
     try {
-        const saved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
-        return saved ? JSON.parse(saved) : [];
+        // Get detailed claims
+        const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (saved) {
+            const planetClaims = JSON.parse(saved);
+            return Object.values(planetClaims);
+        }
+        
+        // Fallback to legacy list
+        const legacySaved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        if (!legacySaved) return [];
+        
+        const claimedNames = JSON.parse(legacySaved);
+        return claimedNames.map(name => ({ planetName: name }));
+        
     } catch (error) {
         console.error('Error getting claimed planets:', error);
+        return [];
+    }
+}
+
+// ===== GET CLAIMS FOR A SPECIFIC PLAYER =====
+export function getPlayerClaims(playerId) {
+    try {
+        // Get player claims index
+        const playerSaved = localStorage.getItem(STORAGE_KEYS.PLAYER_CLAIMS);
+        if (!playerSaved) return [];
+        
+        const playerClaims = JSON.parse(playerSaved);
+        const planetNames = playerClaims[playerId] || [];
+        
+        // Get full claim data for each planet
+        const planetSaved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (!planetSaved) return planetNames.map(name => ({ planetName: name }));
+        
+        const planetClaims = JSON.parse(planetSaved);
+        return planetNames
+            .map(name => planetClaims[name])
+            .filter(claim => claim !== undefined);
+        
+    } catch (error) {
+        console.error(`Error getting claims for player ${playerId}:`, error);
+        return [];
+    }
+}
+
+// ===== GET CLAIMS SORTED BY DISTANCE FROM PLAYER =====
+export function getClaimsSortedByDistance(playerSectorX, playerSectorY) {
+    try {
+        const claims = getClaimedPlanets();
+        
+        // Calculate distance for each claim
+        const claimsWithDistance = claims.map(claim => {
+            const dx = Math.abs(playerSectorX - (claim.sectorX || 30));
+            const dy = Math.abs(playerSectorY - (claim.sectorY || 40));
+            const sectorDistance = Math.sqrt(dx * dx + dy * dy);
+            const distance = sectorDistance * 2.3; // 2.3 light years per sector unit
+            
+            return {
+                ...claim,
+                distance: parseFloat(distance.toFixed(1))
+            };
+        });
+        
+        // Sort by distance (closest first)
+        return claimsWithDistance.sort((a, b) => a.distance - b.distance);
+        
+    } catch (error) {
+        console.error('Error sorting claims by distance:', error);
         return [];
     }
 }
@@ -296,6 +539,10 @@ export function getPlanetCssClass(status) {
     
     if (status.fullyExplored) {
         return 'planet-complete';
+    }
+    
+    if (status.claimed) {
+        return 'planet-claimed';
     }
     
     switch(status.highestRarity) {
@@ -319,6 +566,11 @@ export function getPlanetLabel(planetName, status) {
     if (!status.explored) {
         return `${planetName} ???`;
     }
+    
+    if (status.claimed) {
+        return `${planetName} 👑`;
+    }
+    
     return planetName;
 }
 
@@ -327,16 +579,213 @@ export function isPlanetReadyToClaim(status) {
     return status.explored && status.fullyExplored && !status.claimed;
 }
 
+// ===== CALCULATE MINING FEE =====
+export function calculateMiningFee(extractedQuantity, feePercent) {
+    // Fee calculation: floor(extracted quantity × fee% / 100)
+    // Round up to ensure at least 1 unit fee if any is due
+    const rawFee = (extractedQuantity * feePercent) / 100;
+    const feePaid = Math.ceil(rawFee);
+    const playerGets = Math.max(0, extractedQuantity - feePaid);
+    
+    return {
+        feePaid,
+        playerGets,
+        rawFee
+    };
+}
+
+// ===== RECORD MINING ACTIVITY =====
+export async function recordMiningActivity(transactionData) {
+    try {
+        // Get existing history
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY) || '[]');
+        
+        // Add timestamp if not present
+        if (!transactionData.timestamp) {
+            transactionData.timestamp = Date.now();
+            transactionData.date = new Date().toISOString();
+        }
+        
+        // Add to history
+        history.push({
+            type: 'mining_fee',
+            ...transactionData
+        });
+        
+        // Keep only last 1000 transactions
+        if (history.length > 1000) {
+            history.shift();
+        }
+        
+        localStorage.setItem(STORAGE_KEYS.CLAIM_HISTORY, JSON.stringify(history));
+        
+        // Update planet earnings
+        await addMiningEarnings(
+            transactionData.planetName,
+            transactionData.feeValue,
+            transactionData.minerId
+        );
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Error recording mining activity:', error);
+        return false;
+    }
+}
+
+// ===== GET MINING HISTORY FOR A PLANET =====
+export function getPlanetMiningHistory(planetName, limit = 50) {
+    try {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY) || '[]');
+        
+        return history
+            .filter(h => h.planetName === planetName)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+        
+    } catch (error) {
+        console.error(`Error getting mining history for planet ${planetName}:`, error);
+        return [];
+    }
+}
+
+// ===== GET MINING HISTORY FOR A PLAYER (as miner) =====
+export function getPlayerMiningHistory(playerId, limit = 50) {
+    try {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY) || '[]');
+        
+        return history
+            .filter(h => h.minerId === playerId)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+        
+    } catch (error) {
+        console.error(`Error getting mining history for player ${playerId}:`, error);
+        return [];
+    }
+}
+
+// ===== GET EARNINGS HISTORY FOR A PLAYER (as owner) =====
+export function getOwnerEarningsHistory(playerId, limit = 50) {
+    try {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY) || '[]');
+        
+        return history
+            .filter(h => h.ownerId === playerId)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+        
+    } catch (error) {
+        console.error(`Error getting earnings history for owner ${playerId}:`, error);
+        return [];
+    }
+}
+
+// ===== UPDATE FEE PERCENTAGE FOR A CLAIMED PLANET =====
+export async function updatePlanetFee(planetName, newFeePercent) {
+    try {
+        // Validate fee range (1-20%)
+        if (newFeePercent < 1 || newFeePercent > 20) {
+            console.error('Fee must be between 1% and 20%');
+            return false;
+        }
+        
+        return await updatePlanetClaim(planetName, { currentFee: newFeePercent });
+        
+    } catch (error) {
+        console.error(`Error updating fee for planet ${planetName}:`, error);
+        return false;
+    }
+}
+
+// ===== GET PLAYER STATISTICS =====
+export async function getPlayerClaimStats(playerId) {
+    try {
+        const claims = getPlayerClaims(playerId);
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.CLAIM_HISTORY) || '[]');
+        const earnings = history.filter(h => h.ownerId === playerId);
+        
+        // Calculate statistics
+        const totalEarned = earnings.reduce((sum, h) => sum + (h.feeValue || 0), 0);
+        const totalMiners = new Set(earnings.map(h => h.minerId)).size;
+        const totalTransactions = earnings.length;
+        
+        // Find most profitable planet
+        const planetEarnings = {};
+        earnings.forEach(h => {
+            planetEarnings[h.planetName] = (planetEarnings[h.planetName] || 0) + (h.feeValue || 0);
+        });
+        
+        let mostProfitablePlanet = null;
+        let mostProfitableAmount = 0;
+        
+        for (const [planet, amount] of Object.entries(planetEarnings)) {
+            if (amount > mostProfitableAmount) {
+                mostProfitableAmount = amount;
+                mostProfitablePlanet = planet;
+            }
+        }
+        
+        return {
+            planetsOwned: claims.length,
+            totalEarned,
+            totalMiners,
+            totalTransactions,
+            mostProfitablePlanet,
+            mostProfitableAmount,
+            averagePerPlanet: claims.length > 0 ? totalEarned / claims.length : 0,
+            lastActivity: earnings.length > 0 ? earnings[0].timestamp : null
+        };
+        
+    } catch (error) {
+        console.error(`Error getting claim stats for player ${playerId}:`, error);
+        return {
+            planetsOwned: 0,
+            totalEarned: 0,
+            totalMiners: 0,
+            totalTransactions: 0,
+            mostProfitablePlanet: null,
+            mostProfitableAmount: 0,
+            averagePerPlanet: 0,
+            lastActivity: null
+        };
+    }
+}
+
 // ===== RESET PLANET STATUS (for debugging) =====
 export function resetPlanetStatus(planetName) {
-    // This doesn't delete from journal, just removes claim status
     try {
-        const claimed = getClaimedPlanets();
-        const index = claimed.indexOf(planetName);
+        // Remove from detailed claims
+        const planetSaved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
+        if (planetSaved) {
+            const planetClaims = JSON.parse(planetSaved);
+            delete planetClaims[planetName];
+            localStorage.setItem(STORAGE_KEYS.PLANET_CLAIMS, JSON.stringify(planetClaims));
+        }
         
-        if (index !== -1) {
-            claimed.splice(index, 1);
-            localStorage.setItem(STORAGE_KEYS.CLAIMED_PLANETS, JSON.stringify(claimed));
+        // Remove from player claims index
+        const playerSaved = localStorage.getItem(STORAGE_KEYS.PLAYER_CLAIMS);
+        if (playerSaved) {
+            const playerClaims = JSON.parse(playerSaved);
+            for (const playerId in playerClaims) {
+                const index = playerClaims[playerId].indexOf(planetName);
+                if (index !== -1) {
+                    playerClaims[playerId].splice(index, 1);
+                }
+            }
+            localStorage.setItem(STORAGE_KEYS.PLAYER_CLAIMS, JSON.stringify(playerClaims));
+        }
+        
+        // Remove from legacy claimed planets
+        const legacySaved = localStorage.getItem(STORAGE_KEYS.CLAIMED_PLANETS);
+        if (legacySaved) {
+            const claimed = JSON.parse(legacySaved);
+            const index = claimed.indexOf(planetName);
+            if (index !== -1) {
+                claimed.splice(index, 1);
+                localStorage.setItem(STORAGE_KEYS.CLAIMED_PLANETS, JSON.stringify(claimed));
+            }
         }
         
         return true;
@@ -352,16 +801,29 @@ export default {
     RARITY_LEVELS,
     RARITY_COLORS,
     RARITY_CLASSES,
+    FEE_CONFIG,
     isRarityHigher,
     getHighestRarity,
     getPlanetStatus,
     getPlanetsStatus,
     updatePlanetStatusAfterDiscovery,
     claimPlanet,
+    getPlanetClaim,
+    updatePlanetClaim,
+    addMiningEarnings,
     isPlanetClaimed,
     getClaimedPlanets,
+    getPlayerClaims,
+    getClaimsSortedByDistance,
     getPlanetCssClass,
     getPlanetLabel,
     isPlanetReadyToClaim,
+    calculateMiningFee,
+    recordMiningActivity,
+    getPlanetMiningHistory,
+    getPlayerMiningHistory,
+    getOwnerEarningsHistory,
+    updatePlanetFee,
+    getPlayerClaimStats,
     resetPlanetStatus
 };
