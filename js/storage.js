@@ -1,4 +1,4 @@
-// js/storage/storage.js - Save/load player progress for Voidfarer
+// js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 // UPDATED: Added material inventory, recipe unlocks, skill progression across all fields
 
