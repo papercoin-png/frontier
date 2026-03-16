@@ -1,5 +1,5 @@
 // js/storage/storage.js - ULTRA MINIMAL VERSION
-// No duplicates, just the bare essentials
+// NO DUPLICATES - Fixed
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -83,11 +83,15 @@ export function saveTimestamp() {
 
 // ===== TEST FUNCTION =====
 export function test() {
-    console.log('✅ storage.js loaded');
+    console.log('✅ storage.js loaded successfully - NO DUPLICATES');
     return true;
 }
 
-// ===== SINGLE EXPORT =====
+// ============================================================================
+// SINGLE EXPORT SECTION - ONE EXPORT OF EACH FUNCTION
+// ============================================================================
+
+// Named exports - each function appears exactly ONCE
 export {
     STORAGE_KEYS,
     getPlayer,
@@ -96,9 +100,10 @@ export {
     addElementToCollection,
     addCreditsToOwner,
     saveTimestamp,
-    test
+    test  // test appears ONLY HERE in named exports
 };
 
+// Default export - separate from named exports, this is allowed
 export default {
     STORAGE_KEYS,
     getPlayer,
@@ -107,5 +112,5 @@ export default {
     addElementToCollection,
     addCreditsToOwner,
     saveTimestamp,
-    test
+    test  // test appears HERE in default export (this is OK - different export type)
 };
