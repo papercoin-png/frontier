@@ -191,7 +191,7 @@ const ELEMENT_MASS = {
 
 const DEFAULT_MASS = 100.0;
 
-function getElementMass(elementName) {
+export function getElementMass(elementName) {
     return ELEMENT_MASS[elementName] || DEFAULT_MASS;
 }
 
@@ -601,6 +601,289 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
+// COLLECTION FUNCTIONS (Ship Cargo)
+// ============================================================================
+
+/**
+ * Get the player's collection (ship cargo)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Collection object
+ */
+export async function getCollection(playerId = 'main') {
+    try {
+        const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting collection:', error);
+        return {};
+    }
+}
+
+/**
+ * Add elements to the player's collection (ship cargo)
+ * @param {string} elementName - Name of element to add
+ * @param {number} quantity - Quantity to add
+ * @param {Object} metadata - Additional data (location, etc.)
+ * @returns {Promise<Object>} Result object
+ */
+export async function addElementToCollection(elementName, quantity = 1, metadata = {}) {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
+        
+        let collection = await getCollection(playerId);
+        
+        if (!collection[elementName]) {
+            collection[elementName] = { count: 0, firstFound: Date.now() };
+        }
+        
+        // Handle different storage formats
+        if (typeof collection[elementName] === 'object') {
+            collection[elementName].count = (collection[elementName].count || 0) + quantity;
+            if (!collection[elementName].firstFound) {
+                collection[elementName].firstFound = Date.now();
+            }
+            // Add location metadata if provided
+            if (metadata.planet) {
+                if (!collection[elementName].locations) {
+                    collection[elementName].locations = [];
+                }
+                collection[elementName].locations.push({
+                    planet: metadata.planet,
+                    planetType: metadata.planetType,
+                    quantity: quantity,
+                    timestamp: metadata.timestamp || Date.now()
+                });
+            }
+        } else {
+            // Legacy format (direct number)
+            collection[elementName] = {
+                count: (collection[elementName] || 0) + quantity,
+                firstFound: Date.now()
+            };
+        }
+        
+        localStorage.setItem(key, JSON.stringify(collection));
+        
+        return {
+            success: true,
+            element: elementName,
+            newCount: typeof collection[elementName] === 'object' 
+                ? collection[elementName].count 
+                : collection[elementName],
+            added: quantity
+        };
+    } catch (error) {
+        console.error('Error adding element to collection:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Remove elements from the player's collection (ship cargo)
+ * @param {string} elementName - Name of element to remove
+ * @param {number} quantity - Quantity to remove
+ * @returns {Promise<Object>} Result object
+ */
+export async function removeElementFromCollection(elementName, quantity = 1) {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
+        
+        const collection = await getCollection(playerId);
+        
+        if (!collection[elementName]) {
+            return { success: false, error: 'Element not found' };
+        }
+        
+        let currentCount;
+        if (typeof collection[elementName] === 'object') {
+            currentCount = collection[elementName].count || 0;
+        } else {
+            currentCount = collection[elementName];
+        }
+        
+        if (currentCount < quantity) {
+            return { 
+                success: false, 
+                error: 'Insufficient quantity',
+                available: currentCount,
+                required: quantity
+            };
+        }
+        
+        // Update count
+        if (typeof collection[elementName] === 'object') {
+            collection[elementName].count = currentCount - quantity;
+            if (collection[elementName].count <= 0) {
+                delete collection[elementName];
+            }
+        } else {
+            const newCount = currentCount - quantity;
+            if (newCount <= 0) {
+                delete collection[elementName];
+            } else {
+                collection[elementName] = newCount;
+            }
+        }
+        
+        localStorage.setItem(key, JSON.stringify(collection));
+        
+        return {
+            success: true,
+            element: elementName,
+            removed: quantity,
+            remaining: currentCount - quantity
+        };
+    } catch (error) {
+        console.error('Error removing element from collection:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// HUB INVENTORY FUNCTIONS
+// ============================================================================
+
+/**
+ * Get hub inventory
+ * @returns {Promise<Object>} Hub inventory object
+ */
+export async function getHubInventory() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.HUB_INVENTORY);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting hub inventory:', error);
+        return {};
+    }
+}
+
+/**
+ * Add element to hub storage
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to add
+ * @returns {Promise<Object>} Result object
+ */
+export async function addElementToHub(elementName, quantity = 1) {
+    try {
+        const hubInventory = await getHubInventory();
+        
+        if (!hubInventory[elementName]) {
+            hubInventory[elementName] = { count: 0, firstFound: Date.now() };
+        }
+        
+        hubInventory[elementName].count = (hubInventory[elementName].count || 0) + quantity;
+        
+        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
+        
+        // Update used storage
+        const used = await getCurrentHubUsed();
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, used.toString());
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Error adding element to hub:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Remove element from hub storage
+ * @param {string} elementName - Element name
+ * @param {number} quantity - Quantity to remove
+ * @returns {Promise<Object>} Result object
+ */
+export async function removeElementFromHub(elementName, quantity = 1) {
+    try {
+        const hubInventory = await getHubInventory();
+        
+        if (!hubInventory[elementName]) {
+            return { success: false, error: 'Element not found' };
+        }
+        
+        const currentCount = hubInventory[elementName].count || 0;
+        
+        if (currentCount < quantity) {
+            return { 
+                success: false, 
+                error: 'Insufficient quantity',
+                available: currentCount,
+                required: quantity
+            };
+        }
+        
+        hubInventory[elementName].count = currentCount - quantity;
+        
+        if (hubInventory[elementName].count <= 0) {
+            delete hubInventory[elementName];
+        }
+        
+        localStorage.setItem(STORAGE_KEYS.HUB_INVENTORY, JSON.stringify(hubInventory));
+        
+        // Update used storage
+        const used = await getCurrentHubUsed();
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, used.toString());
+        
+        return { success: true };
+    } catch (error) {
+        console.error('Error removing element from hub:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get current hub used storage
+ * @returns {Promise<number>} Used storage in AMU
+ */
+async function getCurrentHubUsed() {
+    try {
+        const hubInventory = await getHubInventory();
+        let used = 0;
+        for (const [name, data] of Object.entries(hubInventory)) {
+            used += (data.count || 1) * getElementMass(name);
+        }
+        return used;
+    } catch (error) {
+        return 0;
+    }
+}
+
+/**
+ * Get remaining hub storage
+ * @returns {Promise<number>} Available storage in AMU
+ */
+export async function getRemainingHubStorage() {
+    try {
+        const max = parseInt(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) || 0;
+        const used = await getCurrentHubUsed();
+        return Math.max(0, max - used);
+    } catch (error) {
+        return 0;
+    }
+}
+
+/**
+ * Get remaining ship storage
+ * @returns {Promise<number>} Available ship cargo space in AMU
+ */
+export async function getRemainingShipStorage() {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const collection = await getCollection(playerId);
+        const max = getCargoMassLimit();
+        let used = 0;
+        for (const [name, data] of Object.entries(collection)) {
+            used += (data.count || 1) * getElementMass(name);
+        }
+        return Math.max(0, max - used);
+    } catch (error) {
+        return 0;
+    }
+}
+
+// ============================================================================
 // LOCATION HELPERS
 // ============================================================================
 
@@ -978,6 +1261,7 @@ export async function resetGame(playerId = 'main') {
     // Clear all player-specific data
     const keysToRemove = [
         `${STORAGE_KEYS.PLAYER}_${playerId}`,
+        `${STORAGE_KEYS.COLLECTION}_${playerId}`,
         `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`,
         `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`,
         `${STORAGE_KEYS.MATERIAL_QUALITY}_${playerId}`,
@@ -1110,6 +1394,18 @@ export default {
     // Cargo
     getElementMass,
     
+    // Collection (Ship Cargo)
+    getCollection,
+    addElementToCollection,
+    removeElementFromCollection,
+    
+    // Hub Storage
+    getHubInventory,
+    addElementToHub,
+    removeElementFromHub,
+    getRemainingHubStorage,
+    getRemainingShipStorage,
+    
     // Credits
     getCredits,
     saveCredits,
@@ -1153,5 +1449,4 @@ export default {
     initializeStorage,
     resetGame,
     saveTimestamp
-    // saveTimestamp is included ONCE here in the default export
 };
