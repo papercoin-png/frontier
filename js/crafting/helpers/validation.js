@@ -13,7 +13,7 @@ import {
 import { 
     getFieldProgress,
     isRecipeUnlocked as checkUnlock
-} from '../../storage/storage.js';
+} from '../../storage.js';  // FIXED: removed extra /storage/ path
 
 // ============================================================================
 // RECIPE VALIDATION
