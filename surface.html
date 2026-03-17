@@ -740,7 +740,7 @@
         </div>
     </div>
 
-    <!-- Scripts - FIXED: Added transfer.js which contains addElementToCollection -->
+    <!-- Scripts -->
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/transfer.js"></script>
@@ -826,6 +826,61 @@
         let cachedCargoMass = 0;
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
+
+        // ===== PLAYER LOCATIONS SYSTEM =====
+        // This ensures discoveries are saved permanently for planet-status.js
+        
+        async function saveDiscoveryToLocation(elementName, quantity, rarity) {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const locationsKey = `voidfarer_locations_${playerId}`;
+                
+                // Get existing locations
+                let locations = [];
+                const saved = localStorage.getItem(locationsKey);
+                if (saved) {
+                    locations = JSON.parse(saved);
+                }
+                
+                // Add new discovery
+                locations.push({
+                    planet: currentPlanet.name,
+                    planetType: currentPlanet.type,
+                    elementName: elementName,
+                    elementRarity: rarity,
+                    quantity: quantity,
+                    discoveredAt: Date.now()
+                });
+                
+                // Keep only last 1000 entries
+                if (locations.length > 1000) {
+                    locations = locations.slice(-1000);
+                }
+                
+                localStorage.setItem(locationsKey, JSON.stringify(locations));
+                
+                // Ensure window.getPlayerLocations is available
+                window.getPlayerLocations = async function() {
+                    const saved = localStorage.getItem(locationsKey);
+                    return saved ? JSON.parse(saved) : [];
+                };
+                
+                return true;
+            } catch (error) {
+                console.error('Error saving discovery:', error);
+                return false;
+            }
+        }
+
+        // Initialize getPlayerLocations if not exists
+        if (!window.getPlayerLocations) {
+            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+            const locationsKey = `voidfarer_locations_${playerId}`;
+            window.getPlayerLocations = async function() {
+                const saved = localStorage.getItem(locationsKey);
+                return saved ? JSON.parse(saved) : [];
+            };
+        }
 
         // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
@@ -1312,10 +1367,10 @@
                     const totalMass = massPerUnit * quantity;
                     
                     if (currentMass + totalMass <= cargoLimit) {
-                        // addElementToCollection is now available from transfer.js
-                        const avgQuantity = Math.floor(config.massTarget / massPerUnit);
-                        const isRichFind = quantity > avgQuantity * 1.5;
+                        // Save to permanent location record FIRST
+                        await saveDiscoveryToLocation(resource, quantity, rarity);
                         
+                        // Then add to collection
                         const locationData = {
                             planet: currentPlanet.name,
                             planetType: currentPlanet.type,
@@ -1339,7 +1394,7 @@
                                 quantity: quantity,
                                 mass: totalMass,
                                 wasPity: wasPity,
-                                isRichFind: isRichFind
+                                isRichFind: false
                             });
                             
                             await updateClaimButton();
@@ -1408,7 +1463,15 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'claiming planet...';
                 
-                const success = await claimPlanet(currentPlanet.name);
+                // Get player info
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+                
+                // Find the discovery element and rarity for claim
+                const discoveryElement = currentPlanet.resources[0] || 'Unknown';
+                const discoveryRarity = getElementRarity(discoveryElement);
+                
+                const success = await claimPlanet(currentPlanet.name, playerId, playerName, discoveryElement, discoveryRarity);
                 
                 if (success) {
                     showExtractionNotification({
@@ -1432,6 +1495,7 @@
                 }
                 
             } catch (error) {
+                console.error('Claim error:', error);
                 showExtractionNotification({
                     success: false,
                     resource: null,
@@ -1460,6 +1524,7 @@
                 }, 500);
                 
             } catch (error) {
+                console.error('Init error:', error);
                 loadingText.textContent = 'error landing';
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
