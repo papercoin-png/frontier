@@ -675,7 +675,7 @@
                 <input type="text" class="username-input" id="usernameInput" placeholder="Voidfarer" maxlength="20" value="Voidfarer">
             </div>
             
-            <!-- Begin Journey Button - Now clearly visible when scrolling -->
+            <!-- Begin Journey Button -->
             <button class="begin-button" id="beginBtn" onclick="beginJourney()">
                 <div class="button-inner">
                     <div class="button-left">
@@ -701,12 +701,7 @@
         </div>
     </div>
 
-    <!-- Audio element for background music -->
-    <audio id="bg-music" loop preload="auto">
-        <source src="https://cdn.jsdelivr.net/gh/papercoin-png/voidfarer-assets@main/earth.mp3" type="audio/mpeg">
-    </audio>
-
-    <!-- Music Controller -->
+    <!-- Music Controller - Handles all audio -->
     <script src="js/music-controller.js"></script>
 
     <script>
@@ -718,32 +713,20 @@
         }
 
         // ===== MUSIC SETUP =====
-        const music = document.getElementById('bg-music');
         const musicBtn = document.getElementById('musicBtn');
         
-        // Set initial volume
-        music.volume = 0.3;
-        
-        // Try to play music
-        music.play().catch(() => {
-            musicBtn.textContent = '🔇';
-        });
+        // Set initial volume and sync button
+        MusicController.setVolume(0.5);
+        musicBtn.textContent = '🔊';
 
         // ===== TOGGLE MUSIC =====
         window.toggleMusic = function() {
-            if (music.paused) {
-                music.play();
-                music.volume = 0.3;
-                musicBtn.textContent = '🔊';
-                MusicController.setVolume(0.3);
-            } else if (music.volume === 0) {
-                music.volume = 0.3;
-                musicBtn.textContent = '🔊';
-                MusicController.setVolume(0.3);
-            } else {
-                music.volume = 0;
-                musicBtn.textContent = '🔇';
+            if (MusicController.getVolume() > 0) {
                 MusicController.setVolume(0);
+                musicBtn.textContent = '🔇';
+            } else {
+                MusicController.setVolume(0.5);
+                musicBtn.textContent = '🔊';
             }
         };
 
@@ -833,7 +816,7 @@
             event.stopPropagation();
         };
 
-        // ===== BEGIN JOURNEY =====
+        // ===== BEGIN JOURNEY WITH CINEMATIC FADE-OUT =====
         window.beginJourney = function() {
             const username = document.getElementById('usernameInput').value.trim() || 'Voidfarer';
             
@@ -881,13 +864,32 @@
             // Haptic feedback
             if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
-            // Start playing Earth Hub music before navigating
-            MusicController.play('earth-hub');
+            // Get current volume
+            const startVolume = MusicController.getVolume();
             
-            // Navigate to Earth Hub
-            setTimeout(() => {
-                window.location.href = 'earth-hub.html';
-            }, 1500);
+            // FADE OUT MUSIC CINEMATICALLY
+            const fadeSteps = 20;
+            const fadeDuration = 2000; // 2 seconds
+            const stepTime = fadeDuration / fadeSteps;
+            let currentStep = 0;
+            
+            const fadeInterval = setInterval(() => {
+                currentStep++;
+                const newVolume = Math.max(0, startVolume * (1 - currentStep / fadeSteps));
+                MusicController.setVolume(newVolume);
+                
+                // Update button if volume reaches 0
+                if (newVolume === 0) {
+                    musicBtn.textContent = '🔇';
+                }
+                
+                if (currentStep >= fadeSteps) {
+                    clearInterval(fadeInterval);
+                    
+                    // Navigate to Earth Hub after fade completes
+                    window.location.href = 'earth-hub.html';
+                }
+            }, stepTime);
         };
 
         // ===== INIT =====
