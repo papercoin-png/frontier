@@ -1450,3 +1450,36 @@ export default {
     resetGame,
     saveTimestamp
 };
+
+// ============================================================================
+// EXPOSE FUNCTIONS TO WINDOW
+// ============================================================================
+// Make all commonly used functions available globally for non-module scripts
+
+window.getCollection = getCollection;
+window.addElementToCollection = addElementToCollection;
+window.removeElementFromCollection = removeElementFromCollection;
+window.getHubInventory = getHubInventory;
+window.addElementToHub = addElementToHub;
+window.removeElementFromHub = removeElementFromHub;
+window.getRemainingHubStorage = getRemainingHubStorage;
+window.getRemainingShipStorage = getRemainingShipStorage;
+window.isAtEarth = isAtEarth;
+window.getElementMass = getElementMass;
+window.getCredits = getCredits;
+window.saveCredits = saveCredits;
+window.addCredits = addCredits;
+window.spendCredits = spendCredits;
+window.getShipFuel = getShipFuel;
+window.saveShipFuel = saveShipFuel;
+window.getShipPower = getShipPower;
+window.saveShipPower = saveShipPower;
+window.getCurrentPlanetName = getCurrentPlanetName;
+window.getCurrentPlanetType = getCurrentPlanetType;
+window.getCurrentPlanetResources = getCurrentPlanetResources;
+window.getCurrentSector = getCurrentSector;
+window.getCurrentRegion = getCurrentRegion;
+window.setCurrentLocation = setCurrentLocation;
+window.setCurrentPlanet = setCurrentPlanet;
+
+console.log('✅ storage.js fully loaded with window exports');
