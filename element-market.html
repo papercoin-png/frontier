@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Element Market</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0f1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0f1a;
+        }
+        
+        .market-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0a121f 0%, #0e1a2a 100%);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px 100px 16px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0f1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #00c853;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #fff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #00c853;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header with Market Indicators */
+        .market-header {
+            margin-bottom: 20px;
+        }
+        
+        .market-title-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .market-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 0 15px #00c853;
+            letter-spacing: 1px;
+        }
+        
+        .market-status {
+            background: rgba(0, 200, 83, 0.15);
+            border: 1px solid #00c853;
+            border-radius: 30px;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00c853;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00c853;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-text {
+            color: #00c853;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Market Stats Bar */
+        .market-stats {
+            background: rgba(10, 20, 35, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #2a3a55;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .credits-display {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .credits-label {
+            color: #8a9bb5;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .credits-value {
+            color: #ffd700;
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .credits-value span {
+            font-size: 14px;
+            color: #8a9bb5;
+            margin-left: 4px;
+        }
+        
+        .market-indices {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .index-item {
+            text-align: right;
+        }
+        
+        .index-label {
+            color: #8a9bb5;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        
+        .index-value {
+            color: #4affaa;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .index-change {
+            font-size: 11px;
+            color: #4affaa;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        
+        .index-change.negative {
+            color: #ff6b6b;
+        }
+        
+        /* Tab Navigation */
+        .market-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            background: rgba(10, 20, 35, 0.6);
+            border-radius: 60px 20px 60px 20px;
+            padding: 4px;
+            border: 1px solid #2a3a55;
+        }
+        
+        .market-tab {
+            flex: 1;
+            padding: 12px 5px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: #8a9bb5;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .market-tab.active {
+            background: #00c853;
+            color: #0a0f1a;
+            box-shadow: 0 0 20px #00c853;
+        }
+        
+        .market-tab:active {
+            transform: scale(0.95);
+        }
+        
+        /* Search and Filter Bar */
+        .search-section {
+            margin-bottom: 16px;
+        }
+        
+        .search-container {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #4a6a8a;
+            font-size: 16px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 16px 16px 16px 48px;
+            background: rgba(10, 20, 35, 0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid #2a3a55;
+            border-radius: 60px 20px 60px 20px;
+            color: #fff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input:focus {
+            border-color: #00c853;
+        }
+        
+        .search-input::placeholder {
+            color: #4a6a8a;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(20, 35, 55, 0.8);
+            border: 1px solid #2a3a55;
+            color: #8a9bb5;
+            cursor: pointer;
+            transition: all 0.1s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-btn.active {
+            background: #00c853;
+            border-color: #00c853;
+            color: #0a0f1a;
+            box-shadow: 0 0 15px #00c853;
+        }
+        
+        .filter-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .sort-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 16px;
+        }
+        
+        .sort-select {
+            background: rgba(10, 20, 35, 0.8);
+            border: 2px solid #2a3a55;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+            max-width: 180px;
+            cursor: pointer;
+        }
+        
+        .sort-select option {
+            background: #0a1a2a;
+            color: #fff;
+        }
+        
+        /* Market Grid */
+        .market-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .market-item {
+            background: rgba(15, 25, 40, 0.8);
+            backdrop-filter: blur(5px);
+            border: 1px solid;
+            border-radius: 40px 12px 40px 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .market-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 0 20px rgba(0, 200, 83, 0.2);
+        }
+        
+        .market-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s;
+        }
+        
+        .market-item:hover::before {
+            transform: translateX(100%);
+        }
+        
+        .item-rarity-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            border-radius: 40px 0 0 40px;
+        }
+        
+        .rarity-common { border-color: #ffffff; }
+        .rarity-uncommon { border-color: #4affaa; }
+        .rarity-rare { border-color: #4169E1; }
+        .rarity-very-rare { border-color: #e0b0ff; }
+        .rarity-legendary { border-color: #ffd700; }
+        
+        .item-symbol {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            min-width: 45px;
+            text-align: center;
+            color: #fff;
+            background: rgba(0, 200, 83, 0.1);
+            padding: 8px 0;
+            border-radius: 30px 8px 30px 8px;
+            border: 1px solid currentColor;
+        }
+        
+        .item-info {
+            flex: 1;
+        }
+        
+        .item-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .item-name {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .item-atomic {
+            font-size: 10px;
+            color: #8a9bb5;
+            font-family: 'Roboto Mono', monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 20px;
+        }
+        
+        .item-details {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .item-mass {
+            color: #4affaa;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .item-value {
+            color: #ffd700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .item-market-cap {
+            color: #8a9bb5;
+            font-size: 11px;
+        }
+        
+        .item-price-section {
+            text-align: right;
+            min-width: 90px;
+        }
+        
+        .item-price {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            color: #fff;
+        }
+        
+        .item-price-change {
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 2px;
+        }
+        
+        .price-up {
+            color: #4affaa;
+        }
+        
+        .price-down {
+            color: #ff6b6b;
+        }
+        
+        .item-volume {
+            font-size: 10px;
+            color: #8a9bb5;
+            margin-top: 2px;
+        }
+        
+        /* Order Book Preview */
+        .order-book {
+            background: rgba(10, 20, 35, 0.8);
+            border: 1px solid #2a3a55;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .order-title {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .order-title span {
+            color: #4affaa;
+            font-size: 12px;
+            background: rgba(74, 255, 170, 0.1);
+            padding: 4px 8px;
+            border-radius: 20px;
+        }
+        
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(42, 58, 85, 0.3);
+        }
+        
+        .order-buy {
+            color: #4affaa;
+        }
+        
+        .order-sell {
+            color: #ff6b6b;
+        }
+        
+        .order-price {
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 600;
+        }
+        
+        .order-size {
+            color: #8a9bb5;
+        }
+        
+        /* Trading Panel */
+        .trading-panel {
+            background: rgba(15, 25, 40, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid #00c853;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+            box-shadow: 0 0 30px rgba(0, 200, 83, 0.3);
+        }
+        
+        .trading-panel.active {
+            display: block;
+        }
+        
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a3a55;
+        }
+        
+        .panel-icon {
+            font-size: 36px;
+            background: rgba(0, 200, 83, 0.1);
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 40px 10px 40px 10px;
+            border: 1px solid #00c853;
+        }
+        
+        .panel-info {
+            flex: 1;
+        }
+        
+        .panel-name {
+            color: #00c853;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .panel-symbol {
+            color: #8a9bb5;
+            font-size: 14px;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .panel-price {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            color: #fff;
+            text-align: right;
+        }
+        
+        .trade-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        
+        .trade-btn {
+            flex: 1;
+            padding: 16px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.1s;
+            border: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .buy-btn {
+            background: linear-gradient(135deg, #00c853, #00a86b);
+            color: #fff;
+            box-shadow: 0 0 20px #00c853;
+        }
+        
+        .sell-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ff4757);
+            color: #fff;
+            box-shadow: 0 0 20px #ff6b6b;
+        }
+        
+        .trade-btn:active {
+            transform: scale(0.96);
+        }
+        
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .qty-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(74, 138, 192, 0.3);
+            border: 2px solid #2a3a55;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qty-btn:active {
+            background: #00c853;
+            border-color: #00c853;
+            transform: scale(0.9);
+        }
+        
+        .qty-btn:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #tradeQuantity {
+            width: 80px;
+            height: 50px;
+            background: rgba(0,0,0,0.3);
+            border: 2px solid #2a3a55;
+            border-radius: 30px 8px 30px 8px;
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .trade-summary {
+            background: rgba(0,0,0,0.3);
+            border-radius: 40px 10px 40px 10px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: #8a9bb5;
+            font-size: 14px;
+        }
+        
+        .summary-value {
+            color: #fff;
+            font-weight: 600;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .summary-total {
+            font-size: 18px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #2a3a55;
+            color: #00c853;
+        }
+        
+        .trade-execute {
+            width: 100%;
+            background: linear-gradient(135deg, #00c853, #00a86b);
+            border: none;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 20px #00c853;
+        }
+        
+        .trade-execute.sell {
+            background: linear-gradient(135deg, #ff6b6b, #ff4757);
+            box-shadow: 0 0 20px #ff6b6b;
+        }
+        
+        .trade-execute:active {
+            transform: scale(0.96);
+        }
+        
+        .trade-execute:disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #1a2a3a, #0a1a2a);
+            border: 3px solid #00c853;
+            color: #ffffff;
+            padding: 18px 35px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 280px;
+            box-shadow: 0 0 30px #00c853, 0 10px 20px rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            letter-spacing: 1px;
+            animation: subtle-pulse 3s infinite;
+        }
+        
+        @keyframes subtle-pulse {
+            0% { border-color: #00c853; box-shadow: 0 0 20px #00c853; }
+            50% { border-color: #4affaa; box-shadow: 0 0 40px #4affaa; }
+            100% { border-color: #00c853; box-shadow: 0 0 20px #00c853; }
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #1a3a5a;
+        }
+        
+        .back-arrow {
+            font-size: 28px;
+            color: #00c853;
+            font-weight: bold;
+        }
+        
+        .back-text {
+            flex: 0 1 auto;
+        }
+        
+        .back-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 5px #00c853);
+        }
+        
+        /* Toast Notification */
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 200, 83, 0.95);
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 60px 20px 60px 20px;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            z-index: 2000;
+            animation: toast-slide 3s ease-in-out forwards;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 30px #00c853;
+            text-align: center;
+            min-width: 250px;
+        }
+        
+        .toast-notification.error {
+            background: rgba(255, 107, 107, 0.95);
+            box-shadow: 0 0 30px #ff6b6b;
+        }
+        
+        @keyframes toast-slide {
+            0% {
+                transform: translateX(-50%) translateY(-100%);
+                opacity: 0;
+            }
+            10% {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+            90% {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(-50%) translateY(-100%);
+                opacity: 0;
+            }
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #4a6a8a;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #2a3a55;
+            font-style: italic;
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #0a1a2a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #00c853;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4affaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="market-view" id="marketView">
+            <!-- Header -->
+            <div class="market-header">
+                <div class="market-title-section">
+                    <div class="market-title">ELEMENT MARKET</div>
+                    <div class="market-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">LIVE</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Market Stats Bar -->
+            <div class="market-stats">
+                <div class="credits-display">
+                    <span class="credits-label">YOUR BALANCE</span>
+                    <span class="credits-value" id="creditsDisplay">0<span>⭐</span></span>
+                </div>
+                <div class="market-indices">
+                    <div class="index-item">
+                        <div class="index-label">INDEX</div>
+                        <div class="index-value" id="marketIndex">1,247</div>
+                        <div class="index-change" id="marketChange">+2.3%</div>
+                    </div>
+                    <div class="index-item">
+                        <div class="index-label">VOLUME</div>
+                        <div class="index-value" id="marketVolume">12.4K</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="market-tabs">
+                <button class="market-tab active" id="allTab" onclick="switchTab('all')">ALL</button>
+                <button class="market-tab" id="commonTab" onclick="switchTab('common')">COMMON</button>
+                <button class="market-tab" id="uncommonTab" onclick="switchTab('uncommon')">UNCOMMON</button>
+                <button class="market-tab" id="rareTab" onclick="switchTab('rare')">RARE</button>
+                <button class="market-tab" id="veryRareTab" onclick="switchTab('very-rare')">VERY RARE</button>
+                <button class="market-tab" id="legendaryTab" onclick="switchTab('legendary')">LEGENDARY</button>
+            </div>
+            
+            <!-- Search and Filter -->
+            <div class="search-section">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search by name or symbol..." oninput="searchElements()">
+                </div>
+                
+                <div class="filter-row">
+                    <span class="filter-btn active" onclick="filterByRarity('all')">ALL</span>
+                    <span class="filter-btn" onclick="filterByRarity('common')">COMMON</span>
+                    <span class="filter-btn" onclick="filterByRarity('uncommon')">UNCOMMON</span>
+                    <span class="filter-btn" onclick="filterByRarity('rare')">RARE</span>
+                    <span class="filter-btn" onclick="filterByRarity('very-rare')">VERY RARE</span>
+                    <span class="filter-btn" onclick="filterByRarity('legendary')">LEGENDARY</span>
+                </div>
+                
+                <div class="sort-bar">
+                    <select class="sort-select" id="sortSelect" onchange="sortMarket()">
+                        <option value="name">Sort by Name</option>
+                        <option value="symbol">Sort by Symbol</option>
+                        <option value="atomic">Sort by Atomic #</option>
+                        <option value="value-asc">Price: Low to High</option>
+                        <option value="value-desc">Price: High to Low</option>
+                        <option value="rarity">Sort by Rarity</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Market Grid -->
+            <div class="market-grid" id="marketGrid">
+                <!-- Filled by JavaScript -->
+                <div class="empty-state">Loading market data...</div>
+            </div>
+            
+            <!-- Order Book Preview -->
+            <div class="order-book">
+                <div class="order-title">
+                    ORDER BOOK
+                    <span>TOP MOVERS</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-buy">BUY</span>
+                    <span class="order-price">GOLD</span>
+                    <span class="order-size">+12.5%</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-buy">BUY</span>
+                    <span class="order-price">PLATINUM</span>
+                    <span class="order-size">+8.3%</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-sell">SELL</span>
+                    <span class="order-price">LEAD</span>
+                    <span class="order-size">-3.2%</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-sell">SELL</span>
+                    <span class="order-price">MERCURY</span>
+                    <span class="order-size">-1.8%</span>
+                </div>
+            </div>
+            
+            <!-- Trading Panel -->
+            <div class="trading-panel" id="tradingPanel">
+                <div class="panel-header">
+                    <div class="panel-icon" id="panelIcon">🔹</div>
+                    <div class="panel-info">
+                        <div class="panel-name" id="panelName">Select Element</div>
+                        <div class="panel-symbol" id="panelSymbol">---</div>
+                    </div>
+                    <div class="panel-price" id="panelPrice">0⭐</div>
+                </div>
+                
+                <div class="trade-controls">
+                    <button class="trade-btn buy-btn" onclick="setTradeMode('buy')">BUY</button>
+                    <button class="trade-btn sell-btn" onclick="setTradeMode('sell')">SELL</button>
+                </div>
+                
+                <div class="quantity-selector">
+                    <button class="qty-btn" id="tradeDecrementBtn" onclick="decrementQuantity()" disabled>−</button>
+                    <input type="number" id="tradeQuantity" value="1" min="1" max="99" readonly>
+                    <button class="qty-btn" id="tradeIncrementBtn" onclick="incrementQuantity()">+</button>
+                </div>
+                
+                <div class="trade-summary">
+                    <div class="summary-row">
+                        <span>Price per unit:</span>
+                        <span class="summary-value" id="unitPrice">0⭐</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Quantity:</span>
+                        <span class="summary-value" id="summaryQuantity">1</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total value:</span>
+                        <span class="summary-value" id="totalValue">0⭐</span>
+                    </div>
+                    <div class="summary-row summary-total">
+                        <span>Your balance after:</span>
+                        <span class="summary-value" id="balanceAfter">0⭐</span>
+                    </div>
+                </div>
+                
+                <button class="trade-execute" id="executeTradeBtn" onclick="executeTrade()">CONFIRM TRADE</button>
+            </div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">MARKET HUB</span>
+                <span class="back-icon">📊</span>
+            </button>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">loading market...</div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/elements-data.js"></script>
+    
+    <script type="module">
+        import { ELEMENTS, getElementByName, getElementIcon, getElementRarity, getElementValue } from './js/elements-data.js';
+        import { getCredits, spendCredits, addCredits, getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('#0a0f1a');
+            tg.setBackgroundColor('#0a0f1a');
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+        const marketGrid = document.getElementById('marketGrid');
+        const creditsDisplay = document.getElementById('creditsDisplay');
+        const tradingPanel = document.getElementById('tradingPanel');
+        
+        // Trading panel elements
+        const panelIcon = document.getElementById('panelIcon');
+        const panelName = document.getElementById('panelName');
+        const panelSymbol = document.getElementById('panelSymbol');
+        const panelPrice = document.getElementById('panelPrice');
+        const tradeQuantity = document.getElementById('tradeQuantity');
+        const tradeDecrementBtn = document.getElementById('tradeDecrementBtn');
+        const tradeIncrementBtn = document.getElementById('tradeIncrementBtn');
+        const unitPrice = document.getElementById('unitPrice');
+        const summaryQuantity = document.getElementById('summaryQuantity');
+        const totalValue = document.getElementById('totalValue');
+        const balanceAfter = document.getElementById('balanceAfter');
+        const executeTradeBtn = document.getElementById('executeTradeBtn');
+
+        // ===== STATE =====
+        let allElements = [];
+        let filteredElements = [];
+        let currentFilter = 'all';
+        let searchTerm = '';
+        let sortBy = 'name';
+        let currentCredits = 5000;
+        let currentCollection = {};
+        let selectedElement = null;
+        let tradeMode = 'buy'; // 'buy' or 'sell'
+        let maxQuantity = 99;
+
+        // ===== RARITY COLORS =====
+        const rarityColors = {
+            'common': '#ffffff',
+            'uncommon': '#4affaa',
+            'rare': '#4169E1',
+            'very-rare': '#e0b0ff',
+            'legendary': '#ffd700'
+        };
+
+        // ===== MARKET INDICES =====
+        function updateMarketIndices() {
+            const totalValue = allElements.reduce((sum, e) => sum + e.value, 0);
+            const avgValue = Math.round(totalValue / allElements.length);
+            document.getElementById('marketIndex').textContent = avgValue;
+            
+            // Random change for demo
+            const change = (Math.random() * 5 - 2).toFixed(1);
+            const changeEl = document.getElementById('marketChange');
+            changeEl.textContent = change > 0 ? `+${change}%` : `${change}%`;
+            changeEl.className = `index-change ${change >= 0 ? '' : 'negative'}`;
+            
+            const volume = Math.floor(Math.random() * 20000 + 5000);
+            document.getElementById('marketVolume').textContent = volume.toLocaleString();
+        }
+
+        // ===== LOAD DATA =====
+        async function loadMarketData() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'loading market data...';
+                
+                // Load elements
+                allElements = ELEMENTS;
+                filteredElements = [...allElements];
+                
+                // Load player data
+                currentCredits = await getCredits();
+                currentCollection = await getCollection();
+                
+                // Update displays
+                updateCreditsDisplay();
+                updateMarketIndices();
+                renderMarket();
+                
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error loading market:', error);
+                loadingText.textContent = 'error loading data';
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                }, 2000);
+            }
+        }
+
+        // ===== UPDATE CREDITS DISPLAY =====
+        function updateCreditsDisplay() {
+            creditsDisplay.innerHTML = `${currentCredits.toLocaleString()}<span>⭐</span>`;
+        }
+
+        // ===== RENDER MARKET =====
+        function renderMarket() {
+            if (filteredElements.length === 0) {
+                marketGrid.innerHTML = '<div class="empty-state">No elements found</div>';
+                return;
+            }
+            
+            let html = '';
+            filteredElements.forEach(element => {
+                const rarityColor = rarityColors[element.rarity] || '#ffffff';
+                const icon = getElementIcon(element.name);
+                
+                // Random price movement for demo
+                const change = (Math.random() * 8 - 4).toFixed(1);
+                const changeClass = change >= 0 ? 'price-up' : 'price-down';
+                const changeSymbol = change >= 0 ? '▲' : '▼';
+                
+                // Random volume
+                const volume = Math.floor(Math.random() * 1000 + 100);
+                
+                html += `
+                    <div class="market-item rarity-${element.rarity}" onclick="selectElement('${element.name}')" style="border-color: ${rarityColor}">
+                        <div class="item-symbol" style="color: ${rarityColor}">${element.symbol}</div>
+                        <div class="item-info">
+                            <div class="item-name-row">
+                                <span class="item-name" style="color: ${rarityColor}">${element.name}</span>
+                                <span class="item-atomic">#${element.atomic}</span>
+                            </div>
+                            <div class="item-details">
+                                <span class="item-mass">⚖️ ${element.mass} AMU</span>
+                                <span class="item-value">💰 ${element.value}⭐</span>
+                                <span class="item-market-cap">📊 ${element.planets} planets</span>
+                            </div>
+                        </div>
+                        <div class="item-price-section">
+                            <div class="item-price">${element.value}⭐</div>
+                            <div class="item-price-change ${changeClass}">
+                                <span>${changeSymbol} ${Math.abs(change)}%</span>
+                            </div>
+                            <div class="item-volume">Vol: ${volume}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            marketGrid.innerHTML = html;
+        }
+
+        // ===== FILTER BY RARITY =====
+        window.filterByRarity = function(rarity) {
+            currentFilter = rarity;
+            
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            applyFilters();
+        };
+
+        // ===== SEARCH ELEMENTS =====
+        window.searchElements = function() {
+            searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            applyFilters();
+        };
+
+        // ===== SORT MARKET =====
+        window.sortMarket = function() {
+            sortBy = document.getElementById('sortSelect').value;
+            applyFilters();
+        };
+
+        // ===== APPLY FILTERS AND SORT =====
+        function applyFilters() {
+            // Apply rarity filter
+            let filtered = allElements.filter(element => {
+                if (currentFilter !== 'all' && element.rarity !== currentFilter) return false;
+                if (searchTerm) {
+                    return element.name.toLowerCase().includes(searchTerm) || 
+                           element.symbol.toLowerCase().includes(searchTerm);
+                }
+                return true;
+            });
+            
+            // Apply sorting
+            switch(sortBy) {
+                case 'name':
+                    filtered.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'symbol':
+                    filtered.sort((a, b) => a.symbol.localeCompare(b.symbol));
+                    break;
+                case 'atomic':
+                    filtered.sort((a, b) => a.atomic - b.atomic);
+                    break;
+                case 'value-asc':
+                    filtered.sort((a, b) => a.value - b.value);
+                    break;
+                case 'value-desc':
+                    filtered.sort((a, b) => b.value - a.value);
+                    break;
+                case 'rarity':
+                    const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
+                    filtered.sort((a, b) => rarityOrder[b.rarity] - rarityOrder[a.rarity]);
+                    break;
+            }
+            
+            filteredElements = filtered;
+            renderMarket();
+        }
+
+        // ===== SELECT ELEMENT =====
+        window.selectElement = function(elementName) {
+            const element = getElementByName(elementName);
+            if (!element) return;
+            
+            selectedElement = element;
+            
+            // Update panel
+            panelIcon.textContent = getElementIcon(element.name);
+            panelName.textContent = element.name;
+            panelSymbol.textContent = element.symbol;
+            panelPrice.textContent = element.value + '⭐';
+            
+            // Reset quantity
+            tradeQuantity.value = 1;
+            updateQuantityButtons();
+            updateTradeSummary();
+            
+            // Show panel
+            tradingPanel.classList.add('active');
+            
+            // Scroll to panel
+            tradingPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        // ===== SET TRADE MODE =====
+        window.setTradeMode = function(mode) {
+            tradeMode = mode;
+            executeTradeBtn.className = `trade-execute ${mode === 'sell' ? 'sell' : ''}`;
+            executeTradeBtn.textContent = mode === 'buy' ? 'BUY NOW' : 'SELL NOW';
+            updateTradeSummary();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        // ===== UPDATE QUANTITY BUTTONS =====
+        function updateQuantityButtons() {
+            const qty = parseInt(tradeQuantity.value);
+            
+            if (tradeMode === 'buy') {
+                const maxBuy = Math.floor(currentCredits / (selectedElement?.value || 1));
+                tradeDecrementBtn.disabled = qty <= 1;
+                tradeIncrementBtn.disabled = qty >= maxQuantity || qty >= maxBuy;
+            } else {
+                const owned = currentCollection[selectedElement?.name]?.count || 0;
+                tradeDecrementBtn.disabled = qty <= 1;
+                tradeIncrementBtn.disabled = qty >= maxQuantity || qty >= owned;
+            }
+        }
+
+        // ===== INCREMENT QUANTITY =====
+        window.incrementQuantity = function() {
+            let current = parseInt(tradeQuantity.value);
+            if (current < maxQuantity) {
+                current++;
+                tradeQuantity.value = current;
+                updateQuantityButtons();
+                updateTradeSummary();
+            }
+        };
+
+        // ===== DECREMENT QUANTITY =====
+        window.decrementQuantity = function() {
+            let current = parseInt(tradeQuantity.value);
+            if (current > 1) {
+                current--;
+                tradeQuantity.value = current;
+                updateQuantityButtons();
+                updateTradeSummary();
+            }
+        };
+
+        // ===== UPDATE TRADE SUMMARY =====
+        function updateTradeSummary() {
+            if (!selectedElement) return;
+            
+            const qty = parseInt(tradeQuantity.value);
+            const total = selectedElement.value * qty;
+            
+            unitPrice.textContent = selectedElement.value + '⭐';
+            summaryQuantity.textContent = qty;
+            totalValue.textContent = total + '⭐';
+            
+            if (tradeMode === 'buy') {
+                const after = currentCredits - total;
+                balanceAfter.textContent = after + '⭐';
+                balanceAfter.style.color = after >= 0 ? '#4affaa' : '#ff6b6b';
+            } else {
+                const after = currentCredits + total;
+                balanceAfter.textContent = after + '⭐';
+                balanceAfter.style.color = '#4affaa';
+            }
+        }
+
+        // ===== SHOW TOAST NOTIFICATION =====
+        function showToast(message, isSuccess = true) {
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${isSuccess ? '' : 'error'}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // ===== EXECUTE TRADE =====
+        window.executeTrade = async function() {
+            if (!selectedElement) return;
+            
+            const qty = parseInt(tradeQuantity.value);
+            const total = selectedElement.value * qty;
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'processing trade...';
+            
+            try {
+                if (tradeMode === 'buy') {
+                    // Check credits
+                    if (currentCredits < total) {
+                        showToast('❌ Insufficient credits', false);
+                        return;
+                    }
+                    
+                    // Spend credits
+                    const spent = await spendCredits(total);
+                    if (!spent) {
+                        showToast('❌ Transaction failed', false);
+                        return;
+                    }
+                    
+                    // Add to collection
+                    const result = await addElementToCollection(selectedElement.name, qty);
+                    
+                    if (result.success) {
+                        currentCredits -= total;
+                        updateCreditsDisplay();
+                        
+                        // Update local collection
+                        if (!currentCollection[selectedElement.name]) {
+                            currentCollection[selectedElement.name] = { count: 0 };
+                        }
+                        currentCollection[selectedElement.name].count = (currentCollection[selectedElement.name].count || 0) + qty;
+                        
+                        showToast(`✅ Purchased ${qty}x ${selectedElement.name}`);
+                        
+                        // Dispatch event for cargo page
+                        window.dispatchEvent(new CustomEvent('cargo-updated', { 
+                            detail: { element: selectedElement.name, quantity: qty, mass: selectedElement.mass * qty }
+                        }));
+                        
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    } else {
+                        showToast('❌ Purchase failed', false);
+                    }
+                    
+                } else {
+                    // Check ownership
+                    const owned = currentCollection[selectedElement.name]?.count || 0;
+                    if (owned < qty) {
+                        showToast('❌ Not enough elements to sell', false);
+                        return;
+                    }
+                    
+                    // Remove from collection
+                    const result = await removeElementFromCollection(selectedElement.name, qty);
+                    
+                    if (result.success) {
+                        // Add credits
+                        await addCredits(total);
+                        currentCredits += total;
+                        updateCreditsDisplay();
+                        
+                        // Update local collection
+                        if (currentCollection[selectedElement.name]) {
+                            currentCollection[selectedElement.name].count -= qty;
+                            if (currentCollection[selectedElement.name].count <= 0) {
+                                delete currentCollection[selectedElement.name];
+                            }
+                        }
+                        
+                        showToast(`✅ Sold ${qty}x ${selectedElement.name}`);
+                        
+                        // Dispatch event for cargo page
+                        window.dispatchEvent(new CustomEvent('cargo-updated', { 
+                            detail: { element: selectedElement.name, quantity: -qty, mass: -selectedElement.mass * qty }
+                        }));
+                        
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    } else {
+                        showToast('❌ Sale failed', false);
+                    }
+                }
+                
+                // Update UI
+                updateQuantityButtons();
+                updateTradeSummary();
+                
+            } catch (error) {
+                console.error('Trade error:', error);
+                showToast('❌ Transaction error', false);
+            }
+            
+            loadingOverlay.classList.remove('active');
+        };
+
+        // ===== SWITCH TAB =====
+        window.switchTab = function(tab) {
+            currentFilter = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.market-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tab + 'Tab')?.classList.add('active');
+            
+            applyFilters();
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+
+        // ===== RETURN TO HUB =====
+        window.returnToHub = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'market-hub.html';
+        };
+
+        // ===== INITIALIZE =====
+        async function init() {
+            await loadMarketData();
+            
+            // Refresh data every 30 seconds
+            setInterval(async () => {
+                currentCredits = await getCredits();
+                currentCollection = await getCollection();
+                updateCreditsDisplay();
+                updateMarketIndices();
+                renderMarket();
+            }, 30000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
