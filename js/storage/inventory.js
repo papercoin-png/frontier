@@ -1,525 +1,521 @@
-// js/crafting/crafting-core.js
-// Universal Crafting Engine for Voidfarer
-// Handles crafting for ALL fields (alchemy, metallurgy, materials science, etc.)
+// js/storage/inventory.js
+// Inventory management for Voidfarer
+// Tracks both raw elements AND crafted materials separately
 
-import { 
-    RECIPE_DATABASE, 
-    getRecipeById,
-    calculateMaterialCost,
-    getBaseElements
-} from './recipe-index.js';
-
-import { 
-    getInventory, 
-    removeFromInventory, 
-    addToInventory,
-    hasEnoughIngredients
-} from '../storage/inventory.js';
-
-import {
-    getFieldProgress,
-    updateFieldProgress,
-    getFieldLevel,
-    getFieldMultiplier
-} from '../storage/progression.js';
-
-// ===== MASTERY LEVELS (Shared across all fields) =====
-export const MASTERY_LEVELS = [
-    { name: 'Untrained', threshold: 0, multiplier: 1.0 },
-    { name: 'Novice', threshold: 100, multiplier: 1.2 },
-    { name: 'Apprentice', threshold: 1000, multiplier: 1.5 },
-    { name: 'Journeyman', threshold: 5000, multiplier: 2.0 },
-    { name: 'Expert', threshold: 10000, multiplier: 3.0 },
-    { name: 'Master', threshold: 25000, multiplier: 5.0 },
-    { name: 'Grand Master', threshold: 50000, multiplier: 8.0 },
-    { name: 'Sage', threshold: 100000, multiplier: 12.0 },
-    { name: 'Legendary', threshold: 250000, multiplier: 20.0 },
-    { name: 'Mythic', threshold: 500000, multiplier: 35.0 },
-    { name: 'Transcendent', threshold: 1000000, multiplier: 50.0 }
-];
-
-// ===== QUALITY TIERS =====
-export const QUALITY_TIERS = [
-    { name: 'Poor', multiplier: 0.5, icon: '⬛', color: '#808080' },
-    { name: 'Standard', multiplier: 1.0, icon: '⬜', color: '#ffffff' },
-    { name: 'High', multiplier: 1.5, icon: '🟦', color: '#4a8ac0' },
-    { name: 'Perfect', multiplier: 2.0, icon: '🟪', color: '#e0b0ff' },
-    { name: 'Legendary', multiplier: 3.0, icon: '✨', color: '#ffd700' }
-];
+// ===== STORAGE KEYS =====
+const STORAGE_KEYS = {
+    ELEMENT_INVENTORY: 'voidfarer_collection',      // Raw elements from mining
+    MATERIAL_INVENTORY: 'voidfarer_materials',      // Crafted materials
+    MATERIAL_QUALITY: 'voidfarer_material_quality'  // Quality tracking for materials
+};
 
 // ============================================================================
-// CORE CRAFTING FUNCTIONS
+// ELEMENT INVENTORY (Raw materials from mining)
 // ============================================================================
 
 /**
- * Craft an item (universal - works for any field)
- * @param {string} recipeId - ID of the recipe to craft
- * @param {number} count - Number of times to craft
- * @param {Object} options - Crafting options (quality focus, etc.)
- * @returns {Promise<Object>} Result of crafting operation
+ * Get element inventory (raw mined elements)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Element inventory object
  */
-export async function craftItem(recipeId, count = 1, options = {}) {
+export async function getElementInventory(playerId = 'main') {
     try {
-        console.log(`🔨 Crafting ${count}x ${recipeId}...`);
+        const key = `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting element inventory:', error);
+        return {};
+    }
+}
+
+/**
+ * Save element inventory
+ * @param {string} playerId - Player ID
+ * @param {Object} inventory - Inventory object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveElementInventory(playerId, inventory) {
+    try {
+        const key = `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(inventory));
+        return true;
+    } catch (error) {
+        console.error('Error saving element inventory:', error);
+        return false;
+    }
+}
+
+/**
+ * Add elements to inventory
+ * @param {string} playerId - Player ID
+ * @param {string} elementName - Element name
+ * @param {number} count - Amount to add
+ * @param {Object} metadata - Additional data (location, etc.)
+ * @returns {Promise<Object>} Result object
+ */
+export async function addElementToInventory(playerId, elementName, count = 1, metadata = {}) {
+    try {
+        const inventory = await getElementInventory(playerId);
         
-        // Get recipe
-        const recipe = getRecipeById(recipeId);
-        if (!recipe) {
-            return { success: false, error: 'Recipe not found' };
+        if (!inventory[elementName]) {
+            inventory[elementName] = { count: 0, firstFound: Date.now() };
         }
         
-        // Validate count
-        if (count < 1) {
-            return { success: false, error: 'Count must be at least 1' };
-        }
-        
-        // Get player ID
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-        
-        // Get field for this recipe
-        const field = recipe.field || 'alchemy';
-        
-        // Get current progress for this field
-        const fieldProgress = await getFieldProgress(playerId, field);
-        const currentProgress = fieldProgress[recipeId] || 0;
-        
-        // Calculate total ingredients needed
-        const totalIngredients = calculateMaterialCost(recipeId, count);
-        
-        // Get current inventory
-        const inventory = await getInventory(playerId);
-        
-        // Check if player has enough ingredients
-        const hasIngredients = await hasEnoughIngredients(playerId, totalIngredients);
-        if (!hasIngredients) {
-            return { 
-                success: false, 
-                error: 'Insufficient ingredients',
-                required: totalIngredients
+        // Handle different storage formats
+        if (typeof inventory[elementName] === 'object') {
+            inventory[elementName].count = (inventory[elementName].count || 0) + count;
+            if (!inventory[elementName].firstFound) {
+                inventory[elementName].firstFound = Date.now();
+            }
+        } else {
+            // Legacy format (direct number)
+            inventory[elementName] = {
+                count: (inventory[elementName] || 0) + count,
+                firstFound: Date.now()
             };
         }
         
-        // Determine quality based on skill and options
-        const quality = await determineQuality(recipe, fieldProgress, options);
+        await saveElementInventory(playerId, inventory);
         
-        // Consume ingredients
-        for (const [ingredient, amount] of Object.entries(totalIngredients)) {
-            await removeFromInventory(playerId, ingredient, amount);
-        }
-        
-        // Calculate skill gain (base * quality multiplier)
-        const skillGain = Math.round(recipe.skillGain * count * quality.multiplier);
-        
-        // Update progress
-        const newProgress = currentProgress + skillGain;
-        await updateFieldProgress(playerId, field, recipeId, newProgress);
-        
-        // Add crafted item to inventory
-        const itemId = `${recipeId}_${quality.name.toLowerCase()}`;
-        await addToInventory(playerId, itemId, count, {
-            recipeId: recipeId,
-            name: recipe.name,
-            quality: quality.name,
-            qualityMultiplier: quality.multiplier,
-            value: recipe.value * quality.multiplier,
-            icon: recipe.icon,
-            field: field,
-            craftedAt: Date.now()
-        });
-        
-        // Calculate new level
-        const totalFieldProgress = await getTotalFieldProgress(playerId, field);
-        const oldLevel = getFieldLevel(currentProgress);
-        const newLevel = getFieldLevel(newProgress);
-        
-        // Return success with details
         return {
             success: true,
-            count: count,
-            recipe: recipe.name,
-            field: field,
-            skillGain: skillGain,
-            quality: quality.name,
-            qualityMultiplier: quality.multiplier,
-            newProgress: newProgress,
-            leveledUp: oldLevel.name !== newLevel.name,
-            newLevel: newLevel.name,
-            multiplier: newLevel.multiplier,
-            itemId: itemId
+            element: elementName,
+            newCount: typeof inventory[elementName] === 'object' 
+                ? inventory[elementName].count 
+                : inventory[elementName],
+            added: count
         };
-        
     } catch (error) {
-        console.error('Error in craftItem:', error);
+        console.error('Error adding element to inventory:', error);
         return { success: false, error: error.message };
     }
 }
 
 /**
- * Determine quality of crafted item
- * @param {Object} recipe - Recipe being crafted
- * @param {Object} fieldProgress - Player's progress in this field
- * @param {Object} options - Crafting options
- * @returns {Promise<Object>} Quality tier
+ * Remove elements from inventory
+ * @param {string} playerId - Player ID
+ * @param {string} elementName - Element name
+ * @param {number} count - Amount to remove
+ * @returns {Promise<Object>} Result object
  */
-async function determineQuality(recipe, fieldProgress, options = {}) {
-    // Base quality chance influenced by skill level
-    const totalProgress = Object.values(fieldProgress).reduce((a, b) => a + b, 0);
-    const level = getFieldLevel(totalProgress);
-    
-    // Quality roll (0-100)
-    const roll = Math.random() * 100;
-    
-    // Adjust roll based on skill multiplier
-    const adjustedRoll = roll * level.multiplier;
-    
-    // Determine quality
-    if (adjustedRoll > 95 || options.forceLegendary) {
-        return QUALITY_TIERS[4]; // Legendary
-    } else if (adjustedRoll > 80) {
-        return QUALITY_TIERS[3]; // Perfect
-    } else if (adjustedRoll > 60) {
-        return QUALITY_TIERS[2]; // High
-    } else if (adjustedRoll > 30) {
-        return QUALITY_TIERS[1]; // Standard
-    } else {
-        return QUALITY_TIERS[0]; // Poor
+export async function removeElementFromInventory(playerId, elementName, count = 1) {
+    try {
+        const inventory = await getElementInventory(playerId);
+        
+        if (!inventory[elementName]) {
+            return { success: false, error: 'Element not found' };
+        }
+        
+        let currentCount;
+        if (typeof inventory[elementName] === 'object') {
+            currentCount = inventory[elementName].count || 0;
+        } else {
+            currentCount = inventory[elementName];
+        }
+        
+        if (currentCount < count) {
+            return { 
+                success: false, 
+                error: 'Insufficient quantity',
+                available: currentCount,
+                required: count
+            };
+        }
+        
+        // Update count
+        if (typeof inventory[elementName] === 'object') {
+            inventory[elementName].count = currentCount - count;
+            if (inventory[elementName].count <= 0) {
+                delete inventory[elementName];
+            }
+        } else {
+            const newCount = currentCount - count;
+            if (newCount <= 0) {
+                delete inventory[elementName];
+            } else {
+                inventory[elementName] = newCount;
+            }
+        }
+        
+        await saveElementInventory(playerId, inventory);
+        
+        return {
+            success: true,
+            element: elementName,
+            removed: count,
+            remaining: currentCount - count
+        };
+    } catch (error) {
+        console.error('Error removing element from inventory:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// MATERIAL INVENTORY (Crafted items)
+// ============================================================================
+
+/**
+ * Get material inventory (crafted items)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Material inventory object
+ */
+export async function getMaterialInventory(playerId = 'main') {
+    try {
+        const key = `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error getting material inventory:', error);
+        return {};
     }
 }
 
 /**
- * Batch craft multiple items
- * @param {string} recipeId - ID of the recipe to craft
- * @param {number} totalCount - Total number to craft
- * @param {Function} onProgress - Progress callback
- * @returns {Promise<Object>} Batch results
+ * Save material inventory
+ * @param {string} playerId - Player ID
+ * @param {Object} inventory - Inventory object
+ * @returns {Promise<boolean>} Success status
  */
-export async function batchCraft(recipeId, totalCount, onProgress = null) {
-    const results = {
-        success: 0,
-        failed: 0,
-        total: totalCount,
-        leveledUp: false,
-        newLevel: null,
-        items: [],
-        quality: {
+export async function saveMaterialInventory(playerId, inventory) {
+    try {
+        const key = `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`;
+        localStorage.setItem(key, JSON.stringify(inventory));
+        return true;
+    } catch (error) {
+        console.error('Error saving material inventory:', error);
+        return false;
+    }
+}
+
+/**
+ * Add crafted material to inventory
+ * @param {string} playerId - Player ID
+ * @param {string} materialId - Material ID (e.g., 'steel_high')
+ * @param {number} count - Amount to add
+ * @param {Object} metadata - Material metadata (quality, recipe, etc.)
+ * @returns {Promise<Object>} Result object
+ */
+export async function addMaterialToInventory(playerId, materialId, count = 1, metadata = {}) {
+    try {
+        const inventory = await getMaterialInventory(playerId);
+        
+        if (!inventory[materialId]) {
+            inventory[materialId] = {
+                count: 0,
+                firstCrafted: Date.now(),
+                ...metadata
+            };
+        } else {
+            inventory[materialId].count += count;
+            // Keep original metadata but update last crafted
+            inventory[materialId].lastCrafted = Date.now();
+        }
+        
+        await saveMaterialInventory(playerId, inventory);
+        
+        return {
+            success: true,
+            materialId: materialId,
+            name: metadata.name || materialId,
+            quality: metadata.quality || 'Standard',
+            newCount: inventory[materialId].count,
+            added: count
+        };
+    } catch (error) {
+        console.error('Error adding material to inventory:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Remove material from inventory
+ * @param {string} playerId - Player ID
+ * @param {string} materialId - Material ID
+ * @param {number} count - Amount to remove
+ * @returns {Promise<Object>} Result object
+ */
+export async function removeMaterialFromInventory(playerId, materialId, count = 1) {
+    try {
+        const inventory = await getMaterialInventory(playerId);
+        
+        if (!inventory[materialId]) {
+            return { success: false, error: 'Material not found' };
+        }
+        
+        if (inventory[materialId].count < count) {
+            return { 
+                success: false, 
+                error: 'Insufficient quantity',
+                available: inventory[materialId].count,
+                required: count
+            };
+        }
+        
+        inventory[materialId].count -= count;
+        
+        if (inventory[materialId].count <= 0) {
+            delete inventory[materialId];
+        }
+        
+        await saveMaterialInventory(playerId, inventory);
+        
+        return {
+            success: true,
+            materialId: materialId,
+            removed: count,
+            remaining: inventory[materialId]?.count || 0
+        };
+    } catch (error) {
+        console.error('Error removing material from inventory:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// QUALITY TRACKING
+// ============================================================================
+
+/**
+ * Get quality distribution for a material
+ * @param {string} playerId - Player ID
+ * @param {string} baseRecipeId - Base recipe ID (without quality)
+ * @returns {Promise<Object>} Quality distribution
+ */
+export async function getMaterialQualityDistribution(playerId, baseRecipeId) {
+    try {
+        const inventory = await getMaterialInventory(playerId);
+        const distribution = {
             Poor: 0,
             Standard: 0,
             High: 0,
             Perfect: 0,
             Legendary: 0
-        }
-    };
-    
-    // Check if we can craft the entire batch at once
-    const recipe = getRecipeById(recipeId);
-    if (!recipe) {
-        return { success: false, error: 'Recipe not found' };
-    }
-    
-    const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-    const totalIngredients = calculateMaterialCost(recipeId, totalCount);
-    const hasIngredients = await hasEnoughIngredients(playerId, totalIngredients);
-    
-    if (!hasIngredients) {
-        // Fall back to individual crafting
-        for (let i = 0; i < totalCount; i++) {
-            const result = await craftItem(recipeId, 1);
-            
-            if (result.success) {
-                results.success++;
-                results.quality[result.quality]++;
-                results.items.push(result);
-                
-                if (result.leveledUp) {
-                    results.leveledUp = true;
-                    results.newLevel = result.newLevel;
-                }
-            } else {
-                results.failed++;
-            }
-            
-            if (onProgress) {
-                onProgress({
-                    current: i + 1,
-                    total: totalCount,
-                    success: result.success
-                });
-            }
-        }
-    } else {
-        // Craft entire batch at once
-        const result = await craftItem(recipeId, totalCount);
-        
-        if (result.success) {
-            results.success = totalCount;
-            results.quality[result.quality] = totalCount;
-            results.items.push(result);
-            results.leveledUp = result.leveledUp;
-            results.newLevel = result.newLevel;
-        } else {
-            results.failed = totalCount;
-        }
-        
-        if (onProgress) {
-            onProgress({
-                current: totalCount,
-                total: totalCount,
-                success: result.success
-            });
-        }
-    }
-    
-    return results;
-}
-
-// ============================================================================
-// VALIDATION FUNCTIONS
-// ============================================================================
-
-/**
- * Check if player can craft a recipe
- * @param {string} recipeId - Recipe ID
- * @param {number} count - Number to craft
- * @returns {Promise<Object>} Validation result
- */
-export async function canCraft(recipeId, count = 1) {
-    const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-    const recipe = getRecipeById(recipeId);
-    
-    if (!recipe) {
-        return { can: false, error: 'Recipe not found' };
-    }
-    
-    // Check if recipe is unlocked
-    const fieldProgress = await getFieldProgress(playerId, recipe.field);
-    const totalProgress = Object.values(fieldProgress).reduce((a, b) => a + b, 0);
-    
-    if (totalProgress < recipe.unlocksAt) {
-        return { 
-            can: false, 
-            error: `Recipe unlocks at ${recipe.unlocksAt} total crafts in ${recipe.field}` 
         };
-    }
-    
-    // Check ingredients
-    const totalIngredients = calculateMaterialCost(recipeId, count);
-    const hasIngredients = await hasEnoughIngredients(playerId, totalIngredients);
-    
-    if (!hasIngredients) {
-        return { 
-            can: false, 
-            error: 'Insufficient ingredients',
-            required: totalIngredients
-        };
-    }
-    
-    return { can: true };
-}
-
-// ============================================================================
-// PROGRESS & MASTERY FUNCTIONS
-// ============================================================================
-
-/**
- * Get total progress for a field
- * @param {string} playerId - Player ID
- * @param {string} field - Field name
- * @returns {Promise<number>} Total progress
- */
-export async function getTotalFieldProgress(playerId, field) {
-    const progress = await getFieldProgress(playerId, field);
-    return Object.values(progress).reduce((a, b) => a + b, 0);
-}
-
-/**
- * Get mastery level for a field
- * @param {string} playerId - Player ID
- * @param {string} field - Field name
- * @returns {Promise<Object>} Mastery level
- */
-export async function getFieldMastery(playerId, field) {
-    const totalProgress = await getTotalFieldProgress(playerId, field);
-    return getFieldLevel(totalProgress);
-}
-
-/**
- * Get progress to next level for a field
- * @param {string} playerId - Player ID
- * @param {string} field - Field name
- * @returns {Promise<Object>} Progress info
- */
-export async function getProgressToNextLevel(playerId, field) {
-    const totalProgress = await getTotalFieldProgress(playerId, field);
-    
-    for (let i = 0; i < MASTERY_LEVELS.length - 1; i++) {
-        const current = MASTERY_LEVELS[i];
-        const next = MASTERY_LEVELS[i + 1];
         
-        if (totalProgress >= current.threshold && totalProgress < next.threshold) {
-            const totalNeeded = next.threshold - current.threshold;
-            const currentProgress = totalProgress - current.threshold;
-            
-            return {
-                currentLevel: current.name,
-                nextLevel: next.name,
-                progress: currentProgress,
-                totalNeeded: totalNeeded,
-                percentage: (currentProgress / totalNeeded) * 100,
-                currentMultiplier: current.multiplier,
-                nextMultiplier: next.multiplier
-            };
-        }
-    }
-    
-    // At max level
-    const maxLevel = MASTERY_LEVELS[MASTERY_LEVELS.length - 1];
-    return {
-        currentLevel: maxLevel.name,
-        nextLevel: null,
-        progress: 0,
-        totalNeeded: 0,
-        percentage: 100,
-        currentMultiplier: maxLevel.multiplier,
-        nextMultiplier: maxLevel.multiplier
-    };
-}
-
-/**
- * Get level from progress
- * @param {number} progress - Total progress
- * @returns {Object} Level object
- */
-export function getFieldLevel(progress) {
-    for (let i = MASTERY_LEVELS.length - 1; i >= 0; i--) {
-        if (progress >= MASTERY_LEVELS[i].threshold) {
-            return MASTERY_LEVELS[i];
-        }
-    }
-    return MASTERY_LEVELS[0];
-}
-
-// ============================================================================
-// RECIPE UNLOCK FUNCTIONS
-// ============================================================================
-
-/**
- * Get unlocked recipes for a field
- * @param {string} playerId - Player ID
- * @param {string} field - Field name
- * @returns {Promise<Array>} Unlocked recipes
- */
-export async function getUnlockedRecipes(playerId, field) {
-    const totalProgress = await getTotalFieldProgress(playerId, field);
-    const fieldRecipes = RECIPE_DATABASE[field] || {};
-    const unlocked = [];
-    
-    for (const category in fieldRecipes) {
-        for (const recipe of fieldRecipes[category]) {
-            if (totalProgress >= recipe.unlocksAt) {
-                unlocked.push({
-                    ...recipe,
-                    category: category,
-                    field: field
-                });
+        for (const [materialId, data] of Object.entries(inventory)) {
+            if (materialId.startsWith(baseRecipeId)) {
+                const quality = data.quality || 'Standard';
+                distribution[quality] += data.count;
             }
         }
+        
+        return distribution;
+    } catch (error) {
+        console.error('Error getting quality distribution:', error);
+        return null;
     }
-    
-    return unlocked;
 }
 
 /**
- * Get all recipes with progress for a field
+ * Get best quality available for a material
  * @param {string} playerId - Player ID
- * @param {string} field - Field name
- * @returns {Promise<Array>} Recipes with progress
+ * @param {string} baseRecipeId - Base recipe ID
+ * @returns {Promise<Object>} Best quality material
  */
-export async function getRecipesWithProgress(playerId, field) {
-    const fieldProgress = await getFieldProgress(playerId, field);
-    const totalProgress = await getTotalFieldProgress(playerId, field);
-    const fieldRecipes = RECIPE_DATABASE[field] || {};
-    const recipesWithProgress = [];
-    
-    for (const category in fieldRecipes) {
-        for (const recipe of fieldRecipes[category]) {
-            const progress = fieldProgress[recipe.id] || 0;
-            const level = getFieldLevel(progress);
-            const unlocked = totalProgress >= recipe.unlocksAt;
-            
-            recipesWithProgress.push({
-                ...recipe,
-                category: category,
-                progress: progress,
-                level: progress === 0 ? 'Untrained' : level.name,
-                multiplier: level.multiplier,
-                unlocked: unlocked,
-                percentComplete: Math.min(100, Math.round((progress / recipe.target) * 100))
-            });
+export async function getBestQualityMaterial(playerId, baseRecipeId) {
+    try {
+        const inventory = await getMaterialInventory(playerId);
+        const qualityOrder = ['Legendary', 'Perfect', 'High', 'Standard', 'Poor'];
+        
+        for (const quality of qualityOrder) {
+            const materialId = `${baseRecipeId}_${quality.toLowerCase()}`;
+            if (inventory[materialId] && inventory[materialId].count > 0) {
+                return {
+                    materialId,
+                    quality,
+                    count: inventory[materialId].count,
+                    metadata: inventory[materialId]
+                };
+            }
         }
+        
+        return null;
+    } catch (error) {
+        console.error('Error getting best quality material:', error);
+        return null;
     }
-    
-    return recipesWithProgress;
 }
 
 // ============================================================================
-// UTILITY FUNCTIONS
+// UNIVERSAL INVENTORY FUNCTIONS
 // ============================================================================
 
 /**
- * Calculate total value of crafted items
- * @param {Array} items - Array of crafted items
- * @returns {number} Total value
+ * Get combined inventory (elements + materials)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Combined inventory
  */
-export function calculateTotalValue(items) {
-    return items.reduce((sum, item) => {
-        return sum + (item.value * item.count * (item.qualityMultiplier || 1));
-    }, 0);
+export async function getCombinedInventory(playerId = 'main') {
+    try {
+        const elements = await getElementInventory(playerId);
+        const materials = await getMaterialInventory(playerId);
+        
+        return {
+            elements,
+            materials,
+            totalElements: Object.keys(elements).length,
+            totalMaterials: Object.keys(materials).length
+        };
+    } catch (error) {
+        console.error('Error getting combined inventory:', error);
+        return { elements: {}, materials: {}, totalElements: 0, totalMaterials: 0 };
+    }
 }
 
 /**
- * Format quality for display
- * @param {string} quality - Quality name
- * @returns {string} Formatted quality with icon
+ * Get inventory (alias for backward compatibility)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Combined inventory
  */
-export function formatQuality(quality) {
-    const tier = QUALITY_TIERS.find(t => t.name === quality);
-    return tier ? `${tier.icon} ${quality}` : quality;
+export async function getInventory(playerId = 'main') {
+    return getCombinedInventory(playerId);
 }
 
 /**
- * Get quality color
- * @param {string} quality - Quality name
- * @returns {string} Hex color code
+ * Check if player has enough ingredients
+ * @param {string} playerId - Player ID
+ * @param {Object} required - Required ingredients { itemId: amount }
+ * @returns {Promise<boolean>} True if has enough
  */
-export function getQualityColor(quality) {
-    const tier = QUALITY_TIERS.find(t => t.name === quality);
-    return tier ? tier.color : '#ffffff';
+export async function hasEnoughIngredients(playerId, required) {
+    try {
+        const elements = await getElementInventory(playerId);
+        const materials = await getMaterialInventory(playerId);
+        
+        for (const [item, amount] of Object.entries(required)) {
+            // Check if it's an element (raw)
+            if (elements[item]) {
+                const available = typeof elements[item] === 'object' 
+                    ? elements[item].count 
+                    : elements[item];
+                if (available < amount) return false;
+            }
+            // Check if it's a material (crafted)
+            else if (materials[item]) {
+                if (materials[item].count < amount) return false;
+            }
+            else {
+                return false; // Item not found
+            }
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error checking ingredients:', error);
+        return false;
+    }
 }
 
-// ===== EXPORT ALL =====
+/**
+ * Get available count of a specific item
+ * @param {string} playerId - Player ID
+ * @param {string} itemId - Item ID
+ * @returns {Promise<number>} Available count
+ */
+export async function getItemCount(playerId, itemId) {
+    try {
+        const elements = await getElementInventory(playerId);
+        const materials = await getMaterialInventory(playerId);
+        
+        if (elements[itemId]) {
+            return typeof elements[itemId] === 'object' 
+                ? elements[itemId].count 
+                : elements[itemId];
+        }
+        
+        if (materials[itemId]) {
+            return materials[itemId].count;
+        }
+        
+        return 0;
+    } catch (error) {
+        console.error('Error getting item count:', error);
+        return 0;
+    }
+}
+
+/**
+ * Get total inventory value
+ * @param {string} playerId - Player ID
+ * @param {Object} priceMap - Price mapping for items
+ * @returns {Promise<number>} Total value
+ */
+export async function getTotalInventoryValue(playerId, priceMap = {}) {
+    try {
+        const elements = await getElementInventory(playerId);
+        const materials = await getMaterialInventory(playerId);
+        let total = 0;
+        
+        // Calculate element values
+        for (const [element, data] of Object.entries(elements)) {
+            const count = typeof data === 'object' ? data.count : data;
+            const price = priceMap[element] || 100; // Default price
+            total += count * price;
+        }
+        
+        // Calculate material values
+        for (const [material, data] of Object.entries(materials)) {
+            const price = data.value || priceMap[material] || 1000; // Default material price
+            total += data.count * price;
+        }
+        
+        return total;
+    } catch (error) {
+        console.error('Error calculating inventory value:', error);
+        return 0;
+    }
+}
+
+/**
+ * Clear all inventory (for reset)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function clearInventory(playerId = 'main') {
+    try {
+        const elementKey = `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`;
+        const materialKey = `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`;
+        const qualityKey = `${STORAGE_KEYS.MATERIAL_QUALITY}_${playerId}`;
+        
+        localStorage.removeItem(elementKey);
+        localStorage.removeItem(materialKey);
+        localStorage.removeItem(qualityKey);
+        
+        return true;
+    } catch (error) {
+        console.error('Error clearing inventory:', error);
+        return false;
+    }
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
 export default {
-    // Core crafting
-    craftItem,
-    batchCraft,
-    canCraft,
+    // Element inventory
+    getElementInventory,
+    saveElementInventory,
+    addElementToInventory,
+    removeElementFromInventory,
     
-    // Mastery
-    MASTERY_LEVELS,
-    QUALITY_TIERS,
-    getFieldLevel,
-    getFieldMastery,
-    getProgressToNextLevel,
-    getTotalFieldProgress,
+    // Material inventory
+    getMaterialInventory,
+    saveMaterialInventory,
+    addMaterialToInventory,
+    removeMaterialFromInventory,
     
-    // Recipe unlocks
-    getUnlockedRecipes,
-    getRecipesWithProgress,
+    // Quality tracking
+    getMaterialQualityDistribution,
+    getBestQualityMaterial,
     
-    // Utilities
-    calculateTotalValue,
-    formatQuality,
-    getQualityColor,
-    
-    // Quality
-    determineQuality
+    // Universal functions
+    getInventory,
+    getCombinedInventory,
+    hasEnoughIngredients,
+    getItemCount,
+    getTotalInventoryValue,
+    clearInventory
 };
