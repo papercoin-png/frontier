@@ -150,7 +150,7 @@
             transform: scale(0.95);
         }
         
-        /* Stats Bar */
+        /* Stats Bar - This is the TOP indicator */
         .stats-bar {
             background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
@@ -639,6 +639,17 @@
             border: 2px dashed #6a8ac0;
             font-style: italic;
         }
+        
+        /* Simple visual feedback for cargo bar */
+        @keyframes bar-flash {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; background: #4affaa; }
+            100% { opacity: 1; }
+        }
+        
+        .cargo-bar-flash {
+            animation: bar-flash 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -654,7 +665,7 @@
                 </button>
             </div>
             
-            <!-- Stats Bar -->
+            <!-- Stats Bar - TOP INDICATOR -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
@@ -819,16 +830,23 @@
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
+            // Common
             'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
             'Boron': '🧪', 'Sodium': '🧂', 'Magnesium': '✨', 'Aluminum': '🥫',
             'Silicon': '💻', 'Potassium': '🍌', 'Calcium': '🥛',
+            
+            // Uncommon
             'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨', 'Fluorine': '🧪',
             'Neon': '💡', 'Phosphorus': '✨', 'Sulfur': '🟡', 'Chlorine': '🧪',
             'Argon': '🎈', 'Iron': '⚙️', 'Nickel': '🔩', 'Lead': '🔘',
+            
+            // Rare
             'Gold': '🟡', 'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷',
             'Copper': '🔴', 'Zinc': '⚪', 'Tin': '🥫', 'Cobalt': '🔵',
             'Chromium': '✨', 'Mercury': '💧', 'Uranium': '🟣', 'Thorium': '🔮',
             'Plutonium': '☢️', 'Promethium': '✨',
+            
+            // Default
             'default': '🔹'
         };
 
@@ -885,6 +903,33 @@
                 'legendary': '#ffd700'
             };
             return colors[rarity] || '#ffffff';
+        }
+
+        // ===== SHOW CARGO BAR VISUAL =====
+        function showCargoBarVisual(addedMass) {
+            // Find the stats bar and flash it
+            const statsBar = document.querySelector('.stats-bar');
+            if (statsBar) {
+                statsBar.style.transition = 'all 0.3s';
+                statsBar.style.borderColor = '#4affaa';
+                statsBar.style.boxShadow = '0 0 20px #4affaa';
+                
+                setTimeout(() => {
+                    statsBar.style.borderColor = '#6a8ac0';
+                    statsBar.style.boxShadow = 'none';
+                }, 500);
+            }
+            
+            // Update the location display to briefly show the added mass
+            const locationSpan = document.getElementById('currentPlanet');
+            const originalText = locationSpan.textContent;
+            
+            locationSpan.style.color = '#4affaa';
+            locationSpan.style.transition = 'color 0.3s';
+            
+            setTimeout(() => {
+                locationSpan.style.color = '';
+            }, 500);
         }
 
         // ===== LOAD PLANET DATA =====
@@ -967,11 +1012,9 @@
             if (autoExtractionEnabled) {
                 autoToggleSwitch.classList.add('active');
                 startAutoExtraction();
-                showNotification('Auto extraction enabled');
             } else {
                 autoToggleSwitch.classList.remove('active');
                 stopAutoExtraction();
-                showNotification('Auto extraction disabled');
             }
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -979,16 +1022,15 @@
 
         // ===== START AUTO EXTRACTION =====
         function startAutoExtraction() {
-            stopAutoExtraction(); // Clear any existing interval
+            stopAutoExtraction();
             autoExtractionInterval = setInterval(() => {
                 if (selectedResource) {
-                    performExtraction(1); // Extract 1 of selected resource
+                    performExtraction(1);
                 } else if (resources.length > 0) {
-                    // Auto-select first resource if none selected
                     selectResource(resources[0].name);
                     setTimeout(() => performExtraction(1), 500);
                 }
-            }, 30000); // Every 30 seconds
+            }, 30000);
         }
 
         // ===== STOP AUTO EXTRACTION =====
@@ -1158,15 +1200,8 @@
             }
         }
 
-        // ===== SHOW NOTIFICATION =====
-        function showNotification(message, isSuccess = true) {
-            // Create a simple alert for now - you can enhance this later
-            console.log(message);
-        }
-
         // ===== DISPATCH EXTRACTION EVENT =====
         function dispatchExtractionEvent(elementName, quantity, value) {
-            // Create custom event for cargo page
             const event = new CustomEvent('extraction-completed', {
                 detail: {
                     element: elementName,
@@ -1178,7 +1213,6 @@
             });
             window.dispatchEvent(event);
             
-            // Store in localStorage as backup
             const pendingExtractions = JSON.parse(localStorage.getItem('voidfarer_pending_extractions') || '[]');
             pendingExtractions.push({
                 element: elementName,
@@ -1187,7 +1221,6 @@
                 timestamp: Date.now(),
                 icon: elementIcons[elementName] || '🔹'
             });
-            // Keep only last 20
             if (pendingExtractions.length > 20) pendingExtractions.shift();
             localStorage.setItem('voidfarer_pending_extractions', JSON.stringify(pendingExtractions));
         }
@@ -1208,11 +1241,9 @@
             
             const history = JSON.parse(localStorage.getItem('voidfarer_extraction_history') || '[]');
             history.unshift(extraction);
-            // Keep only last 50
             if (history.length > 50) history.pop();
             localStorage.setItem('voidfarer_extraction_history', JSON.stringify(history));
             
-            // Update recent display
             recentExtractions.unshift(extraction);
             if (recentExtractions.length > 10) recentExtractions.pop();
             renderRecentExtractions();
@@ -1227,7 +1258,6 @@
             const newTotal = currentCargoMass + mass;
             
             if (newTotal > CARGO_MASS_LIMIT) {
-                showNotification('❌ Not enough cargo space!', false);
                 return false;
             }
             
@@ -1259,6 +1289,9 @@
                 // Update cargo mass
                 currentCargoMass = newTotal;
                 
+                // SHOW VISUAL FEEDBACK ON TOP INDICATOR
+                showCargoBarVisual(mass);
+                
                 // Save to history
                 saveExtractionToHistory(selectedResource.name, qty, netTotal);
                 
@@ -1282,14 +1315,12 @@
             
             const qty = parseInt(extractQuantity.value);
             
-            // Disable button during extraction
             extractBtn.disabled = true;
             extractBtn.classList.add('processing');
             extractBtn.textContent = '⏳ EXTRACTING...';
             
             const success = await performExtraction(qty);
             
-            // Re-enable button
             setTimeout(() => {
                 extractBtn.disabled = false;
                 extractBtn.classList.remove('processing');
@@ -1353,7 +1384,6 @@
             }
         }
 
-        // Clean up on page unload
         window.addEventListener('beforeunload', () => {
             stopAutoExtraction();
         });
