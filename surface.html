@@ -827,22 +827,36 @@
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
 
+        // ===== PERSIST EXPLORED STATE =====
+        function loadExploredState() {
+            const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
+            if (saved) {
+                exploredElements = JSON.parse(saved);
+            } else {
+                exploredElements = {};
+                currentPlanet.resources.forEach(resource => {
+                    exploredElements[resource] = false;
+                });
+            }
+            updateExploredCount();
+        }
+
+        function saveExploredState() {
+            localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
+        }
+
         // ===== PLAYER LOCATIONS SYSTEM =====
-        // This ensures discoveries are saved permanently for planet-status.js
-        
         async function saveDiscoveryToLocation(elementName, quantity, rarity) {
             try {
                 const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
                 const locationsKey = `voidfarer_locations_${playerId}`;
                 
-                // Get existing locations
                 let locations = [];
                 const saved = localStorage.getItem(locationsKey);
                 if (saved) {
                     locations = JSON.parse(saved);
                 }
                 
-                // Add new discovery
                 locations.push({
                     planet: currentPlanet.name,
                     planetType: currentPlanet.type,
@@ -852,14 +866,12 @@
                     discoveredAt: Date.now()
                 });
                 
-                // Keep only last 1000 entries
                 if (locations.length > 1000) {
                     locations = locations.slice(-1000);
                 }
                 
                 localStorage.setItem(locationsKey, JSON.stringify(locations));
                 
-                // Ensure window.getPlayerLocations is available
                 window.getPlayerLocations = async function() {
                     const saved = localStorage.getItem(locationsKey);
                     return saved ? JSON.parse(saved) : [];
@@ -872,7 +884,6 @@
             }
         }
 
-        // Initialize getPlayerLocations if not exists
         if (!window.getPlayerLocations) {
             const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
             const locationsKey = `voidfarer_locations_${playerId}`;
@@ -950,11 +961,7 @@
 
         function initializeExplorationTracking() {
             totalElements = currentPlanet.resources.length;
-            currentPlanet.resources.forEach(resource => {
-                if (!exploredElements[resource]) {
-                    exploredElements[resource] = false;
-                }
-            });
+            loadExploredState();
         }
 
         function checkElementExplored(resource) {
@@ -964,6 +971,7 @@
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
+                saveExploredState();
                 updateExploredCount();
                 renderResourceToggles();
                 checkAllElementsExplored();
@@ -1060,7 +1068,6 @@
             return masses[elementName] || masses.default;
         }
 
-        // ===== FIXED: Get fresh cargo mass directly from collection =====
         async function getFreshCargoMass() {
             try {
                 const collection = await window.getCollection();
@@ -1256,7 +1263,6 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        // ===== MAIN EXTRACTION FUNCTION - FIXED =====
         async function attemptExtraction() {
             console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
             
@@ -1265,7 +1271,6 @@
             }
             
             try {
-                // Get FRESH cargo mass directly from collection
                 const currentMass = await getFreshCargoMass();
                 const cargoLimit = CARGO_MASS_LIMIT;
                 
@@ -1293,7 +1298,6 @@
                     extractorText.textContent = 'Auto-extractor active';
                 }
                 
-                // Pick random resource
                 const resource = activeResources[Math.floor(Math.random() * activeResources.length)];
                 const rarity = getElementRarity(resource);
                 const config = RARITY_CONFIG[rarity];
@@ -1336,7 +1340,6 @@
                     const totalMass = massPerUnit * quantity;
                     
                     if (currentMass + totalMass <= cargoLimit) {
-                        // Create location data
                         const locationData = {
                             planet: currentPlanet.name,
                             planetType: currentPlanet.type,
@@ -1345,18 +1348,14 @@
                             timestamp: Date.now()
                         };
                         
-                        // Add to collection
                         const result = await window.addElementToCollection(resource, quantity, locationData);
                         
                         if (result && result.success) {
-                            // Save discovery record
                             await saveDiscoveryToLocation(resource, quantity, rarity);
                             
-                            // FORCE UPDATE CARGO DISPLAY - Get fresh mass and update UI
                             const newMass = await getFreshCargoMass();
                             cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
                             
-                            // Dispatch event for other pages (like cargo hold)
                             window.dispatchEvent(new CustomEvent('cargo-updated', { 
                                 detail: { element: resource, quantity, mass: totalMass }
                             }));
