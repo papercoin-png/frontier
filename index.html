@@ -522,8 +522,10 @@
         </div>
     </div>
 
-    <!-- Music Controller - Handles all audio -->
-    <script src="js/music-controller.js"></script>
+    <!-- Global audio element for background music -->
+    <audio id="bg-music" loop preload="auto">
+        <source src="https://cdn.jsdelivr.net/gh/papercoin-png/voidfarer-assets@main/earth.mp3" type="audio/mpeg">
+    </audio>
 
     <script>
         // ===== TELEGRAM INITIALIZATION =====
@@ -534,8 +536,15 @@
         }
 
         // ===== MUSIC SETUP =====
+        const music = document.getElementById('bg-music');
         const musicBtn = document.getElementById('musicBtn');
         const tapOverlay = document.getElementById('tapOverlay');
+        
+        // Set initial volume to 0 (muted)
+        music.volume = 0;
+        
+        // Store music in window for cross-page persistence
+        window.gameMusic = music;
         
         // ===== START EXPERIENCE ON FIRST TAP =====
         window.startExperience = function() {
@@ -545,12 +554,26 @@
             // Show music button
             musicBtn.style.display = 'flex';
             
-            // Start playing path selection music through the controller
-            MusicController.play('path-selection');
-            MusicController.setVolume(0.5);
-            
-            // Update music button based on controller state
-            musicBtn.textContent = '🔊';
+            // Start playing music (now allowed because user tapped)
+            music.play().then(() => {
+                console.log('Music started successfully');
+                
+                // Fade in music over 3 seconds
+                let volume = 0;
+                const fadeInterval = setInterval(() => {
+                    volume += 0.02;
+                    if (volume >= 0.5) {
+                        volume = 0.5;
+                        clearInterval(fadeInterval);
+                        musicBtn.textContent = '🔊';
+                    }
+                    music.volume = volume;
+                }, 120);
+                
+            }).catch(error => {
+                console.log('Music play failed:', error);
+                musicBtn.textContent = '🔇';
+            });
             
             // Remove tap overlay after fade
             setTimeout(() => {
@@ -560,12 +583,14 @@
 
         // ===== TOGGLE MUSIC =====
         window.toggleMusic = function() {
-            if (MusicController.getVolume() > 0) {
-                MusicController.setVolume(0);
-                musicBtn.textContent = '🔇';
-            } else {
-                MusicController.setVolume(0.5);
+            if (music.volume === 0) {
+                // Unmute - fade in quickly
+                music.volume = 0.5;
                 musicBtn.textContent = '🔊';
+            } else {
+                // Mute
+                music.volume = 0;
+                musicBtn.textContent = '🔇';
             }
         };
 
@@ -624,6 +649,11 @@
             // Check if player has COMPLETED path selection
             const playerId = localStorage.getItem('voidfarer_player_id');
             const playerPath = localStorage.getItem('voidfarer_player_path');
+            
+            // Save music state before navigating
+            localStorage.setItem('music_current_time', music.currentTime);
+            localStorage.setItem('music_volume', music.volume);
+            localStorage.setItem('music_playing', 'true');
             
             setTimeout(() => {
                 if (playerId && playerPath) {
