@@ -97,7 +97,7 @@
             z-index: 10;
             display: flex;
             flex-direction: column;
-            padding: 60px 20px 120px 20px;  /* Increased bottom padding for better scrolling */
+            padding: 60px 20px 120px 20px;
             color: white;
             overflow-y: auto;
             scroll-behavior: smooth;
@@ -706,6 +706,9 @@
         <source src="https://cdn.jsdelivr.net/gh/papercoin-png/voidfarer-assets@main/earth.mp3" type="audio/mpeg">
     </audio>
 
+    <!-- Music Controller -->
+    <script src="js/music-controller.js"></script>
+
     <script>
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -732,12 +735,15 @@
                 music.play();
                 music.volume = 0.3;
                 musicBtn.textContent = '🔊';
+                MusicController.setVolume(0.3);
             } else if (music.volume === 0) {
                 music.volume = 0.3;
                 musicBtn.textContent = '🔊';
+                MusicController.setVolume(0.3);
             } else {
                 music.volume = 0;
                 musicBtn.textContent = '🔇';
+                MusicController.setVolume(0);
             }
         };
 
@@ -782,7 +788,6 @@
         };
 
         // ===== CHARACTER ART MAPPING =====
-        // Using placeholder images - replace with actual assets
         const characterArt = {
             prospector: { m: 'https://i.postimg.cc/rsvt2Q2D/prospector-m.jpg', f: 'https://i.postimg.cc/2yr0gN8D/prospector-f.jpg' },
             explorer: { m: 'https://i.postimg.cc/ydJx1Nqd/explorer-m.jpg', f: 'https://i.postimg.cc/6q0W2w9y/explorer-f.jpg' },
@@ -815,7 +820,6 @@
             pathGenders[path] = gender;
             
             // Update UI
-            const pathUpper = path.charAt(0).toUpperCase() + path.slice(1);
             document.getElementById(`${path}M`).classList.toggle('active', gender === 'm');
             document.getElementById(`${path}F`).classList.toggle('active', gender === 'f');
             
@@ -877,6 +881,9 @@
             // Haptic feedback
             if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
+            // Start playing Earth Hub music before navigating
+            MusicController.play('earth-hub');
+            
             // Navigate to Earth Hub
             setTimeout(() => {
                 window.location.href = 'earth-hub.html';
@@ -887,6 +894,9 @@
         // Pre-select first path by default for better UX
         setTimeout(() => {
             selectPath(1);
+            
+            // Ensure music is playing the path selection theme
+            MusicController.play('path-selection');
         }, 100);
     </script>
 </body>
