@@ -1189,9 +1189,9 @@
         <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts - FIXED PATHS -->
     <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/storage/storage.js"></script>
+    <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/storage/inventory.js"></script>
     <script type="module" src="js/crafting/recipe-index.js"></script>
     <script type="module" src="js/crafting/crafting-core.js"></script>
@@ -1222,7 +1222,7 @@
             getFieldProgress,
             getPlayer,
             getCredits
-        } from './js/storage/storage.js';
+        } from './js/storage.js';  // FIXED: removed /storage/ path
         
         import { 
             canCraft,
@@ -1291,6 +1291,7 @@
         window.showInventoryModal = showInventoryModal;
         window.closeInventoryModal = closeInventoryModal;
         window.setTension = setTension;
+        window.scrollToCategory = scrollToCategory;
 
         // ===== STATE =====
         const field = 'textiles';
@@ -1468,14 +1469,14 @@
             categories.forEach((category, index) => {
                 const tier = Math.min(7, Math.floor(index / 2) + 1);
                 const categoryId = category.replace(/\s+/g, '-').toLowerCase();
-                navHtml += `<button class="category-nav-btn tier${tier}" onclick="window.scrollToCategory('${categoryId}')">${category}</button>`;
+                navHtml += `<button class="category-nav-btn tier${tier}" onclick="window.scrollToCategory('${categoryId}', event)">${category}</button>`;
             });
             
             categoryNav.innerHTML = navHtml;
         }
 
         // ===== SCROLL TO CATEGORY =====
-        window.scrollToCategory = function(categoryId) {
+        function scrollToCategory(categoryId, event) {
             const element = document.getElementById(categoryId);
             if (element) {
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1485,10 +1486,12 @@
             document.querySelectorAll('.category-nav-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
+        }
 
         // ===== TOGGLE CATEGORY =====
         function toggleCategory(category) {
