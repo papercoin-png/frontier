@@ -963,6 +963,7 @@
                     
                     if (status) {
                         if (status.claimed) {
+                            // Claimed planets keep their color + golden glow
                             cssClass = `planet-${status.highestRarity || 'common'} planet-claimed`;
                         } else if (status.fullyExplored) {
                             cssClass = `planet-${status.highestRarity || 'common'} planet-complete`;
@@ -988,6 +989,16 @@
                 if (status && status.claimed) {
                     // Update the exploration status text
                     explorationStatus.textContent = '✅ Claimed';
+                    
+                    // Update the planet in the info panel visual
+                    const planetIndex = planets.findIndex(p => p.name === currentPlanet.name);
+                    if (planetIndex !== -1) {
+                        const planetEl = document.getElementById(`planet-${planetIndex}`);
+                        if (planetEl) {
+                            const cssClass = `planet-${status.highestRarity || 'common'} planet-claimed`;
+                            planetEl.className = `planet planet-${currentPlanet.type} ${cssClass}`;
+                        }
+                    }
                 }
             }
         }
@@ -1535,14 +1546,38 @@
         // ===== SETUP EVENT LISTENERS =====
         window.addEventListener('planet-claimed', async (event) => {
             console.log('Planet claimed event received:', event.detail);
-            await refreshPlanetDisplay();
             
-            // Also update the claim button in the info panel if it's open
-            if (currentPlanet && currentPlanet.name === event.detail.planetName) {
-                const claimBtn = document.querySelector('.planet-info .claim-btn');
-                if (claimBtn) {
-                    claimBtn.classList.remove('visible');
+            if (event.detail && event.detail.planetName) {
+                // Check if this planet is in our current system
+                const claimedPlanetInSystem = planets.some(p => p.name === event.detail.planetName);
+                
+                if (claimedPlanetInSystem) {
+                    await refreshPlanetDisplay();
+                    
+                    // Also update the claim button in the info panel if it's open
+                    if (currentPlanet && currentPlanet.name === event.detail.planetName) {
+                        const claimBtn = document.querySelector('.planet-info .claim-btn');
+                        if (claimBtn) {
+                            claimBtn.classList.remove('visible');
+                        }
+                    }
                 }
+            }
+        });
+
+        // Listen for page visibility changes (when returning to this tab)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                console.log('Page became visible, refreshing planet statuses');
+                refreshPlanetDisplay();
+            }
+        });
+
+        // Also listen for storage events (in case the claim happened in another tab)
+        window.addEventListener('storage', (event) => {
+            if (event.key && (event.key.includes('planet_claims') || event.key.includes('PLAYER_CLAIMS'))) {
+                console.log('Storage changed, refreshing planet display');
+                refreshPlanetDisplay();
             }
         });
 
