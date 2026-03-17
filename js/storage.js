@@ -601,17 +601,21 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
-// COLLECTION FUNCTIONS (Ship Cargo)
+// COLLECTION FUNCTIONS (Ship Cargo) - FIXED
 // ============================================================================
 
 /**
  * Get the player's collection (ship cargo)
- * @param {string} playerId - Player ID
+ * @param {string} playerId - Player ID (optional, will use localStorage if not provided)
  * @returns {Promise<Object>} Collection object
  */
-export async function getCollection(playerId = 'main') {
+export async function getCollection(playerId = null) {
     try {
-        const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
+        // Get the actual player ID from localStorage if not provided
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // Use EXACT same key format as addElementToCollection
+        const key = `${STORAGE_KEYS.COLLECTION}_${actualPlayerId}`;
+        console.log('🔍 Reading collection from key:', key);
         const saved = localStorage.getItem(key);
         return saved ? JSON.parse(saved) : {};
     } catch (error) {
@@ -632,8 +636,11 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         
+        console.log('💾 Saving to key:', key);
+        
         // Get current collection
         let collection = await getCollection(playerId);
+        console.log('📦 Current collection before add:', collection);
         
         // Initialize if empty
         if (!collection[elementName]) {
@@ -653,6 +660,10 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         // Save to localStorage
         localStorage.setItem(key, JSON.stringify(collection));
         
+        // Verify it saved
+        const saved = localStorage.getItem(key);
+        console.log('✅ Verified saved data:', saved ? JSON.parse(saved) : 'null');
+        
         console.log(`✅ Added ${quantity}x ${elementName} to cargo. New count: ${collection[elementName].count}`);
         
         return {
@@ -662,7 +673,7 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
             added: quantity
         };
     } catch (error) {
-        console.error('Error adding element to collection:', error);
+        console.error('🔴 Error adding element to collection:', error);
         return { success: false, error: error.message };
     }
 }
