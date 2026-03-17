@@ -944,6 +944,54 @@
             cumulativeBeforePlanet: 0
         };
 
+        // ===== REFRESH PLANET DISPLAY AFTER CLAIM =====
+        async function refreshPlanetDisplay() {
+            console.log('Refreshing planet display after claim...');
+            
+            // Clear the cache
+            planetStatusCache.clear();
+            
+            // Reload statuses for all planets
+            await loadPlanetStatuses();
+            
+            // Update the visual appearance of all planets
+            planets.forEach((planet, index) => {
+                const planetEl = document.getElementById(`planet-${index}`);
+                if (planetEl) {
+                    const status = planetStatusCache.get(planet.name);
+                    let cssClass = 'planet-unexplored';
+                    
+                    if (status) {
+                        if (status.claimed) {
+                            cssClass = `planet-${status.highestRarity || 'common'} planet-claimed`;
+                        } else if (status.fullyExplored) {
+                            cssClass = `planet-${status.highestRarity || 'common'} planet-complete`;
+                        } else if (status.explored) {
+                            cssClass = `planet-${status.highestRarity || 'common'}`;
+                        }
+                    }
+                    
+                    planetEl.className = `planet planet-${planet.type} ${cssClass}`;
+                    
+                    // Update label
+                    const labelEl = planetEl.querySelector('.planet-label');
+                    if (labelEl) {
+                        const label = status ? getPlanetLabel(planet.name, status) : `${planet.name} ???`;
+                        labelEl.textContent = label;
+                    }
+                }
+            });
+            
+            // If planet info panel is currently showing a claimed planet, update it
+            if (currentPlanet) {
+                const status = planetStatusCache.get(currentPlanet.name);
+                if (status && status.claimed) {
+                    // Update the exploration status text
+                    explorationStatus.textContent = '✅ Claimed';
+                }
+            }
+        }
+
         // ===== WARP CALCULATION FUNCTIONS =====
         function getWarpCyclesFromDistance(distance) {
             if (distance <= 1.0) return 1;
@@ -1483,6 +1531,20 @@
                 window.location.href = 'star-cluster.html';
             }
         }
+
+        // ===== SETUP EVENT LISTENERS =====
+        window.addEventListener('planet-claimed', async (event) => {
+            console.log('Planet claimed event received:', event.detail);
+            await refreshPlanetDisplay();
+            
+            // Also update the claim button in the info panel if it's open
+            if (currentPlanet && currentPlanet.name === event.detail.planetName) {
+                const claimBtn = document.querySelector('.planet-info .claim-btn');
+                if (claimBtn) {
+                    claimBtn.classList.remove('visible');
+                }
+            }
+        });
 
         // ===== INITIALIZE =====
         async function init() {
