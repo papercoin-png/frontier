@@ -1060,32 +1060,23 @@
             return masses[elementName] || masses.default;
         }
 
-        async function getCurrentCargoMass() {
-            const now = Date.now();
-            if (cachedCargoMass > 0 && now - lastMassUpdate < MASS_UPDATE_INTERVAL) {
-                return cachedCargoMass;
-            }
-            
+        // ===== FIXED: Get fresh cargo mass directly from collection =====
+        async function getFreshCargoMass() {
             try {
-                if (typeof window.getCollection !== 'function') {
-                    return cachedCargoMass || 0;
-                }
-                
                 const collection = await window.getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     mass += (data.count || 1) * getElementMass(name);
                 }
-                cachedCargoMass = mass;
-                lastMassUpdate = now;
                 return mass;
             } catch (error) {
-                return cachedCargoMass || 0;
+                console.error('Error getting fresh cargo mass:', error);
+                return 0;
             }
         }
 
         async function updateCargoDisplay() {
-            const mass = await getCurrentCargoMass();
+            const mass = await getFreshCargoMass();
             cargoMass.innerHTML = `<span>${Math.round(mass)}</span>/5000 AMU`;
             return mass;
         }
@@ -1265,8 +1256,8 @@
             activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        // ===== MAIN EXTRACTION FUNCTION =====
-        // FIXED: Added to collection FIRST, then save discovery
+        // ===== MAIN EXTRACTION FUNCTION - FIXED =====
+        // Now gets fresh cargo mass and updates display correctly
         async function attemptExtraction() {
             console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
             
@@ -1275,7 +1266,8 @@
             }
             
             try {
-                const currentMass = await getCurrentCargoMass();
+                // Get FRESH cargo mass directly from collection, not from cache
+                const currentMass = await getFreshCargoMass();
                 const cargoLimit = CARGO_MASS_LIMIT;
                 
                 if (currentMass >= cargoLimit) {
@@ -1384,10 +1376,15 @@
                             // STEP 2: Only after cargo is updated, save discovery record
                             await saveDiscoveryToLocation(resource, quantity, rarity);
                             
-                            // Update cargo cache and display
-                            cachedCargoMass = currentMass + totalMass;
+                            // STEP 3: Get FRESH cargo mass after addition
+                            const newMass = await getFreshCargoMass();
+                            
+                            // Update cache and display
+                            cachedCargoMass = newMass;
                             lastMassUpdate = Date.now();
-                            await updateCargoDisplay();
+                            
+                            // Force update the cargo display with the actual new mass
+                            cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
                             
                             markElementExplored(resource);
                             
