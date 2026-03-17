@@ -522,12 +522,7 @@
         </div>
     </div>
 
-    <!-- Audio element for background music -->
-    <audio id="bg-music" loop preload="auto">
-        <source src="https://cdn.jsdelivr.net/gh/papercoin-png/voidfarer-assets@main/earth.mp3" type="audio/mpeg">
-    </audio>
-
-    <!-- Music Controller -->
+    <!-- Music Controller - Handles all audio -->
     <script src="js/music-controller.js"></script>
 
     <script>
@@ -539,12 +534,8 @@
         }
 
         // ===== MUSIC SETUP =====
-        const music = document.getElementById('bg-music');
         const musicBtn = document.getElementById('musicBtn');
         const tapOverlay = document.getElementById('tapOverlay');
-        
-        // Set initial volume to 0 (muted)
-        music.volume = 0;
         
         // ===== START EXPERIENCE ON FIRST TAP =====
         window.startExperience = function() {
@@ -554,29 +545,12 @@
             // Show music button
             musicBtn.style.display = 'flex';
             
-            // Start playing music (now allowed because user tapped)
-            music.play().then(() => {
-                console.log('Music started successfully');
-                
-                // Fade in music over 3 seconds
-                let volume = 0;
-                const fadeInterval = setInterval(() => {
-                    volume += 0.02;
-                    if (volume >= 0.5) {
-                        volume = 0.5;
-                        clearInterval(fadeInterval);
-                        musicBtn.textContent = '🔊';
-                    }
-                    music.volume = volume;
-                }, 120);
-                
-                // Start playing path selection music through the controller
-                MusicController.play('path-selection');
-                
-            }).catch(error => {
-                console.log('Music play failed:', error);
-                musicBtn.textContent = '🔇';
-            });
+            // Start playing path selection music through the controller
+            MusicController.play('path-selection');
+            MusicController.setVolume(0.5);
+            
+            // Update music button based on controller state
+            musicBtn.textContent = '🔊';
             
             // Remove tap overlay after fade
             setTimeout(() => {
@@ -586,16 +560,12 @@
 
         // ===== TOGGLE MUSIC =====
         window.toggleMusic = function() {
-            if (music.volume === 0) {
-                // Unmute - fade in quickly
-                music.volume = 0.5;
-                musicBtn.textContent = '🔊';
-                MusicController.setVolume(0.5);
-            } else {
-                // Mute
-                music.volume = 0;
-                musicBtn.textContent = '🔇';
+            if (MusicController.getVolume() > 0) {
                 MusicController.setVolume(0);
+                musicBtn.textContent = '🔇';
+            } else {
+                MusicController.setVolume(0.5);
+                musicBtn.textContent = '🔊';
             }
         };
 
