@@ -1360,15 +1360,14 @@
                         if (result && result.success) {
                             await saveDiscoveryToLocation(resource, quantity, rarity);
                             
-                            // DIRECTLY READ COLLECTION TO UPDATE CARGO DISPLAY
-                            const collection = await window.getCollection();
-                            let newMass = 0;
-                            for (const [name, data] of Object.entries(collection)) {
-                                newMass += (data.count || 1) * getElementMass(name);
-                            }
+                            // Update cargo display by adding to current value
+                            const currentDisplay = cargoMass.innerHTML;
+                            const match = currentDisplay.match(/<span>(\d+)<\/span>/);
+                            const currentMassValue = match ? parseInt(match[1]) : 0;
+                            const newMass = currentMassValue + totalMass;
                             cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
                             
-                            // Flash the status bar to show cargo was added
+                            // Flash the status bar
                             statusBar.classList.add('flash');
                             setTimeout(() => {
                                 statusBar.classList.remove('flash');
