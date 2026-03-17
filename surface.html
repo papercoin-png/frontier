@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Voidfarer - Cargo Hold</title>
+    <title>Voidfarer - Planetary Surface</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Add idb library for IndexedDB -->
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -20,11 +19,11 @@
         
         body {
             background: #0a0a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            overflow: hidden;
             font-family: 'Libre Baskerville', serif;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
         
         .phone-frame {
@@ -38,16 +37,594 @@
             background: #0a0a1a;
         }
         
-        .cargo-view {
+        .surface-view {
             position: relative;
             width: 100%;
             height: 100%;
-            background: #0a1a2a;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 20px 20px 100px 20px;
-            scroll-behavior: smooth;
+            background: #000;
             -webkit-overflow-scrolling: touch;
+        }
+        
+        .content {
+            position: relative;
+            min-height: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+        }
+        
+        .planet-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: brightness(0.9) saturate(1.2);
+            pointer-events: none;
+        }
+        
+        .star-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 40%, transparent 30%, rgba(0,0,0,0.3) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 10px 18px;
+            z-index: 10;
+            color: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .planet-name {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .planet-name-main {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 0 10px #4affaa;
+        }
+        
+        .planet-name-type {
+            font-size: 10px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        .cargo-display {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .cargo-label {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .cargo-value {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .cargo-value span {
+            color: #a0c0ff;
+            font-size: 12px;
+        }
+        
+        /* Extractor Status */
+        .extractor-status {
+            background: rgba(10, 10, 26, 0.3);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 16px;
+            color: #4affaa;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+        }
+        
+        .extractor-pulse {
+            width: 8px;
+            height: 8px;
+            background: #4affaa;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4affaa;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.5; transform: scale(1); }
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 5px;
+            position: relative;
+            z-index: 30;
+        }
+        
+        /* Navigation Row */
+        .nav-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .nav-btn {
+            flex: 1;
+            background: rgba(10, 10, 26, 0.9);
+            backdrop-filter: blur(10px);
+            border: 2px solid #6a8ac0;
+            color: white;
+            padding: 14px 0;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(106, 138, 192, 0.5);
+        }
+        
+        .nav-btn:active {
+            background: #6a8ac0;
+            transform: scale(0.96);
+        }
+        
+        .nav-btn.system-btn {
+            border-color: #4affaa;
+            color: #4affaa;
+        }
+        
+        .nav-btn.system-btn:active {
+            background: #4affaa;
+            color: #0a0a1a;
+        }
+        
+        /* Claim Button - Overlapping positioning */
+        .claim-btn {
+            width: 100%;
+            background: rgba(255, 215, 0, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid gold;
+            color: #0a0a1a;
+            padding: 14px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.2s;
+            text-align: center;
+            letter-spacing: 1px;
+            box-shadow: 0 0 30px gold;
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 10px;
+            z-index: 35;
+        }
+        
+        .claim-btn.visible {
+            display: block;
+        }
+        
+        .claim-btn:active {
+            background: gold;
+            transform: scale(0.96);
+        }
+        
+        .claim-btn:disabled {
+            opacity: 0.5;
+            background: rgba(100, 100, 100, 0.5);
+            border-color: #888;
+            color: #ccc;
+            box-shadow: none;
+            pointer-events: none;
+        }
+        
+        /* Sliding Success/Failure Notification - CENTER SCREEN */
+        .extraction-notification {
+            position: fixed;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateX(100%);
+            background: rgba(10, 10, 26, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px 40px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transition: transform 0.3s ease-out, opacity 0.2s ease-out;
+            pointer-events: none;
+            min-width: 280px;
+            text-align: center;
+        }
+        
+        /* Success notification colors - only very rare and legendary get glow */
+        .extraction-notification.success {
+            border-color: currentColor;
+        }
+        
+        .extraction-notification.success.rarity-very-rare {
+            color: #e0b0ff;
+            box-shadow: 0 0 30px #e0b0ff;
+        }
+        
+        .extraction-notification.success.rarity-legendary {
+            color: #ffd700;
+            box-shadow: 0 0 30px #ffd700;
+        }
+        
+        /* No glow for common, uncommon, or rare */
+        .extraction-notification.success.rarity-common {
+            color: #ffffff;
+            border-color: #ffffff;
+            box-shadow: none;
+        }
+        
+        .extraction-notification.success.rarity-uncommon {
+            color: #b0ffb0;
+            border-color: #b0ffb0;
+            box-shadow: none;
+        }
+        
+        .extraction-notification.success.rarity-rare {
+            color: #4169E1;
+            border-color: #4169E1;
+            box-shadow: none;
+        }
+        
+        /* Smaller notification for failures */
+        .extraction-notification.fail {
+            min-width: 200px;
+            padding: 15px 25px;
+            border-width: 1px;
+            box-shadow: 0 0 20px #ff6b6b;
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        
+        .extraction-notification.fail .notification-icon {
+            font-size: 32px;
+            filter: grayscale(0.8);
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-title {
+            font-size: 18px;
+            color: #aaaaaa;
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-resource {
+            font-size: 14px;
+            color: #aaaaaa;
+            opacity: 0.7;
+        }
+        
+        .extraction-notification.fail .notification-quantity {
+            font-size: 12px;
+            color: #888888;
+        }
+        
+        .extraction-notification.fail .notification-rarity {
+            font-size: 11px;
+            background: rgba(100, 100, 100, 0.2);
+            color: #999999;
+        }
+        
+        .extraction-notification.fail .notification-pity {
+            font-size: 12px;
+            color: #ffaaaa;
+            margin-top: 2px;
+        }
+        
+        .extraction-notification.show {
+            transform: translate(-50%, -50%) translateX(0);
+            opacity: 1;
+        }
+        
+        .notification-icon {
+            font-size: 48px;
+            margin-bottom: 5px;
+        }
+        
+        .notification-title {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'Exo 2', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .notification-resource {
+            font-size: 18px;
+            font-family: 'Libre Baskerville', serif;
+            margin-top: 5px;
+            font-weight: 700;
+        }
+        
+        .notification-quantity {
+            font-size: 16px;
+            font-family: 'Exo 2', sans-serif;
+            opacity: 0.9;
+        }
+        
+        .notification-rarity {
+            font-size: 14px;
+            text-transform: capitalize;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 12px;
+            border-radius: 60px 20px 60px 20px;
+            margin-top: 5px;
+        }
+        
+        .notification-pity {
+            font-size: 14px;
+            color: #ffd700;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        /* Resource Bar - Positioned below notification */
+        .resource-bar {
+            background: rgba(10, 10, 26, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 255, 170, 0.3);
+            border-radius: 60px 20px 60px 20px;
+            padding: 15px;
+            margin-top: 280px;
+            margin-bottom: 20px;
+            width: 100%;
+            left: 0;
+            right: 0;
+            z-index: 20;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        
+        .resource-label {
+            color: #a0c0ff;
+            font-size: 12px;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        /* 2-column grid for elements */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 3px;
+        }
+        
+        .resource-toggle {
+            background: rgba(30, 45, 70, 0.5);
+            border: 2px solid;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 5px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            cursor: pointer;
+            transition: all 0.1s;
+            justify-content: space-between;
+            font-size: 11px;
+            width: 100%;
+            position: relative;
+            min-width: 0;
+        }
+        
+        .resource-toggle:active {
+            transform: scale(0.95);
+        }
+        
+        /* Explored checkmark */
+        .resource-toggle.explored::after {
+            content: "✓";
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #4affaa;
+            color: #0a0a1a;
+            font-size: 12px;
+            font-weight: bold;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #0a0a1a;
+            box-shadow: 0 0 10px #4affaa;
+            z-index: 5;
+        }
+        
+        /* Active/Success state */
+        .resource-toggle.active {
+            opacity: 1;
+            filter: none;
+            border-color: currentColor;
+            background: rgba(30, 45, 70, 0.8);
+        }
+        
+        /* Glow for active states - only very rare and legendary */
+        .resource-toggle.active.rarity-very-rare {
+            box-shadow: 0 0 15px #e0b0ff;
+        }
+        
+        .resource-toggle.active.rarity-legendary {
+            box-shadow: 0 0 15px #ffd700;
+        }
+        
+        .resource-toggle.active.rarity-common,
+        .resource-toggle.active.rarity-uncommon,
+        .resource-toggle.active.rarity-rare {
+            box-shadow: none;
+        }
+        
+        /* Inactive/Failure state */
+        .resource-toggle:not(.active) {
+            opacity: 0.4;
+            filter: grayscale(0.9) brightness(0.7);
+            border-color: #ff3333 !important;
+            box-shadow: 0 0 15px #ff3333, 0 0 5px #ff0000 inset;
+            background: rgba(20, 20, 30, 0.9);
+        }
+        
+        .resource-symbol {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            min-width: 22px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .resource-name {
+            font-size: 10px;
+            font-weight: 500;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 50px;
+            min-width: 0;
+        }
+        
+        .resource-chance {
+            color: #ffd966;
+            font-size: 9px;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 3px;
+            border-radius: 20px;
+            min-width: 32px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .resource-icon {
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+        
+        /* Rarity colors */
+        .rarity-common { 
+            border-color: #ffffff; 
+            color: #ffffff;
+        }
+        
+        .rarity-uncommon { 
+            border-color: #b0ffb0; 
+            color: #b0ffb0;
+        }
+        
+        .rarity-rare { 
+            border-color: #4169E1;
+            color: #4169E1;
+        }
+        
+        .rarity-very-rare { 
+            border-color: #e0b0ff; 
+            color: #e0b0ff;
+        }
+        
+        .rarity-legendary { 
+            border-color: #ffd700; 
+            color: #ffd700;
+        }
+        
+        .resource-toggle:not(.active) .resource-symbol,
+        .resource-toggle:not(.active) .resource-name {
+            color: #aaaaaa !important;
+            opacity: 0.7;
+        }
+        
+        .resource-toggle:not(.active) .resource-chance {
+            background: rgba(50, 30, 30, 0.5);
+            color: #ff9999;
+        }
+        
+        .resource-toggle:not(.active) .resource-icon {
+            opacity: 0.5;
+        }
+        
+        .explored-count {
+            text-align: center;
+            margin-top: 6px;
+            color: #4affaa;
+            font-size: 10px;
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .explored-count span {
+            background: rgba(74, 255, 170, 0.2);
+            padding: 2px 6px;
+            border-radius: 20px;
+            color: #4affaa;
+        }
+        
+        .active-count {
+            text-align: center;
+            margin-top: 4px;
+            color: #a0c0ff;
+            font-size: 9px;
+            font-family: 'Exo 2', sans-serif;
         }
         
         /* Loading Overlay */
@@ -61,7 +638,7 @@
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            z-index: 2000;
             opacity: 0;
             transition: opacity 0.3s;
             pointer-events: none;
@@ -98,1948 +675,829 @@
             100% { transform: rotate(360deg); }
         }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-        }
-        
-        /* Header */
-        .cargo-header {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .cargo-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 36px;
-            color: #e0f0ff;
-            text-shadow: 0 0 20px #6a8ac0, 0 0 40px #3a5a8a;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        
-        .cargo-subtitle {
-            color: #a0c0ff;
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-        
-        /* Tab Navigation */
-        .cargo-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            background: rgba(30, 45, 70, 0.4);
-            border-radius: 60px 20px 60px 20px;
-            padding: 5px;
-            border: 1px solid #6a8ac0;
-        }
-        
-        .cargo-tab {
-            flex: 1;
-            padding: 12px 5px;
-            border-radius: 40px 10px 40px 10px;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            color: #a0c0ff;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-        
-        .cargo-tab.active {
-            background: #6a8ac0;
-            color: #ffffff;
-            box-shadow: 0 0 15px #3a5a8a;
-        }
-        
-        .cargo-tab:active {
-            transform: scale(0.95);
-        }
-        
-        /* Location Banner - Shows if transfers are allowed */
-        .location-banner {
-            background: rgba(30, 45, 70, 0.8);
-            border: 2px solid #4affaa;
-            border-radius: 40px 10px 40px 10px;
-            padding: 10px 16px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-        }
-        
-        .location-icon {
-            font-size: 20px;
-        }
-        
-        .location-text {
-            color: #ffffff;
-            flex: 1;
-        }
-        
-        .location-highlight {
-            color: #4affaa;
-            font-weight: 600;
-        }
-        
-        .transfer-allowed {
-            background: rgba(74, 255, 170, 0.15);
-            border-color: #4affaa;
-        }
-        
-        .transfer-not-allowed {
-            background: rgba(255, 100, 100, 0.15);
-            border-color: #ff6b6b;
-        }
-        
-        .transfer-not-allowed .location-highlight {
-            color: #ff6b6b;
-        }
-        
-        /* Stats Bar */
-        .stats-bar {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 60px 20px 60px 20px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #ffffff;
-        }
-        
-        .credits {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        
-        .credits span {
-            color: #ffd966;
-            font-size: 22px;
-        }
-        
-        .cargo-capacity {
-            font-size: 14px;
-            color: #a0c0ff;
-            text-align: right;
-        }
-        
-        /* Capacity Card */
-        .capacity-card {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .capacity-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .capacity-label {
-            color: #ffffff;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        
-        .capacity-numbers {
-            color: #ffd966;
-            font-size: 16px;
-            font-weight: 600;
-        }
-        
-        .capacity-bar-bg {
-            width: 100%;
-            height: 12px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid #6a8ac0;
-        }
-        
-        .capacity-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #4a8ac0, #8ac0ff);
-            transition: width 0.3s;
-        }
-        
-        /* Stats Row */
-        .stats-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 25px;
-        }
-        
-        .stat-card {
-            background: rgba(30, 45, 70, 0.5);
-            border: 2px solid #6a8ac0;
-            border-radius: 30% 10% 30% 10%;
-            padding: 12px 5px;
-            text-align: center;
-        }
-        
-        .stat-value {
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .stat-label {
-            color: #a0c0ff;
-            font-size: 10px;
-            letter-spacing: 1px;
-        }
-        
-        /* Filter Bar */
-        .filter-bar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .filter-btn {
-            padding: 8px 14px;
-            border-radius: 40px;
-            font-size: 12px;
-            font-weight: 600;
-            background: rgba(30, 45, 70, 0.7);
-            border: 2px solid #6a8ac0;
-            color: #e0f0ff;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        
-        .filter-btn.active {
-            background: #6a8ac0;
-            color: #ffffff;
-            border-color: #aac8ff;
-            box-shadow: 0 0 15px #3a5a8a;
-        }
-        
-        .filter-btn:active {
-            transform: scale(0.95);
-        }
-        
-        /* Search Box */
-        .search-container {
-            margin-bottom: 15px;
-        }
-        
-        .search-input {
-            width: 100%;
-            padding: 14px 20px;
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #6a8ac0;
-            border-radius: 60px 20px 60px 20px;
-            color: #ffffff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 15px;
-            outline: none;
-        }
-        
-        .search-input::placeholder {
-            color: #a0c0ff;
-            opacity: 0.6;
-        }
-        
-        /* Sort Bar */
-        .sort-bar {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 15px;
-        }
-        
-        .sort-select {
-            background: rgba(30, 45, 70, 0.7);
-            border: 2px solid #6a8ac0;
-            color: #ffffff;
-            padding: 8px 15px;
-            border-radius: 40px 10px 40px 10px;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 13px;
-            outline: none;
-            width: 100%;
-            max-width: 200px;
-        }
-        
-        .sort-select option {
-            background: #0a1a2a;
-        }
-        
-        /* Cargo Grid */
-        .cargo-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-        
-        .cargo-item {
-            background: rgba(30, 45, 70, 0.6);
-            border: 2px solid #6a8ac0;
-            border-radius: 40px 12px 40px 12px;
-            padding: 16px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            transition: all 0.1s;
-            position: relative;
-        }
-        
-        .item-icon {
-            font-size: 36px;
-            min-width: 50px;
-            text-align: center;
-            filter: drop-shadow(0 0 10px #6a8ac0);
-        }
-        
-        .item-info {
-            flex: 1;
-        }
-        
-        .item-name {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .item-details {
-            display: flex;
-            gap: 15px;
-            color: #a0c0ff;
-            font-size: 13px;
-            flex-wrap: wrap;
-        }
-        
-        .item-quantity {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        .item-mass {
-            color: #4affaa;
-            font-weight: 600;
-        }
-        
-        .item-value {
-            color: #ffaa4a;
-        }
-        
-        /* Item Actions */
-        .item-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-        
-        .action-btn {
-            padding: 8px 12px;
-            border-radius: 30px 8px 30px 8px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.1s;
-            font-family: 'Exo 2', sans-serif;
-            font-weight: 600;
-            min-width: 60px;
-            text-align: center;
-            border: 2px solid;
-        }
-        
-        .eject-btn {
-            background: rgba(255, 100, 100, 0.2);
-            border-color: #ff6b6b;
-            color: #ffb0b0;
-        }
-        
-        .eject-btn:active {
-            background: #ff6b6b;
-            color: white;
-            transform: scale(0.95);
-        }
-        
-        .transfer-btn {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #b0ffd0;
-        }
-        
-        .transfer-btn:active {
-            background: #4affaa;
-            color: #0a1a2a;
-            transform: scale(0.95);
-        }
-        
-        .transfer-btn.disabled {
-            opacity: 0.3;
-            pointer-events: none;
-            border-color: #6a8ac0;
-            background: rgba(106, 138, 192, 0.1);
-            color: #6a8ac0;
-        }
-        
-        /* Owned Products Section */
-        .products-section {
-            margin-bottom: 30px;
-        }
-        
-        .section-title {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            font-family: 'Exo 2', sans-serif;
-            border-bottom: 1px solid #ffd966;
-            padding-bottom: 6px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .product-count {
-            color: #ffd966;
-            font-size: 14px;
-        }
-        
-        .products-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .product-item {
-            background: rgba(30, 45, 70, 0.6);
-            border: 2px solid #ffd966;
-            border-radius: 40px 12px 40px 12px;
-            padding: 14px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .product-icon {
-            font-size: 32px;
-            min-width: 45px;
-            text-align: center;
-        }
-        
-        .product-info {
-            flex: 1;
-        }
-        
-        .product-name {
-            color: #ffd966;
-            font-size: 16px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-            margin-bottom: 2px;
-        }
-        
-        .product-type {
-            color: #a0c0ff;
-            font-size: 11px;
-        }
-        
-        .product-purchase-date {
-            color: #6a8ac0;
-            font-size: 10px;
-        }
-        
-        /* Eject Modal */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(5px);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-        }
-        
-        .modal-overlay.active {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: rgba(20, 30, 50, 0.95);
-            backdrop-filter: blur(15px);
-            border: 3px solid #ff6b6b;
-            border-radius: 60px 20px 60px 20px;
-            padding: 25px;
-            width: 280px;
-            text-align: center;
-            color: #ffffff;
-            box-shadow: 0 0 30px #ff6b6b;
-        }
-        
-        .modal-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 28px;
-            margin-bottom: 10px;
-            font-weight: 600;
-            color: #ffb0b0;
-        }
-        
-        .modal-item-name {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #ffffff;
-        }
-        
-        .modal-current {
-            color: #a0c0ff;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        
-        .eject-quantity {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin: 20px 0;
-        }
-        
-        .qty-btn {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: rgba(74, 138, 192, 0.3);
-            border: 2px solid #6a8ac0;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.1s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .qty-btn:active {
-            background: #6a8ac0;
-            transform: scale(0.9);
-        }
-        
-        .qty-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        #ejectQuantity {
-            width: 70px;
-            height: 50px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #6a8ac0;
-            border-radius: 30px 8px 30px 8px;
-            color: white;
-            font-size: 22px;
-            font-weight: bold;
-            text-align: center;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .eject-mass-info {
-            background: rgba(0,0,0,0.3);
-            border-radius: 30px 8px 30px 8px;
-            padding: 10px;
-            margin: 15px 0;
-            font-size: 14px;
-        }
-        
-        .eject-mass {
-            color: #4affaa;
-            font-weight: 600;
-            font-size: 18px;
-        }
-        
-        .warning-text {
-            color: #ffaa4a;
-            font-size: 12px;
-            margin: 10px 0;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        .modal-btn {
-            flex: 1;
-            background: rgba(74, 138, 192, 0.3);
-            border: 2px solid #6a8ac0;
-            color: #ffffff;
-            padding: 14px;
-            border-radius: 40px 10px 40px 10px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.1s;
-            font-family: 'Exo 2', sans-serif;
-            font-weight: 600;
-        }
-        
-        .modal-btn:active {
-            background: #6a8ac0;
-            transform: scale(0.95);
-        }
-        
-        .modal-btn.eject-confirm {
-            background: rgba(255, 100, 100, 0.3);
-            border-color: #ff6b6b;
-            color: #ffb0b0;
-        }
-        
-        .modal-btn.eject-confirm:active {
-            background: #ff6b6b;
-            color: white;
-        }
-        
-        /* Transfer Modal */
-        .modal-content.transfer {
-            border-color: #4affaa;
-            box-shadow: 0 0 30px #4affaa;
-        }
-        
-        .modal-title.transfer {
-            color: #b0ffd0;
-        }
-        
-        .transfer-max-info {
-            background: rgba(0,0,0,0.3);
-            border-radius: 30px 8px 30px 8px;
-            padding: 10px;
-            margin: 15px 0;
-            font-size: 14px;
-        }
-        
-        .transfer-max {
-            color: #4affaa;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        
-        .modal-btn.transfer-confirm {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #b0ffd0;
-        }
-        
-        .modal-btn.transfer-confirm:active {
-            background: #4affaa;
-            color: #0a1a2a;
-        }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 50px 20px;
-            color: #a0b0c0;
-            background: rgba(30, 45, 70, 0.4);
-            border-radius: 60px 20px 60px 20px;
-            border: 2px dashed #6a8ac0;
-            font-style: italic;
-        }
-        
-        /* Scroll Hint */
-        .scroll-hint {
-            text-align: center;
-            color: #a0c0ff;
-            font-size: 14px;
-            margin: 20px 0 80px;
-            font-style: italic;
-            font-family: 'Exo 2', sans-serif;
-            animation: fade-in-out 2s infinite;
-            letter-spacing: 1px;
-        }
-        
-        @keyframes fade-in-out {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
-        }
-        
-        /* Enhanced Back Button - SHIP BRIDGE */
-        .back-button {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
-            border: 3px solid #ffaa4a;
-            color: #ffffff;
-            padding: 18px 35px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            width: fit-content;
-            min-width: 280px;
-            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            letter-spacing: 1px;
-            margin: 0;
-            animation: subtle-pulse 3s infinite;
-            pointer-events: auto;
-        }
-        
-        @keyframes subtle-pulse {
-            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
-            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-        }
-        
-        .back-button:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #3a5a8a;
-        }
-        
-        .back-arrow {
-            font-size: 28px;
-            color: #ffd966;
-            font-weight: bold;
-        }
-        
-        .back-icon {
-            font-size: 24px;
-            filter: drop-shadow(0 0 5px #ffaa4a);
-        }
-        
-        .back-text {
-            flex: 0 1 auto;
-        }
-        
-        /* Mass warning */
-        .mass-warning {
-            color: #ff6b6b;
-            font-size: 12px;
-            margin-top: 5px;
-            text-align: center;
-            display: none;
-        }
-        
-        .mass-warning.visible {
-            display: block;
-        }
-        
-        /* Refresh indicator */
-        .refresh-indicator {
-            text-align: center;
-            color: #4affaa;
-            font-size: 11px;
-            margin: 5px 0;
-            display: none;
-            animation: pulse 1.5s infinite;
-        }
-        
-        .refresh-indicator.visible {
-            display: block;
-        }
-        
-        /* Migration status (debug) */
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
+        .spacer {
             display: none;
         }
     </style>
 </head>
 <body>
     <div class="phone-frame">
-        <div class="cargo-view" id="cargoView">
-            <!-- Header -->
-            <div class="cargo-header">
-                <div class="cargo-title">Cargo Hold</div>
-                <div class="cargo-subtitle">✦ mass-based storage ✦</div>
-            </div>
+        <div class="surface-view" id="surfaceView">
+            <img src="assets/images/earth-view.jpg" class="planet-canvas" id="planetImage" alt="Planet surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+            <div class="star-overlay"></div>
             
-            <!-- Refresh Indicator -->
-            <div class="refresh-indicator" id="refreshIndicator">↻ Updating...</div>
-            
-            <!-- Tab Navigation -->
-            <div class="cargo-tabs">
-                <button class="cargo-tab active" id="elementsTab" onclick="window.switchTab('elements')">🔹 ELEMENTS</button>
-                <button class="cargo-tab" id="productsTab" onclick="window.switchTab('products')">📦 PRODUCTS</button>
-            </div>
-            
-            <!-- Location Banner - Shows if transfers are allowed -->
-            <div class="location-banner" id="locationBanner">
-                <span class="location-icon" id="locationIcon">🚀</span>
-                <span class="location-text" id="locationText">Current Location: <span id="currentLocation" class="location-highlight">Loading...</span></span>
-            </div>
-            
-            <!-- Stats Bar -->
-            <div class="stats-bar">
-                <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> --
-                </div>
-                <div class="cargo-capacity" id="cargoCapacityDisplay">
-                    Mass: --/5000 AMU
-                </div>
-            </div>
-            
-            <!-- Capacity Card -->
-            <div class="capacity-card">
-                <div class="capacity-header">
-                    <span class="capacity-label">Mass Capacity</span>
-                    <span class="capacity-numbers" id="capacityText">-- / 5000 AMU</span>
-                </div>
-                <div class="capacity-bar-bg">
-                    <div class="capacity-bar-fill" id="capacityBar" style="width: 0%"></div>
-                </div>
-                <div class="mass-warning" id="massWarning">
-                    ⚠️ Approaching mass limit
-                </div>
-            </div>
-            
-            <!-- Stats Row -->
-            <div class="stats-row">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalItems">0</div>
-                    <div class="stat-label">ITEMS</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="uniqueItems">0</div>
-                    <div class="stat-label">UNIQUE</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="totalValue">0</div>
-                    <div class="stat-label">VALUE</div>
-                </div>
-            </div>
-            
-            <!-- Elements Section (visible by default) -->
-            <div id="elementsSection">
-                <!-- Filter Bar -->
-                <div class="filter-bar">
-                    <span class="filter-btn active" onclick="window.filterElements('all')">All</span>
-                    <span class="filter-btn" onclick="window.filterElements('common')">Common</span>
-                    <span class="filter-btn" onclick="window.filterElements('uncommon')">Uncommon</span>
-                    <span class="filter-btn" onclick="window.filterElements('rare')">Rare</span>
-                    <span class="filter-btn" onclick="window.filterElements('very-rare')">Very Rare</span>
-                    <span class="filter-btn" onclick="window.filterElements('legendary')">Legendary</span>
-                </div>
-                
-                <!-- Search Box -->
-                <div class="search-container">
-                    <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search cargo..." oninput="window.searchCargo()">
-                </div>
-                
-                <!-- Sort Bar -->
-                <div class="sort-bar">
-                    <select class="sort-select" id="sortSelect" onchange="window.sortCargo()">
-                        <option value="name">Sort by Name</option>
-                        <option value="count">Sort by Quantity</option>
-                        <option value="mass">Sort by Mass</option>
-                        <option value="value">Sort by Value</option>
-                        <option value="rarity">Sort by Rarity</option>
-                    </select>
-                </div>
-                
-                <!-- Cargo Grid -->
-                <div class="cargo-grid" id="cargoGrid">
-                    <!-- Filled by JavaScript -->
-                    <div class="empty-state">Loading cargo...</div>
-                </div>
-            </div>
-            
-            <!-- Products Section (hidden by default) -->
-            <div id="productsSection" style="display: none;">
-                <div class="products-section">
-                    <div class="section-title">
-                        <span>🚀 Owned Ships</span>
-                        <span class="product-count" id="shipCount">0</span>
+            <div class="content">
+                <div class="status-bar">
+                    <div class="planet-name">
+                        <span class="planet-name-main" id="planetName">Loading...</span>
+                        <span class="planet-name-type" id="planetType">Loading...</span>
                     </div>
-                    <div class="products-grid" id="shipsGrid"></div>
+                    <div class="cargo-display">
+                        <span class="cargo-label">CARGO</span>
+                        <span class="cargo-value" id="cargoMass"><span>0</span>/5000 AMU</span>
+                    </div>
+                </div>
+                
+                <div class="extractor-status">
+                    <span class="extractor-pulse"></span>
+                    <span id="extractorText">Auto-extractor active</span>
+                </div>
+                
+                <div class="action-buttons" style="position: relative;">
+                    <div class="nav-row">
+                        <button class="nav-btn system-btn" id="systemBtn" onclick="window.returnToSystem()">🪐 SYSTEM VIEW</button>
+                        <button class="nav-btn" id="shipBtn" onclick="window.returnToShip()">🚀 RETURN TO SHIP</button>
+                    </div>
                     
-                    <div class="section-title" style="margin-top: 20px;">
-                        <span>⚙️ Owned Equipment</span>
-                        <span class="product-count" id="equipmentCount">0</span>
+                    <button class="claim-btn" id="claimBtn" onclick="window.claimCurrentPlanet()">✨ CLAIM PLANET</button>
+                </div>
+                
+                <div class="resource-bar">
+                    <div class="resource-label">⚡ TAP TO TOGGLE EXTRACTION</div>
+                    <div class="resource-grid" id="resourceGrid"></div>
+                    <div class="explored-count" id="exploredCount">
+                        <span id="exploredProgress">0/4</span> ELEMENTS EXPLORED
                     </div>
-                    <div class="products-grid" id="equipmentGrid"></div>
-                    
-                    <div class="section-title" style="margin-top: 20px;">
-                        <span>🏭 Owned Infrastructure</span>
-                        <span class="product-count" id="infrastructureCount">0</span>
-                    </div>
-                    <div class="products-grid" id="infrastructureGrid"></div>
+                    <div class="active-count" id="activeCount">Extracting: 0 resources</div>
                 </div>
             </div>
             
-            <!-- Scroll Hint -->
-            <div class="scroll-hint">▼ scroll down to return to Ship Bridge ▼</div>
+            <!-- Sliding Extraction Notification - CENTER SCREEN -->
+            <div class="extraction-notification" id="extractionNotification">
+                <div class="notification-icon" id="notificationIcon">✨</div>
+                <div class="notification-title" id="notificationTitle">SUCCESS</div>
+                <div class="notification-resource" id="notificationResource"></div>
+                <div class="notification-quantity" id="notificationQuantity"></div>
+                <div class="notification-rarity" id="notificationRarity"></div>
+                <div class="notification-pity" id="notificationPity"></div>
+            </div>
             
-            <!-- Back button - SHIP BRIDGE -->
-            <button class="back-button" onclick="window.returnToShipBridge()">
-                <span class="back-arrow">←</span>
-                <span class="back-text">SHIP BRIDGE</span>
-                <span class="back-icon">🚀</span>
-            </button>
-        </div>
-        
-        <!-- Eject Confirmation Modal -->
-        <div class="modal-overlay" id="ejectModal">
-            <div class="modal-content">
-                <div class="modal-title">🗑️ EJECT CARGO</div>
-                <div class="modal-item-name" id="ejectItemName">Item</div>
-                <div class="modal-current" id="ejectCurrentCount">Current: 0</div>
-                
-                <div class="eject-quantity">
-                    <button class="qty-btn" id="decrementBtn" onclick="window.decrementQty()">−</button>
-                    <input type="number" id="ejectQuantity" value="1" min="1" max="99" readonly>
-                    <button class="qty-btn" id="incrementBtn" onclick="window.incrementQty()">+</button>
-                </div>
-                
-                <div class="eject-mass-info">
-                    Mass to eject: <span class="eject-mass" id="ejectMass">0</span> AMU
-                </div>
-                
-                <div class="warning-text" id="ejectWarning"></div>
-                
-                <div class="modal-buttons">
-                    <button class="modal-btn eject-confirm" onclick="window.confirmEject()">🗑️ EJECT</button>
-                    <button class="modal-btn" onclick="window.closeEjectModal()">CANCEL</button>
-                </div>
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">processing...</div>
             </div>
         </div>
-        
-        <!-- Transfer to Hub Confirmation Modal -->
-        <div class="modal-overlay" id="transferModal">
-            <div class="modal-content transfer">
-                <div class="modal-title transfer">🏢 TRANSFER TO HUB</div>
-                <div class="modal-item-name" id="transferItemName">Item</div>
-                <div class="modal-current" id="transferCurrentCount">Current: 0</div>
-                
-                <div class="eject-quantity">
-                    <button class="qty-btn" id="transferDecrementBtn" onclick="window.transferDecrementQty()">−</button>
-                    <input type="number" id="transferQuantity" value="1" min="1" max="99" readonly>
-                    <button class="qty-btn" id="transferIncrementBtn" onclick="window.transferIncrementQty()">+</button>
-                </div>
-                
-                <div class="transfer-max-info">
-                    Transfer mass: <span class="transfer-max" id="transferMass">0</span> AMU<br>
-                    Hub available: <span class="transfer-max" id="hubAvailable">0</span> AMU
-                </div>
-                
-                <div class="warning-text" id="transferWarning"></div>
-                
-                <div class="modal-buttons">
-                    <button class="modal-btn transfer-confirm" onclick="window.confirmTransfer()">🏢 TRANSFER</button>
-                    <button class="modal-btn" onclick="window.closeTransferModal()">CANCEL</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Loading Overlay -->
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="loading-spinner"></div>
-            <div class="loading-text" id="loadingText">processing...</div>
-        </div>
-        
-        <!-- Migration status (debug) -->
-        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- CRITICAL FIX: Added type="module" to all script tags -->
+    <!-- Scripts -->
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/transfer.js"></script>
     <script type="module" src="js/migration.js"></script>
-    <script type="module" src="js/product-catalog.js"></script>
+    <script type="module" src="js/planet-utils.js"></script>
+    <script type="module" src="js/planet-status.js"></script>
 
     <script type="module">
-        import { PRODUCT_CATALOG, getProductById, getProductsByCategory } from './js/product-catalog.js';
+        import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
 
-        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
-            tg.setHeaderColor('#0a1a2a');
-            tg.setBackgroundColor('#0a1a2a');
         }
 
-        // ===== ENSURE PLAYER ID IS CONSISTENT WITH SURFACE.HTML =====
-        if (!localStorage.getItem('voidfarer_player_id')) {
-            localStorage.setItem('voidfarer_player_id', 'player_default');
+        const EXTRACTION_INTERVAL = 5000;
+        const CARGO_MASS_LIMIT = 5000;
+        
+        const RARITY_CONFIG = {
+            'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff' },
+            'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0' },
+            'rare': { baseChance: 25, massTarget: 12, variety: 0.4, icon: '🔵', color: '#4169E1' },
+            'very-rare': { baseChance: 12, massTarget: 7, variety: 0.3, icon: '🟣', color: '#e0b0ff' },
+            'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700' }
+        };
+
+        let pityCounters = {};
+        
+        const PITY_CONFIG = {
+            'common': { threshold: 2 },
+            'uncommon': { threshold: 3 },
+            'rare': { threshold: 4 },
+            'very-rare': { threshold: 9 },
+            'legendary': { threshold: 25 }
+        };
+
+        function initializePityCounters() {
+            currentPlanet.resources.forEach(resource => {
+                const rarity = getElementRarity(resource);
+                pityCounters[resource] = {
+                    attempts: 0,
+                    threshold: PITY_CONFIG[rarity].threshold
+                };
+            });
         }
-        console.log('Player ID:', localStorage.getItem('voidfarer_player_id'));
 
-        // ===== CONSTANTS =====
-        const CARGO_MASS_LIMIT = 5000; // Fixed ship capacity
-
-        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
-        const cargoGrid = document.getElementById('cargoGrid');
-        const elementsSection = document.getElementById('elementsSection');
-        const productsSection = document.getElementById('productsSection');
-        const elementsTab = document.getElementById('elementsTab');
-        const productsTab = document.getElementById('productsTab');
-        const refreshIndicator = document.getElementById('refreshIndicator');
+        const planetImage = document.getElementById('planetImage');
+        const planetName = document.getElementById('planetName');
+        const planetType = document.getElementById('planetType');
+        const cargoMass = document.getElementById('cargoMass');
+        const resourceGrid = document.getElementById('resourceGrid');
+        const activeCount = document.getElementById('activeCount');
+        const extractorText = document.getElementById('extractorText');
+        const claimBtn = document.getElementById('claimBtn');
         
-        // Eject modal elements
-        const ejectModal = document.getElementById('ejectModal');
-        const ejectItemName = document.getElementById('ejectItemName');
-        const ejectCurrentCount = document.getElementById('ejectCurrentCount');
-        const ejectQuantity = document.getElementById('ejectQuantity');
-        const ejectMass = document.getElementById('ejectMass');
-        const ejectWarning = document.getElementById('ejectWarning');
-        const decrementBtn = document.getElementById('decrementBtn');
-        const incrementBtn = document.getElementById('incrementBtn');
-        
-        // Transfer modal elements
-        const transferModal = document.getElementById('transferModal');
-        const transferItemName = document.getElementById('transferItemName');
-        const transferCurrentCount = document.getElementById('transferCurrentCount');
-        const transferQuantity = document.getElementById('transferQuantity');
-        const transferMass = document.getElementById('transferMass');
-        const transferWarning = document.getElementById('transferWarning');
-        const hubAvailable = document.getElementById('hubAvailable');
-        const transferDecrementBtn = document.getElementById('transferDecrementBtn');
-        const transferIncrementBtn = document.getElementById('transferIncrementBtn');
+        // Notification elements
+        const extractionNotification = document.getElementById('extractionNotification');
+        const notificationIcon = document.getElementById('notificationIcon');
+        const notificationTitle = document.getElementById('notificationTitle');
+        const notificationResource = document.getElementById('notificationResource');
+        const notificationQuantity = document.getElementById('notificationQuantity');
+        const notificationRarity = document.getElementById('notificationRarity');
+        const notificationPity = document.getElementById('notificationPity');
 
-        // Make functions available globally for onclick handlers
-        window.filterElements = filterElements;
-        window.searchCargo = searchCargo;
-        window.sortCargo = sortCargo;
-        window.showEjectModal = showEjectModal;
-        window.closeEjectModal = closeEjectModal;
-        window.incrementQty = incrementQty;
-        window.decrementQty = decrementQty;
-        window.confirmEject = confirmEject;
-        window.showTransferModal = showTransferModal;
-        window.closeTransferModal = closeTransferModal;
-        window.transferIncrementQty = transferIncrementQty;
-        window.transferDecrementQty = transferDecrementQty;
-        window.confirmTransfer = confirmTransfer;
-        window.returnToShipBridge = returnToShipBridge;
-        window.switchTab = switchTab;
-
-        // ===== STATE =====
-        let cargoItems = [];
-        let filteredItems = [];
-        let currentFilter = 'all';
-        let searchTerm = '';
-        let sortBy = 'name';
-        let currentPlanet = 'Earth';
-        let canTransfer = false; // Only true when at Earth
-        let currentTab = 'elements';
-        let refreshTimeout = null;
-        
-        // Current item being ejected
-        let currentEjectItem = null;
-        let currentEjectMax = 1;
-        let currentEjectMassPerUnit = 0;
-        
-        // Current item being transferred
-        let currentTransferItem = null;
-        let currentTransferMax = 1;
-        let currentTransferMassPerUnit = 0;
-        let currentHubAvailable = 0;
-        
-        // Owned products
-        let ownedProducts = [];
-
-        // ===== ELEMENT ICONS =====
-        const elementIcons = {
-            // Common
-            'Hydrogen': '💧', 'Helium': '🎈', 'Lithium': '🔋', 'Beryllium': '💎',
-            'Boron': '🧪', 'Sodium': '🧂', 'Magnesium': '✨', 'Aluminum': '🥫',
-            'Silicon': '💻', 'Potassium': '🍌', 'Calcium': '🥛',
-            
-            // Uncommon
-            'Carbon': '⚫', 'Nitrogen': '🌬️', 'Oxygen': '💨', 'Fluorine': '🧪',
-            'Neon': '💡', 'Phosphorus': '✨', 'Sulfur': '🟡', 'Chlorine': '🧪',
-            'Argon': '🎈', 'Iron': '⚙️', 'Nickel': '🔩', 'Lead': '🔘',
-            
-            // Rare
-            'Gold': '🟡', 'Silver': '⚪', 'Platinum': '⬜', 'Titanium': '🔷',
-            'Copper': '🔴', 'Zinc': '⚪', 'Tin': '🥫', 'Cobalt': '🔵',
-            'Chromium': '✨', 'Mercury': '💧', 'Uranium': '🟣', 'Thorium': '🔮',
-            'Plutonium': '☢️', 'Promethium': '✨',
-            
-            // Default
-            'default': '🔹'
+        let currentPlanet = {
+            name: 'Earth',
+            type: 'lush',
+            typeName: 'Lush',
+            resources: []
         };
+        
+        let resourceStates = {};
+        let resourceChances = {};
+        let isExtracting = true;
+        let extractionTimer = null;
+        
+        let exploredElements = {};
+        let totalElements = 4;
+        
+        let cachedCargoMass = 0;
+        let lastMassUpdate = 0;
+        const MASS_UPDATE_INTERVAL = 2000;
 
-        // ===== ELEMENT RARITY COLORS =====
-        const rarityColors = {
-            'common': '#ffffff',
-            'uncommon': '#b0ffb0',
-            'rare': '#b0b0ff',
-            'very-rare': '#e0b0ff',
-            'legendary': '#ffd700'
-        };
+        // ===== PERSIST EXPLORED STATE =====
+        function loadExploredState() {
+            const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
+            if (saved) {
+                exploredElements = JSON.parse(saved);
+            } else {
+                exploredElements = {};
+                currentPlanet.resources.forEach(resource => {
+                    exploredElements[resource] = false;
+                });
+            }
+            updateExploredCount();
+        }
 
-        // ===== ELEMENT BASE VALUES =====
-        const elementValues = {
-            'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-            'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
-            'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
-            'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250, 'Fluorine': 250,
-            'Neon': 250, 'Phosphorus': 250, 'Sulfur': 250, 'Chlorine': 250,
-            'Argon': 250, 'Iron': 250, 'Nickel': 250, 'Lead': 250,
-            'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Titanium': 1000,
-            'Copper': 1000, 'Zinc': 1000, 'Tin': 1000, 'Cobalt': 1000,
-            'Chromium': 1000, 'Mercury': 1000, 'Uranium': 5000, 'Thorium': 5000,
-            'Plutonium': 5000, 'Promethium': 25000,
-            'default': 100
-        };
+        function saveExploredState() {
+            localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
+        }
 
-        // ===== GET ELEMENT MASS - COMPLETE DATABASE =====
-        function getElementMass(elementName) {
-            // Use the global function from storage.js if available
-            if (typeof window.getElementMass === 'function') {
-                return window.getElementMass(elementName);
+        // ===== PLAYER LOCATIONS SYSTEM =====
+        async function saveDiscoveryToLocation(elementName, quantity, rarity) {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const locationsKey = `voidfarer_locations_${playerId}`;
+                
+                let locations = [];
+                const saved = localStorage.getItem(locationsKey);
+                if (saved) {
+                    locations = JSON.parse(saved);
+                }
+                
+                locations.push({
+                    planet: currentPlanet.name,
+                    planetType: currentPlanet.type,
+                    elementName: elementName,
+                    elementRarity: rarity,
+                    quantity: quantity,
+                    discoveredAt: Date.now()
+                });
+                
+                if (locations.length > 1000) {
+                    locations = locations.slice(-1000);
+                }
+                
+                localStorage.setItem(locationsKey, JSON.stringify(locations));
+                
+                window.getPlayerLocations = async function() {
+                    const saved = localStorage.getItem(locationsKey);
+                    return saved ? JSON.parse(saved) : [];
+                };
+                
+                return true;
+            } catch (error) {
+                console.error('Error saving discovery:', error);
+                return false;
+            }
+        }
+
+        if (!window.getPlayerLocations) {
+            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+            const locationsKey = `voidfarer_locations_${playerId}`;
+            window.getPlayerLocations = async function() {
+                const saved = localStorage.getItem(locationsKey);
+                return saved ? JSON.parse(saved) : [];
+            };
+        }
+
+        // ===== NOTIFICATION SYSTEM =====
+        let notificationTimeout = null;
+
+        function showExtractionNotification(result) {
+            if (notificationTimeout) {
+                clearTimeout(notificationTimeout);
             }
             
-            // Complete fallback mass database for all elements
-            const masses = {
-                // Common
-                'Hydrogen': 1.008,
-                'Helium': 4.003,
-                'Lithium': 6.94,
-                'Beryllium': 9.012,
-                'Boron': 10.81,
-                'Sodium': 22.99,
-                'Magnesium': 24.31,
-                'Aluminum': 26.98,
-                'Silicon': 28.09,
-                'Potassium': 39.10,
-                'Calcium': 40.08,
-                
-                // Uncommon
-                'Carbon': 12.01,
-                'Nitrogen': 14.01,
-                'Oxygen': 16.00,
-                'Fluorine': 19.00,
-                'Neon': 20.18,
-                'Phosphorus': 30.97,
-                'Sulfur': 32.06,
-                'Chlorine': 35.45,
-                'Argon': 39.95,
-                'Iron': 55.85,
-                'Nickel': 58.69,
-                'Lead': 207.2,
-                
-                // Rare
-                'Scandium': 44.96,
-                'Titanium': 47.87,
-                'Vanadium': 50.94,
-                'Chromium': 52.00,
-                'Manganese': 54.94,
-                'Cobalt': 58.93,
-                'Copper': 63.55,
-                'Zinc': 65.38,
-                'Gallium': 69.72,
-                'Germanium': 72.63,
-                'Arsenic': 74.92,
-                'Selenium': 78.97,
-                'Bromine': 79.90,
-                'Krypton': 83.80,
-                'Rubidium': 85.47,
-                'Strontium': 87.62,
-                'Yttrium': 88.91,
-                'Zirconium': 91.22,
-                'Niobium': 92.91,
-                'Molybdenum': 95.95,
-                'Ruthenium': 101.1,
-                'Rhodium': 102.9,
-                'Palladium': 106.4,
-                'Silver': 107.9,
-                'Cadmium': 112.4,
-                'Indium': 114.8,
-                'Tin': 118.7,
-                'Antimony': 121.8,
-                'Tellurium': 127.6,
-                'Iodine': 126.9,
-                'Xenon': 131.3,
-                'Cesium': 132.9,
-                'Barium': 137.3,
-                'Lanthanum': 138.9,
-                'Cerium': 140.1,
-                'Praseodymium': 140.9,
-                'Neodymium': 144.2,
-                'Samarium': 150.4,
-                'Europium': 152.0,
-                'Gadolinium': 157.3,
-                'Terbium': 158.9,
-                'Dysprosium': 162.5,
-                'Holmium': 164.9,
-                'Erbium': 167.3,
-                'Thulium': 168.9,
-                'Ytterbium': 173.0,
-                'Lutetium': 175.0,
-                'Hafnium': 178.5,
-                'Tantalum': 180.9,
-                'Tungsten': 183.8,
-                'Rhenium': 186.2,
-                'Osmium': 190.2,
-                'Iridium': 192.2,
-                'Platinum': 195.1,
-                'Gold': 197.0,
-                'Mercury': 200.6,
-                'Thallium': 204.4,
-                'Bismuth': 209.0,
-                
-                // Very Rare
-                'Polonium': 209.0,
-                'Radon': 222.0,
-                'Radium': 226.0,
-                'Actinium': 227.0,
-                'Thorium': 232.0,
-                'Protactinium': 231.0,
-                'Uranium': 238.0,
-                
-                // Legendary
-                'Technetium': 98.0,
-                'Promethium': 145.0,
-                'Astatine': 210.0,
-                'Francium': 223.0,
-                'Neptunium': 237.0,
-                'Plutonium': 244.0,
-                'Americium': 243.0,
-                'Curium': 247.0,
-                'Berkelium': 247.0,
-                'Californium': 251.0,
-                'Einsteinium': 252.0,
-                'Fermium': 257.0,
-                'Mendelevium': 258.0,
-                'Nobelium': 259.0,
-                'Lawrencium': 262.0,
-                'Rutherfordium': 267.0,
-                'Dubnium': 268.0,
-                'Seaborgium': 269.0,
-                'Bohrium': 270.0,
-                'Hassium': 277.0,
-                'Meitnerium': 278.0,
-                'Darmstadtium': 281.0,
-                'Roentgenium': 282.0,
-                'Copernicium': 285.0,
-                'Nihonium': 286.0,
-                'Flerovium': 289.0,
-                'Moscovium': 290.0,
-                'Livermorium': 293.0,
-                'Tennessine': 294.0,
-                'Oganesson': 294.0
-            };
+            extractionNotification.classList.remove('show', 'success', 'fail', 'rarity-common', 'rarity-uncommon', 'rarity-rare', 'rarity-very-rare', 'rarity-legendary');
             
-            return masses[elementName] || 100.0;
+            if (result.success) {
+                extractionNotification.classList.add('success');
+                const rarity = getElementRarity(result.resource);
+                extractionNotification.classList.add(`rarity-${rarity}`);
+                
+                notificationIcon.textContent = '✨';
+                notificationTitle.textContent = 'SUCCESS';
+                
+                const config = RARITY_CONFIG[rarity];
+                
+                notificationResource.textContent = result.resource;
+                notificationQuantity.textContent = `+${result.quantity} units • ${Math.round(result.mass)} AMU`;
+                notificationRarity.textContent = `${rarity} • ${config.icon}`;
+                
+                if (result.wasPity) {
+                    notificationPity.textContent = '⚡ PITY BONUS! ⚡';
+                } else {
+                    notificationPity.textContent = '';
+                }
+            } else {
+                extractionNotification.classList.add('fail');
+                notificationIcon.textContent = '⚠️';
+                notificationTitle.textContent = 'FAIL';
+                
+                if (result.resource) {
+                    const rarity = getElementRarity(result.resource);
+                    notificationResource.textContent = result.resource;
+                    notificationQuantity.textContent = `Extraction failed`;
+                    notificationRarity.textContent = `${rarity}`;
+                    
+                    if (result.pityCount) {
+                        notificationPity.textContent = `Pity: ${result.pityCount}/${result.pityThreshold}`;
+                    } else {
+                        notificationPity.textContent = '';
+                    }
+                } else if (result.reason === 'cargo_full') {
+                    notificationResource.textContent = 'Cargo Full';
+                    notificationQuantity.textContent = '';
+                    notificationRarity.textContent = '';
+                    notificationPity.textContent = '';
+                }
+            }
+            
+            extractionNotification.classList.add('show');
+            
+            const hideDelay = result.success ? 2000 : 1500;
+            notificationTimeout = setTimeout(() => {
+                extractionNotification.classList.remove('show');
+            }, hideDelay);
         }
 
-        // ===== GET ELEMENT ICON =====
-        function getElementIcon(elementName) {
-            return elementIcons[elementName] || elementIcons.default;
+        window.toggleResource = toggleResource;
+        window.returnToShip = returnToShip;
+        window.returnToSystem = returnToSystem;
+        window.claimCurrentPlanet = claimCurrentPlanet;
+
+        function initializeExplorationTracking() {
+            totalElements = currentPlanet.resources.length;
+            loadExploredState();
         }
 
-        // ===== GET ELEMENT VALUE =====
-        function getElementValue(elementName) {
-            return elementValues[elementName] || elementValues.default;
+        function checkElementExplored(resource) {
+            return exploredElements[resource] || false;
         }
 
-        // ===== GET ELEMENT RARITY =====
+        function markElementExplored(resource) {
+            if (!exploredElements[resource]) {
+                exploredElements[resource] = true;
+                saveExploredState();
+                updateExploredCount();
+                renderResourceToggles();
+                checkAllElementsExplored();
+            }
+        }
+
+        function updateExploredCount() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            const exploredProgress = document.getElementById('exploredProgress');
+            if (exploredProgress) {
+                exploredProgress.textContent = `${explored}/${totalElements}`;
+            }
+            return explored;
+        }
+
+        function checkAllElementsExplored() {
+            const explored = Object.values(exploredElements).filter(v => v).length;
+            if (explored === totalElements && totalElements > 0) {
+                claimBtn.classList.add('visible');
+                claimBtn.disabled = false;
+                claimBtn.textContent = '✨ CLAIM PLANET';
+                showExtractionNotification({
+                    success: true,
+                    resource: 'All Elements',
+                    quantity: 0,
+                    mass: 0,
+                    wasPity: false
+                });
+            }
+        }
+
         function getElementRarity(elementName) {
-            if (['Gold', 'Silver', 'Platinum', 'Titanium', 'Copper'].includes(elementName)) return 'rare';
-            if (['Uranium', 'Thorium', 'Plutonium'].includes(elementName)) return 'very-rare';
-            if (['Promethium'].includes(elementName)) return 'legendary';
-            if (['Carbon', 'Oxygen', 'Iron'].includes(elementName)) return 'uncommon';
+            const rareElements = [
+                'Gold', 'Silver', 'Platinum', 'Titanium', 'Copper', 'Zinc', 'Tin', 'Cobalt',
+                'Chromium', 'Nickel', 'Lead', 'Mercury', 'Uranium', 'Thorium', 'Plutonium',
+                'Radium', 'Polonium', 'Promethium', 'Technetium', 'Astatine', 'Francium'
+            ];
+            
+            if (rareElements.includes(elementName)) {
+                if (['Promethium', 'Technetium', 'Astatine', 'Francium'].includes(elementName)) {
+                    return 'legendary';
+                }
+                if (['Uranium', 'Thorium', 'Plutonium', 'Radium', 'Polonium'].includes(elementName)) {
+                    return 'very-rare';
+                }
+                return 'rare';
+            }
+            
+            const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon'];
+            if (uncommonElements.includes(elementName)) {
+                return 'uncommon';
+            }
+            
             return 'common';
         }
 
-        // ===== CHECK CURRENT LOCATION =====
-        function checkLocation() {
-            currentPlanet = localStorage.getItem('voidfarer_current_planet') || 'Earth';
-            canTransfer = (currentPlanet === 'Earth');
-            
-            const locationIcon = document.getElementById('locationIcon');
-            const locationText = document.getElementById('locationText');
-            const locationBanner = document.getElementById('locationBanner');
-            
-            if (canTransfer) {
-                locationIcon.textContent = '🌍';
-                locationBanner.classList.add('transfer-allowed');
-                locationBanner.classList.remove('transfer-not-allowed');
-                document.getElementById('currentLocation').textContent = 'EARTH • Transfer Available';
-            } else {
-                locationIcon.textContent = '🚀';
-                locationBanner.classList.add('transfer-not-allowed');
-                locationBanner.classList.remove('transfer-allowed');
-                document.getElementById('currentLocation').textContent = currentPlanet + ' • Cannot Transfer';
-            }
-            
-            return canTransfer;
+        const elementData = {
+            'Hydrogen': { symbol: 'H' }, 'Helium': { symbol: 'He' }, 'Lithium': { symbol: 'Li' },
+            'Beryllium': { symbol: 'Be' }, 'Boron': { symbol: 'B' }, 'Sodium': { symbol: 'Na' },
+            'Magnesium': { symbol: 'Mg' }, 'Aluminum': { symbol: 'Al' }, 'Silicon': { symbol: 'Si' },
+            'Potassium': { symbol: 'K' }, 'Calcium': { symbol: 'Ca' }, 'Scandium': { symbol: 'Sc' },
+            'Vanadium': { symbol: 'V' }, 'Manganese': { symbol: 'Mn' }, 'Carbon': { symbol: 'C' },
+            'Nitrogen': { symbol: 'N' }, 'Oxygen': { symbol: 'O' }, 'Fluorine': { symbol: 'F' },
+            'Neon': { symbol: 'Ne' }, 'Phosphorus': { symbol: 'P' }, 'Sulfur': { symbol: 'S' },
+            'Chlorine': { symbol: 'Cl' }, 'Argon': { symbol: 'Ar' }, 'Iron': { symbol: 'Fe' },
+            'Nickel': { symbol: 'Ni' }, 'Lead': { symbol: 'Pb' }, 'Copper': { symbol: 'Cu' },
+            'Zinc': { symbol: 'Zn' }, 'Silver': { symbol: 'Ag' }, 'Gold': { symbol: 'Au' },
+            'Platinum': { symbol: 'Pt' }, 'Titanium': { symbol: 'Ti' }, 'Cobalt': { symbol: 'Co' },
+            'Chromium': { symbol: 'Cr' }, 'Tin': { symbol: 'Sn' }, 'Mercury': { symbol: 'Hg' },
+            'Uranium': { symbol: 'U' }, 'Thorium': { symbol: 'Th' }, 'Plutonium': { symbol: 'Pu' },
+            'Radium': { symbol: 'Ra' }, 'Polonium': { symbol: 'Po' }, 'Promethium': { symbol: 'Pm' },
+            'Technetium': { symbol: 'Tc' }, 'Astatine': { symbol: 'At' }, 'Francium': { symbol: 'Fr' }
+        };
+
+        function getElementSymbol(resource) {
+            return elementData[resource]?.symbol || resource.substring(0, 2);
         }
 
-        // ===== LOAD OWNED PRODUCTS =====
-        async function loadOwnedProducts() {
+        function getElementMass(elementName) {
+            const masses = {
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Lithium': 6.94, 'Beryllium': 9.012,
+                'Boron': 10.81, 'Sodium': 22.99, 'Magnesium': 24.31, 'Aluminum': 26.98,
+                'Silicon': 28.09, 'Potassium': 39.10, 'Calcium': 40.08, 'Scandium': 44.96,
+                'Vanadium': 50.94, 'Manganese': 54.94, 'Carbon': 12.01, 'Nitrogen': 14.01,
+                'Oxygen': 16.00, 'Fluorine': 19.00, 'Neon': 20.18, 'Phosphorus': 30.97,
+                'Sulfur': 32.06, 'Chlorine': 35.45, 'Argon': 39.95, 'Iron': 55.85,
+                'Nickel': 58.69, 'Lead': 207.2, 'Copper': 63.55, 'Zinc': 65.38,
+                'Silver': 107.9, 'Gold': 197.0, 'Platinum': 195.1, 'Titanium': 47.87,
+                'Cobalt': 58.93, 'Chromium': 52.00, 'Tin': 118.7, 'Mercury': 200.6,
+                'Uranium': 238.0, 'Thorium': 232.0, 'Plutonium': 244.0, 'Radium': 226.0,
+                'Polonium': 209.0, 'Promethium': 145.0, 'Technetium': 98.0,
+                'default': 100.0
+            };
+            return masses[elementName] || masses.default;
+        }
+
+        async function getFreshCargoMass() {
             try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                
-                if (typeof window.getPlayerProducts === 'function') {
-                    ownedProducts = await window.getPlayerProducts(playerId);
-                } else {
-                    const products = JSON.parse(localStorage.getItem('voidfarer_player_products') || '{}');
-                    ownedProducts = products[playerId] || [];
-                }
-                
-                // Update product counts
-                const ships = ownedProducts.filter(p => {
-                    const product = PRODUCT_CATALOG[p.productId];
-                    return product && product.category === 'Ships';
-                });
-                
-                const equipment = ownedProducts.filter(p => {
-                    const product = PRODUCT_CATALOG[p.productId];
-                    return product && (product.category === 'Equipment' || product.category === 'Ship Upgrades');
-                });
-                
-                const infrastructure = ownedProducts.filter(p => {
-                    const product = PRODUCT_CATALOG[p.productId];
-                    return product && product.category === 'Infrastructure';
-                });
-                
-                document.getElementById('shipCount').textContent = ships.length;
-                document.getElementById('equipmentCount').textContent = equipment.length;
-                document.getElementById('infrastructureCount').textContent = infrastructure.length;
-                
-                renderOwnedProducts();
-                
-            } catch (error) {
-                console.error('Error loading owned products:', error);
-            }
-        }
-
-        // ===== RENDER OWNED PRODUCTS =====
-        function renderOwnedProducts() {
-            const shipsGrid = document.getElementById('shipsGrid');
-            const equipmentGrid = document.getElementById('equipmentGrid');
-            const infrastructureGrid = document.getElementById('infrastructureGrid');
-            
-            // Filter and sort owned products
-            const ships = ownedProducts.filter(p => {
-                const product = PRODUCT_CATALOG[p.productId];
-                return product && product.category === 'Ships';
-            });
-            
-            const equipment = ownedProducts.filter(p => {
-                const product = PRODUCT_CATALOG[p.productId];
-                return product && (product.category === 'Equipment' || product.category === 'Ship Upgrades');
-            });
-            
-            const infrastructure = ownedProducts.filter(p => {
-                const product = PRODUCT_CATALOG[p.productId];
-                return product && product.category === 'Infrastructure';
-            });
-            
-            // Render ships
-            if (ships.length === 0) {
-                shipsGrid.innerHTML = '<div class="empty-state" style="padding: 20px;">No ships owned</div>';
-            } else {
-                let html = '';
-                ships.forEach(purchase => {
-                    const product = PRODUCT_CATALOG[purchase.productId];
-                    if (!product) return;
-                    
-                    const date = new Date(purchase.purchaseDate).toLocaleDateString();
-                    html += `
-                        <div class="product-item">
-                            <div class="product-icon">${product.icon || '🚀'}</div>
-                            <div class="product-info">
-                                <div class="product-name">${product.name}</div>
-                                <div class="product-type">${product.class || ''}</div>
-                                <div class="product-purchase-date">Acquired: ${date}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                shipsGrid.innerHTML = html;
-            }
-            
-            // Render equipment
-            if (equipment.length === 0) {
-                equipmentGrid.innerHTML = '<div class="empty-state" style="padding: 20px;">No equipment owned</div>';
-            } else {
-                let html = '';
-                equipment.forEach(purchase => {
-                    const product = PRODUCT_CATALOG[purchase.productId];
-                    if (!product) return;
-                    
-                    const date = new Date(purchase.purchaseDate).toLocaleDateString();
-                    html += `
-                        <div class="product-item">
-                            <div class="product-icon">${product.icon || '⚙️'}</div>
-                            <div class="product-info">
-                                <div class="product-name">${product.name}</div>
-                                <div class="product-type">${product.equipmentType || ''}</div>
-                                <div class="product-purchase-date">Acquired: ${date}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                equipmentGrid.innerHTML = html;
-            }
-            
-            // Render infrastructure
-            if (infrastructure.length === 0) {
-                infrastructureGrid.innerHTML = '<div class="empty-state" style="padding: 20px;">No infrastructure owned</div>';
-            } else {
-                let html = '';
-                infrastructure.forEach(purchase => {
-                    const product = PRODUCT_CATALOG[purchase.productId];
-                    if (!product) return;
-                    
-                    const date = new Date(purchase.purchaseDate).toLocaleDateString();
-                    html += `
-                        <div class="product-item">
-                            <div class="product-icon">${product.icon || '🏭'}</div>
-                            <div class="product-info">
-                                <div class="product-name">${product.name}</div>
-                                <div class="product-type">${product.infrastructureType || ''}</div>
-                                <div class="product-purchase-date">Acquired: ${date}</div>
-                            </div>
-                        </div>
-                    `;
-                });
-                infrastructureGrid.innerHTML = html;
-            }
-        }
-
-        // ===== LOAD CARGO DATA =====
-        async function loadCargoData(showRefreshIndicator = false) {
-            try {
-                if (showRefreshIndicator) {
-                    refreshIndicator.classList.add('visible');
-                    if (refreshTimeout) clearTimeout(refreshTimeout);
-                    refreshTimeout = setTimeout(() => {
-                        refreshIndicator.classList.remove('visible');
-                    }, 1000);
-                }
-                
-                console.log('Loading cargo data...');
-                
-                // Check location
-                checkLocation();
-                
-                // Get credits
-                let credits = 5000;
-                if (typeof window.getCredits === 'function') {
-                    credits = await window.getCredits();
-                    console.log('Got credits:', credits);
-                }
-                
-                // Get collection
-                let collection = {};
-                if (typeof window.getCollection === 'function') {
-                    collection = await window.getCollection();
-                    console.log('Got collection:', collection);
-                }
-                
-                // Get hub available space (for transfer info)
-                if (typeof window.getRemainingHubStorage === 'function') {
-                    currentHubAvailable = await window.getRemainingHubStorage();
-                } else {
-                    currentHubAvailable = 0;
-                }
-                
-                // Load owned products
-                await loadOwnedProducts();
-                
-                // Update credits display
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-                
-                // Convert collection to array
-                cargoItems = [];
-                let totalMass = 0;
-                let totalItems = 0;
-                let totalValue = 0;
-                
+                const collection = await window.getCollection();
+                let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
-                    const count = data.count || 1;
-                    const massPerUnit = getElementMass(name);
-                    const totalItemMass = count * massPerUnit;
-                    const valuePerUnit = getElementValue(name);
-                    const totalItemValue = count * valuePerUnit;
-                    
-                    totalMass += totalItemMass;
-                    totalItems += count;
-                    totalValue += totalItemValue;
-                    
-                    cargoItems.push({
-                        name: name,
-                        count: count,
-                        massPerUnit: massPerUnit,
-                        totalMass: totalItemMass,
-                        valuePerUnit: valuePerUnit,
-                        totalValue: totalItemValue,
-                        icon: getElementIcon(name),
-                        rarity: getElementRarity(name)
-                    });
+                    mass += (data.count || 1) * getElementMass(name);
+                }
+                return mass;
+            } catch (error) {
+                console.error('Error getting fresh cargo mass:', error);
+                return 0;
+            }
+        }
+
+        async function updateCargoDisplay() {
+            const mass = await getFreshCargoMass();
+            cargoMass.innerHTML = `<span>${Math.round(mass)}</span>/5000 AMU`;
+            return mass;
+        }
+
+        function generateFallbackResources(planetType) {
+            const fallbackPools = {
+                'scorched': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'volcanic': ['Iron', 'Sulfur', 'Copper', 'Gold'],
+                'barren': ['Iron', 'Silicon', 'Aluminum', 'Titanium'],
+                'lush': ['Carbon', 'Oxygen', 'Hydrogen', 'Silicon'],
+                'frozen': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'ice': ['Hydrogen', 'Helium', 'Oxygen', 'Methane'],
+                'gas': ['Hydrogen', 'Helium', 'Methane', 'Ammonia'],
+                'oceanic': ['Hydrogen', 'Oxygen', 'Sodium', 'Chlorine'],
+                'toxic': ['Sulfur', 'Chlorine', 'Mercury', 'Arsenic'],
+                'asteroid': ['Iron', 'Nickel', 'Cobalt', 'Platinum']
+            };
+            return fallbackPools[planetType] || fallbackPools['barren'];
+        }
+
+        async function loadPlanetData() {
+            try {
+                let planetNameStr = localStorage.getItem('voidfarer_current_planet');
+                let planetTypeStr = localStorage.getItem('voidfarer_current_planet_type');
+                let planetResources = [];
+                
+                const savedResources = localStorage.getItem('voidfarer_current_planet_resources');
+                if (savedResources) {
+                    try {
+                        planetResources = JSON.parse(savedResources);
+                    } catch (e) {}
                 }
                 
-                console.log('Cargo items:', cargoItems);
-                
-                // Update stats
-                document.getElementById('totalItems').textContent = totalItems;
-                document.getElementById('uniqueItems').textContent = cargoItems.length;
-                document.getElementById('totalValue').textContent = totalValue.toLocaleString();
-                
-                // Update capacity
-                const capacityPercent = (totalMass / CARGO_MASS_LIMIT) * 100;
-                document.getElementById('capacityText').textContent = `${totalMass.toFixed(1)} / ${CARGO_MASS_LIMIT} AMU`;
-                document.getElementById('cargoCapacityDisplay').textContent = `Mass: ${totalMass.toFixed(1)}/${CARGO_MASS_LIMIT} AMU`;
-                document.getElementById('capacityBar').style.width = Math.min(100, capacityPercent) + '%';
-                
-                // Show warning if near capacity
-                const warningEl = document.getElementById('massWarning');
-                if (capacityPercent > 90) {
-                    warningEl.classList.add('visible');
-                    warningEl.textContent = '⚠️ CRITICAL: Cargo nearly full!';
-                } else if (capacityPercent > 75) {
-                    warningEl.classList.add('visible');
-                    warningEl.textContent = '⚠️ Warning: Cargo approaching limit';
-                } else {
-                    warningEl.classList.remove('visible');
+                if (!planetNameStr || !planetTypeStr) {
+                    const warpData = localStorage.getItem('voidfarer_warp_data');
+                    if (warpData) {
+                        try {
+                            const data = JSON.parse(warpData);
+                            planetNameStr = data.destPlanet || data.destination;
+                            planetTypeStr = data.destPlanetType || data.destinationType;
+                            planetResources = data.destPlanetResources || [];
+                        } catch (e) {}
+                    }
                 }
                 
-                // Apply filters and render
-                applyFilters();
+                if (!planetNameStr) planetNameStr = 'Earth';
+                if (!planetTypeStr) planetTypeStr = 'lush';
+                
+                if (!planetResources || planetResources.length === 0) {
+                    planetResources = generateFallbackResources(planetTypeStr);
+                }
+                
+                if (planetResources.length > 4) {
+                    planetResources = planetResources.slice(0, 4);
+                }
+                
+                let imageFile = 'earth-view.jpg';
+                if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
+                    imageFile = 'pyros-surface.jpg';
+                } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
+                    imageFile = 'glacier-surface.jpg';
+                } else if (planetTypeStr.includes('lush')) {
+                    imageFile = 'verdant-surface.jpg';
+                } else if (planetTypeStr.includes('barren')) {
+                    imageFile = 'barren-surface.jpg';
+                } else if (planetTypeStr.includes('gas')) {
+                    imageFile = 'gas-surface.jpg';
+                } else if (planetTypeStr.includes('oceanic')) {
+                    imageFile = 'oceanic-surface.jpg';
+                } else if (planetTypeStr.includes('toxic')) {
+                    imageFile = 'toxic-surface.jpg';
+                } else if (planetTypeStr.includes('asteroid')) {
+                    imageFile = 'asteroid-field.jpg';
+                }
+                
+                planetImage.src = 'assets/images/' + imageFile;
+                planetImage.onerror = function() {
+                    this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
+                };
+                
+                currentPlanet = {
+                    name: planetNameStr,
+                    type: planetTypeStr,
+                    typeName: planetTypeStr.charAt(0).toUpperCase() + planetTypeStr.slice(1),
+                    resources: planetResources
+                };
+                
+                planetName.textContent = currentPlanet.name;
+                planetType.textContent = currentPlanet.typeName;
+                
+                currentPlanet.resources.forEach(resource => {
+                    resourceStates[resource] = true;
+                    const rarity = getElementRarity(resource);
+                    resourceChances[resource] = RARITY_CONFIG[rarity].baseChance;
+                });
+                
+                initializePityCounters();
+                initializeExplorationTracking();
+                
+                await updateClaimButton();
+                
+                renderResourceToggles();
+                await updateCargoDisplay();
+                
+                return true;
                 
             } catch (error) {
-                console.error('Error loading cargo:', error);
-                cargoGrid.innerHTML = '<div class="empty-state">Error loading cargo</div>';
+                return false;
             }
         }
 
-        // ===== SWITCH TAB =====
-        function switchTab(tab) {
-            currentTab = tab;
-            
-            // Update tab buttons
-            if (tab === 'elements') {
-                elementsTab.classList.add('active');
-                productsTab.classList.remove('active');
-                elementsSection.style.display = 'block';
-                productsSection.style.display = 'none';
-            } else {
-                elementsTab.classList.remove('active');
-                productsTab.classList.add('active');
-                elementsSection.style.display = 'none';
-                productsSection.style.display = 'block';
-            }
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        async function updateClaimButton() {
+            try {
+                const status = await getPlanetStatus(currentPlanet.name);
+                
+                if (status) {
+                    if (status.fullyExplored && !status.claimed) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = false;
+                        claimBtn.textContent = '✨ CLAIM PLANET';
+                    } else if (status.claimed) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = true;
+                        claimBtn.textContent = '✓ CLAIMED';
+                    } else {
+                        claimBtn.classList.remove('visible');
+                    }
+                } else {
+                    claimBtn.classList.remove('visible');
+                }
+            } catch (error) {}
         }
 
-        // ===== APPLY FILTERS AND RENDER =====
-        function applyFilters() {
-            // Apply rarity filter
-            filteredItems = cargoItems.filter(item => {
-                if (currentFilter !== 'all' && item.rarity !== currentFilter) return false;
-                if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                return true;
-            });
-            
-            // Apply sorting
-            sortItems();
-        }
-
-        // ===== SORT ITEMS =====
-        function sortItems() {
-            switch(sortBy) {
-                case 'name':
-                    filteredItems.sort((a, b) => a.name.localeCompare(b.name));
-                    break;
-                case 'count':
-                    filteredItems.sort((a, b) => b.count - a.count);
-                    break;
-                case 'mass':
-                    filteredItems.sort((a, b) => b.totalMass - a.totalMass);
-                    break;
-                case 'value':
-                    filteredItems.sort((a, b) => b.totalValue - a.totalValue);
-                    break;
-                case 'rarity':
-                    const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
-                    filteredItems.sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0));
-                    break;
-            }
-            
-            renderCargo();
-        }
-
-        // ===== RENDER CARGO =====
-        function renderCargo() {
-            if (filteredItems.length === 0) {
-                cargoGrid.innerHTML = '<div class="empty-state">No cargo items found</div>';
+        function renderResourceToggles() {
+            if (!currentPlanet.resources || currentPlanet.resources.length === 0) {
+                resourceGrid.innerHTML = '<div style="color: #a0c0ff; padding: 20px;">No resources found</div>';
                 return;
             }
             
             let html = '';
-            filteredItems.forEach(item => {
-                const rarityColor = rarityColors[item.rarity] || '#ffffff';
-                
-                // Determine button classes based on location
-                const transferBtnClass = canTransfer ? 'transfer-btn' : 'transfer-btn disabled';
-                const transferBtnText = canTransfer ? '🏢 HUB' : '🏢 HUB';
+            currentPlanet.resources.forEach(resource => {
+                const rarity = getElementRarity(resource);
+                const config = RARITY_CONFIG[rarity];
+                const symbol = getElementSymbol(resource);
+                const chance = resourceChances[resource] || config.baseChance;
+                const isActive = resourceStates[resource];
+                const isExplored = checkElementExplored(resource);
                 
                 html += `
-                    <div class="cargo-item">
-                        <div class="item-icon">${item.icon}</div>
-                        <div class="item-info">
-                            <div class="item-name" style="color: ${rarityColor}">${item.name}</div>
-                            <div class="item-details">
-                                <span class="item-quantity">Qty: ${item.count}</span>
-                                <span class="item-mass">Mass: ${item.totalMass.toFixed(1)} AMU</span>
-                                <span class="item-value">Value: ${item.totalValue.toLocaleString()}⭐</span>
-                            </div>
-                        </div>
-                        <div class="item-actions">
-                            <button class="action-btn ${transferBtnClass}" onclick="window.showTransferModal('${item.name}', ${item.count}, ${item.massPerUnit})" ${!canTransfer ? 'disabled' : ''}>${transferBtnText}</button>
-                            <button class="action-btn eject-btn" onclick="window.showEjectModal('${item.name}', ${item.count}, ${item.massPerUnit})">🗑️</button>
-                        </div>
+                    <div class="resource-toggle rarity-${rarity} ${isActive ? 'active' : ''} ${isExplored ? 'explored' : ''}" 
+                         onclick="window.toggleResource('${resource}')"
+                         title="Chance: ${chance}%">
+                        <span class="resource-symbol">${symbol}</span>
+                        <span class="resource-name">${resource}</span>
+                        <span class="resource-chance">${chance}%</span>
+                        <span class="resource-icon">${config.icon}</span>
                     </div>
                 `;
             });
             
-            cargoGrid.innerHTML = html;
+            resourceGrid.innerHTML = html;
+            updateActiveCount();
         }
 
-        // ===== FILTER ELEMENTS =====
-        function filterElements(rarity) {
-            currentFilter = rarity;
-            
-            // Update active button
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            applyFilters();
-        }
-
-        // ===== SEARCH CARGO =====
-        function searchCargo() {
-            searchTerm = document.getElementById('searchInput').value;
-            applyFilters();
-        }
-
-        // ===== SORT CARGO =====
-        function sortCargo() {
-            sortBy = document.getElementById('sortSelect').value;
-            applyFilters();
-        }
-
-        // ===== SHOW EJECT MODAL =====
-        function showEjectModal(itemName, currentCount, massPerUnit) {
-            currentEjectItem = itemName;
-            currentEjectMax = currentCount;
-            currentEjectMassPerUnit = massPerUnit;
-            
-            ejectItemName.textContent = itemName;
-            ejectCurrentCount.textContent = `Current: ${currentCount}`;
-            ejectQuantity.value = 1;
-            ejectMass.textContent = massPerUnit.toFixed(1);
-            ejectWarning.textContent = '';
-            
-            // Enable/disable buttons
-            decrementBtn.disabled = true;
-            incrementBtn.disabled = (currentCount <= 1);
-            
-            ejectModal.classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-
-        // ===== CLOSE EJECT MODAL =====
-        function closeEjectModal() {
-            ejectModal.classList.remove('active');
-            currentEjectItem = null;
-        }
-
-        // ===== INCREMENT QUANTITY =====
-        function incrementQty() {
-            let current = parseInt(ejectQuantity.value);
-            if (current < currentEjectMax) {
-                current++;
-                ejectQuantity.value = current;
-                ejectMass.textContent = (current * currentEjectMassPerUnit).toFixed(1);
-                
-                // Update button states
-                decrementBtn.disabled = (current <= 1);
-                incrementBtn.disabled = (current >= currentEjectMax);
+        function toggleResource(resource) {
+            resourceStates[resource] = !resourceStates[resource];
+            renderResourceToggles();
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
             }
         }
 
-        // ===== DECREMENT QUANTITY =====
-        function decrementQty() {
-            let current = parseInt(ejectQuantity.value);
-            if (current > 1) {
-                current--;
-                ejectQuantity.value = current;
-                ejectMass.textContent = (current * currentEjectMassPerUnit).toFixed(1);
-                
-                // Update button states
-                decrementBtn.disabled = (current <= 1);
-                incrementBtn.disabled = (current >= currentEjectMax);
-            }
+        function updateActiveCount() {
+            const activeResources = Object.values(resourceStates).filter(v => v).length;
+            activeCount.textContent = `Extracting: ${activeResources} resource${activeResources !== 1 ? 's' : ''}`;
         }
 
-        // ===== CONFIRM EJECT =====
-        async function confirmEject() {
-            if (!currentEjectItem) return;
+        async function attemptExtraction() {
+            console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
             
-            const quantity = parseInt(ejectQuantity.value);
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'ejecting cargo...';
+            if (!isExtracting) {
+                return;
+            }
             
             try {
-                let result;
+                const currentMass = await getFreshCargoMass();
+                const cargoLimit = CARGO_MASS_LIMIT;
                 
-                // Call the remove function from storage.js
-                if (typeof window.removeElementFromCollection === 'function') {
-                    result = await window.removeElementFromCollection(currentEjectItem, quantity);
-                }
-                
-                if (result && result.success) {
-                    // Close modal
-                    closeEjectModal();
+                if (currentMass >= cargoLimit) {
+                    isExtracting = false;
+                    extractorText.textContent = 'Cargo full - extraction paused';
+                    if (extractionTimer) {
+                        clearInterval(extractionTimer);
+                        extractionTimer = null;
+                    }
                     
-                    // Reload cargo data
-                    await loadCargoData(true);
+                    showExtractionNotification({
+                        success: false,
+                        resource: null,
+                        reason: 'cargo_full'
+                    });
+                    return;
+                }
+                
+                const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
+                if (activeResources.length === 0) {
+                    extractorText.textContent = 'No resources selected';
+                    return;
+                } else {
+                    extractorText.textContent = 'Auto-extractor active';
+                }
+                
+                const resource = activeResources[Math.floor(Math.random() * activeResources.length)];
+                const rarity = getElementRarity(resource);
+                const config = RARITY_CONFIG[rarity];
+                const massPerUnit = getElementMass(resource);
+                
+                if (!pityCounters[resource]) {
+                    pityCounters[resource] = {
+                        attempts: 0,
+                        threshold: PITY_CONFIG[rarity].threshold
+                    };
+                }
+                
+                pityCounters[resource].attempts++;
+                
+                let wasPity = false;
+                let success = false;
+                
+                if (pityCounters[resource].attempts >= pityCounters[resource].threshold) {
+                    wasPity = true;
+                    success = true;
+                } else {
+                    let roll = Math.random() * 100;
+                    success = roll < config.baseChance;
+                }
+                
+                if (success) {
+                    pityCounters[resource].attempts = 0;
                     
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    let baseQuantity = Math.ceil(config.massTarget / massPerUnit);
+                    baseQuantity = Math.max(1, baseQuantity);
+                    
+                    const varietyFactor = 0.7 + (Math.random() * 0.6);
+                    let quantity = Math.floor(baseQuantity * varietyFactor);
+                    quantity = Math.max(1, quantity);
+                    
+                    if (wasPity) {
+                        quantity = Math.floor(quantity * 1.5);
+                    }
+                    
+                    const totalMass = massPerUnit * quantity;
+                    
+                    if (currentMass + totalMass <= cargoLimit) {
+                        const locationData = {
+                            planet: currentPlanet.name,
+                            planetType: currentPlanet.type,
+                            quantity: quantity,
+                            rarity: rarity,
+                            timestamp: Date.now()
+                        };
+                        
+                        const result = await window.addElementToCollection(resource, quantity, locationData);
+                        
+                        if (result && result.success) {
+                            await saveDiscoveryToLocation(resource, quantity, rarity);
+                            
+                            const newMass = await getFreshCargoMass();
+                            cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
+                            
+                            window.dispatchEvent(new CustomEvent('cargo-updated', { 
+                                detail: { element: resource, quantity, mass: totalMass }
+                            }));
+                            
+                            markElementExplored(resource);
+                            
+                            showExtractionNotification({
+                                success: true,
+                                resource: resource,
+                                quantity: quantity,
+                                mass: totalMass,
+                                wasPity: wasPity,
+                                isRichFind: false
+                            });
+                            
+                            await updateClaimButton();
+                        }
+                    } else {
+                        showExtractionNotification({
+                            success: false,
+                            resource: resource,
+                            reason: 'cargo_full',
+                            pityCount: pityCounters[resource].attempts,
+                            pityThreshold: pityCounters[resource].threshold
+                        });
+                    }
                 } else {
-                    // Show error
-                    ejectWarning.textContent = result?.reason || 'Failed to eject cargo';
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                    showExtractionNotification({
+                        success: false,
+                        resource: resource,
+                        pityCount: pityCounters[resource].attempts,
+                        pityThreshold: pityCounters[resource].threshold,
+                        reason: 'failed_roll'
+                    });
                 }
-                
             } catch (error) {
-                console.error('Eject error:', error);
-                ejectWarning.textContent = 'Error ejecting cargo';
+                console.error('Extraction error:', error);
+            }
+        }
+
+        function startExtraction() {
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+                extractionTimer = null;
             }
             
-            loadingOverlay.classList.remove('active');
-        }
-
-        // ===== SHOW TRANSFER MODAL =====
-        function showTransferModal(itemName, currentCount, massPerUnit) {
-            if (!canTransfer) {
-                alert('You can only transfer items to Earth Hub when at Earth!');
-                return;
-            }
+            isExtracting = true;
+            extractorText.textContent = 'Auto-extractor active';
             
-            currentTransferItem = itemName;
-            currentTransferMax = currentCount;
-            currentTransferMassPerUnit = massPerUnit;
+            attemptExtraction().catch(console.error);
             
-            transferItemName.textContent = itemName;
-            transferCurrentCount.textContent = `Current: ${currentCount}`;
-            transferQuantity.value = 1;
-            transferMass.textContent = massPerUnit.toFixed(1);
-            hubAvailable.textContent = currentHubAvailable.toFixed(1);
-            transferWarning.textContent = '';
-            
-            // Enable/disable buttons
-            transferDecrementBtn.disabled = true;
-            transferIncrementBtn.disabled = (currentCount <= 1 || massPerUnit > currentHubAvailable);
-            
-            transferModal.classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-
-        // ===== CLOSE TRANSFER MODAL =====
-        function closeTransferModal() {
-            transferModal.classList.remove('active');
-            currentTransferItem = null;
-        }
-
-        // ===== TRANSFER INCREMENT QUANTITY =====
-        function transferIncrementQty() {
-            let current = parseInt(transferQuantity.value);
-            if (current < currentTransferMax) {
-                current++;
-                transferQuantity.value = current;
-                const massToTransfer = current * currentTransferMassPerUnit;
-                transferMass.textContent = massToTransfer.toFixed(1);
-                
-                // Update button states
-                transferDecrementBtn.disabled = (current <= 1);
-                transferIncrementBtn.disabled = (current >= currentTransferMax || massToTransfer >= currentHubAvailable);
-                
-                // Show warning if near limit
-                if (massToTransfer > currentHubAvailable * 0.9) {
-                    transferWarning.textContent = '⚠️ Approaching hub storage limit';
-                } else {
-                    transferWarning.textContent = '';
+            extractionTimer = setInterval(() => {
+                if (isExtracting) {
+                    attemptExtraction().catch(console.error);
                 }
-            }
+            }, EXTRACTION_INTERVAL);
         }
 
-        // ===== TRANSFER DECREMENT QUANTITY =====
-        function transferDecrementQty() {
-            let current = parseInt(transferQuantity.value);
-            if (current > 1) {
-                current--;
-                transferQuantity.value = current;
-                const massToTransfer = current * currentTransferMassPerUnit;
-                transferMass.textContent = massToTransfer.toFixed(1);
-                
-                // Update button states
-                transferDecrementBtn.disabled = (current <= 1);
-                transferIncrementBtn.disabled = (current >= currentTransferMax || massToTransfer >= currentHubAvailable);
-                transferWarning.textContent = '';
-            }
-        }
-
-        // ===== CONFIRM TRANSFER =====
-        async function confirmTransfer() {
-            if (!currentTransferItem) return;
-            if (!canTransfer) {
-                alert('You can only transfer items to Earth Hub when at Earth!');
-                closeTransferModal();
-                return;
+        function returnToShip() {
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
             }
             
-            const quantity = parseInt(transferQuantity.value);
-            const massToTransfer = quantity * currentTransferMassPerUnit;
-            
-            if (massToTransfer > currentHubAvailable) {
-                transferWarning.textContent = 'Not enough hub storage space!';
-                return;
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+                extractionTimer = null;
             }
             
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'transferring to hub...';
-            
-            try {
-                // Remove from ship cargo
-                const removeResult = await window.removeElementFromCollection(currentTransferItem, quantity);
-                
-                if (!removeResult.success) {
-                    throw new Error(removeResult.reason || 'Failed to remove from ship');
-                }
-                
-                // Add to hub storage
-                const addResult = await window.addElementToHub(currentTransferItem, quantity);
-                
-                if (!addResult.success) {
-                    // Rollback: add back to ship
-                    await window.addElementToCollection(currentTransferItem, quantity);
-                    throw new Error(addResult.reason || 'Failed to add to hub');
-                }
-                
-                // Close modal
-                closeTransferModal();
-                
-                // Reload cargo data
-                await loadCargoData(true);
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                alert(`✅ Transferred ${quantity}x ${currentTransferItem} to Earth Hub`);
-                
-            } catch (error) {
-                console.error('Transfer error:', error);
-                transferWarning.textContent = error.message || 'Error transferring cargo';
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-            }
-            
-            loadingOverlay.classList.remove('active');
-        }
-
-        // ===== RETURN TO SHIP BRIDGE =====
-        function returnToShipBridge() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
         }
 
-        // ===== REFRESH WHEN CARGO UPDATED =====
-        window.addEventListener('cargo-updated', () => {
-            console.log('Cargo updated event received, reloading...');
-            loadCargoData(true);
-        });
-
-        // ===== REFRESH WHEN PAGE BECOMES VISIBLE =====
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                console.log('Page became visible, refreshing cargo...');
-                loadCargoData(true);
+        function returnToSystem() {
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
             }
-        });
-
-        // ===== REFRESH WHEN PAGE IS SHOWN FROM CACHE =====
-        window.addEventListener('pageshow', (event) => {
-            if (event.persisted) {
-                console.log('Page shown from cache, refreshing cargo...');
-                loadCargoData(true);
+            
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+                extractionTimer = null;
             }
-        });
+            
+            window.location.href = 'system-view.html';
+        }
 
-        // ===== REFRESH WHEN NAVIGATING BACK =====
-        window.addEventListener('popstate', () => {
-            console.log('Navigation detected, refreshing cargo...');
-            loadCargoData(true);
-        });
+        async function claimCurrentPlanet() {
+            try {
+                loadingOverlay.classList.add('active');
+                loadingText.textContent = 'claiming planet...';
+                
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+                
+                const discoveryElement = currentPlanet.resources[0] || 'Unknown';
+                const discoveryRarity = getElementRarity(discoveryElement);
+                
+                const success = await claimPlanet(currentPlanet.name, playerId, playerName, discoveryElement, discoveryRarity);
+                
+                if (success) {
+                    showExtractionNotification({
+                        success: true,
+                        resource: 'Planet',
+                        quantity: 0,
+                        mass: 0,
+                        wasPity: false
+                    });
+                    await updateClaimButton();
+                    
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
+                } else {
+                    showExtractionNotification({
+                        success: false,
+                        resource: null,
+                        reason: 'claim_failed'
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Claim error:', error);
+                showExtractionNotification({
+                    success: false,
+                    resource: null,
+                    reason: 'error'
+                });
+            } finally {
+                loadingOverlay.classList.remove('active');
+            }
+        }
 
-        // ===== INITIALIZE =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
-                loadingText.textContent = 'loading cargo hold...';
+                loadingText.textContent = 'landing on surface...';
                 
-                // Load cargo data
-                await loadCargoData();
+                const planetLoaded = await loadPlanetData();
                 
-                // Set up periodic refresh every 10 seconds to stay in sync
-                setInterval(() => {
-                    loadCargoData();
-                }, 10000);
+                if (!planetLoaded) {
+                    throw new Error('Failed to load planet data');
+                }
+                
+                startExtraction();
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
@@ -2047,14 +1505,19 @@
                 
             } catch (error) {
                 console.error('Init error:', error);
-                loadingText.textContent = 'error loading data';
+                loadingText.textContent = 'error landing';
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
                 }, 2000);
             }
         }
 
-        // ===== START =====
+        window.addEventListener('beforeunload', () => {
+            if (extractionTimer) {
+                clearInterval(extractionTimer);
+            }
+        });
+
         init();
     </script>
 </body>
