@@ -19,7 +19,7 @@ import {
 import {
     getFieldProgress,
     updateFieldProgress,
-    getFieldLevel,
+    getFieldLevel,      // Imported from progression.js
     getFieldMultiplier
 } from '../storage/progression.js';
 
@@ -384,20 +384,6 @@ export async function getProgressToNextLevel(playerId, field) {
     };
 }
 
-/**
- * Get level from progress
- * @param {number} progress - Total progress
- * @returns {Object} Level object
- */
-export function getFieldLevel(progress) {
-    for (let i = MASTERY_LEVELS.length - 1; i >= 0; i--) {
-        if (progress >= MASTERY_LEVELS[i].threshold) {
-            return MASTERY_LEVELS[i];
-        }
-    }
-    return MASTERY_LEVELS[0];
-}
-
 // ============================================================================
 // RECIPE UNLOCK FUNCTIONS
 // ============================================================================
@@ -506,7 +492,7 @@ export default {
     // Mastery
     MASTERY_LEVELS,
     QUALITY_TIERS,
-    getFieldLevel,
+    getFieldLevel,      // Now using the imported version
     getFieldMastery,
     getProgressToNextLevel,
     getTotalFieldProgress,
