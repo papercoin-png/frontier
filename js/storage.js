@@ -1076,81 +1076,8 @@ function setAmbientVolume(volume) {
 // EXPORTS
 // ============================================================================
 
-// Named exports
-export {
-    // Constants
-    STORAGE_KEYS,
-    ELEMENT_MASS,
-    
-    // Player
-    getPlayer,
-    savePlayer,
-    createDefaultPlayer,
-    getPlayerId,
-    
-    // Field progression
-    getFieldProgress,
-    saveFieldProgress,
-    updateFieldProgress,
-    
-    // Recipe unlocks
-    getUnlockedRecipes,
-    saveUnlockedRecipes,
-    unlockRecipe,
-    isRecipeUnlocked,
-    
-    // Field mastery
-    getFieldMastery,
-    saveFieldMastery,
-    updateFieldMastery,
-    
-    // Cargo
-    getElementMass,
-    
-    // Credits
-    getCredits,
-    saveCredits,
-    addCredits,
-    spendCredits,
-    
-    // Location
-    isAtEarth,
-    getCurrentPlanetName,
-    getCurrentPlanetType,
-    getCurrentPlanetResources,
-    getCurrentSector,
-    getCurrentRegion,
-    setCurrentLocation,
-    setCurrentPlanet,
-    
-    // Ship
-    getShipFuel,
-    saveShipFuel,
-    getShipPower,
-    saveShipPower,
-    
-    // Warp
-    setWarpData,
-    getWarpData,
-    clearWarpData,
-    
-    // Settings
-    getHapticsEnabled,
-    setHapticsEnabled,
-    getAutoGatherEnabled,
-    setAutoGatherEnabled,
-    getOrbitSpeed,
-    setOrbitSpeed,
-    getMusicVolume,
-    setMusicVolume,
-    getAmbientVolume,
-    setAmbientVolume,
-    
-    // System
-    initializeStorage,
-    resetGame,
-    saveTimestamp
-};
+// Named exports - each function is already exported with 'export' keyword
+// So we don't need a separate named exports block
 
 // Default export for backward compatibility
 export default {
@@ -1224,7 +1151,7 @@ export default {
     
     // System
     initializeStorage,
-    resetGame
-    // Note: saveTimestamp is intentionally omitted here to avoid duplicate export
-    // It is already exported in the named exports above
+    resetGame,
+    saveTimestamp
+    // saveTimestamp is included ONCE here in the default export
 };
