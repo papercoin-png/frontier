@@ -560,6 +560,5 @@ window.bulkTransfer = bulkTransfer;
 window.transferByRarity = transferByRarity;
 window.getTransferSummary = getTransferSummary;
 window.canTransfer = canTransfer;
-window.addElementToCollection = addElementToCollection;  // ADDED: Expose the function for surface.html
 
 console.log('✅ Transfer.js loaded - Ship/Hub transfer functions ready');
