@@ -11,8 +11,10 @@ import {
 
 import { 
     getInventory, 
-    removeFromInventory, 
-    addToInventory,
+    removeElementFromInventory,
+    removeMaterialFromInventory,
+    addElementToInventory,
+    addMaterialToInventory,
     hasEnoughIngredients
 } from '../storage/inventory.js';
 
@@ -104,7 +106,11 @@ export async function craftItem(recipeId, count = 1, options = {}) {
         
         // Consume ingredients
         for (const [ingredient, amount] of Object.entries(totalIngredients)) {
-            await removeFromInventory(playerId, ingredient, amount);
+            // Try to remove as material first, fall back to element
+            const removed = await removeMaterialFromInventory(playerId, ingredient, amount);
+            if (!removed.success) {
+                await removeElementFromInventory(playerId, ingredient, amount);
+            }
         }
         
         // Calculate skill gain (base * quality multiplier)
@@ -116,7 +122,7 @@ export async function craftItem(recipeId, count = 1, options = {}) {
         
         // Add crafted item to inventory
         const itemId = `${recipeId}_${quality.name.toLowerCase()}`;
-        await addToInventory(playerId, itemId, count, {
+        await addMaterialToInventory(playerId, itemId, count, {
             recipeId: recipeId,
             name: recipe.name,
             quality: quality.name,
