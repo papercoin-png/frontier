@@ -701,8 +701,10 @@
         </div>
     </div>
 
-    <!-- Music Controller - Handles all audio -->
-    <script src="js/music-controller.js"></script>
+    <!-- Global audio element for background music -->
+    <audio id="bg-music" loop preload="auto">
+        <source src="https://cdn.jsdelivr.net/gh/papercoin-png/voidfarer-assets@main/earth.mp3" type="audio/mpeg">
+    </audio>
 
     <script>
         // ===== TELEGRAM INITIALIZATION =====
@@ -713,20 +715,40 @@
         }
 
         // ===== MUSIC SETUP =====
+        const music = document.getElementById('bg-music');
         const musicBtn = document.getElementById('musicBtn');
         
-        // Set initial volume and sync button
-        MusicController.setVolume(0.5);
-        musicBtn.textContent = '🔊';
+        // Load saved music state from previous page
+        const savedTime = localStorage.getItem('music_current_time');
+        const savedVolume = localStorage.getItem('music_volume');
+        const savedPlaying = localStorage.getItem('music_playing') === 'true';
+        
+        // Set volume
+        music.volume = savedVolume ? parseFloat(savedVolume) : 0.5;
+        
+        // Set current time
+        if (savedTime) {
+            music.currentTime = parseFloat(savedTime);
+        }
+        
+        // Update button based on volume
+        musicBtn.textContent = music.volume > 0 ? '🔊' : '🔇';
+        
+        // Start playing if it was playing before
+        if (savedPlaying) {
+            music.play().catch(() => {
+                musicBtn.textContent = '🔇';
+            });
+        }
 
         // ===== TOGGLE MUSIC =====
         window.toggleMusic = function() {
-            if (MusicController.getVolume() > 0) {
-                MusicController.setVolume(0);
-                musicBtn.textContent = '🔇';
-            } else {
-                MusicController.setVolume(0.5);
+            if (music.volume === 0) {
+                music.volume = 0.5;
                 musicBtn.textContent = '🔊';
+            } else {
+                music.volume = 0;
+                musicBtn.textContent = '🔇';
             }
         };
 
@@ -864,8 +886,13 @@
             // Haptic feedback
             if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
+            // Save music state before navigating
+            localStorage.setItem('music_current_time', music.currentTime);
+            localStorage.setItem('music_volume', music.volume);
+            localStorage.setItem('music_playing', 'true');
+            
             // Get current volume
-            const startVolume = MusicController.getVolume();
+            const startVolume = music.volume;
             
             // FADE OUT MUSIC CINEMATICALLY
             const fadeSteps = 20;
@@ -876,7 +903,7 @@
             const fadeInterval = setInterval(() => {
                 currentStep++;
                 const newVolume = Math.max(0, startVolume * (1 - currentStep / fadeSteps));
-                MusicController.setVolume(newVolume);
+                music.volume = newVolume;
                 
                 // Update button if volume reaches 0
                 if (newVolume === 0) {
@@ -896,9 +923,6 @@
         // Pre-select first path by default for better UX
         setTimeout(() => {
             selectPath(1);
-            
-            // Ensure music is playing the path selection theme
-            MusicController.play('path-selection');
         }, 100);
     </script>
 </body>
