@@ -2,7 +2,7 @@
 // Skill progression and mastery tracking for all crafting fields
 // Tracks player progress across alchemy, metallurgy, materials science, etc.
 
-import { getPlayer, savePlayer } from './storage.js';
+import { getPlayer, savePlayer } from '../storage.js';  // FIXED: removed extra /storage/
 
 // ===== STORAGE KEYS =====
 const STORAGE_KEYS = {
