@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>VOIDFARER</title>
     
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -133,7 +135,6 @@
             pointer-events: auto;
         }
         
-        /* Rest of your existing CSS remains the same */
         .content {
             position: absolute;
             top: 0;
@@ -252,6 +253,7 @@
             padding-left: 18px;
             font-style: italic;
             text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: opacity 0.4s ease;
         }
         
         .menu-container {
@@ -359,6 +361,47 @@
             font-size: 8px;
             color: rgba(255, 255, 255, 0.3);
             letter-spacing: 1px;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(138, 106, 255, 0.3);
+            border-top: 4px solid #8a6aff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: white;
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -471,6 +514,12 @@
                 <span>✦ COGNATUS IS WITH YOU ✦</span>
             </div>
         </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">ENTERING THE VOID...</div>
+        </div>
     </div>
 
     <!-- Audio element for background music -->
@@ -575,10 +624,36 @@
         document.getElementById('resourceCount').textContent = '12';
         document.getElementById('distanceTraveled').textContent = '8.4';
 
+        // ===== CHECK FOR EXISTING PLAYER =====
+        function checkExistingPlayer() {
+            const playerId = localStorage.getItem('voidfarer_player_id');
+            const playerName = localStorage.getItem('voidfarer_player_name');
+            
+            if (playerId && playerName) {
+                console.log('Existing player found:', playerName);
+                // Could update UI to show "Continue as [name]" if desired
+            }
+        }
+
         // ===== GAME FUNCTIONS =====
         window.startGame = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            window.location.href = 'ship-bridge.html';
+            
+            // Show loading
+            document.getElementById('loadingOverlay').classList.add('active');
+            
+            // Check if player exists
+            const playerId = localStorage.getItem('voidfarer_player_id');
+            
+            setTimeout(() => {
+                if (playerId) {
+                    // Existing player - go directly to Earth Hub
+                    window.location.href = 'earth-hub.html';
+                } else {
+                    // New player - go to path selection
+                    window.location.href = 'path-selection.html';
+                }
+            }, 1500);
         };
 
         window.openSettings = function() {
@@ -590,6 +665,10 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             alert('Voidfarer - Created by SpellForge Studios');
         };
+
+        // ===== INIT =====
+        // Check for existing player on load
+        checkExistingPlayer();
     </script>
 </body>
 </html>
