@@ -92,17 +92,21 @@ export async function getPlanetStatus(planetName, locations = null) {
             locations = await window.getPlayerLocations();
         }
         
+        // Check if claimed and get claim data FIRST - this ensures we always know claim status
+        const claimed = await isPlanetClaimed(planetName);
+        const claimData = claimed ? await getPlanetClaim(planetName) : null;
+        
         if (!locations || locations.length === 0) {
             return {
                 explored: false,
-                highestRarity: null,
+                highestRarity: claimData?.highestRarity || null,
                 resourcesFound: [],
                 resourceCount: 0,
                 fullyExplored: false,
-                claimed: false,
-                claimData: null,
-                color: null,
-                cssClass: 'unexplored'
+                claimed: claimed,
+                claimData: claimData,
+                color: claimData?.highestRarity ? RARITY_COLORS[claimData.highestRarity] : null,
+                cssClass: claimed ? 'claimed' : 'unexplored'
             };
         }
         
@@ -112,14 +116,14 @@ export async function getPlanetStatus(planetName, locations = null) {
         if (planetLocations.length === 0) {
             return {
                 explored: false,
-                highestRarity: null,
+                highestRarity: claimData?.highestRarity || null,
                 resourcesFound: [],
                 resourceCount: 0,
                 fullyExplored: false,
-                claimed: false,
-                claimData: null,
-                color: null,
-                cssClass: 'unexplored'
+                claimed: claimed,
+                claimData: claimData,
+                color: claimData?.highestRarity ? RARITY_COLORS[claimData.highestRarity] : null,
+                cssClass: claimed ? 'claimed' : 'unexplored'
             };
         }
         
@@ -140,18 +144,17 @@ export async function getPlanetStatus(planetName, locations = null) {
             }
         });
         
-        // Get highest rarity
-        const highestRarity = getHighestRarity(raritiesFound);
+        // Get highest rarity - prefer stored claim data if available, otherwise calculate
+        let highestRarity = getHighestRarity(raritiesFound);
+        
+        // If claimed and we have claim data with highestRarity, use that instead
+        if (claimed && claimData && claimData.highestRarity) {
+            highestRarity = claimData.highestRarity;
+        }
         
         // Check if fully explored (all 4 resources found)
-        // Note: This assumes planets have 4 resources max
-        // In a real implementation, you might want to get the planet's total resources
         const totalResources = 4; // Default max
         const fullyExplored = resourcesFound.length >= totalResources;
-        
-        // Check if claimed and get claim data
-        const claimed = await isPlanetClaimed(planetName);
-        const claimData = claimed ? await getPlanetClaim(planetName) : null;
         
         return {
             explored: true,
@@ -251,6 +254,12 @@ export async function claimPlanet(planetName, playerId, playerName, discoveryEle
             return false;
         }
         
+        // Get the highest rarity from the planet's resources before claiming
+        const planetStatus = await getPlanetStatus(planetName);
+        const highestRarity = planetStatus.highestRarity || discoveryRarity;
+        
+        console.log(`Planet ${planetName} highest rarity: ${highestRarity}`);
+        
         // Get existing claims
         let planetClaims = {};
         const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
@@ -280,7 +289,7 @@ export async function claimPlanet(planetName, playerId, playerName, discoveryEle
         // Determine base fee from discovery rarity
         const baseFee = FEE_CONFIG[discoveryRarity] || 10;
         
-        // Create claim record
+        // Create claim record with highestRarity preserved
         const claimRecord = {
             planetName: planetName,
             planetType: localStorage.getItem('voidfarer_current_planet_type') || 'unknown',
@@ -288,6 +297,7 @@ export async function claimPlanet(planetName, playerId, playerName, discoveryEle
             ownerName: playerName,
             discoveredElement: discoveryElement,
             rarity: discoveryRarity,
+            highestRarity: highestRarity, // Store the actual highest rarity
             baseFee: baseFee,
             currentFee: baseFee,
             claimedAt: Date.now(),
@@ -341,7 +351,7 @@ export async function claimPlanet(planetName, playerId, playerName, discoveryEle
         // Dispatch event for UI update
         if (typeof window !== 'undefined') {
             const event = new CustomEvent('planet-claimed', {
-                detail: { planetName, ownerName: playerName, discoveryElement, discoveryRarity }
+                detail: { planetName, ownerName: playerName, discoveryElement, discoveryRarity, highestRarity }
             });
             window.dispatchEvent(event);
         }
@@ -826,5 +836,4 @@ export default {
     updatePlanetFee,
     getPlayerClaimStats,
     resetPlanetStatus
-    // saveTimestamp removed - not defined here!
 };
