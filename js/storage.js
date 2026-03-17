@@ -632,46 +632,33 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         
+        // Get current collection
         let collection = await getCollection(playerId);
         
+        // Initialize if empty
         if (!collection[elementName]) {
-            collection[elementName] = { count: 0, firstFound: Date.now() };
+            collection[elementName] = { count: 0 };
         }
         
-        // Handle different storage formats
+        // Add quantity
         if (typeof collection[elementName] === 'object') {
             collection[elementName].count = (collection[elementName].count || 0) + quantity;
-            if (!collection[elementName].firstFound) {
-                collection[elementName].firstFound = Date.now();
-            }
-            // Add location metadata if provided
-            if (metadata.planet) {
-                if (!collection[elementName].locations) {
-                    collection[elementName].locations = [];
-                }
-                collection[elementName].locations.push({
-                    planet: metadata.planet,
-                    planetType: metadata.planetType,
-                    quantity: quantity,
-                    timestamp: metadata.timestamp || Date.now()
-                });
-            }
         } else {
-            // Legacy format (direct number)
+            // Handle legacy format
             collection[elementName] = {
-                count: (collection[elementName] || 0) + quantity,
-                firstFound: Date.now()
+                count: (collection[elementName] || 0) + quantity
             };
         }
         
+        // Save to localStorage
         localStorage.setItem(key, JSON.stringify(collection));
+        
+        console.log(`✅ Added ${quantity}x ${elementName} to cargo. New count: ${collection[elementName].count}`);
         
         return {
             success: true,
             element: elementName,
-            newCount: typeof collection[elementName] === 'object' 
-                ? collection[elementName].count 
-                : collection[elementName],
+            newCount: collection[elementName].count,
             added: quantity
         };
     } catch (error) {
