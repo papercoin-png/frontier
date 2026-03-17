@@ -160,7 +160,7 @@
             transform: scale(0.95);
         }
         
-        /* Location Banner */
+        /* Location Banner - Shows if transfers are allowed */
         .location-banner {
             background: rgba(30, 45, 70, 0.8);
             border: 2px solid #4affaa;
@@ -858,6 +858,20 @@
             display: block;
         }
         
+        /* Refresh indicator */
+        .refresh-indicator {
+            text-align: center;
+            color: #4affaa;
+            font-size: 11px;
+            margin: 5px 0;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .refresh-indicator.visible {
+            display: block;
+        }
+        
         /* Migration status (debug) */
         .migration-status {
             position: fixed;
@@ -881,6 +895,9 @@
                 <div class="cargo-title">Cargo Hold</div>
                 <div class="cargo-subtitle">✦ mass-based storage ✦</div>
             </div>
+            
+            <!-- Refresh Indicator -->
+            <div class="refresh-indicator" id="refreshIndicator">↻ Updating...</div>
             
             <!-- Tab Navigation -->
             <div class="cargo-tabs">
@@ -1096,6 +1113,7 @@
         const productsSection = document.getElementById('productsSection');
         const elementsTab = document.getElementById('elementsTab');
         const productsTab = document.getElementById('productsTab');
+        const refreshIndicator = document.getElementById('refreshIndicator');
         
         // Eject modal elements
         const ejectModal = document.getElementById('ejectModal');
@@ -1144,6 +1162,7 @@
         let currentPlanet = 'Earth';
         let canTransfer = false; // Only true when at Earth
         let currentTab = 'elements';
+        let refreshTimeout = null;
         
         // Current item being ejected
         let currentEjectItem = null;
@@ -1524,8 +1543,16 @@
         }
 
         // ===== LOAD CARGO DATA =====
-        async function loadCargoData() {
+        async function loadCargoData(showRefreshIndicator = false) {
             try {
+                if (showRefreshIndicator) {
+                    refreshIndicator.classList.add('visible');
+                    if (refreshTimeout) clearTimeout(refreshTimeout);
+                    refreshTimeout = setTimeout(() => {
+                        refreshIndicator.classList.remove('visible');
+                    }, 1000);
+                }
+                
                 console.log('Loading cargo data...');
                 
                 // Check location
@@ -1817,7 +1844,7 @@
                     closeEjectModal();
                     
                     // Reload cargo data
-                    await loadCargoData();
+                    await loadCargoData(true);
                     
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
@@ -1946,7 +1973,7 @@
                 closeTransferModal();
                 
                 // Reload cargo data
-                await loadCargoData();
+                await loadCargoData(true);
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 alert(`✅ Transferred ${quantity}x ${currentTransferItem} to Earth Hub`);
@@ -1966,6 +1993,12 @@
             window.location.href = 'ship-bridge.html';
         }
 
+        // ===== LISTEN FOR CARGO UPDATES FROM OTHER PAGES =====
+        window.addEventListener('cargo-updated', () => {
+            console.log('Cargo updated event received, reloading...');
+            loadCargoData(true);
+        });
+
         // ===== INITIALIZE =====
         async function init() {
             try {
@@ -1974,6 +2007,11 @@
                 
                 // Load cargo data
                 await loadCargoData();
+                
+                // Set up periodic refresh every 10 seconds to stay in sync
+                setInterval(() => {
+                    loadCargoData();
+                }, 10000);
                 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
