@@ -1266,6 +1266,7 @@
         }
 
         // ===== MAIN EXTRACTION FUNCTION =====
+        // FIXED: Added to collection FIRST, then save discovery
         async function attemptExtraction() {
             console.log('⏱️ Extraction attempt at:', new Date().toLocaleTimeString());
             
@@ -1367,10 +1368,7 @@
                     const totalMass = massPerUnit * quantity;
                     
                     if (currentMass + totalMass <= cargoLimit) {
-                        // Save to permanent location record FIRST
-                        await saveDiscoveryToLocation(resource, quantity, rarity);
-                        
-                        // Then add to collection
+                        // Create location data
                         const locationData = {
                             planet: currentPlanet.name,
                             planetType: currentPlanet.type,
@@ -1379,9 +1377,14 @@
                             timestamp: Date.now()
                         };
                         
+                        // STEP 1: Add to collection FIRST (this puts items in cargo)
                         const result = await window.addElementToCollection(resource, quantity, locationData);
                         
                         if (result && result.success) {
+                            // STEP 2: Only after cargo is updated, save discovery record
+                            await saveDiscoveryToLocation(resource, quantity, rarity);
+                            
+                            // Update cargo cache and display
                             cachedCargoMass = currentMass + totalMass;
                             lastMassUpdate = Date.now();
                             await updateCargoDisplay();
@@ -1399,6 +1402,15 @@
                             
                             await updateClaimButton();
                         }
+                    } else {
+                        // Not enough cargo space
+                        showExtractionNotification({
+                            success: false,
+                            resource: resource,
+                            reason: 'cargo_full',
+                            pityCount: pityCounters[resource].attempts,
+                            pityThreshold: pityCounters[resource].threshold
+                        });
                     }
                 } else {
                     showExtractionNotification({
