@@ -80,7 +80,7 @@
             z-index: 2;
         }
         
-        /* Status Bar */
+        /* Status Bar - with flash animation */
         .status-bar {
             display: flex;
             justify-content: space-between;
@@ -93,6 +93,12 @@
             z-index: 10;
             color: white;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .status-bar.flash {
+            border-color: #4affaa;
+            box-shadow: 0 0 20px #4affaa;
         }
         
         .planet-name {
@@ -687,7 +693,7 @@
             <div class="star-overlay"></div>
             
             <div class="content">
-                <div class="status-bar">
+                <div class="status-bar" id="statusBar">
                     <div class="planet-name">
                         <span class="planet-name-main" id="planetName">Loading...</span>
                         <span class="planet-name-type" id="planetType">Loading...</span>
@@ -798,6 +804,7 @@
         const activeCount = document.getElementById('activeCount');
         const extractorText = document.getElementById('extractorText');
         const claimBtn = document.getElementById('claimBtn');
+        const statusBar = document.getElementById('statusBar');
         
         // Notification elements
         const extractionNotification = document.getElementById('extractionNotification');
@@ -1353,8 +1360,15 @@
                         if (result && result.success) {
                             await saveDiscoveryToLocation(resource, quantity, rarity);
                             
+                            // Update cargo display with new mass
                             const newMass = await getFreshCargoMass();
                             cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
+                            
+                            // Flash the status bar to show cargo was added
+                            statusBar.classList.add('flash');
+                            setTimeout(() => {
+                                statusBar.classList.remove('flash');
+                            }, 500);
                             
                             window.dispatchEvent(new CustomEvent('cargo-updated', { 
                                 detail: { element: resource, quantity, mass: totalMass }
