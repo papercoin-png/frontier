@@ -1224,6 +1224,7 @@ export default {
     
     // System
     initializeStorage,
-    resetGame,
-    saveTimestamp
+    resetGame
+    // Note: saveTimestamp is intentionally omitted here to avoid duplicate export
+    // It is already exported in the named exports above
 };
