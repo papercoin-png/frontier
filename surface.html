@@ -1360,8 +1360,12 @@
                         if (result && result.success) {
                             await saveDiscoveryToLocation(resource, quantity, rarity);
                             
-                            // Update cargo display with new mass
-                            const newMass = await getFreshCargoMass();
+                            // DIRECTLY READ COLLECTION TO UPDATE CARGO DISPLAY
+                            const collection = await window.getCollection();
+                            let newMass = 0;
+                            for (const [name, data] of Object.entries(collection)) {
+                                newMass += (data.count || 1) * getElementMass(name);
+                            }
                             cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
                             
                             // Flash the status bar to show cargo was added
