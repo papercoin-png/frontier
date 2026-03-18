@@ -1656,6 +1656,10 @@ export default {
 // ============================================================================
 // Make all commonly used functions available globally for non-module scripts
 
+// Player functions (ADDED)
+window.getPlayer = getPlayer;
+window.savePlayer = savePlayer;
+
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
 window.removeElementFromCollection = removeElementFromCollection;
