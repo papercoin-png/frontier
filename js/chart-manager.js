@@ -75,20 +75,15 @@ export const Indicators = {
 // ===== CHART MANAGER CLASS =====
 export class ChartManager {
     constructor() {
-        // Initialize properties FIRST
+        // Initialize properties
         this.charts = new Map();        // Active charts by element
         this.currentElement = 'Gold';    // Default element
         this.currentTimeframe = CHART_CONFIG.defaultTimeframe;
         this.currentIndicators = [Indicators.SMA];
         this.chartType = ChartType.CANDLESTICK;
         
-        // Bind methods AFTER properties are initialized
-        this.createChart = this.createChart.bind(this);
-        this.updateChart = this.updateChart.bind(this);
-        this.destroyChart = this.destroyChart.bind(this);
-        this.setChartType = this.setChartType.bind(this);
-        this.setTimeframe = this.setTimeframe.bind(this);
-        this.toggleIndicator = this.toggleIndicator.bind(this);
+        // No bind methods needed - we use arrow functions or direct references
+        console.log('📊 ChartManager initialized');
     }
     
     // ===== CHART CREATION =====
@@ -923,43 +918,43 @@ export function createChartToolbar(elementName, currentType = ChartType.CANDLEST
         <div class="chart-toolbar">
             <div class="chart-type-selector">
                 <button class="chart-type-btn ${currentType === ChartType.CANDLESTICK ? 'active' : ''}" 
-                        onclick="chartManager.setChartType('${elementName}', '${ChartType.CANDLESTICK}')">
+                        onclick="window.chartManager?.setChartType('${elementName}', '${ChartType.CANDLESTICK}')">
                     📊 Candlestick
                 </button>
                 <button class="chart-type-btn ${currentType === ChartType.LINE ? 'active' : ''}" 
-                        onclick="chartManager.setChartType('${elementName}', '${ChartType.LINE}')">
+                        onclick="window.chartManager?.setChartType('${elementName}', '${ChartType.LINE}')">
                     📈 Line
                 </button>
                 <button class="chart-type-btn ${currentType === ChartType.DEPTH ? 'active' : ''}" 
-                        onclick="chartManager.setChartType('${elementName}', '${ChartType.DEPTH}')">
+                        onclick="window.chartManager?.setChartType('${elementName}', '${ChartType.DEPTH}')">
                     📉 Depth
                 </button>
             </div>
             
             <div class="timeframe-selector">
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '1m')">1m</button>
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '5m')">5m</button>
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '15m')">15m</button>
-                <button class="timeframe-btn active" onclick="chartManager.setTimeframe('${elementName}', '1h')">1h</button>
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '4h')">4h</button>
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '1d')">1d</button>
-                <button class="timeframe-btn" onclick="chartManager.setTimeframe('${elementName}', '1w')">1w</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '1m')">1m</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '5m')">5m</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '15m')">15m</button>
+                <button class="timeframe-btn active" onclick="window.chartManager?.setTimeframe('${elementName}', '1h')">1h</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '4h')">4h</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '1d')">1d</button>
+                <button class="timeframe-btn" onclick="window.chartManager?.setTimeframe('${elementName}', '1w')">1w</button>
             </div>
             
             <div class="indicator-selector">
-                <button class="indicator-btn" onclick="chartManager.toggleIndicator('${elementName}', '${Indicators.SMA}')">
+                <button class="indicator-btn" onclick="window.chartManager?.toggleIndicator('${elementName}', '${Indicators.SMA}')">
                     SMA
                 </button>
-                <button class="indicator-btn" onclick="chartManager.toggleIndicator('${elementName}', '${Indicators.EMA}')">
+                <button class="indicator-btn" onclick="window.chartManager?.toggleIndicator('${elementName}', '${Indicators.EMA}')">
                     EMA
                 </button>
-                <button class="indicator-btn" onclick="chartManager.toggleIndicator('${elementName}', '${Indicators.RSI}')">
+                <button class="indicator-btn" onclick="window.chartManager?.toggleIndicator('${elementName}', '${Indicators.RSI}')">
                     RSI
                 </button>
-                <button class="indicator-btn" onclick="chartManager.toggleIndicator('${elementName}', '${Indicators.MACD}')">
+                <button class="indicator-btn" onclick="window.chartManager?.toggleIndicator('${elementName}', '${Indicators.MACD}')">
                     MACD
                 </button>
-                <button class="indicator-btn" onclick="chartManager.toggleIndicator('${elementName}', '${Indicators.BOLLINGER}')">
+                <button class="indicator-btn" onclick="window.chartManager?.toggleIndicator('${elementName}', '${Indicators.BOLLINGER}')">
                     Bollinger
                 </button>
             </div>
@@ -969,6 +964,11 @@ export function createChartToolbar(elementName, currentType = ChartType.CANDLEST
 
 // ===== EXPORT SINGLETON INSTANCE =====
 export const chartManager = new ChartManager();
+
+// Make chartManager available globally for onclick handlers
+if (typeof window !== 'undefined') {
+    window.chartManager = chartManager;
+}
 
 // ===== DEFAULT EXPORT =====
 export default chartManager;
