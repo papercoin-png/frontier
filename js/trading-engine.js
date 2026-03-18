@@ -198,7 +198,9 @@ export class TradingEngine {
                 portfolio.recordBuy(elementName, quantity, currentPrice);
                 
                 // Update market volume
-                marketData.volume24h[elementName] = (marketData.volume24h[elementName] || 0) + quantity;
+                if (marketData.volume24h) {
+                    marketData.volume24h[elementName] = (marketData.volume24h[elementName] || 0) + quantity;
+                }
                 
                 return new TradeResult(true, `Bought ${quantity}x ${elementName} for ${totalCost}⭐`, {
                     element: elementName,
@@ -227,7 +229,9 @@ export class TradingEngine {
                 portfolio.recordSell(elementName, quantity, currentPrice);
                 
                 // Update market volume
-                marketData.volume24h[elementName] = (marketData.volume24h[elementName] || 0) + quantity;
+                if (marketData.volume24h) {
+                    marketData.volume24h[elementName] = (marketData.volume24h[elementName] || 0) + quantity;
+                }
                 
                 return new TradeResult(true, `Sold ${quantity}x ${elementName} for ${netTotal}⭐`, {
                     element: elementName,
@@ -404,7 +408,7 @@ export class TradingEngine {
             dailyVolume: this.dailyVolume,
             dailyTrades: this.dailyTrades,
             averageTradeSize: this.dailyTrades > 0 ? this.dailyVolume / this.dailyTrades : 0,
-            activeOrders: orderBook.allOrders.size,
+            activeOrders: orderBook.allOrders ? orderBook.allOrders.size : 0,
             marketStatus: this.getMarketStatus()
         };
     }
@@ -509,7 +513,9 @@ export class TradingEngine {
             }
             
             // Update market data
-            marketData.volume24h[buyOrder.elementName] = (marketData.volume24h[buyOrder.elementName] || 0) + quantity;
+            if (marketData.volume24h) {
+                marketData.volume24h[buyOrder.elementName] = (marketData.volume24h[buyOrder.elementName] || 0) + quantity;
+            }
             
             console.log(`✅ Trade settled: ${quantity}x ${buyOrder.elementName} at ${price}⭐`);
             
@@ -560,8 +566,13 @@ export class TradingEngine {
      * Process pending settlements
      */
     processSettlements() {
+        // Ensure pendingSettlements exists
+        if (!this.pendingSettlements) {
+            this.pendingSettlements = [];
+            return;
+        }
+        
         // This would handle any pending settlements
-        // For now, just log
         if (this.pendingSettlements.length > 0) {
             console.log(`Processing ${this.pendingSettlements.length} settlements...`);
             this.pendingSettlements = [];
