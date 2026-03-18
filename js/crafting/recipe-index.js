@@ -1,347 +1,473 @@
-// js/crafting/recipe-index.js
-// Master index that combines all field recipe files
-// This file imports and exports ALL recipes from every field
+// js/recipe-index.js - Central index of all crafting recipes across all fields
+// Provides unified access to recipes for UI rendering, crafting, and progression
 
-// ===== IMPORT ALL FIELD RECIPES =====
-import { ALCHEMY_RECIPES } from './fields/alchemy.js';
-import { METALLURGY_RECIPES } from './fields/metallurgy.js';
-import { MATERIALS_SCIENCE_RECIPES } from './fields/materials-science.js';
-import { PHARMACEUTICALS_RECIPES } from './fields/pharmaceuticals.js';
-import { TEXTILES_RECIPES } from './fields/textiles.js';
-import { CONSTRUCTION_RECIPES } from './fields/construction.js';
-import { AEROSPACE_RECIPES } from './fields/aerospace.js';
-import { NUCLEAR_RECIPES } from './fields/nuclear.js';
-import { OPTICAL_RECIPES } from './fields/optical.js';
-import { MAGNETIC_RECIPES } from './fields/magnetic.js';
-import { CRYOGENIC_RECIPES } from './fields/cryogenic.js';
-import { POLYMERS_RECIPES } from './fields/polymers.js';
+import { ALCHEMY_RECIPES, LEVEL_THRESHOLDS as ALCHEMY_THRESHOLDS } from './alchemy.js';
 
-// ===== COMBINE ALL RECIPES INTO ONE MASTER DATABASE =====
-export const RECIPE_DATABASE = {
-    // Alchemy (existing)
-    ...ALCHEMY_RECIPES,
-    
-    // Metallurgy (150+ recipes)
-    ...METALLURGY_RECIPES,
-    
-    // Materials Science (100+ recipes)
-    ...MATERIALS_SCIENCE_RECIPES,
-    
-    // Pharmaceuticals (80+ recipes)
-    ...PHARMACEUTICALS_RECIPES,
-    
-    // Textiles (60+ recipes)
-    ...TEXTILES_RECIPES,
-    
-    // Construction (70+ recipes)
-    ...CONSTRUCTION_RECIPES,
-    
-    // Aerospace (50+ recipes)
-    ...AEROSPACE_RECIPES,
-    
-    // Nuclear (40+ recipes)
-    ...NUCLEAR_RECIPES,
-    
-    // Optical (50+ recipes)
-    ...OPTICAL_RECIPES,
-    
-    // Magnetic (40+ recipes)
-    ...MAGNETIC_RECIPES,
-    
-    // Cryogenic (30+ recipes)
-    ...CRYOGENIC_RECIPES,
-    
-    // Polymers (60+ recipes)
-    ...POLYMERS_RECIPES
+// ===== FIELD DEFINITIONS =====
+export const FIELDS = {
+    ALCHEMY: 'alchemy',
+    METALLURGY: 'metallurgy',
+    MATERIALS_SCIENCE: 'materials-science',
+    PHARMACEUTICALS: 'pharmaceuticals',
+    TEXTILES: 'textiles',
+    CONSTRUCTION: 'construction',
+    AEROSPACE: 'aerospace',
+    NUCLEAR: 'nuclear',
+    OPTICAL: 'optical',
+    MAGNETIC: 'magnetic',
+    CRYOGENIC: 'cryogenic',
+    POLYMERS: 'polymers'
 };
 
-// ===== HELPER: GET ALL RECIPE CATEGORIES =====
-export function getAllCategories() {
-    const categories = [];
-    for (const field in RECIPE_DATABASE) {
-        categories.push(...Object.keys(RECIPE_DATABASE[field]));
+// ===== FIELD DISPLAY NAMES =====
+export const FIELD_NAMES = {
+    [FIELDS.ALCHEMY]: 'Alchemy',
+    [FIELDS.METALLURGY]: 'Metallurgy',
+    [FIELDS.MATERIALS_SCIENCE]: 'Materials Science',
+    [FIELDS.PHARMACEUTICALS]: 'Pharmaceuticals',
+    [FIELDS.TEXTILES]: 'Textiles',
+    [FIELDS.CONSTRUCTION]: 'Construction',
+    [FIELDS.AEROSPACE]: 'Aerospace Engineering',
+    [FIELDS.NUCLEAR]: 'Nuclear Physics',
+    [FIELDS.OPTICAL]: 'Optical Engineering',
+    [FIELDS.MAGNETIC]: 'Magnetic Systems',
+    [FIELDS.CRYOGENIC]: 'Cryogenics',
+    [FIELDS.POLYMERS]: 'Polymer Chemistry'
+};
+
+// ===== FIELD ICONS =====
+export const FIELD_ICONS = {
+    [FIELDS.ALCHEMY]: '⚗️',
+    [FIELDS.METALLURGY]: '🔨',
+    [FIELDS.MATERIALS_SCIENCE]: '🔬',
+    [FIELDS.PHARMACEUTICALS]: '💊',
+    [FIELDS.TEXTILES]: '🧵',
+    [FIELDS.CONSTRUCTION]: '🏗️',
+    [FIELDS.AEROSPACE]: '🚀',
+    [FIELDS.NUCLEAR]: '☢️',
+    [FIELDS.OPTICAL]: '🔍',
+    [FIELDS.MAGNETIC]: '🧲',
+    [FIELDS.CRYOGENIC]: '❄️',
+    [FIELDS.POLYMERS]: '🧪'
+};
+
+// ===== FIELD COLORS =====
+export const FIELD_COLORS = {
+    [FIELDS.ALCHEMY]: '#4affaa',
+    [FIELDS.METALLURGY]: '#ffaa4a',
+    [FIELDS.MATERIALS_SCIENCE]: '#4a8ac0',
+    [FIELDS.PHARMACEUTICALS]: '#ff6b6b',
+    [FIELDS.TEXTILES]: '#c0a0ff',
+    [FIELDS.CONSTRUCTION]: '#8b8b8b',
+    [FIELDS.AEROSPACE]: '#4ac0ff',
+    [FIELDS.NUCLEAR]: '#4aff4a',
+    [FIELDS.OPTICAL]: '#ff4aff',
+    [FIELDS.MAGNETIC]: '#ffaa4a',
+    [FIELDS.CRYOGENIC]: '#a0c0ff',
+    [FIELDS.POLYMERS]: '#ffd966'
+};
+
+// ===== MASTERY THRESHOLDS (shared across fields) =====
+// Using Alchemy thresholds as the standard
+export const MASTERY_THRESHOLDS = ALCHEMY_THRESHOLDS;
+
+// ===== COMBINED RECIPE INDEX =====
+// This will be populated as we import more field recipe files
+export const RECIPE_INDEX = {
+    [FIELDS.ALCHEMY]: ALCHEMY_RECIPES,
+    [FIELDS.METALLURGY]: {},
+    [FIELDS.MATERIALS_SCIENCE]: {},
+    [FIELDS.PHARMACEUTICALS]: {},
+    [FIELDS.TEXTILES]: {},
+    [FIELDS.CONSTRUCTION]: {},
+    [FIELDS.AEROSPACE]: {},
+    [FIELDS.NUCLEAR]: {},
+    [FIELDS.OPTICAL]: {},
+    [FIELDS.MAGNETIC]: {},
+    [FIELDS.CRYOGENIC]: {},
+    [FIELDS.POLYMERS]: {}
+};
+
+// ===== GET ALL RECIPES FLAT =====
+export function getAllRecipes() {
+    const allRecipes = [];
+    
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, recipes] of Object.entries(categories)) {
+            recipes.forEach(recipe => {
+                allRecipes.push({
+                    ...recipe,
+                    field,
+                    category
+                });
+            });
+        }
     }
-    return [...new Set(categories)]; // Remove duplicates
+    
+    return allRecipes;
 }
 
-// ===== HELPER: GET ALL FIELDS =====
-export function getAllFields() {
-    return Object.keys(RECIPE_DATABASE);
-}
-
-// ===== HELPER: GET RECIPES BY FIELD =====
+// ===== GET RECIPES BY FIELD =====
 export function getRecipesByField(field) {
-    return RECIPE_DATABASE[field] || {};
+    return RECIPE_INDEX[field] || {};
 }
 
-// ===== HELPER: GET RECIPES BY CATEGORY =====
-export function getRecipesByCategory(category) {
-    const results = [];
-    
-    for (const field in RECIPE_DATABASE) {
-        if (RECIPE_DATABASE[field][category]) {
-            results.push(...RECIPE_DATABASE[field][category]);
-        }
-    }
-    
-    return results;
-}
-
-// ===== HELPER: GET RECIPES BY TIER =====
-export function getRecipesByTier(tier) {
-    const results = [];
-    
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            const filtered = RECIPE_DATABASE[field][category].filter(r => r.tier === tier);
-            results.push(...filtered);
-        }
-    }
-    
-    return results;
-}
-
-// ===== HELPER: GET RECIPE BY ID (SEARCHES ALL FIELDS) =====
+// ===== GET RECIPE BY ID =====
 export function getRecipeById(recipeId) {
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            const found = RECIPE_DATABASE[field][category].find(r => r.id === recipeId);
-            if (found) return found;
+    // Search through all fields
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, recipes] of Object.entries(categories)) {
+            const found = recipes.find(r => r.id === recipeId);
+            if (found) {
+                return {
+                    ...found,
+                    field,
+                    category
+                };
+            }
         }
     }
     return null;
 }
 
-// ===== HELPER: SEARCH RECIPES BY NAME OR FORMULA =====
+// ===== GET RECIPES BY TIER =====
+export function getRecipesByTier(tier) {
+    const recipes = [];
+    
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, categoryRecipes] of Object.entries(categories)) {
+            categoryRecipes.forEach(recipe => {
+                if (recipe.tier === tier) {
+                    recipes.push({
+                        ...recipe,
+                        field,
+                        category
+                    });
+                }
+            });
+        }
+    }
+    
+    return recipes;
+}
+
+// ===== GET RECIPES BY CATEGORY =====
+export function getRecipesByCategory(field, category) {
+    return RECIPE_INDEX[field]?.[category] || [];
+}
+
+// ===== GET ALL CATEGORIES =====
+export function getAllCategories() {
+    const categories = [];
+    
+    for (const [field, fieldCategories] of Object.entries(RECIPE_INDEX)) {
+        for (const category of Object.keys(fieldCategories)) {
+            categories.push({
+                field,
+                category,
+                displayName: category,
+                icon: FIELD_ICONS[field],
+                color: FIELD_COLORS[field]
+            });
+        }
+    }
+    
+    return categories;
+}
+
+// ===== GET CATEGORIES BY FIELD =====
+export function getCategoriesByField(field) {
+    return Object.keys(RECIPE_INDEX[field] || {});
+}
+
+// ===== SEARCH RECIPES =====
 export function searchRecipes(query) {
+    if (!query) return getAllRecipes();
+    
     const lowerQuery = query.toLowerCase();
     const results = [];
     
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            for (const recipe of RECIPE_DATABASE[field][category]) {
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, recipes] of Object.entries(categories)) {
+            recipes.forEach(recipe => {
                 if (recipe.name.toLowerCase().includes(lowerQuery) ||
-                    recipe.formula.toLowerCase().includes(lowerQuery) ||
-                    recipe.id.toLowerCase().includes(lowerQuery)) {
+                    recipe.description?.toLowerCase().includes(lowerQuery) ||
+                    recipe.formula?.toLowerCase().includes(lowerQuery) ||
+                    category.toLowerCase().includes(lowerQuery)) {
                     results.push({
                         ...recipe,
-                        field: field,
-                        category: category
+                        field,
+                        category
                     });
                 }
-            }
+            });
         }
     }
     
     return results;
 }
 
-// ===== HELPER: GET RECIPES THAT USE A SPECIFIC INGREDIENT =====
-export function getRecipesUsingIngredient(ingredient) {
-    const results = [];
+// ===== GET UNLOCKABLE RECIPES =====
+export function getUnlockableRecipes(totalCrafts) {
+    const recipes = [];
     
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            for (const recipe of RECIPE_DATABASE[field][category]) {
-                if (recipe.ingredients[ingredient]) {
-                    results.push({
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, categoryRecipes] of Object.entries(categories)) {
+            categoryRecipes.forEach(recipe => {
+                if (recipe.unlocksAt > totalCrafts) {
+                    recipes.push({
                         ...recipe,
-                        field: field,
-                        category: category
+                        field,
+                        category,
+                        craftsNeeded: recipe.unlocksAt - totalCrafts
                     });
                 }
-            }
+            });
         }
     }
     
-    return results;
+    return recipes.sort((a, b) => a.craftsNeeded - b.craftsNeeded);
 }
 
-// ===== HELPER: GET RECIPES THAT UNLOCK AT A SPECIFIC MILESTONE =====
-export function getRecipesUnlockedAt(crafts) {
-    const results = [];
+// ===== GET LOCKED RECIPES =====
+export function getLockedRecipes(totalCrafts) {
+    const recipes = [];
     
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            for (const recipe of RECIPE_DATABASE[field][category]) {
-                if (recipe.unlocksAt === crafts) {
-                    results.push({
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, categoryRecipes] of Object.entries(categories)) {
+            categoryRecipes.forEach(recipe => {
+                if (recipe.unlocksAt > totalCrafts) {
+                    recipes.push({
                         ...recipe,
-                        field: field,
-                        category: category
+                        field,
+                        category,
+                        craftsNeeded: recipe.unlocksAt - totalCrafts
                     });
                 }
-            }
+            });
         }
     }
     
-    return results;
+    return recipes;
 }
 
-// ===== HELPER: GET TOTAL RECIPE COUNT =====
-export function getTotalRecipeCount() {
-    let count = 0;
+// ===== GET UNLOCKED RECIPES =====
+export function getUnlockedRecipes(totalCrafts) {
+    const recipes = [];
     
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            count += RECIPE_DATABASE[field][category].length;
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, categoryRecipes] of Object.entries(categories)) {
+            categoryRecipes.forEach(recipe => {
+                if (recipe.unlocksAt <= totalCrafts || recipe.unlocksAt <= 100) {
+                    recipes.push({
+                        ...recipe,
+                        field,
+                        category
+                    });
+                }
+            });
         }
     }
     
-    return count;
+    return recipes;
 }
 
-// ===== HELPER: GET RECIPE COUNT BY FIELD =====
-export function getRecipeCountByField() {
-    const counts = {};
+// ===== GET RECIPE COUNTS =====
+export function getRecipeCounts() {
+    const counts = {
+        total: 0,
+        byField: {},
+        byTier: {}
+    };
     
-    for (const field in RECIPE_DATABASE) {
-        counts[field] = 0;
-        for (const category in RECIPE_DATABASE[field]) {
-            counts[field] += RECIPE_DATABASE[field][category].length;
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        let fieldCount = 0;
+        
+        for (const [category, recipes] of Object.entries(categories)) {
+            fieldCount += recipes.length;
+            counts.total += recipes.length;
+            
+            recipes.forEach(recipe => {
+                const tier = recipe.tier || 1;
+                counts.byTier[tier] = (counts.byTier[tier] || 0) + 1;
+            });
         }
+        
+        counts.byField[field] = fieldCount;
     }
     
     return counts;
 }
 
-// ===== HELPER: GET RECIPE TREE FOR VISUALIZATION =====
-export function getRecipeTree() {
-    const tree = {};
+// ===== GET HIGHEST TIER AVAILABLE =====
+export function getHighestTier(totalCrafts) {
+    let highestTier = 1;
     
-    for (const field in RECIPE_DATABASE) {
-        tree[field] = {};
-        for (const category in RECIPE_DATABASE[field]) {
-            tree[field][category] = RECIPE_DATABASE[field][category].map(recipe => ({
-                id: recipe.id,
-                name: recipe.name,
-                tier: recipe.tier,
-                field: field,
-                category: category,
-                dependencies: recipe.ingredients ? Object.keys(recipe.ingredients) : [],
-                unlocksAt: recipe.unlocksAt,
-                value: recipe.value,
-                icon: recipe.icon
-            }));
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, recipes] of Object.entries(categories)) {
+            recipes.forEach(recipe => {
+                if (recipe.unlocksAt <= totalCrafts && recipe.tier > highestTier) {
+                    highestTier = recipe.tier;
+                }
+            });
         }
     }
     
-    return tree;
+    return highestTier;
 }
 
-// ===== HELPER: GET CRAFTING CHAIN FOR A RECIPE =====
-export function getCraftingChain(recipeId, depth = 0, maxDepth = 5) {
-    if (depth > maxDepth) return null;
+// ===== GET NEXT TIER UNLOCK =====
+export function getNextTierUnlock(totalCrafts) {
+    let nextTier = null;
+    let minCraftsNeeded = Infinity;
     
-    const recipe = getRecipeById(recipeId);
-    if (!recipe) return null;
+    for (const [field, categories] of Object.entries(RECIPE_INDEX)) {
+        for (const [category, recipes] of Object.entries(categories)) {
+            recipes.forEach(recipe => {
+                if (recipe.unlocksAt > totalCrafts && recipe.unlocksAt < minCraftsNeeded) {
+                    minCraftsNeeded = recipe.unlocksAt;
+                    nextTier = recipe.tier;
+                }
+            });
+        }
+    }
     
-    const chain = {
-        id: recipe.id,
-        name: recipe.name,
-        field: findFieldForRecipe(recipeId),
-        category: findCategoryForRecipe(recipeId),
-        tier: recipe.tier,
-        ingredients: {}
+    if (nextTier) {
+        return {
+            tier: nextTier,
+            craftsNeeded: minCraftsNeeded - totalCrafts
+        };
+    }
+    
+    return null;
+}
+
+// ===== GET PROGRESS TO NEXT TIER =====
+export function getProgressToNextTier(totalCrafts) {
+    const nextTier = getNextTierUnlock(totalCrafts);
+    
+    if (!nextTier) {
+        return {
+            hasNext: false,
+            progress: 100,
+            craftsNeeded: 0,
+            nextTier: null
+        };
+    }
+    
+    // Find the threshold for this tier
+    let currentThreshold = 0;
+    let nextThreshold = nextTier.craftsNeeded + totalCrafts;
+    
+    // Find the current tier threshold
+    for (let i = MASTERY_THRESHOLDS.length - 1; i >= 0; i--) {
+        if (totalCrafts >= MASTERY_THRESHOLDS[i].threshold) {
+            currentThreshold = MASTERY_THRESHOLDS[i].threshold;
+            break;
+        }
+    }
+    
+    const progress = ((totalCrafts - currentThreshold) / (nextThreshold - currentThreshold)) * 100;
+    
+    return {
+        hasNext: true,
+        progress: Math.min(100, Math.max(0, progress)),
+        craftsNeeded: nextTier.craftsNeeded,
+        nextTier: nextTier.tier
     };
-    
-    for (const [ingredient, amount] of Object.entries(recipe.ingredients)) {
-        // Check if ingredient is itself a crafted material
-        const ingredientRecipe = getRecipeById(ingredient.toLowerCase().replace(' ', '_'));
+}
+
+// ===== GET MASTERY LEVEL FROM PROGRESS =====
+export function getMasteryLevelFromProgress(progress) {
+    for (let i = MASTERY_THRESHOLDS.length - 1; i >= 0; i--) {
+        if (progress >= MASTERY_THRESHOLDS[i].threshold) {
+            return MASTERY_THRESHOLDS[i];
+        }
+    }
+    return MASTERY_THRESHOLDS[0];
+}
+
+// ===== GET MASTERY PROGRESS =====
+export function getMasteryProgress(progress) {
+    for (let i = 0; i < MASTERY_THRESHOLDS.length - 1; i++) {
+        const current = MASTERY_THRESHOLDS[i];
+        const next = MASTERY_THRESHOLDS[i + 1];
         
-        if (ingredientRecipe && depth < maxDepth) {
-            chain.ingredients[ingredient] = {
-                amount: amount,
-                recipe: getCraftingChain(ingredientRecipe.id, depth + 1, maxDepth)
+        if (progress >= current.threshold && progress < next.threshold) {
+            const totalNeeded = next.threshold - current.threshold;
+            const currentProgress = progress - current.threshold;
+            return {
+                currentLevel: current.name,
+                nextLevel: next.name,
+                progress: currentProgress,
+                totalNeeded: totalNeeded,
+                percentage: (currentProgress / totalNeeded) * 100,
+                multiplier: current.multiplier
             };
-        } else {
-            chain.ingredients[ingredient] = {
-                amount: amount,
-                isBase: true
-            };
         }
     }
     
-    return chain;
-}
-
-// ===== HELPER: FIND FIELD FOR A RECIPE =====
-function findFieldForRecipe(recipeId) {
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            const found = RECIPE_DATABASE[field][category].find(r => r.id === recipeId);
-            if (found) return field;
-        }
-    }
-    return null;
-}
-
-// ===== HELPER: FIND CATEGORY FOR A RECIPE =====
-function findCategoryForRecipe(recipeId) {
-    for (const field in RECIPE_DATABASE) {
-        for (const category in RECIPE_DATABASE[field]) {
-            const found = RECIPE_DATABASE[field][category].find(r => r.id === recipeId);
-            if (found) return category;
-        }
-    }
-    return null;
-}
-
-// ===== HELPER: CALCULATE TOTAL MATERIAL COST FOR A RECIPE =====
-export function calculateMaterialCost(recipeId, count = 1) {
-    const recipe = getRecipeById(recipeId);
-    if (!recipe) return null;
-    
-    const materials = {};
-    
-    for (const [ingredient, amount] of Object.entries(recipe.ingredients)) {
-        materials[ingredient] = amount * count;
-    }
-    
-    return materials;
-}
-
-// ===== HELPER: GET ALL BASE ELEMENTS NEEDED FOR A RECIPE =====
-export function getBaseElements(recipeId, count = 1) {
-    const recipe = getRecipeById(recipeId);
-    if (!recipe) return null;
-    
-    const baseElements = {};
-    
-    function addIngredients(ingredients, multiplier = 1) {
-        for (const [ingredient, amount] of Object.entries(ingredients)) {
-            const subRecipe = getRecipeById(ingredient.toLowerCase().replace(' ', '_'));
-            
-            if (subRecipe) {
-                // Ingredient is itself a crafted material - recurse
-                addIngredients(subRecipe.ingredients, multiplier * amount);
-            } else {
-                // Ingredient is a base element
-                baseElements[ingredient] = (baseElements[ingredient] || 0) + (amount * multiplier);
-            }
-        }
-    }
-    
-    addIngredients(recipe.ingredients, count);
-    return baseElements;
+    // At max level
+    const maxLevel = MASTERY_THRESHOLDS[MASTERY_THRESHOLDS.length - 1];
+    return {
+        currentLevel: maxLevel.name,
+        nextLevel: null,
+        progress: 0,
+        totalNeeded: 0,
+        percentage: 100,
+        multiplier: maxLevel.multiplier
+    };
 }
 
 // ===== EXPORT ALL =====
 export default {
-    RECIPE_DATABASE,
-    getAllCategories,
-    getAllFields,
+    FIELDS,
+    FIELD_NAMES,
+    FIELD_ICONS,
+    FIELD_COLORS,
+    MASTERY_THRESHOLDS,
+    RECIPE_INDEX,
+    getAllRecipes,
     getRecipesByField,
-    getRecipesByCategory,
-    getRecipesByTier,
     getRecipeById,
+    getRecipesByTier,
+    getRecipesByCategory,
+    getAllCategories,
+    getCategoriesByField,
     searchRecipes,
-    getRecipesUsingIngredient,
-    getRecipesUnlockedAt,
-    getTotalRecipeCount,
-    getRecipeCountByField,
-    getRecipeTree,
-    getCraftingChain,
-    calculateMaterialCost,
-    getBaseElements
+    getUnlockableRecipes,
+    getLockedRecipes,
+    getUnlockedRecipes,
+    getRecipeCounts,
+    getHighestTier,
+    getNextTierUnlock,
+    getProgressToNextTier,
+    getMasteryLevelFromProgress,
+    getMasteryProgress
 };
+
+// ===== GLOBAL EXPOSURE =====
+window.FIELDS = FIELDS;
+window.FIELD_NAMES = FIELD_NAMES;
+window.FIELD_ICONS = FIELD_ICONS;
+window.FIELD_COLORS = FIELD_COLORS;
+window.MASTERY_THRESHOLDS = MASTERY_THRESHOLDS;
+window.RECIPE_INDEX = RECIPE_INDEX;
+window.getAllRecipes = getAllRecipes;
+window.getRecipesByField = getRecipesByField;
+window.getRecipeById = getRecipeById;
+window.getRecipesByTier = getRecipesByTier;
+window.getRecipesByCategory = getRecipesByCategory;
+window.getAllCategories = getAllCategories;
+window.searchRecipes = searchRecipes;
+window.getUnlockableRecipes = getUnlockableRecipes;
+window.getLockedRecipes = getLockedRecipes;
+window.getUnlockedRecipes = getUnlockedRecipes;
+window.getRecipeCounts = getRecipeCounts;
+window.getHighestTier = getHighestTier;
+window.getNextTierUnlock = getNextTierUnlock;
+window.getProgressToNextTier = getProgressToNextTier;
+window.getMasteryLevelFromProgress = getMasteryLevelFromProgress;
+window.getMasteryProgress = getMasteryProgress;
+
+console.log('✅ recipe-index.js loaded with alchemy recipes');
