@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voidfarer - Earth Hub</title>
     
+    <!-- Telegram Web App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -16,670 +18,615 @@
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
+        :root {
+            --color-bg: #0a0c10;
+            --color-surface: #14181f;
+            --color-surface-light: #1e2530;
+            --color-primary: #3b82f6;
+            --color-primary-glow: rgba(59, 130, 246, 0.5);
+            --color-secondary: #10b981;
+            --color-accent: #8b5cf6;
+            --color-text: #f0f4fa;
+            --color-text-secondary: #9aa8b9;
+            --color-border: #2a3440;
+            --color-border-light: #3a4555;
+            --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-surface: linear-gradient(145deg, #14181f, #0f131a);
+            --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --shadow-glow: 0 0 20px var(--color-primary-glow);
+        }
+
         body {
-            background: #0a0a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: var(--color-bg);
+            color: var(--color-text);
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
-            font-family: 'Libre Baskerville', serif;
-        }
-        
-        .phone-frame {
-            width: 100%;
-            max-width: 390px;
-            height: 844px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
             position: relative;
-            overflow: hidden;
-            border-radius: 40px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-            background: #0a0a1a;
+            overflow-x: hidden;
         }
-        
-        .earth-view {
-            position: relative;
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: #0a2a3a;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 20px 20px 100px 20px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.03) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
         }
-        
-        /* Loading Overlay */
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .hub-icon {
+            font-size: 64px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 20px var(--color-primary-glow));
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .hub-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .hub-subtitle {
+            color: var(--color-text-secondary);
+            font-size: 14px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* Quick Access Bar */
+        .quick-access {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            animation: fadeInUp 0.8s ease-out 0.1s both;
+        }
+
+        .quick-btn {
+            flex: 1;
+            background: var(--gradient-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 24px;
+            padding: 16px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .quick-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--gradient-primary);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 0;
+        }
+
+        .quick-btn:hover::before,
+        .quick-btn:active::before {
+            opacity: 0.1;
+        }
+
+        .quick-btn-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .quick-btn-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            z-index: 1;
+            color: var(--color-text-secondary);
+        }
+
+        .quick-btn:hover .quick-btn-label,
+        .quick-btn:active .quick-btn-label {
+            color: var(--color-primary);
+        }
+
+        /* District Cards */
+        .district-card {
+            background: var(--gradient-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 32px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            animation: fadeInUp 0.8s ease-out;
+            box-shadow: var(--shadow-sm);
+            backdrop-filter: blur(10px);
+        }
+
+        .district-card:hover {
+            border-color: var(--color-primary);
+            box-shadow: var(--shadow-glow);
+            transform: translateY(-2px);
+        }
+
+        .district-header {
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .district-icon {
+            font-size: 32px;
+            min-width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .district-card:hover .district-icon {
+            background: rgba(59, 130, 246, 0.2);
+            transform: scale(1.05);
+        }
+
+        .district-info {
+            flex: 1;
+        }
+
+        .district-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--color-text);
+        }
+
+        .district-desc {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+        }
+
+        .district-arrow {
+            font-size: 20px;
+            color: var(--color-text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .district-card.expanded .district-arrow {
+            transform: rotate(180deg);
+            color: var(--color-primary);
+        }
+
+        .district-submenu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .district-card.expanded .district-submenu {
+            max-height: 300px;
+        }
+
+        .submenu-item {
+            padding: 16px 24px 16px 88px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .submenu-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            padding-left: 96px;
+        }
+
+        .submenu-item:active {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .submenu-icon {
+            font-size: 20px;
+            min-width: 32px;
+        }
+
+        .submenu-info {
+            flex: 1;
+        }
+
+        .submenu-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .submenu-desc {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+        }
+
+        .submenu-badge {
+            background: var(--gradient-primary);
+            padding: 4px 8px;
+            border-radius: 40px;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            background: var(--gradient-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 60px;
+            padding: 16px 24px;
+            margin-top: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--color-text-secondary);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Loading animation */
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #0a0a1a;
-            display: none;
+            background: var(--color-bg);
+            display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1000;
             opacity: 0;
-            transition: opacity 0.3s;
             pointer-events: none;
-            flex-direction: column;
-            gap: 20px;
+            transition: opacity 0.3s ease;
         }
-        
+
         .loading-overlay.active {
-            display: flex;
             opacity: 1;
             pointer-events: all;
         }
-        
+
         .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #4a9a8a;
-            border-top: 4px solid transparent;
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--color-border);
+            border-top-color: var(--color-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            text-shadow: 0 0 30px #4a9a8a;
-            animation: pulse 1.5s infinite;
-            font-weight: 500;
-        }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-        }
-        
-        /* Header */
-        .earth-header {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .earth-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 36px;
-            color: #c0e0ff;
-            text-shadow: 0 0 20px #4a8a6a, 0 0 40px #2a5a4a;
-            margin-bottom: 4px;
-            font-weight: 600;
-        }
-        
-        .earth-subtitle {
-            color: #a0d0c0;
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-        
-        /* Stats Bar */
-        .stats-bar {
-            background: rgba(30, 60, 70, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 60px 20px 60px 20px;
-            padding: 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #ffffff;
-        }
-        
-        .credits {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        
-        .credits span {
-            color: #ffd966;
-            font-size: 22px;
-        }
-        
-        .location {
-            font-size: 14px;
-            color: #a0d0c0;
-            text-align: right;
-        }
-        
-        .location span {
-            color: #4affaa;
-            font-weight: 600;
-        }
-        
-        /* Location Bar */
-        .location-bar {
-            background: rgba(30, 60, 70, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 60px 20px 60px 20px;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #ffffff;
-            font-size: 14px;
-        }
-        
-        /* Section Header */
-        .section-header {
-            margin-bottom: 15px;
-            margin-top: 20px;
-        }
-        
-        .section-header:first-of-type {
-            margin-top: 0;
-        }
-        
-        .section-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 20px;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .section-title span {
-            color: #4affaa;
-            font-size: 24px;
-        }
-        
-        /* Hub Cards Grid - 2 columns for main navigation */
-        .hub-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .hub-card {
-            background: rgba(30, 60, 70, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid #4a9a8a;
-            border-radius: 40px 15px 40px 15px;
-            padding: 25px 15px;
-            cursor: pointer;
-            transition: all 0.1s;
-            text-align: center;
-        }
-        
-        .hub-card:active {
-            transform: scale(0.97);
-            background: rgba(74, 154, 138, 0.3);
-        }
-        
-        .hub-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-            filter: drop-shadow(0 0 10px #4a9a8a);
-        }
-        
-        .hub-label {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-            margin-bottom: 5px;
-        }
-        
-        .hub-desc {
-            color: #a0d0c0;
-            font-size: 12px;
-        }
-        
-        /* Color-coded cards */
-        .hub-card.manufacturing {
-            border-color: #4affaa;
-        }
-        
-        .hub-card.shipyard {
-            border-color: #4a8ac0;
-        }
-        
-        .hub-card.market {
-            border-color: #ffaa4a;
-        }
-        
-        .hub-card.claims {
-            border-color: gold;
-        }
-        
-        .hub-card.services {
-            border-color: #6a8ac0;
-        }
-        
-        /* Notification badge */
-        .hub-card {
-            position: relative;
-        }
-        
-        .notification-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #ffaa4a;
-            color: #0a0a1a;
-            font-size: 12px;
-            font-weight: bold;
-            padding: 4px 8px;
-            border-radius: 20px;
-            min-width: 24px;
-            text-align: center;
-            border: 2px solid white;
-            box-shadow: 0 0 15px #ffaa4a;
-            animation: pulse-badge 2s infinite;
-            z-index: 10;
-        }
-        
-        @keyframes pulse-badge {
-            0% { opacity: 0.8; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-            100% { opacity: 0.8; transform: scale(1); }
-        }
-        
-        /* Labor Pool Card */
-        .labor-pool-card {
-            background: rgba(30, 60, 70, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid #ffaa4a;
-            border-radius: 40px 15px 40px 15px;
-            padding: 16px;
-            margin-bottom: 20px;
-            cursor: pointer;
-            transition: all 0.1s;
-            box-shadow: 0 0 15px rgba(255, 170, 74, 0.3);
-        }
-        
-        .labor-pool-card:active {
-            transform: scale(0.99);
-            background: rgba(255, 170, 74, 0.1);
-        }
-        
-        .labor-pool-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .labor-pool-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 600;
-            font-family: 'Exo 2', sans-serif;
-            color: #ffffff;
-        }
-        
-        .labor-pool-title span {
-            font-size: 24px;
-            color: #ffaa4a;
-        }
-        
-        .labor-pool-amount {
-            font-size: 24px;
-            font-weight: 700;
-            color: #ffd966;
-        }
-        
-        .labor-pool-details {
-            display: flex;
-            justify-content: space-between;
-            color: #a0d0c0;
-            font-size: 13px;
-            margin-top: 8px;
-        }
-        
-        /* Back button */
-        .back-button {
-            position: sticky;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
-            border: 3px solid #ffaa4a;
-            color: #ffffff;
-            padding: 16px 30px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            width: fit-content;
-            min-width: 240px;
-            box-shadow: 0 0 30px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin: 0;
-            animation: subtle-pulse 3s infinite;
-        }
-        
-        @keyframes subtle-pulse {
-            0% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-            50% { border-color: #ffd966; box-shadow: 0 0 40px #ffd966, 0 10px 20px rgba(0,0,0,0.5); }
-            100% { border-color: #ffaa4a; box-shadow: 0 0 20px #ffaa4a, 0 10px 20px rgba(0,0,0,0.5); }
-        }
-        
-        .back-button:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #3a5a8a;
-        }
-        
-        .back-arrow {
-            font-size: 24px;
-            color: #ffd966;
-            font-weight: bold;
-        }
-        
-        .back-icon {
-            font-size: 22px;
-            filter: drop-shadow(0 0 5px #ffaa4a);
+
+        /* Haptic feedback simulation */
+        .quick-btn:active,
+        .submenu-item:active,
+        .district-header:active {
+            transform: scale(0.98);
         }
     </style>
 </head>
 <body>
-    <div class="phone-frame">
-        <div class="earth-view" id="earthView">
-            <!-- Header -->
-            <div class="earth-header">
-                <div class="earth-title">Earth Central</div>
-                <div class="earth-subtitle">✦ home port ✦</div>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="hub-icon">🏛️</div>
+            <h1 class="hub-title">EARTH HUB</h1>
+            <div class="hub-subtitle">✦ COMMAND CENTER ✦</div>
+        </div>
+
+        <!-- Quick Access (always visible) -->
+        <div class="quick-access">
+            <div class="quick-btn" onclick="window.location.href='ship-bridge.html'">
+                <div class="quick-btn-icon">🚀</div>
+                <div class="quick-btn-label">BRIDGE</div>
             </div>
-            
-            <!-- Stats Bar -->
-            <div class="stats-bar">
-                <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> --
+            <div class="quick-btn" onclick="window.location.href='university.html'">
+                <div class="quick-btn-icon">🎓</div>
+                <div class="quick-btn-label">UNIVERSITY</div>
+            </div>
+        </div>
+
+        <!-- Manufacturing Complex -->
+        <div class="district-card" id="manufacturingDistrict">
+            <div class="district-header" onclick="toggleDistrict('manufacturing')">
+                <div class="district-icon">⚙️</div>
+                <div class="district-info">
+                    <div class="district-name">Manufacturing Complex</div>
+                    <div class="district-desc">Build ships, equipment, colonies</div>
                 </div>
-                <div class="location" id="locationDisplay">
-                    <span>Earth • Sol System</span>
-                </div>
+                <div class="district-arrow" id="arrow-manufacturing">▼</div>
             </div>
-            
-            <!-- Location Bar -->
-            <div class="location-bar">
-                <span>📍 Earth Central</span>
-                <span class="coordinates">Orion Arm • Sector B2</span>
-            </div>
-            
-            <!-- Labor Pool Card -->
-            <div class="labor-pool-card" onclick="navigateTo('labor-exchange.html')">
-                <div class="labor-pool-header">
-                    <div class="labor-pool-title">
-                        <span>💰</span> Labor Pool
+            <div class="district-submenu" id="submenu-manufacturing">
+                <div class="submenu-item" onclick="window.location.href='shipyard.html'">
+                    <span class="submenu-icon">🚢</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Shipyard</div>
+                        <div class="submenu-desc">Construct and upgrade vessels</div>
                     </div>
-                    <div class="labor-pool-amount" id="laborPoolAmount">0⭐</div>
+                    <span class="submenu-badge">3 AVAILABLE</span>
                 </div>
-                <div class="labor-pool-details">
-                    <span>Your earnings: <span id="laborEarnings">0⭐</span></span>
-                    <span>Multiplier: <span id="laborMultiplier">1.0x</span></span>
+                <div class="submenu-item" onclick="window.location.href='equipment-fabricator.html'">
+                    <span class="submenu-icon">🔧</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Equipment Fabricator</div>
+                        <div class="submenu-desc">Craft mining lasers, scanners, modules</div>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Main Navigation Sections -->
-            
-            <!-- Section: Manufacturing -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>🏭</span> Manufacturing
-                </div>
-            </div>
-            
-            <div class="hub-grid">
-                <div class="hub-card manufacturing" onclick="navigateTo('manufacturing-hub.html')">
-                    <div class="hub-icon">⚗️</div>
-                    <div class="hub-label">Crafting Labs</div>
-                    <div class="hub-desc">12 fields • Alchemy to Polymers</div>
-                </div>
-                
-                <div class="hub-card manufacturing" onclick="navigateTo('equipment-fabricator.html')">
-                    <div class="hub-icon">⚙️</div>
-                    <div class="hub-label">Equipment Fab</div>
-                    <div class="hub-desc">Craft tools & gear</div>
+                <div class="submenu-item" onclick="window.location.href='colony-planner.html'">
+                    <span class="submenu-icon">🌍</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Colony Planner</div>
+                        <div class="submenu-desc">Design and manage colonies</div>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Section: Shipyard & Fleet -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>🚀</span> Shipyard & Fleet
+        </div>
+
+        <!-- Market District -->
+        <div class="district-card" id="marketDistrict">
+            <div class="district-header" onclick="toggleDistrict('market')">
+                <div class="district-icon">💹</div>
+                <div class="district-info">
+                    <div class="district-name">Market District</div>
+                    <div class="district-desc">Trade, labor, commerce</div>
+                </div>
+                <div class="district-arrow" id="arrow-market">▼</div>
+            </div>
+            <div class="district-submenu" id="submenu-market">
+                <div class="submenu-item" onclick="window.location.href='marketplace.html'">
+                    <span class="submenu-icon">🏪</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Marketplace</div>
+                        <div class="submenu-desc">Buy and sell resources</div>
+                    </div>
+                </div>
+                <div class="submenu-item" onclick="window.location.href='trading-hub.html'">
+                    <span class="submenu-icon">🤝</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Trading Hub</div>
+                        <div class="submenu-desc">Player-to-player trades</div>
+                    </div>
+                </div>
+                <div class="submenu-item" onclick="window.location.href='labor-exchange.html'">
+                    <span class="submenu-icon">👷</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Labor Exchange</div>
+                        <div class="submenu-desc">Manage workforce and jobs</div>
+                    </div>
+                    <span class="submenu-badge">ACTIVE</span>
                 </div>
             </div>
-            
-            <div class="hub-grid">
-                <div class="hub-card shipyard" onclick="navigateTo('shipyard-fleet.html')">
-                    <div class="hub-icon">🚀</div>
-                    <div class="hub-label">Shipyard</div>
-                    <div class="hub-desc">Build & manage ships</div>
+        </div>
+
+        <!-- Claims Office -->
+        <div class="district-card" id="claimsDistrict">
+            <div class="district-header" onclick="toggleDistrict('claims')">
+                <div class="district-icon">📜</div>
+                <div class="district-info">
+                    <div class="district-name">Claims Office</div>
+                    <div class="district-desc">Planets, property, deeds</div>
                 </div>
-                
-                <div class="hub-card shipyard" onclick="navigateTo('colony-planner.html')">
-                    <div class="hub-icon">🏗️</div>
-                    <div class="hub-label">Colony Planner</div>
-                    <div class="hub-desc">Build settlements</div>
+                <div class="district-arrow" id="arrow-claims">▼</div>
+            </div>
+            <div class="district-submenu" id="submenu-claims">
+                <div class="submenu-item" onclick="window.location.href='planet-claims.html'">
+                    <span class="submenu-icon">🪐</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Planet Claims</div>
+                        <div class="submenu-desc">Claim and manage planets</div>
+                    </div>
+                </div>
+                <div class="submenu-item" onclick="window.location.href='real-estate.html'">
+                    <span class="submenu-icon">🏢</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Real Estate</div>
+                        <div class="submenu-desc">Properties and infrastructure</div>
+                    </div>
+                </div>
+                <div class="submenu-item" onclick="window.location.href='ownership-records.html'">
+                    <span class="submenu-icon">📋</span>
+                    <div class="submenu-info">
+                        <div class="submenu-name">Ownership Records</div>
+                        <div class="submenu-desc">Track your assets</div>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Section: Marketplace -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>🏪</span> Marketplace
-                </div>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="credits">12,450</div>
+                <div class="stat-label">CREDITS</div>
             </div>
-            
-            <div class="hub-grid">
-                <div class="hub-card market" onclick="navigateTo('market-hub.html')">
-                    <div class="hub-icon">🏪</div>
-                    <div class="hub-label">Market Hub</div>
-                    <div class="hub-desc">Trade & economy</div>
-                </div>
-                
-                <div class="hub-card market" onclick="navigateTo('labor-exchange.html')">
-                    <div class="hub-icon">💰</div>
-                    <div class="hub-label">Labor Exchange</div>
-                    <div class="hub-desc">Claim earnings</div>
-                </div>
+            <div class="stat-item">
+                <div class="stat-value" id="certificates">4</div>
+                <div class="stat-label">CERTIFICATES</div>
             </div>
-            
-            <!-- Section: Claims & Ownership -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>👑</span> Claims & Ownership
-                </div>
-            </div>
-            
-            <div class="hub-grid">
-                <div class="hub-card claims" id="claimsCard" onclick="navigateTo('claims-hub.html')">
-                    <div class="hub-icon">👑</div>
-                    <div class="hub-label">Claims Hub</div>
-                    <div class="hub-desc">Planet ownership</div>
-                    <div class="notification-badge" id="claimsNotificationBadge" style="display: none;">!</div>
-                </div>
-                
-                <div class="hub-card claims" onclick="navigateTo('real-estate.html')">
-                    <div class="hub-icon">🏢</div>
-                    <div class="hub-label">Real Estate</div>
-                    <div class="hub-desc">Hub storage</div>
-                </div>
-            </div>
-            
-            <!-- Section: Services -->
-            <div class="section-header">
-                <div class="section-title">
-                    <span>⚡</span> Services
-                </div>
-            </div>
-            
-            <div class="hub-grid">
-                <div class="hub-card services" onclick="navigateTo('services-hub.html')">
-                    <div class="hub-icon">⚡</div>
-                    <div class="hub-label">Services Hub</div>
-                    <div class="hub-desc">Ship, storage, university</div>
-                </div>
-                
-                <div class="hub-card services" onclick="navigateTo('ship-bridge.html')">
-                    <div class="hub-icon">🚀</div>
-                    <div class="hub-label">Ship Bridge</div>
-                    <div class="hub-desc">Return to your ship</div>
-                </div>
-            </div>
-            
-            <!-- Back button to main menu -->
-            <button class="back-button" onclick="returnToMenu()">
-                <span class="back-arrow">←</span>
-                <span class="back-text">MAIN MENU</span>
-                <span class="back-icon">🏠</span>
-            </button>
-            
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-spinner"></div>
-                <div class="loading-text" id="loadingText">loading Earth Hub...</div>
+            <div class="stat-item">
+                <div class="stat-value" id="labor">2.5k</div>
+                <div class="stat-label">LABOR POOL</div>
             </div>
         </div>
     </div>
 
-    <!-- Simple scripts - no modules -->
-    <script src="js/db.js"></script>
-    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <script>
-        // ===== TELEGRAM INITIALIZATION =====
+        // Telegram WebApp initialization
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
+            tg.setHeaderColor?.(document.documentElement.style.getPropertyValue('--color-bg'));
+            tg.setBottomBarColor?.(document.documentElement.style.getPropertyValue('--color-bg'));
         }
 
-        // ===== DOM ELEMENTS =====
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        const claimsNotificationBadge = document.getElementById('claimsNotificationBadge');
-
-        // ===== LOAD CREDITS =====
-        function loadCredits() {
-            try {
-                const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
-            } catch (error) {
-                console.error('Error loading credits:', error);
-            }
-        }
-
-        // ===== LOAD LABOR DATA =====
-        function loadLaborData() {
-            try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
-                
-                // Get labor pool total
-                const laborPoolTotal = parseInt(localStorage.getItem('voidfarer_labor_pool_total')) || 0;
-                document.getElementById('laborPoolAmount').textContent = laborPoolTotal.toLocaleString() + '⭐';
-                
-                // Get player's labor earnings
-                const earningsData = JSON.parse(localStorage.getItem('voidfarer_player_labor_earnings') || '{}');
-                const earnings = earningsData[playerId] || 0;
-                document.getElementById('laborEarnings').textContent = earnings.toLocaleString() + '⭐';
-                
-                // Simulated multiplier
-                document.getElementById('laborMultiplier').textContent = '1.2x';
-                
-            } catch (error) {
-                console.error('Error loading labor data:', error);
-            }
-        }
-
-        // ===== CHECK FOR NOTIFICATIONS =====
-        function checkNotifications() {
-            try {
-                // Simulated notification check
-                const hasUnread = Math.random() > 0.7; // 30% chance for demo
-                
-                if (hasUnread) {
-                    claimsNotificationBadge.style.display = 'block';
-                    claimsNotificationBadge.textContent = '!';
-                } else {
-                    claimsNotificationBadge.style.display = 'none';
+        // District toggle function
+        function toggleDistrict(district) {
+            const card = document.getElementById(`${district}District`);
+            const arrow = document.getElementById(`arrow-${district}`);
+            
+            // Close other districts
+            ['manufacturing', 'market', 'claims'].forEach(d => {
+                if (d !== district) {
+                    const otherCard = document.getElementById(`${d}District`);
+                    const otherArrow = document.getElementById(`arrow-${d}`);
+                    if (otherCard?.classList.contains('expanded')) {
+                        otherCard.classList.remove('expanded');
+                        otherArrow.style.transform = 'rotate(0deg)';
+                    }
                 }
-            } catch (error) {
-                console.error('Error checking notifications:', error);
-            }
-        }
-
-        // ===== NAVIGATION =====
-        function navigateTo(url) {
-            safeHaptic();
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'navigating...';
+            });
             
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-                window.location.href = url;
-            }, 300);
-        }
-
-        function returnToMenu() {
-            safeHaptic();
-            navigateTo('index.html');
-        }
-
-        // ===== SAFE HAPTIC =====
-        function safeHaptic() {
+            // Toggle current district
+            card.classList.toggle('expanded');
+            
+            // Haptic feedback
             if (tg?.HapticFeedback) {
-                try {
-                    tg.HapticFeedback.impactOccurred('light');
-                } catch (e) {}
+                tg.HapticFeedback.impactOccurred('light');
             }
         }
 
-        // ===== CLEANUP =====
-        function cleanupHubData() {
-            // Ensure current planet is Earth
-            localStorage.setItem('voidfarer_current_planet', 'Earth');
-            localStorage.setItem('voidfarer_current_planet_type', 'lush');
+        // Load player stats (placeholder - replace with actual data)
+        async function loadStats() {
+            try {
+                // This will be replaced with actual storage calls
+                // const player = await window.getPlayer();
+                // document.getElementById('credits').textContent = player.credits.toLocaleString();
+                // document.getElementById('certificates').textContent = player.certificates?.length || 0;
+                
+                // Simulated data for now
+                document.getElementById('credits').textContent = '12,450';
+                document.getElementById('certificates').textContent = '4';
+                document.getElementById('labor').textContent = '2.5k';
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
         }
 
-        // ===== INITIALIZE =====
-        function init() {
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'connecting to Earth Hub...';
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
             
-            cleanupHubData();
-            loadCredits();
-            loadLaborData();
-            checkNotifications();
-            
-            setTimeout(() => {
-                loadingOverlay.classList.remove('active');
-            }, 500);
-            
-            // Refresh data periodically
-            setInterval(() => {
-                loadLaborData();
-                checkNotifications();
-            }, 30000);
+            // Add smooth transitions
+            document.querySelectorAll('.district-header').forEach(header => {
+                header.addEventListener('click', function(e) {
+                    e.preventDefault();
+                });
+            });
+        });
+
+        // Loading overlay (for navigation)
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.add('active');
         }
 
-        init();
+        // Expose navigation functions globally
+        window.toggleDistrict = toggleDistrict;
+        window.showLoading = showLoading;
     </script>
 </body>
 </html>
