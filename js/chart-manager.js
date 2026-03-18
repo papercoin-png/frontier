@@ -82,7 +82,6 @@ export class ChartManager {
         this.currentIndicators = [Indicators.SMA];
         this.chartType = ChartType.CANDLESTICK;
         
-        // No bind methods needed - we use arrow functions or direct references
         console.log('📊 ChartManager initialized');
     }
     
@@ -965,9 +964,17 @@ export function createChartToolbar(elementName, currentType = ChartType.CANDLEST
 // ===== EXPORT SINGLETON INSTANCE =====
 export const chartManager = new ChartManager();
 
-// Make chartManager available globally for onclick handlers
+// Make chartManager globally available for onclick handlers
 if (typeof window !== 'undefined') {
     window.chartManager = chartManager;
+    console.log('📊 chartManager attached to window');
+}
+
+// Also expose individual methods for easier access
+if (typeof window !== 'undefined') {
+    window.setChartType = (elementName, type) => chartManager.setChartType(elementName, type);
+    window.setTimeframe = (elementName, tf) => chartManager.setTimeframe(elementName, tf);
+    window.toggleIndicator = (elementName, indicator) => chartManager.toggleIndicator(elementName, indicator);
 }
 
 // ===== DEFAULT EXPORT =====
