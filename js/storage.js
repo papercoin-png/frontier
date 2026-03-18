@@ -1508,6 +1508,42 @@ export async function loadTradeHistory(playerId = null) {
 }
 
 // ============================================================================
+// ELEMENT LOCATIONS FUNCTIONS (ADDED FOR JOURNAL)
+// ============================================================================
+
+/**
+ * Get all locations where a specific element was found
+ * @param {string} elementName - Name of the element
+ * @returns {Promise<Array>} Array of location objects
+ */
+export async function getElementLocations(elementName) {
+    try {
+        // Try to use IndexedDB first if available
+        if (typeof window.dbGetElementLocations === 'function') {
+            return await window.dbGetElementLocations(elementName);
+        }
+        
+        // Fallback: Check localStorage for scan history
+        const scanHistory = localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
+        if (scanHistory) {
+            const scans = JSON.parse(scanHistory);
+            return scans.filter(scan => scan.element === elementName).map(scan => ({
+                planet: scan.planet,
+                planetType: scan.planetType || 'unknown',
+                discoveredAt: scan.timestamp || Date.now(),
+                discoveredDate: scan.date || new Date().toISOString(),
+                quantity: scan.quantity || 1
+            }));
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error getting element locations:', error);
+        return [];
+    }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1606,6 +1642,9 @@ export default {
     saveTradeHistory,
     loadTradeHistory,
     
+    // Element Locations (ADDED)
+    getElementLocations,
+    
     // System
     initializeStorage,
     resetGame,
@@ -1652,5 +1691,8 @@ window.savePortfolio = savePortfolio;
 window.loadPortfolio = loadPortfolio;
 window.saveTradeHistory = saveTradeHistory;
 window.loadTradeHistory = loadTradeHistory;
+
+// Element locations function (ADDED)
+window.getElementLocations = getElementLocations;
 
 console.log('✅ storage.js fully loaded with window exports');
