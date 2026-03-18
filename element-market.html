@@ -1381,6 +1381,10 @@
         let currentTimeframe = '1h';
         let updateInterval = null;
 
+        // ===== FUNCTION DECLARATIONS (will be attached to window later) =====
+        let togglePortfolio, filterMarket, returnToHub, selectElement, setOrderType, 
+            incrementAmount, decrementAmount, executeTrade, searchMarket, setTimeframe;
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
@@ -1566,16 +1570,16 @@
         }
 
         // ===== SET TIMEFRAME =====
-        function setTimeframe(tf) {
+        setTimeframe = function(tf) {
             currentTimeframe = tf;
             setupTimeframeButtons();
             if (selectedElement) {
                 chartManager.setTimeframe(selectedElement.name, tf);
             }
-        }
+        };
 
         // ===== SELECT ELEMENT =====
-        function selectElement(elementName) {
+        selectElement = function(elementName) {
             selectedElement = getElementByName(elementName);
             
             // Update table selection
@@ -1592,7 +1596,7 @@
             
             // Scroll to trading panel
             document.getElementById('tradingPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
+        };
 
         // ===== UPDATE TRADING PANEL =====
         function updateTradingPanel() {
@@ -1620,7 +1624,7 @@
         }
 
         // ===== SET ORDER TYPE =====
-        function setOrderType(type) {
+        setOrderType = function(type) {
             orderType = type;
             
             document.querySelectorAll('.order-type-btn').forEach(btn => {
@@ -1631,10 +1635,10 @@
             updateExecuteButton();
             updateOrderSummary();
             updateFee();
-        }
+        };
 
         // ===== AMOUNT CONTROLS =====
-        function incrementAmount() {
+        incrementAmount = function() {
             const input = document.getElementById('orderAmount');
             let val = parseInt(input.value) || 1;
             
@@ -1650,9 +1654,9 @@
             updateAmountButtons();
             updateOrderSummary();
             updateFee();
-        }
+        };
 
-        function decrementAmount() {
+        decrementAmount = function() {
             const input = document.getElementById('orderAmount');
             let val = parseInt(input.value) || 1;
             val = Math.max(val - 1, 1);
@@ -1660,7 +1664,7 @@
             updateAmountButtons();
             updateOrderSummary();
             updateFee();
-        }
+        };
 
         function resetAmount() {
             document.getElementById('orderAmount').value = 1;
@@ -1721,7 +1725,7 @@
         }
 
         // ===== EXECUTE TRADE =====
-        async function executeTrade() {
+        executeTrade = async function() {
             if (!selectedElement) return;
             
             const side = orderType === 'buy' ? OrderSide.BUY : OrderSide.SELL;
@@ -1763,22 +1767,22 @@
             }
             
             showLoading(false);
-        }
+        };
 
         // ===== FILTER =====
-        function filterMarket(rarity) {
+        filterMarket = function(rarity) {
             currentFilter = rarity;
             
             document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             
             applyFilters();
-        }
+        };
 
-        function searchMarket() {
+        searchMarket = function() {
             searchTerm = document.getElementById('searchInput').value.toLowerCase();
             applyFilters();
-        }
+        };
 
         function applyFilters() {
             filteredElements = ELEMENTS.filter(el => {
@@ -1794,7 +1798,7 @@
         }
 
         // ===== PORTFOLIO =====
-        function togglePortfolio() {
+        togglePortfolio = function() {
             const panel = document.getElementById('portfolioPanel');
             
             if (panel.classList.contains('active')) {
@@ -1803,7 +1807,7 @@
                 updatePortfolioDisplay();
                 panel.classList.add('active');
             }
-        }
+        };
 
         function updatePortfolioDisplay() {
             const summary = portfolio.getSummary();
@@ -1912,10 +1916,10 @@
         }
 
         // ===== RETURN TO HUB =====
-        function returnToHub() {
+        returnToHub = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'market-hub.html';
-        }
+        };
 
         // ===== CLEANUP =====
         window.addEventListener('beforeunload', () => {
@@ -1927,7 +1931,7 @@
             }
         });
 
-        // ===== MAKE FUNCTIONS GLOBALLY AVAILABLE =====
+        // ===== ATTACH ALL FUNCTIONS TO WINDOW =====
         window.togglePortfolio = togglePortfolio;
         window.filterMarket = filterMarket;
         window.returnToHub = returnToHub;
@@ -1945,7 +1949,12 @@
             filterMarket: typeof window.filterMarket,
             returnToHub: typeof window.returnToHub,
             selectElement: typeof window.selectElement,
-            setOrderType: typeof window.setOrderType
+            setOrderType: typeof window.setOrderType,
+            incrementAmount: typeof window.incrementAmount,
+            decrementAmount: typeof window.decrementAmount,
+            executeTrade: typeof window.executeTrade,
+            searchMarket: typeof window.searchMarket,
+            setTimeframe: typeof window.setTimeframe
         });
 
         // ===== START =====
