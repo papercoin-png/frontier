@@ -52,10 +52,10 @@ export class TradeResult {
 export class TradingEngine {
     constructor() {
         this.activeTrades = new Map();
-        self.pendingSettlements = [];
-        self.dailyVolume = 0;
-        self.dailyTrades = 0;
-        self.lastReset = Date.now();
+        this.pendingSettlements = [];
+        this.dailyVolume = 0;
+        this.dailyTrades = 0;
+        this.lastReset = Date.now();
         
         // Start trading engine
         this.startEngine();
