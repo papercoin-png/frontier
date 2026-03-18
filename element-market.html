@@ -1440,8 +1440,8 @@
         // ===== FUNCTION DECLARATIONS =====
         let togglePortfolio, filterMarket, returnToHub, selectElement, setOrderType, 
             incrementBuyAmount, decrementBuyAmount, incrementSellAmount, decrementSellAmount,
-            setMaxSell, sellAll, executeTrade, searchMarket, setTimeframe,
-            quickBuy, quickSell, updateTradingPanel;
+            setMaxBuyAmount, setMaxSellAmount, sellAll, executeTrade, searchMarket, setTimeframe,
+            quickBuy, quickSell, updateTradingPanel, updateBalance;
 
         // ===== INIT =====
         async function init() {
@@ -1490,10 +1490,10 @@
         }
 
         // ===== BALANCE =====
-        function updateBalance() {
+        updateBalance = function() {
             document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span style="font-size: 14px;">⭐</span>`;
             document.getElementById('balanceUSD').textContent = `≈ $${(currentCredits * 0.12).toFixed(2)} USD`;
-        }
+        };
 
         // ===== MARKET TICKER =====
         function renderMarketTicker() {
@@ -1712,7 +1712,7 @@
                         <div class="amount-field" id="buyAmountField">
                             <div class="amount-header">
                                 <span class="amount-label">Buy Amount</span>
-                                <span class="amount-max" onclick="window.setMaxBuy()">MAX: ${maxBuy}</span>
+                                <span class="amount-max" onclick="window.setMaxBuyAmount()">MAX: ${maxBuy}</span>
                             </div>
                             <div class="amount-controls">
                                 <button class="amount-btn" id="buyDecrementBtn" onclick="window.decrementBuyAmount()" disabled>−</button>
@@ -1725,7 +1725,7 @@
                         <div class="amount-field hidden" id="sellAmountField">
                             <div class="amount-header">
                                 <span class="amount-label">Sell Amount</span>
-                                <span class="amount-max" onclick="window.setMaxSell()">MAX: ${ownedQuantity}</span>
+                                <span class="amount-max" onclick="window.setMaxSellAmount()">MAX: ${ownedQuantity}</span>
                             </div>
                             <div class="amount-controls">
                                 <button class="amount-btn" id="sellDecrementBtn" onclick="window.decrementSellAmount()" disabled>−</button>
@@ -1795,8 +1795,8 @@
             if (panelSymbol) panelSymbol.textContent = selectedElement.symbol;
             
             // Update max labels
-            const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuy"]');
-            const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSell"]');
+            const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuyAmount"]');
+            const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSellAmount"]');
             if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${maxBuy}`;
             if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${ownedQuantity}`;
             
@@ -1880,7 +1880,7 @@
             updateFee();
         };
 
-        setMaxBuy = function() {
+        setMaxBuyAmount = function() {
             const input = document.getElementById('buyAmount');
             if (!input) return;
             
@@ -1918,7 +1918,7 @@
             updateFee();
         };
 
-        setMaxSell = function() {
+        setMaxSellAmount = function() {
             const input = document.getElementById('sellAmount');
             if (!input) return;
             
@@ -2067,8 +2067,8 @@
                     const maxBuy = calculateMaxBuy(currentCredits, price);
                     const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
                     
-                    const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuy"]');
-                    const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSell"]');
+                    const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuyAmount"]');
+                    const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSellAmount"]');
                     if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${maxBuy}`;
                     if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${ownedQuantity}`;
                     
@@ -2305,14 +2305,15 @@
         window.decrementBuyAmount = decrementBuyAmount;
         window.incrementSellAmount = incrementSellAmount;
         window.decrementSellAmount = decrementSellAmount;
-        window.setMaxBuy = setMaxBuy;
-        window.setMaxSell = setMaxSell;
+        window.setMaxBuyAmount = setMaxBuyAmount;
+        window.setMaxSellAmount = setMaxSellAmount;
         window.sellAll = sellAll;
         window.executeTrade = executeTrade;
         window.searchMarket = searchMarket;
         window.setTimeframe = setTimeframe;
         window.quickBuy = quickBuy;
         window.quickSell = quickSell;
+        window.updateBalance = updateBalance;
 
         // Make chartManager available globally
         window.chartManager = chartManager;
