@@ -1414,9 +1414,9 @@
         import { marketData, formatPrice, formatChange, formatVolume, getChangeClass } from './js/market-data.js';
         import { orderBook, OrderSide, OrderType } from './js/order-book.js';
         import { portfolio, formatCurrency, formatPercentage, getPnLClass, generatePortfolioHTML } from './js/portfolio.js';
-        import { tradingEngine, calculateMaxBuy, calculateMaxSell, getEstimatedPrice } from './js/trading-engine.js';
+        import { tradingEngine, getEstimatedPrice } from './js/trading-engine.js';
         import { chartManager, ChartType, Indicators, createChartToolbar } from './js/chart-manager.js';
-        import { getCredits, getCollection } from './js/storage.js';
+        import { getCollection, spendCredits, addCredits } from './js/storage.js';
 
         // ===== TELEGRAM =====
         const tg = window.Telegram?.WebApp;
@@ -1443,13 +1443,22 @@
             setMaxBuyAmount, setMaxSellAmount, sellAll, executeTrade, searchMarket, setTimeframe,
             quickBuy, quickSell, updateTradingPanel, updateBalance;
 
+        // ===== HELPER FUNCTIONS (same as other pages) =====
+        function calculateMaxBuy(credits, price) {
+            return Math.floor(credits / price);
+        }
+
+        function calculateMaxSell(collection, elementName) {
+            return collection[elementName]?.count || 0;
+        }
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
             
             try {
-                // Load player data
-                currentCredits = await getCredits();
+                // Load player data - using same method as other pages
+                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 currentCollection = await getCollection();
                 
                 // Update displays
@@ -2038,35 +2047,59 @@
             const side = orderType === 'buy' ? OrderSide.BUY : OrderSide.SELL;
             const quantity = amount;
             const price = parseInt(orderPrice.value);
+            const total = quantity * price;
             
             showLoading(true);
             
             try {
-                const result = await tradingEngine.executeOrder(
-                    localStorage.getItem('voidfarer_player_id') || 'player_default',
-                    side,
-                    selectedElement.name,
-                    quantity,
-                    price,
-                    OrderType.MARKET
-                );
+                let success = false;
                 
-                if (result.success) {
-                    showToast(result.message, 'success');
-                    
-                    // Force refresh credits and collection from storage
-                    const newCredits = await getCredits();
-                    const newCollection = await getCollection();
-                    
-                    // Update state
-                    currentCredits = newCredits;
-                    currentCollection = newCollection;
-                    
-                    // Update balance display immediately
-                    const balanceElement = document.getElementById('totalBalance');
-                    if (balanceElement) {
-                        balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+                if (side === OrderSide.BUY) {
+                    // Check if enough credits
+                    if (currentCredits < total) {
+                        showToast('Insufficient credits', 'error');
+                        showLoading(false);
+                        return;
                     }
+                    
+                    // Spend credits
+                    localStorage.setItem('voidfarer_credits', (currentCredits - total).toString());
+                    
+                    // Add to collection
+                    await window.addElementToCollection(selectedElement.name, quantity, {
+                        source: 'market',
+                        price: price
+                    });
+                    
+                    success = true;
+                    
+                } else { // SELL
+                    // Check if enough elements
+                    const owned = currentCollection[selectedElement.name]?.count || 0;
+                    if (owned < quantity) {
+                        showToast('Insufficient elements', 'error');
+                        showLoading(false);
+                        return;
+                    }
+                    
+                    // Remove from collection
+                    await window.removeElementFromCollection(selectedElement.name, quantity);
+                    
+                    // Add credits
+                    localStorage.setItem('voidfarer_credits', (currentCredits + total).toString());
+                    
+                    success = true;
+                }
+                
+                if (success) {
+                    showToast(`${side === OrderSide.BUY ? 'Bought' : 'Sold'} ${quantity}x ${selectedElement.name}`, 'success');
+                    
+                    // Refresh credits and collection
+                    currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                    currentCollection = await getCollection();
+                    
+                    // Update balance display
+                    updateBalance();
                     
                     // Update amount buttons and summary
                     updateAmountButtons();
@@ -2096,7 +2129,7 @@
                     }
                     
                 } else {
-                    showToast(result.message, 'error');
+                    showToast('Trade failed', 'error');
                 }
                 
             } catch (error) {
