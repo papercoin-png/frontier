@@ -750,11 +750,46 @@
             font-weight: 600;
         }
         
-        .amount-input-group {
+        /* Buy/Sell Amount Fields Container */
+        .amount-fields-container {
+            margin-bottom: 12px;
+        }
+        
+        .amount-field {
             background: #2B2F36;
             border-radius: 40px 10px 40px 10px;
             padding: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .amount-field.hidden {
+            display: none;
+        }
+        
+        .amount-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .amount-label {
+            color: #848E9C;
+            font-size: 12px;
+        }
+        
+        .amount-max {
+            color: #F0B90B;
+            font-size: 11px;
+            background: rgba(240, 185, 11, 0.1);
+            padding: 2px 8px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+        
+        .amount-max:active {
+            background: rgba(240, 185, 11, 0.3);
+            transform: scale(0.95);
         }
         
         .amount-controls {
@@ -798,6 +833,33 @@
             font-weight: 600;
             text-align: center;
             outline: none;
+        }
+        
+        /* Sell All Button */
+        .sell-all-btn {
+            width: 100%;
+            background: rgba(246, 70, 93, 0.2);
+            border: 2px solid #F6465D;
+            color: #F6465D;
+            padding: 12px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.1s;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .sell-all-btn:active {
+            background: #F6465D;
+            color: #fff;
+            transform: scale(0.98);
+        }
+        
+        .sell-all-btn.hidden {
+            display: none;
         }
         
         .order-summary {
@@ -1377,7 +1439,8 @@
 
         // ===== FUNCTION DECLARATIONS =====
         let togglePortfolio, filterMarket, returnToHub, selectElement, setOrderType, 
-            incrementAmount, decrementAmount, executeTrade, searchMarket, setTimeframe,
+            incrementBuyAmount, decrementBuyAmount, incrementSellAmount, decrementSellAmount,
+            setMaxSell, sellAll, executeTrade, searchMarket, setTimeframe,
             quickBuy, quickSell, updateTradingPanel;
 
         // ===== INIT =====
@@ -1612,6 +1675,9 @@
             const changeClass = change >= 0 ? 'positive' : 'negative';
             const changeSymbol = change > 0 ? '+' : '';
             
+            const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
+            const maxBuy = calculateMaxBuy(currentCredits, price);
+            
             const panelHtml = `
                 <div class="trading-panel active" id="tradingPanel">
                     <div class="panel-header">
@@ -1641,14 +1707,36 @@
                         </div>
                     </div>
                     
-                    <div class="amount-input-group">
-                        <div class="price-input-label">Amount</div>
-                        <div class="amount-controls">
-                            <button class="amount-btn" id="decrementBtn" onclick="window.decrementAmount()" disabled>−</button>
-                            <input type="text" class="amount-input" id="orderAmount" value="1" readonly>
-                            <button class="amount-btn" id="incrementBtn" onclick="window.incrementAmount()">+</button>
+                    <!-- Buy Amount Field (visible by default) -->
+                    <div class="amount-fields-container">
+                        <div class="amount-field" id="buyAmountField">
+                            <div class="amount-header">
+                                <span class="amount-label">Buy Amount</span>
+                                <span class="amount-max" onclick="window.setMaxBuy()">MAX: ${maxBuy}</span>
+                            </div>
+                            <div class="amount-controls">
+                                <button class="amount-btn" id="buyDecrementBtn" onclick="window.decrementBuyAmount()" disabled>−</button>
+                                <input type="text" class="amount-input" id="buyAmount" value="1" readonly>
+                                <button class="amount-btn" id="buyIncrementBtn" onclick="window.incrementBuyAmount()">+</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Sell Amount Field (hidden by default) -->
+                        <div class="amount-field hidden" id="sellAmountField">
+                            <div class="amount-header">
+                                <span class="amount-label">Sell Amount</span>
+                                <span class="amount-max" onclick="window.setMaxSell()">MAX: ${ownedQuantity}</span>
+                            </div>
+                            <div class="amount-controls">
+                                <button class="amount-btn" id="sellDecrementBtn" onclick="window.decrementSellAmount()" disabled>−</button>
+                                <input type="text" class="amount-input" id="sellAmount" value="1" readonly>
+                                <button class="amount-btn" id="sellIncrementBtn" onclick="window.incrementSellAmount()">+</button>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- Sell All Button (hidden by default) -->
+                    <button class="sell-all-btn hidden" id="sellAllBtn" onclick="window.sellAll()">SELL ALL</button>
                     
                     <div class="fee-info" id="feeDisplay">Fee: 0.1% (${Math.floor(price * 0.001)}⭐)</div>
                     
@@ -1667,7 +1755,7 @@
                         </div>
                     </div>
                     
-                    <button class="execute-btn" id="executeBtn" onclick="window.executeTrade()">BUY ${selectedElement.symbol}</button>
+                    <button class="execute-btn buy" id="executeBtn" onclick="window.executeTrade()">BUY ${selectedElement.symbol}</button>
                 </div>
             `;
             
@@ -1685,24 +1773,19 @@
             const tradingPanel = document.getElementById('tradingPanel');
             if (!tradingPanel || !tradingPanel.classList.contains('active')) return;
             
-            // Safely get elements with null checks
-            const orderPrice = document.getElementById('orderPrice');
-            const panelPrice = document.getElementById('panelPrice');
-            const panelChange = document.getElementById('panelChange');
-            const panelName = document.getElementById('panelName');
-            const panelSymbol = document.getElementById('panelSymbol');
-            const feeDisplay = document.getElementById('feeDisplay');
-            const summaryPrice = document.getElementById('summaryPrice');
-            const summaryAmount = document.getElementById('summaryAmount');
-            const summaryTotal = document.getElementById('summaryTotal');
-            const executeBtn = document.getElementById('executeBtn');
-            
             const price = marketData.getCurrentPrice(selectedElement.name);
             const change = marketData.getDailyChange(selectedElement.name);
             const changeClass = change >= 0 ? 'positive' : 'negative';
             const changeSymbol = change > 0 ? '+' : '';
+            const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
+            const maxBuy = calculateMaxBuy(currentCredits, price);
             
-            if (orderPrice) orderPrice.value = price;
+            // Update panel header
+            const panelPrice = document.getElementById('panelPrice');
+            const panelChange = document.getElementById('panelChange');
+            const panelName = document.getElementById('panelName');
+            const panelSymbol = document.getElementById('panelSymbol');
+            
             if (panelPrice) panelPrice.textContent = price + '⭐';
             if (panelChange) {
                 panelChange.textContent = `${changeSymbol}${change.toFixed(1)}%`;
@@ -1710,58 +1793,74 @@
             }
             if (panelName) panelName.textContent = selectedElement.name;
             if (panelSymbol) panelSymbol.textContent = selectedElement.symbol;
-            if (executeBtn) executeBtn.textContent = `${orderType.toUpperCase()} ${selectedElement.symbol}`;
             
-            // Update fee display
+            // Update max labels
+            const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuy"]');
+            const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSell"]');
+            if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${maxBuy}`;
+            if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${ownedQuantity}`;
+            
+            // Update fee
+            const feeDisplay = document.getElementById('feeDisplay');
             if (feeDisplay) {
-                const amount = parseInt(document.getElementById('orderAmount')?.value || '1');
+                const amount = orderType === 'buy' 
+                    ? parseInt(document.getElementById('buyAmount')?.value || '1')
+                    : parseInt(document.getElementById('sellAmount')?.value || '1');
                 const total = price * amount;
                 const fee = Math.floor(total * 0.001);
                 feeDisplay.textContent = `Fee: 0.1% (${fee}⭐)`;
             }
             
-            // Update summary
-            if (summaryPrice) summaryPrice.textContent = formatPrice(price);
-            if (summaryAmount) summaryAmount.textContent = document.getElementById('orderAmount')?.value || '1';
-            if (summaryTotal) {
-                const amount = parseInt(document.getElementById('orderAmount')?.value || '1');
-                summaryTotal.textContent = formatPrice(price * amount);
-            }
-            
-            resetAmount();
+            // Update summary based on current mode
             updateOrderSummary();
-            updateFee();
-            updateExecuteButton();
+            updateAmountButtons();
         };
 
         // ===== SET ORDER TYPE =====
         setOrderType = function(type) {
             orderType = type;
             
+            // Update button active states
             document.querySelectorAll('.order-type-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
             
-            updateExecuteButton();
+            // Toggle amount fields
+            const buyField = document.getElementById('buyAmountField');
+            const sellField = document.getElementById('sellAmountField');
+            const sellAllBtn = document.getElementById('sellAllBtn');
+            const executeBtn = document.getElementById('executeBtn');
+            
+            if (buyField && sellField && sellAllBtn && executeBtn) {
+                if (type === 'buy') {
+                    buyField.classList.remove('hidden');
+                    sellField.classList.add('hidden');
+                    sellAllBtn.classList.add('hidden');
+                    executeBtn.className = 'execute-btn buy';
+                    executeBtn.textContent = `BUY ${selectedElement?.symbol || ''}`;
+                } else {
+                    buyField.classList.add('hidden');
+                    sellField.classList.remove('hidden');
+                    sellAllBtn.classList.remove('hidden');
+                    executeBtn.className = 'execute-btn sell';
+                    executeBtn.textContent = `SELL ${selectedElement?.symbol || ''}`;
+                }
+            }
+            
             updateOrderSummary();
+            updateAmountButtons();
             updateFee();
         };
 
-        // ===== AMOUNT CONTROLS =====
-        incrementAmount = function() {
-            const input = document.getElementById('orderAmount');
+        // ===== BUY AMOUNT CONTROLS =====
+        incrementBuyAmount = function() {
+            const input = document.getElementById('buyAmount');
             if (!input) return;
             
             let val = parseInt(input.value) || 1;
-            
-            if (orderType === 'buy') {
-                const maxBuy = calculateMaxBuy(currentCredits, parseInt(document.getElementById('orderPrice')?.value || '0'));
-                val = Math.min(val + 1, maxBuy, 9999);
-            } else {
-                const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
-                val = Math.min(val + 1, maxSell, 9999);
-            }
+            const maxBuy = calculateMaxBuy(currentCredits, parseInt(document.getElementById('orderPrice')?.value || '0'));
+            val = Math.min(val + 1, maxBuy, 9999);
             
             input.value = val;
             updateAmountButtons();
@@ -1769,8 +1868,8 @@
             updateFee();
         };
 
-        decrementAmount = function() {
-            const input = document.getElementById('orderAmount');
+        decrementBuyAmount = function() {
+            const input = document.getElementById('buyAmount');
             if (!input) return;
             
             let val = parseInt(input.value) || 1;
@@ -1781,27 +1880,92 @@
             updateFee();
         };
 
-        function resetAmount() {
-            const input = document.getElementById('orderAmount');
-            if (input) input.value = 1;
+        setMaxBuy = function() {
+            const input = document.getElementById('buyAmount');
+            if (!input) return;
+            
+            const maxBuy = calculateMaxBuy(currentCredits, parseInt(document.getElementById('orderPrice')?.value || '0'));
+            input.value = maxBuy;
             updateAmountButtons();
-        }
+            updateOrderSummary();
+            updateFee();
+        };
 
+        // ===== SELL AMOUNT CONTROLS =====
+        incrementSellAmount = function() {
+            const input = document.getElementById('sellAmount');
+            if (!input) return;
+            
+            let val = parseInt(input.value) || 1;
+            const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
+            val = Math.min(val + 1, maxSell, 9999);
+            
+            input.value = val;
+            updateAmountButtons();
+            updateOrderSummary();
+            updateFee();
+        };
+
+        decrementSellAmount = function() {
+            const input = document.getElementById('sellAmount');
+            if (!input) return;
+            
+            let val = parseInt(input.value) || 1;
+            val = Math.max(val - 1, 1);
+            input.value = val;
+            updateAmountButtons();
+            updateOrderSummary();
+            updateFee();
+        };
+
+        setMaxSell = function() {
+            const input = document.getElementById('sellAmount');
+            if (!input) return;
+            
+            const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
+            input.value = maxSell;
+            updateAmountButtons();
+            updateOrderSummary();
+            updateFee();
+        };
+
+        sellAll = async function() {
+            if (!selectedElement) return;
+            
+            const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
+            if (maxSell <= 0) {
+                showToast('No elements to sell', 'error');
+                return;
+            }
+            
+            const sellInput = document.getElementById('sellAmount');
+            if (sellInput) sellInput.value = maxSell;
+            
+            await executeTrade();
+        };
+
+        // ===== COMMON FUNCTIONS =====
         function updateAmountButtons() {
-            const val = parseInt(document.getElementById('orderAmount')?.value || '1');
-            const decrementBtn = document.getElementById('decrementBtn');
-            const incrementBtn = document.getElementById('incrementBtn');
-            
-            if (!decrementBtn || !incrementBtn) return;
-            
-            decrementBtn.disabled = val <= 1;
-            
             if (orderType === 'buy') {
-                const maxBuy = calculateMaxBuy(currentCredits, parseInt(document.getElementById('orderPrice')?.value || '0'));
-                incrementBtn.disabled = val >= maxBuy || val >= 9999;
+                const val = parseInt(document.getElementById('buyAmount')?.value || '1');
+                const decrementBtn = document.getElementById('buyDecrementBtn');
+                const incrementBtn = document.getElementById('buyIncrementBtn');
+                
+                if (decrementBtn && incrementBtn) {
+                    decrementBtn.disabled = val <= 1;
+                    const maxBuy = calculateMaxBuy(currentCredits, parseInt(document.getElementById('orderPrice')?.value || '0'));
+                    incrementBtn.disabled = val >= maxBuy || val >= 9999;
+                }
             } else {
-                const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
-                incrementBtn.disabled = val >= maxSell || val >= 9999;
+                const val = parseInt(document.getElementById('sellAmount')?.value || '1');
+                const decrementBtn = document.getElementById('sellDecrementBtn');
+                const incrementBtn = document.getElementById('sellIncrementBtn');
+                
+                if (decrementBtn && incrementBtn) {
+                    decrementBtn.disabled = val <= 1;
+                    const maxSell = calculateMaxSell(currentCollection, selectedElement?.name);
+                    incrementBtn.disabled = val >= maxSell || val >= 9999;
+                }
             }
         }
 
@@ -1809,15 +1973,21 @@
             if (!selectedElement) return;
             
             const orderPrice = document.getElementById('orderPrice');
-            const orderAmount = document.getElementById('orderAmount');
             const summaryPrice = document.getElementById('summaryPrice');
             const summaryAmount = document.getElementById('summaryAmount');
             const summaryTotal = document.getElementById('summaryTotal');
             
-            if (!orderPrice || !orderAmount) return;
+            if (!orderPrice) return;
             
             const price = parseInt(orderPrice.value);
-            const amount = parseInt(orderAmount.value);
+            let amount = 1;
+            
+            if (orderType === 'buy') {
+                amount = parseInt(document.getElementById('buyAmount')?.value || '1');
+            } else {
+                amount = parseInt(document.getElementById('sellAmount')?.value || '1');
+            }
+            
             const total = price * amount;
             
             if (summaryPrice) summaryPrice.textContent = formatPrice(price);
@@ -1829,38 +1999,42 @@
             if (!selectedElement) return;
             
             const orderPrice = document.getElementById('orderPrice');
-            const orderAmount = document.getElementById('orderAmount');
             const feeDisplay = document.getElementById('feeDisplay');
             
-            if (!orderPrice || !orderAmount || !feeDisplay) return;
+            if (!orderPrice || !feeDisplay) return;
             
             const price = parseInt(orderPrice.value);
-            const amount = parseInt(orderAmount.value);
+            let amount = 1;
+            
+            if (orderType === 'buy') {
+                amount = parseInt(document.getElementById('buyAmount')?.value || '1');
+            } else {
+                amount = parseInt(document.getElementById('sellAmount')?.value || '1');
+            }
+            
             const total = price * amount;
-            const fee = Math.floor(total * 0.001); // 0.1% fee
+            const fee = Math.floor(total * 0.001);
             
             feeDisplay.textContent = `Fee: 0.1% (${fee}⭐)`;
-        }
-
-        function updateExecuteButton() {
-            const btn = document.getElementById('executeBtn');
-            if (!btn || !selectedElement) return;
-            
-            btn.className = `execute-btn ${orderType}`;
-            btn.textContent = `${orderType.toUpperCase()} ${selectedElement.symbol}`;
         }
 
         // ===== EXECUTE TRADE =====
         executeTrade = async function() {
             if (!selectedElement) return;
             
-            const orderAmount = document.getElementById('orderAmount');
             const orderPrice = document.getElementById('orderPrice');
+            let amount = 1;
             
-            if (!orderAmount || !orderPrice) return;
+            if (orderType === 'buy') {
+                amount = parseInt(document.getElementById('buyAmount')?.value || '1');
+            } else {
+                amount = parseInt(document.getElementById('sellAmount')?.value || '1');
+            }
+            
+            if (!orderPrice) return;
             
             const side = orderType === 'buy' ? OrderSide.BUY : OrderSide.SELL;
-            const quantity = parseInt(orderAmount.value);
+            const quantity = amount;
             const price = parseInt(orderPrice.value);
             
             showLoading(true);
@@ -1887,6 +2061,20 @@
                     updateOrderSummary();
                     renderMarketTable();
                     renderOrderBook();
+                    
+                    // Update max labels
+                    const price = marketData.getCurrentPrice(selectedElement.name);
+                    const maxBuy = calculateMaxBuy(currentCredits, price);
+                    const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
+                    
+                    const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuy"]');
+                    const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSell"]');
+                    if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${maxBuy}`;
+                    if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${ownedQuantity}`;
+                    
+                    // Reset amount to 1 after trade
+                    if (document.getElementById('buyAmount')) document.getElementById('buyAmount').value = '1';
+                    if (document.getElementById('sellAmount')) document.getElementById('sellAmount').value = '1';
                     
                     // Update portfolio if open
                     if (document.getElementById('portfolioPanel').classList.contains('active')) {
@@ -2113,8 +2301,13 @@
         window.returnToHub = returnToHub;
         window.selectElement = selectElement;
         window.setOrderType = setOrderType;
-        window.incrementAmount = incrementAmount;
-        window.decrementAmount = decrementAmount;
+        window.incrementBuyAmount = incrementBuyAmount;
+        window.decrementBuyAmount = decrementBuyAmount;
+        window.incrementSellAmount = incrementSellAmount;
+        window.decrementSellAmount = decrementSellAmount;
+        window.setMaxBuy = setMaxBuy;
+        window.setMaxSell = setMaxSell;
+        window.sellAll = sellAll;
         window.executeTrade = executeTrade;
         window.searchMarket = searchMarket;
         window.setTimeframe = setTimeframe;
