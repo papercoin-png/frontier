@@ -1,6 +1,7 @@
 // js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 // UPDATED: Added material inventory, recipe unlocks, skill progression across all fields
+// UPDATED: Added market data persistence for trading system
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -1355,6 +1356,158 @@ function setAmbientVolume(volume) {
 }
 
 // ============================================================================
+// MARKET DATA PERSISTENCE (NEW)
+// ============================================================================
+
+/**
+ * Save market data (prices, history, etc.)
+ * @param {Object} marketData - Market data to save
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveMarketData(marketData) {
+    try {
+        const key = STORAGE_KEYS.MARKET_PRICES;
+        localStorage.setItem(key, JSON.stringify(marketData));
+        return true;
+    } catch (error) {
+        console.error('Error saving market data:', error);
+        return false;
+    }
+}
+
+/**
+ * Load market data
+ * @returns {Promise<Object>} Market data
+ */
+export async function loadMarketData() {
+    try {
+        const key = STORAGE_KEYS.MARKET_PRICES;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        console.error('Error loading market data:', error);
+        return null;
+    }
+}
+
+// ============================================================================
+// ORDER BOOK PERSISTENCE (NEW)
+// ============================================================================
+
+/**
+ * Save order book data
+ * @param {Object} orderBookData - Order book to save
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveOrderBook(orderBookData, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `${STORAGE_KEYS.MARKET_ORDERS}_${actualPlayerId}`;
+        localStorage.setItem(key, JSON.stringify(orderBookData));
+        return true;
+    } catch (error) {
+        console.error('Error saving order book:', error);
+        return false;
+    }
+}
+
+/**
+ * Load order book data
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Order book data
+ */
+export async function loadOrderBook(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `${STORAGE_KEYS.MARKET_ORDERS}_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        console.error('Error loading order book:', error);
+        return null;
+    }
+}
+
+// ============================================================================
+// PORTFOLIO PERSISTENCE (NEW)
+// ============================================================================
+
+/**
+ * Save portfolio data
+ * @param {Object} portfolioData - Portfolio to save
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function savePortfolio(portfolioData, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `voidfarer_portfolio_${actualPlayerId}`;
+        localStorage.setItem(key, JSON.stringify(portfolioData));
+        return true;
+    } catch (error) {
+        console.error('Error saving portfolio:', error);
+        return false;
+    }
+}
+
+/**
+ * Load portfolio data
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Portfolio data
+ */
+export async function loadPortfolio(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `voidfarer_portfolio_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+        console.error('Error loading portfolio:', error);
+        return null;
+    }
+}
+
+// ============================================================================
+// TRADE HISTORY PERSISTENCE (NEW)
+// ============================================================================
+
+/**
+ * Save trade history
+ * @param {Array} trades - Trade history array
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveTradeHistory(trades, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `voidfarer_trades_${actualPlayerId}`;
+        localStorage.setItem(key, JSON.stringify(trades));
+        return true;
+    } catch (error) {
+        console.error('Error saving trade history:', error);
+        return false;
+    }
+}
+
+/**
+ * Load trade history
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Trade history array
+ */
+export async function loadTradeHistory(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const key = `voidfarer_trades_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error loading trade history:', error);
+        return [];
+    }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1443,6 +1596,16 @@ export default {
     getAmbientVolume,
     setAmbientVolume,
     
+    // Market Data (NEW)
+    saveMarketData,
+    loadMarketData,
+    saveOrderBook,
+    loadOrderBook,
+    savePortfolio,
+    loadPortfolio,
+    saveTradeHistory,
+    loadTradeHistory,
+    
     // System
     initializeStorage,
     resetGame,
@@ -1479,5 +1642,15 @@ window.getCurrentSector = getCurrentSector;
 window.getCurrentRegion = getCurrentRegion;
 window.setCurrentLocation = setCurrentLocation;
 window.setCurrentPlanet = setCurrentPlanet;
+
+// Market data functions (NEW)
+window.saveMarketData = saveMarketData;
+window.loadMarketData = loadMarketData;
+window.saveOrderBook = saveOrderBook;
+window.loadOrderBook = loadOrderBook;
+window.savePortfolio = savePortfolio;
+window.loadPortfolio = loadPortfolio;
+window.saveTradeHistory = saveTradeHistory;
+window.loadTradeHistory = loadTradeHistory;
 
 console.log('✅ storage.js fully loaded with window exports');
