@@ -482,42 +482,79 @@ export class TradingEngine {
      */
     async settleTrade(trade) {
         try {
-            const { buyOrder, sellOrder, quantity, price } = trade;
+            // Validate trade object
+            if (!trade) {
+                console.error('Invalid trade: trade is null or undefined');
+                return new TradeResult(false, 'Invalid trade');
+            }
+            
+            // Extract order details with null checks
+            const buyOrder = trade.buyOrderId ? { playerId: trade.buyerId } : null;
+            const sellOrder = trade.sellOrderId ? { playerId: trade.sellerId } : null;
+            
+            // Skip if no valid orders
+            if (!buyOrder && !sellOrder) {
+                console.error('Invalid trade: no valid orders');
+                return new TradeResult(false, 'Invalid trade orders');
+            }
+            
+            const quantity = trade.quantity || 0;
+            const price = trade.price || 0;
+            const elementName = trade.elementName || 'unknown';
+            
+            if (quantity <= 0 || price <= 0) {
+                console.error('Invalid trade: quantity or price is zero');
+                return new TradeResult(false, 'Invalid trade quantity or price');
+            }
             
             // Calculate fees for both parties
-            const buyerFee = await this.calculateFee(buyOrder.playerId, quantity, price);
-            const sellerFee = await this.calculateFee(sellOrder.playerId, quantity, price);
+            let buyerFee = 0;
+            let sellerFee = 0;
+            
+            if (buyOrder) {
+                buyerFee = await this.calculateFee(trade.buyerId, quantity, price);
+            }
+            
+            if (sellOrder) {
+                sellerFee = await this.calculateFee(trade.sellerId, quantity, price);
+            }
             
             const buyerFeeAmount = Math.floor(quantity * price * buyerFee);
             const sellerFeeAmount = Math.floor(quantity * price * sellerFee);
             
-            // Transfer credits from buyer to seller (after fees)
-            const netSellerAmount = (quantity * price) - sellerFeeAmount;
-            
-            // In real implementation, this would use a secure transaction
-            // For now, we'll simulate with storage
-            
-            // Release reserved credits from buyer
-            await this.releaseReservedCredits(buyOrder.playerId, quantity * price);
-            
-            // Release reserved elements from seller
-            await this.releaseReservedElements(sellOrder.playerId, buyOrder.elementName, quantity);
-            
-            // Record in portfolio for both parties
-            if (buyOrder.playerId.startsWith('player')) {
-                portfolio.recordBuy(buyOrder.elementName, quantity, price);
+            // Release reserved credits from buyer if exists
+            if (buyOrder) {
+                await this.releaseReservedCredits(trade.buyerId, quantity * price);
             }
             
-            if (sellOrder.playerId.startsWith('player')) {
-                portfolio.recordSell(sellOrder.elementName, quantity, price);
+            // Release reserved elements from seller if exists
+            if (sellOrder) {
+                await this.releaseReservedElements(trade.sellerId, elementName, quantity);
+            }
+            
+            // Record in portfolio for both parties
+            if (buyOrder && trade.buyerId?.startsWith('player')) {
+                try {
+                    portfolio.recordBuy(elementName, quantity, price);
+                } catch (e) {
+                    console.error('Error recording buy in portfolio:', e);
+                }
+            }
+            
+            if (sellOrder && trade.sellerId?.startsWith('player')) {
+                try {
+                    portfolio.recordSell(elementName, quantity, price);
+                } catch (e) {
+                    console.error('Error recording sell in portfolio:', e);
+                }
             }
             
             // Update market data
             if (marketData.volume24h) {
-                marketData.volume24h[buyOrder.elementName] = (marketData.volume24h[buyOrder.elementName] || 0) + quantity;
+                marketData.volume24h[elementName] = (marketData.volume24h[elementName] || 0) + quantity;
             }
             
-            console.log(`✅ Trade settled: ${quantity}x ${buyOrder.elementName} at ${price}⭐`);
+            console.log(`✅ Trade settled: ${quantity}x ${elementName} at ${price}⭐`);
             
             return new TradeResult(true, 'Trade settled successfully', { trade });
             
@@ -557,7 +594,9 @@ export class TradingEngine {
         // Listen for trade events from order book
         if (typeof window !== 'undefined') {
             window.addEventListener('trade-executed', (e) => {
-                this.settleTrade(e.detail.trade);
+                if (e.detail && e.detail.trade) {
+                    this.settleTrade(e.detail.trade);
+                }
             });
         }
     }
