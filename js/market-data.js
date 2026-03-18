@@ -121,14 +121,14 @@ export class MarketData {
     constructor() {
         this.prices = {};           // Current prices
         this.priceHistory = {};      // Historical prices for charts
-        self.dailyChange = {};       // 24h percentage change
-        self.volume24h = {};         // 24h trading volume
-        self.volatility = {};        // Current volatility per element
-        self.marketEvents = [];       // Active market events
-        self.lastUpdate = Date.now();
-        self.trends = {};            // Price trends (bullish/bearish)
-        self.support = {};           // Support levels
-        self.resistance = {};        // Resistance levels
+        this.dailyChange = {};       // 24h percentage change
+        this.volume24h = {};         // 24h trading volume
+        this.volatility = {};        // Current volatility per element
+        this.marketEvents = [];       // Active market events
+        this.lastUpdate = Date.now();
+        this.trends = {};            // Price trends (bullish/bearish)
+        this.support = {};           // Support levels
+        this.resistance = {};        // Resistance levels
         
         // Initialize all elements
         this.initializeMarket();
@@ -157,10 +157,10 @@ export class MarketData {
             }
             
             // Initialize other metrics
-            self.dailyChange[name] = (Math.random() * 10 - 5).toFixed(1); // -5% to +5%
-            self.volume24h[name] = Math.floor(Math.random() * MARKET_CONFIG.baseVolume[rarity] * (0.5 + Math.random()));
-            self.volatility[name] = MARKET_CONFIG.volatility[rarity];
-            self.trends[name] = Math.random() > 0.5 ? 'bullish' : 'bearish';
+            this.dailyChange[name] = (Math.random() * 10 - 5).toFixed(1); // -5% to +5%
+            this.volume24h[name] = Math.floor(Math.random() * MARKET_CONFIG.baseVolume[rarity] * (0.5 + Math.random()));
+            this.volatility[name] = MARKET_CONFIG.volatility[rarity];
+            this.trends[name] = Math.random() > 0.5 ? 'bullish' : 'bearish';
             
             // Set support/resistance
             this.support[name] = Math.round(basePrice * 0.85);
@@ -199,15 +199,15 @@ export class MarketData {
             const name = element.name;
             const rarity = element.rarity;
             const currentPrice = this.prices[name];
-            const volatility = self.volatility[name] / 100; // Convert to decimal
+            const volatility = this.volatility[name] / 100; // Convert to decimal
             
             // Base random walk
             let change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
             
             // Add trend bias
-            if (self.trends[name] === 'bullish') {
+            if (this.trends[name] === 'bullish') {
                 change += volatility * currentPrice * 0.1;
-            } else if (self.trends[name] === 'bearish') {
+            } else if (this.trends[name] === 'bearish') {
                 change -= volatility * currentPrice * 0.1;
             }
             
@@ -235,14 +235,14 @@ export class MarketData {
             
             // Recalculate daily change
             const oldPrice = this.priceHistory[name][0] || this.prices[name];
-            self.dailyChange[name] = ((this.prices[name] - oldPrice) / oldPrice * 100).toFixed(1);
+            this.dailyChange[name] = ((this.prices[name] - oldPrice) / oldPrice * 100).toFixed(1);
             
             // Update volume (gradual decay + random new orders)
-            self.volume24h[name] = Math.max(100, self.volume24h[name] * 0.95 + Math.random() * 100);
+            this.volume24h[name] = Math.max(100, this.volume24h[name] * 0.95 + Math.random() * 100);
             
             // Occasionally flip trend
             if (Math.random() < 0.01) { // 1% chance per update
-                self.trends[name] = self.trends[name] === 'bullish' ? 'bearish' : 'bullish';
+                this.trends[name] = this.trends[name] === 'bullish' ? 'bearish' : 'bullish';
             }
             
             // Occasionally adjust support/resistance
@@ -334,11 +334,11 @@ export class MarketData {
     }
     
     getDailyChange(elementName) {
-        return parseFloat(self.dailyChange[elementName] || 0);
+        return parseFloat(this.dailyChange[elementName] || 0);
     }
     
     getVolume24h(elementName) {
-        return Math.round(self.volume24h[elementName] || 0);
+        return Math.round(this.volume24h[elementName] || 0);
     }
     
     getMarketDepth(elementName) {
@@ -386,7 +386,7 @@ export class MarketData {
         
         ELEMENTS.forEach(element => {
             const name = element.name;
-            totalVolume += self.volume24h[name] || 0;
+            totalVolume += this.volume24h[name] || 0;
             avgChange += Math.abs(this.getDailyChange(name));
             
             if (this.getDailyChange(name) > 0) {
@@ -483,10 +483,10 @@ export class MarketData {
             high24h: Math.max(...this.priceHistory[elementName].slice(-12)),
             low24h: Math.min(...this.priceHistory[elementName].slice(-12)),
             spread: this.getSpread(elementName),
-            trend: self.trends[elementName] || 'neutral',
+            trend: this.trends[elementName] || 'neutral',
             support: this.support[elementName],
             resistance: this.resistance[elementName],
-            volatility: self.volatility[elementName] * 100 + '%'
+            volatility: this.volatility[elementName] * 100 + '%'
         };
     }
 }
