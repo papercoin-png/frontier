@@ -114,7 +114,7 @@ export class OrderBook {
         this.asks = new Map();      // Sell orders grouped by price
         this.allOrders = new Map(); // All orders by ID
         this.tradeHistory = [];      // Recent trades
-        self.maxTradeHistory = 100;   // Keep last 100 trades
+        this.maxTradeHistory = 100;   // Keep last 100 trades
         
         // Load saved orders from storage
         this.loadOrders();
@@ -280,7 +280,7 @@ export class OrderBook {
         
         // Add to trade history
         this.tradeHistory.unshift(trade);
-        if (this.tradeHistory.length > self.maxTradeHistory) {
+        if (this.tradeHistory.length > this.maxTradeHistory) {
             this.tradeHistory.pop();
         }
         
@@ -593,9 +593,18 @@ export class OrderBook {
         const now = Date.now();
         
         for (let order of this.allOrders.values()) {
-            if (order.status === OrderStatus.PENDING && order.isExpired()) {
-                order.status = OrderStatus.EXPIRED;
-                this.removeFromOrderBook(order);
+            // Check if order has isExpired method (for loaded orders)
+            if (typeof order.isExpired === 'function') {
+                if (order.status === OrderStatus.PENDING && order.isExpired()) {
+                    order.status = OrderStatus.EXPIRED;
+                    this.removeFromOrderBook(order);
+                }
+            } else {
+                // Fallback for older orders without the method
+                if (order.status === OrderStatus.PENDING && now > order.expiresAt) {
+                    order.status = OrderStatus.EXPIRED;
+                    this.removeFromOrderBook(order);
+                }
             }
         }
         
@@ -672,7 +681,36 @@ export class OrderBook {
                 // Restore maps
                 this.bids = new Map(data.bids);
                 this.asks = new Map(data.asks);
-                this.allOrders = new Map(data.orders);
+                
+                // Restore orders and ensure they have all methods
+                const ordersArray = data.orders || [];
+                this.allOrders = new Map();
+                
+                ordersArray.forEach(([id, orderData]) => {
+                    // Recreate Order instance to ensure methods exist
+                    const order = new Order(
+                        orderData.side,
+                        orderData.elementName,
+                        orderData.quantity,
+                        orderData.price,
+                        orderData.orderType,
+                        orderData.stopPrice
+                    );
+                    
+                    // Copy over properties
+                    order.id = orderData.id;
+                    order.remainingQuantity = orderData.remainingQuantity;
+                    order.status = orderData.status;
+                    order.createdAt = orderData.createdAt;
+                    order.expiresAt = orderData.expiresAt;
+                    order.filledQuantity = orderData.filledQuantity;
+                    order.averageFillPrice = orderData.averageFillPrice;
+                    order.trades = orderData.trades || [];
+                    order.playerId = orderData.playerId;
+                    
+                    this.allOrders.set(id, order);
+                });
+                
                 this.tradeHistory = data.tradeHistory || [];
                 
                 console.log('📚 Orders loaded:', this.allOrders.size, 'active orders');
