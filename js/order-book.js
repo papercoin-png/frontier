@@ -95,15 +95,15 @@ export class Order {
 export class Trade {
     constructor(buyOrder, sellOrder, quantity, price) {
         this.id = 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        this.buyOrderId = buyOrder.id;
-        this.sellOrderId = sellOrder.id;
-        this.elementName = buyOrder.elementName;
+        this.buyOrderId = buyOrder?.id || 'unknown';
+        this.sellOrderId = sellOrder?.id || 'unknown';
+        this.elementName = buyOrder?.elementName || sellOrder?.elementName || 'unknown';
         this.quantity = quantity;
         this.price = price;
         this.total = quantity * price;
         this.timestamp = Date.now();
-        this.buyerId = buyOrder.playerId;
-        this.sellerId = sellOrder.playerId;
+        this.buyerId = buyOrder?.playerId || 'system';
+        this.sellerId = sellOrder?.playerId || 'system';
     }
 }
 
@@ -284,9 +284,6 @@ export class OrderBook {
             this.tradeHistory.pop();
         }
         
-        // Transfer assets (handled by trading engine)
-        this.transferAssets(trade);
-        
         // Dispatch trade event
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('trade-executed', {
@@ -294,40 +291,9 @@ export class OrderBook {
             }));
         }
         
+        console.log(`💰 Trade executed: ${quantity}x ${buyOrder.elementName} at ${price}⭐ (Total: ${quantity * price}⭐)`);
+        
         return trade;
-    }
-    
-    /**
-     * Transfer assets between players
-     */
-    async transferAssets(trade) {
-        try {
-            // Get player IDs
-            const buyerId = trade.buyerId;
-            const sellerId = trade.sellerId;
-            const elementName = trade.elementName;
-            const quantity = trade.quantity;
-            const totalCredits = trade.total;
-            
-            // This would connect to your backend in a real implementation
-            // For now, we'll simulate with localStorage
-            
-            // For the buyer (you), we need to:
-            // 1. Spend credits
-            // 2. Receive elements
-            
-            // For the seller (other player/bot), we need to:
-            // 1. Receive credits  
-            // 2. Remove elements
-            
-            // In single-player mode, both are you
-            // In multiplayer, this would be more complex
-            
-            console.log(`💰 Trade executed: ${quantity}x ${elementName} at ${trade.price}⭐ (Total: ${totalCredits}⭐)`);
-            
-        } catch (error) {
-            console.error('Error transferring assets:', error);
-        }
     }
     
     /**
