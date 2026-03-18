@@ -476,7 +476,6 @@
         .market-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 350px;
         }
         
         .market-table th {
@@ -618,7 +617,7 @@
             background: #1E2026;
             border-radius: 60px 20px 60px 20px;
             padding: 20px;
-            margin-bottom: 20px;
+            margin: 12px 0 20px 0;
             border: 1px solid #F0B90B;
             box-shadow: 0 0 20px rgba(240, 185, 11, 0.2);
             display: none;
@@ -626,6 +625,12 @@
         
         .trading-panel.active {
             display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            0% { opacity: 0; transform: translateY(-20px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
         
         .panel-header {
@@ -983,7 +988,7 @@
         }
         
         .positions-list {
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
         }
         
@@ -991,8 +996,20 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 12px;
             border-bottom: 1px solid #2B2F36;
+            cursor: pointer;
+            transition: background 0.1s;
+            border-radius: 40px 10px 40px 10px;
+            margin-bottom: 4px;
+        }
+        
+        .position-item:hover {
+            background: #2B2F36;
+        }
+        
+        .position-item:active {
+            transform: scale(0.98);
         }
         
         .position-item:last-child {
@@ -1002,11 +1019,11 @@
         .position-info {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
         
         .position-icon {
-            font-size: 20px;
+            font-size: 24px;
         }
         
         .position-details {
@@ -1017,12 +1034,12 @@
         .position-name {
             color: #EAECEF;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 16px;
         }
         
         .position-quantity {
             color: #848E9C;
-            font-size: 11px;
+            font-size: 12px;
         }
         
         .position-pnl {
@@ -1032,11 +1049,11 @@
         .position-value {
             color: #F0B90B;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 16px;
         }
         
         .position-pnl-value {
-            font-size: 11px;
+            font-size: 12px;
         }
         
         .position-pnl-value.positive {
@@ -1045,6 +1062,39 @@
         
         .position-pnl-value.negative {
             color: #F6465D;
+        }
+        
+        /* Quick Trade Buttons */
+        .position-actions {
+            display: flex;
+            gap: 4px;
+            margin-left: 8px;
+        }
+        
+        .quick-trade-btn {
+            padding: 4px 8px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.1s;
+        }
+        
+        .quick-buy {
+            background: rgba(14, 203, 129, 0.2);
+            color: #0ECB81;
+            border: 1px solid #0ECB81;
+        }
+        
+        .quick-sell {
+            background: rgba(246, 70, 93, 0.2);
+            color: #F6465D;
+            border: 1px solid #F6465D;
+        }
+        
+        .quick-trade-btn:active {
+            transform: scale(0.9);
         }
         
         /* Back button */
@@ -1245,6 +1295,9 @@
                 </table>
             </div>
             
+            <!-- Trading Panel (appears inline after selected element) -->
+            <div class="trading-panel" id="tradingPanel"></div>
+            
             <!-- Order Book -->
             <div class="order-book">
                 <div class="order-book-header">
@@ -1255,64 +1308,6 @@
                 <div id="orderBookBids"></div>
                 <div class="spread-indicator" id="spreadDisplay">▼ SPREAD 0.0% ▼</div>
                 <div id="orderBookAsks"></div>
-            </div>
-            
-            <!-- Trading Panel -->
-            <div class="trading-panel" id="tradingPanel">
-                <div class="panel-header">
-                    <div class="panel-element">
-                        <div class="panel-icon" id="panelIcon">🔹</div>
-                        <div class="panel-info">
-                            <h3 id="panelName">Select Element</h3>
-                            <span id="panelSymbol">---</span>
-                        </div>
-                    </div>
-                    <div class="panel-price">
-                        <div class="current" id="panelPrice">0⭐</div>
-                        <div class="change" id="panelChange">+0.0%</div>
-                    </div>
-                </div>
-                
-                <div class="order-types">
-                    <button class="order-type-btn buy active" onclick="window.setOrderType('buy')">BUY</button>
-                    <button class="order-type-btn sell" onclick="window.setOrderType('sell')">SELL</button>
-                </div>
-                
-                <div class="price-input-group">
-                    <div class="price-input-label">Price</div>
-                    <div class="price-input-row">
-                        <input type="text" class="price-input" id="orderPrice" value="0" readonly>
-                        <span class="price-unit">⭐</span>
-                    </div>
-                </div>
-                
-                <div class="amount-input-group">
-                    <div class="price-input-label">Amount</div>
-                    <div class="amount-controls">
-                        <button class="amount-btn" id="decrementBtn" onclick="window.decrementAmount()" disabled>−</button>
-                        <input type="text" class="amount-input" id="orderAmount" value="1" readonly>
-                        <button class="amount-btn" id="incrementBtn" onclick="window.incrementAmount()">+</button>
-                    </div>
-                </div>
-                
-                <div class="fee-info" id="feeDisplay">Fee: 0.1% (0⭐)</div>
-                
-                <div class="order-summary">
-                    <div class="summary-row">
-                        <span>Price</span>
-                        <span class="summary-value" id="summaryPrice">0 ⭐</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Amount</span>
-                        <span class="summary-value" id="summaryAmount">1</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Total</span>
-                        <span class="summary-value summary-total" id="summaryTotal">0 ⭐</span>
-                    </div>
-                </div>
-                
-                <button class="execute-btn" id="executeBtn" onclick="window.executeTrade()" disabled>SELECT ELEMENT</button>
             </div>
             
             <!-- Portfolio Panel -->
@@ -1381,9 +1376,10 @@
         let currentTimeframe = '1h';
         let updateInterval = null;
 
-        // ===== FUNCTION DECLARATIONS (will be attached to window later) =====
+        // ===== FUNCTION DECLARATIONS =====
         let togglePortfolio, filterMarket, returnToHub, selectElement, setOrderType, 
-            incrementAmount, decrementAmount, executeTrade, searchMarket, setTimeframe;
+            incrementAmount, decrementAmount, executeTrade, searchMarket, setTimeframe,
+            quickBuy, quickSell;
 
         // ===== INIT =====
         async function init() {
@@ -1489,7 +1485,11 @@
 
         // ===== ORDER BOOK =====
         function renderOrderBook() {
-            if (!selectedElement) return;
+            if (!selectedElement) {
+                document.getElementById('orderBookBids').innerHTML = '<div class="order-row">Select an element</div>';
+                document.getElementById('orderBookAsks').innerHTML = '<div class="order-row">to view order book</div>';
+                return;
+            }
             
             const book = orderBook.getOrderBook(selectedElement.name, 5);
             const bids = document.getElementById('orderBookBids');
@@ -1580,6 +1580,16 @@
 
         // ===== SELECT ELEMENT =====
         selectElement = function(elementName) {
+            // If same element is clicked, hide the panel
+            if (selectedElement?.name === elementName) {
+                selectedElement = null;
+                document.getElementById('tradingPanel').classList.remove('active');
+                document.getElementById('tradingPanel').innerHTML = '';
+                renderMarketTable();
+                renderOrderBook();
+                return;
+            }
+            
             selectedElement = getElementByName(elementName);
             
             // Update table selection
@@ -1591,15 +1601,14 @@
             // Update order book
             renderOrderBook();
             
-            // Update trading panel
-            updateTradingPanel();
+            // Create and show trading panel inline
+            createTradingPanel();
             
-            // Scroll to trading panel
-            document.getElementById('tradingPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // No scroll - panel appears right below the selected row
         };
 
-        // ===== UPDATE TRADING PANEL =====
-        function updateTradingPanel() {
+        // ===== CREATE TRADING PANEL =====
+        function createTradingPanel() {
             if (!selectedElement) return;
             
             const price = marketData.getCurrentPrice(selectedElement.name);
@@ -1607,15 +1616,83 @@
             const changeClass = change >= 0 ? 'positive' : 'negative';
             const changeSymbol = change > 0 ? '+' : '';
             
-            document.getElementById('panelIcon').textContent = getElementIcon(selectedElement.name);
-            document.getElementById('panelName').textContent = selectedElement.name;
-            document.getElementById('panelSymbol').textContent = selectedElement.symbol;
+            const panelHtml = `
+                <div class="panel-header">
+                    <div class="panel-element">
+                        <div class="panel-icon">${getElementIcon(selectedElement.name)}</div>
+                        <div class="panel-info">
+                            <h3>${selectedElement.name}</h3>
+                            <span>${selectedElement.symbol}</span>
+                        </div>
+                    </div>
+                    <div class="panel-price">
+                        <div class="current">${price}⭐</div>
+                        <div class="change ${changeClass}">${changeSymbol}${change.toFixed(1)}%</div>
+                    </div>
+                </div>
+                
+                <div class="order-types">
+                    <button class="order-type-btn buy active" onclick="window.setOrderType('buy')">BUY</button>
+                    <button class="order-type-btn sell" onclick="window.setOrderType('sell')">SELL</button>
+                </div>
+                
+                <div class="price-input-group">
+                    <div class="price-input-label">Price</div>
+                    <div class="price-input-row">
+                        <input type="text" class="price-input" id="orderPrice" value="${price}" readonly>
+                        <span class="price-unit">⭐</span>
+                    </div>
+                </div>
+                
+                <div class="amount-input-group">
+                    <div class="price-input-label">Amount</div>
+                    <div class="amount-controls">
+                        <button class="amount-btn" id="decrementBtn" onclick="window.decrementAmount()" disabled>−</button>
+                        <input type="text" class="amount-input" id="orderAmount" value="1" readonly>
+                        <button class="amount-btn" id="incrementBtn" onclick="window.incrementAmount()">+</button>
+                    </div>
+                </div>
+                
+                <div class="fee-info" id="feeDisplay">Fee: 0.1% (${Math.floor(price * 0.001)}⭐)</div>
+                
+                <div class="order-summary">
+                    <div class="summary-row">
+                        <span>Price</span>
+                        <span class="summary-value" id="summaryPrice">${formatPrice(price)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Amount</span>
+                        <span class="summary-value" id="summaryAmount">1</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total</span>
+                        <span class="summary-value summary-total" id="summaryTotal">${formatPrice(price)}</span>
+                    </div>
+                </div>
+                
+                <button class="execute-btn" id="executeBtn" onclick="window.executeTrade()">BUY ${selectedElement.symbol}</button>
+            `;
+            
+            document.getElementById('tradingPanel').innerHTML = panelHtml;
+            document.getElementById('tradingPanel').classList.add('active');
+            
+            // Reset order type to buy
+            orderType = 'buy';
+        }
+
+        // ===== UPDATE TRADING PANEL =====
+        function updateTradingPanel() {
+            if (!selectedElement) return;
+            
+            const price = marketData.getCurrentPrice(selectedElement.name);
+            document.getElementById('orderPrice').value = price;
             document.getElementById('panelPrice').textContent = price + '⭐';
+            
+            const change = marketData.getDailyChange(selectedElement.name);
+            const changeClass = change >= 0 ? 'positive' : 'negative';
+            const changeSymbol = change > 0 ? '+' : '';
             document.getElementById('panelChange').textContent = `${changeSymbol}${change.toFixed(1)}%`;
             document.getElementById('panelChange').className = `change ${changeClass}`;
-            
-            document.getElementById('orderPrice').value = price;
-            document.getElementById('tradingPanel').classList.add('active');
             
             resetAmount();
             updateOrderSummary();
@@ -1676,6 +1753,8 @@
             const decrementBtn = document.getElementById('decrementBtn');
             const incrementBtn = document.getElementById('incrementBtn');
             
+            if (!decrementBtn || !incrementBtn) return;
+            
             decrementBtn.disabled = val <= 1;
             
             if (orderType === 'buy') {
@@ -1712,14 +1791,8 @@
 
         function updateExecuteButton() {
             const btn = document.getElementById('executeBtn');
+            if (!btn) return;
             
-            if (!selectedElement) {
-                btn.disabled = true;
-                btn.textContent = 'SELECT ELEMENT';
-                return;
-            }
-            
-            btn.disabled = false;
             btn.className = `execute-btn ${orderType}`;
             btn.textContent = `${orderType.toUpperCase()} ${selectedElement.symbol}`;
         }
@@ -1757,6 +1830,11 @@
                     renderMarketTable();
                     renderOrderBook();
                     
+                    // Update portfolio if open
+                    if (document.getElementById('portfolioPanel').classList.contains('active')) {
+                        updatePortfolioDisplay();
+                    }
+                    
                 } else {
                     showToast(result.message, 'error');
                 }
@@ -1767,6 +1845,17 @@
             }
             
             showLoading(false);
+        };
+
+        // ===== QUICK BUY/SELL =====
+        quickBuy = function(elementName) {
+            selectElement(elementName);
+            setOrderType('buy');
+        };
+
+        quickSell = function(elementName) {
+            selectElement(elementName);
+            setOrderType('sell');
         };
 
         // ===== FILTER =====
@@ -1795,6 +1884,12 @@
             });
             
             renderMarketTable();
+            
+            // If selected element is no longer in filtered list, hide trading panel
+            if (selectedElement && !filteredElements.some(el => el.name === selectedElement.name)) {
+                selectedElement = null;
+                document.getElementById('tradingPanel').classList.remove('active');
+            }
         }
 
         // ===== PORTFOLIO =====
@@ -1863,15 +1958,15 @@
             
             document.getElementById('allocationSection').innerHTML = allocationHtml;
             
-            // Positions list
-            let positionsHtml = '<div class="allocation-title">Your Holdings</div>';
+            // Positions list - with clickable items and quick trade buttons
+            let positionsHtml = '<div class="allocation-title">Your Holdings (click to trade)</div>';
             
             if (positions.length === 0) {
                 positionsHtml += '<div class="empty-state">No holdings yet</div>';
             } else {
                 positions.forEach(pos => {
                     positionsHtml += `
-                        <div class="position-item">
+                        <div class="position-item" onclick="window.selectElement('${pos.elementName}')">
                             <div class="position-info">
                                 <span class="position-icon">${pos.elementIcon}</span>
                                 <div class="position-details">
@@ -1882,6 +1977,10 @@
                             <div class="position-pnl">
                                 <div class="position-value">${formatCurrency(pos.currentValue)}</div>
                                 <div class="position-pnl-value ${getPnLClass(pos.totalPnL)}">${formatCurrency(pos.totalPnL)}</div>
+                            </div>
+                            <div class="position-actions" onclick="event.stopPropagation()">
+                                <button class="quick-trade-btn quick-buy" onclick="window.quickBuy('${pos.elementName}')">BUY</button>
+                                <button class="quick-trade-btn quick-sell" onclick="window.quickSell('${pos.elementName}')">SELL</button>
                             </div>
                         </div>
                     `;
@@ -1898,10 +1997,15 @@
                 renderMarketTicker();
                 renderMarketTable();
                 if (selectedElement) {
-                    renderOrderBook();
                     updateTradingPanel();
+                    renderOrderBook();
                 }
                 updateMarketStats();
+                
+                // Update portfolio if open
+                if (document.getElementById('portfolioPanel').classList.contains('active')) {
+                    updatePortfolioDisplay();
+                }
             }, 5000);
         }
 
@@ -1942,24 +2046,14 @@
         window.executeTrade = executeTrade;
         window.searchMarket = searchMarket;
         window.setTimeframe = setTimeframe;
+        window.quickBuy = quickBuy;
+        window.quickSell = quickSell;
 
-        // Also make chartManager available globally
+        // Make chartManager available globally
         window.chartManager = chartManager;
 
         // Log to confirm functions are attached
-        console.log('✅ Window functions attached:', {
-            togglePortfolio: typeof window.togglePortfolio,
-            filterMarket: typeof window.filterMarket,
-            returnToHub: typeof window.returnToHub,
-            selectElement: typeof window.selectElement,
-            setOrderType: typeof window.setOrderType,
-            incrementAmount: typeof window.incrementAmount,
-            decrementAmount: typeof window.decrementAmount,
-            executeTrade: typeof window.executeTrade,
-            searchMarket: typeof window.searchMarket,
-            setTimeframe: typeof window.setTimeframe,
-            chartManager: typeof window.chartManager
-        });
+        console.log('✅ Window functions attached');
 
         // ===== START =====
         init();
