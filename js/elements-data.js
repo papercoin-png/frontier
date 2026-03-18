@@ -317,6 +317,120 @@ export function getDiscoveryPercentage(collection) {
     return (discovered / ELEMENTS.length) * 100;
 }
 
+// ===== MARKET-SPECIFIC HELPER FUNCTIONS (NEW) =====
+
+/**
+ * Get volatility factor for an element based on rarity
+ * Used by market-data.js for price simulation
+ * @param {string} elementName - Name of the element
+ * @returns {number} Volatility factor (0.02-0.25)
+ */
+export function getElementVolatility(elementName) {
+    const rarity = getElementRarity(elementName);
+    const volatilityMap = {
+        'common': 0.02,      // 2% daily movement
+        'uncommon': 0.04,    // 4% daily movement
+        'rare': 0.08,        // 8% daily movement
+        'very-rare': 0.15,   // 15% daily movement
+        'legendary': 0.25    // 25% daily movement
+    };
+    return volatilityMap[rarity] || 0.02;
+}
+
+/**
+ * Get base trading volume for an element based on rarity
+ * Used by market-data.js for volume simulation
+ * @param {string} elementName - Name of the element
+ * @returns {number} Base volume
+ */
+export function getElementBaseVolume(elementName) {
+    const rarity = getElementRarity(elementName);
+    const volumeMap = {
+        'common': 10000,
+        'uncommon': 5000,
+        'rare': 2000,
+        'very-rare': 500,
+        'legendary': 100
+    };
+    return volumeMap[rarity] || 1000;
+}
+
+/**
+ * Get market category for grouping elements
+ * @param {string} elementName - Name of the element
+ * @returns {string} Category (metals, gases, radioactive, rare-earth, other)
+ */
+export function getElementCategory(elementName) {
+    const element = getElementByName(elementName);
+    if (!element) return 'other';
+    
+    // Group by type
+    const metals = ['Gold', 'Silver', 'Platinum', 'Copper', 'Iron', 'Nickel', 'Lead', 'Zinc', 'Tin', 'Titanium', 'Aluminum', 'Magnesium', 'Calcium', 'Potassium', 'Sodium'];
+    const gases = ['Hydrogen', 'Helium', 'Oxygen', 'Nitrogen', 'Neon', 'Argon', 'Krypton', 'Xenon', 'Radon', 'Fluorine', 'Chlorine'];
+    const radioactive = ['Uranium', 'Plutonium', 'Thorium', 'Radium', 'Polonium', 'Promethium', 'Neptunium', 'Americium', 'Curium', 'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium'];
+    const rareEarth = ['Scandium', 'Yttrium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium', 'Promethium', 'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium'];
+    const semiconductors = ['Silicon', 'Germanium', 'Gallium', 'Arsenic', 'Selenium', 'Boron', 'Phosphorus'];
+    const precious = ['Gold', 'Silver', 'Platinum', 'Palladium', 'Rhodium', 'Iridium', 'Osmium', 'Ruthenium'];
+    
+    if (precious.includes(element.name)) return 'precious';
+    if (metals.includes(element.name)) return 'metals';
+    if (gases.includes(element.name)) return 'gases';
+    if (radioactive.includes(element.name)) return 'radioactive';
+    if (rareEarth.includes(element.name)) return 'rare-earth';
+    if (semiconductors.includes(element.name)) return 'semiconductor';
+    return 'other';
+}
+
+/**
+ * Get color for price change display
+ * @param {number} change - Price change percentage
+ * @returns {string} Color code
+ */
+export function getPriceChangeColor(change) {
+    if (change > 0) return '#0ECB81';
+    if (change < 0) return '#F6465D';
+    return '#848E9C';
+}
+
+/**
+ * Format element name for display
+ * @param {string} elementName - Name of the element
+ * @returns {string} Formatted name
+ */
+export function formatElementName(elementName) {
+    return elementName.charAt(0).toUpperCase() + elementName.slice(1);
+}
+
+/**
+ * Get atomic number from element name
+ * @param {string} elementName - Name of the element
+ * @returns {number} Atomic number
+ */
+export function getAtomicNumber(elementName) {
+    const element = getElementByName(elementName);
+    return element ? element.atomic : 0;
+}
+
+/**
+ * Get element mass number (string to number)
+ * @param {string} elementName - Name of the element
+ * @returns {number} Mass as number
+ */
+export function getElementMassAsNumber(elementName) {
+    const element = getElementByName(elementName);
+    return element ? parseFloat(element.mass) : 0;
+}
+
+/**
+ * Check if element is stable (not radioactive/legendary)
+ * @param {string} elementName - Name of the element
+ * @returns {boolean} True if stable
+ */
+export function isElementStable(elementName) {
+    const rarity = getElementRarity(elementName);
+    return rarity === 'common' || rarity === 'uncommon' || rarity === 'rare';
+}
+
 // ===== EXPORT =====
 export default {
     ELEMENTS,
@@ -338,5 +452,15 @@ export default {
     getTotalElementCount,
     getDiscoveredElements,
     getUndiscoveredElements,
-    getDiscoveryPercentage
+    getDiscoveryPercentage,
+    
+    // New market helper functions
+    getElementVolatility,
+    getElementBaseVolume,
+    getElementCategory,
+    getPriceChangeColor,
+    formatElementName,
+    getAtomicNumber,
+    getElementMassAsNumber,
+    isElementStable
 };
