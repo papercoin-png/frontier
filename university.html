@@ -333,7 +333,7 @@
         .card-container {
             perspective: 1000px;
             width: 100%;
-            height: 160px;
+            height: 180px;
             cursor: pointer;
         }
         
@@ -551,6 +551,13 @@
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .training-icon {
+            font-size: 20px;
         }
         
         .donation-options {
@@ -764,16 +771,50 @@
             <!-- Certificates Section -->
             <div class="section-header">
                 <div class="section-line"></div>
-                <span class="section-title">MINING CERTIFICATES</span>
+                <span class="section-title" id="sectionTitle">MINING CERTIFICATES</span>
                 <div class="section-line"></div>
             </div>
             
-            <!-- Certificate Cards (Flip on Click) -->
-            <div class="certificates-grid" id="certificatesContainer">
+            <!-- Certificate Cards Container -->
+            <div class="certificates-grid" id="certificatesContainer"></div>
+            
+            <!-- Training Section -->
+            <div class="training-section" id="trainingSection">
+                <div class="training-title">
+                    <span class="training-icon">⛏️</span>
+                    <span>Mining Lab · Training</span>
+                </div>
+                <div class="donation-options" id="donationOptions"></div>
+            </div>
+            
+            <!-- Back Button -->
+            <div class="back-btn" onclick="goBack()">
+                <span class="back-icon">←</span>
+                <span class="back-text">RETURN TO HUB</span>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">PROCESSING...</div>
+        </div>
+    </div>
+
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== CERTIFICATE DATA FUNCTIONS =====
+        function getMiningCertificates() {
+            return `
                 <!-- Prospector - Earned -->
-                <div class="card-container" onclick="this.classList.toggle('flipped')">
+                <div class="card-container">
                     <div class="card-flip">
-                        <!-- Front - Requirements -->
                         <div class="card-front">
                             <div class="card-status">
                                 <span class="card-tier">TIER 1</span>
@@ -790,8 +831,6 @@
                             </div>
                             <div class="card-flip-hint">↻ flip for stats</div>
                         </div>
-                        
-                        <!-- Back - Stats/Unlocks -->
                         <div class="card-back">
                             <div class="card-status">
                                 <span class="card-tier">UNLOCKS</span>
@@ -820,9 +859,8 @@
                 </div>
                 
                 <!-- Excavator - In Progress -->
-                <div class="card-container" onclick="this.classList.toggle('flipped')">
+                <div class="card-container">
                     <div class="card-flip">
-                        <!-- Front - Requirements -->
                         <div class="card-front">
                             <div class="card-status">
                                 <span class="card-tier">TIER 1</span>
@@ -848,8 +886,6 @@
                             </div>
                             <div class="card-flip-hint">↻ flip for stats</div>
                         </div>
-                        
-                        <!-- Back - Stats/Unlocks -->
                         <div class="card-back">
                             <div class="card-status">
                                 <span class="card-tier">UNLOCKS</span>
@@ -884,131 +920,498 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- Geologist - Locked -->
-                <div class="card-container" onclick="this.classList.toggle('flipped')">
+            `;
+        }
+
+        function getTradingCertificates() {
+            return `
+                <!-- Merchant - Earned -->
+                <div class="card-container">
                     <div class="card-flip">
-                        <!-- Front - Requirements -->
                         <div class="card-front">
                             <div class="card-status">
-                                <span class="card-tier">TIER 2</span>
-                                <span class="card-locked">LOCKED</span>
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-earned">EARNED</span>
                             </div>
-                            <div class="card-title">Geologist</div>
-                            <div class="card-subtitle">Mining Certificate</div>
+                            <div class="card-title">Merchant</div>
+                            <div class="card-subtitle">Trading Certificate</div>
                             <div class="card-requirements">
                                 <div class="requirement-row">
-                                    <span class="requirement-icon">⛏️</span>
-                                    <span class="requirement-text">Mining Level 50</span>
-                                    <span class="requirement-value">35/50</span>
-                                </div>
-                                <div class="requirement-row">
-                                    <span class="requirement-icon">✓</span>
-                                    <span class="requirement-text">Requires: Prospector</span>
+                                    <span class="requirement-icon">💹</span>
+                                    <span class="requirement-text">Trading Level 10</span>
                                     <span class="requirement-value">✓</span>
-                                </div>
-                            </div>
-                            <div class="card-progress">
-                                <div class="progress-row">
-                                    <span>Progress to unlock</span>
-                                    <span>70%</span>
-                                </div>
-                                <div class="progress-bar-small">
-                                    <div class="progress-fill-small" style="width: 70%"></div>
                                 </div>
                             </div>
                             <div class="card-flip-hint">↻ flip for stats</div>
                         </div>
-                        
-                        <!-- Back - Stats/Unlocks -->
                         <div class="card-back">
                             <div class="card-status">
                                 <span class="card-tier">UNLOCKS</span>
                             </div>
-                            <div class="card-title">Ore Scanner</div>
+                            <div class="card-title">Basic Trade License</div>
                             <div class="stats-grid">
                                 <div class="stat-block">
-                                    <div class="stat-label-small">RANGE</div>
-                                    <div class="stat-value-small">1.3x</div>
+                                    <div class="stat-label-small">LISTINGS</div>
+                                    <div class="stat-value-small">2</div>
                                 </div>
                                 <div class="stat-block">
-                                    <div class="stat-label-small">RARE</div>
-                                    <div class="stat-value-small">+3%</div>
+                                    <div class="stat-label-small">FEE</div>
+                                    <div class="stat-value-small">5%</div>
                                 </div>
                             </div>
                             <div class="unlock-item">
-                                <span class="unlock-icon">🔍</span>
+                                <span class="unlock-icon">📜</span>
                                 <div>
-                                    <div class="unlock-name">Ore Scanner</div>
-                                    <div class="unlock-type">Equipment · Tier 2</div>
+                                    <div class="unlock-name">Basic Trade License</div>
+                                    <div class="unlock-type">License · Tier 1</div>
                                 </div>
                             </div>
                             <div class="card-flip-hint">↻ flip back</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Training Section -->
-            <div class="training-section">
-                <div class="training-title">⚒️ Mining Lab · Training</div>
-                <div class="donation-options">
-                    <div class="donation-row">
-                        <div class="donation-element">
-                            <span class="element-icon">⚙️</span>
-                            <span class="element-name">Iron</span>
-                            <span class="donation-rate">+1 skill / 10</span>
+                
+                <!-- Trader - In Progress -->
+                <div class="card-container">
+                    <div class="card-flip">
+                        <div class="card-front">
+                            <div class="card-status">
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-locked">IN PROGRESS</span>
+                            </div>
+                            <div class="card-title">Trader</div>
+                            <div class="card-subtitle">Trading Certificate</div>
+                            <div class="card-requirements">
+                                <div class="requirement-row">
+                                    <span class="requirement-icon">💹</span>
+                                    <span class="requirement-text">Trading Level 25</span>
+                                    <span class="requirement-value">22/50</span>
+                                </div>
+                            </div>
+                            <div class="card-progress">
+                                <div class="progress-row">
+                                    <span>Progress to unlock</span>
+                                    <span>44%</span>
+                                </div>
+                                <div class="progress-bar-small">
+                                    <div class="progress-fill-small" style="width: 44%"></div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip for stats</div>
                         </div>
-                        <div class="donation-controls">
-                            <span class="donation-amount">234</span>
-                            <span class="donate-btn" onclick="donate('iron')">DONATE</span>
-                        </div>
-                    </div>
-                    <div class="donation-row">
-                        <div class="donation-element">
-                            <span class="element-icon">🔴</span>
-                            <span class="element-name">Copper</span>
-                            <span class="donation-rate">+1 skill / 8</span>
-                        </div>
-                        <div class="donation-controls">
-                            <span class="donation-amount">156</span>
-                            <span class="donate-btn" onclick="donate('copper')">DONATE</span>
-                        </div>
-                    </div>
-                    <div class="donation-row">
-                        <div class="donation-element">
-                            <span class="element-icon">🔷</span>
-                            <span class="element-name">Titanium</span>
-                            <span class="donation-rate">+1 skill / 5</span>
-                        </div>
-                        <div class="donation-controls">
-                            <span class="donation-amount">42</span>
-                            <span class="donate-btn" onclick="donate('titanium')">DONATE</span>
+                        <div class="card-back">
+                            <div class="card-status">
+                                <span class="card-tier">UNLOCKS</span>
+                            </div>
+                            <div class="card-title">Courier Ship</div>
+                            <div class="stats-grid">
+                                <div class="stat-block">
+                                    <div class="stat-label-small">CARGO</div>
+                                    <div class="stat-value-small">400</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">SPEED</div>
+                                    <div class="stat-value-small">1.1x</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">FUEL</div>
+                                    <div class="stat-value-small">+5%</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">SLOTS</div>
+                                    <div class="stat-value-small">3</div>
+                                </div>
+                            </div>
+                            <div class="unlock-item">
+                                <span class="unlock-icon">🚚</span>
+                                <div>
+                                    <div class="unlock-name">Courier</div>
+                                    <div class="unlock-type">Ship · Transport Focus</div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip back</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Back Button -->
-            <div class="back-btn" onclick="goBack()">
-                <span class="back-icon">←</span>
-                <span class="back-text">RETURN TO HUB</span>
-            </div>
-        </div>
-        
-        <!-- Loading Overlay -->
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="loading-spinner"></div>
-            <div class="loading-text" id="loadingText">PROCESSING...</div>
-        </div>
-    </div>
+            `;
+        }
 
-    <script>
-        // ===== TELEGRAM INITIALIZATION =====
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
+        function getScienceCertificates() {
+            return `
+                <!-- Observer - Earned -->
+                <div class="card-container">
+                    <div class="card-flip">
+                        <div class="card-front">
+                            <div class="card-status">
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-earned">EARNED</span>
+                            </div>
+                            <div class="card-title">Observer</div>
+                            <div class="card-subtitle">Science Certificate</div>
+                            <div class="card-requirements">
+                                <div class="requirement-row">
+                                    <span class="requirement-icon">🔬</span>
+                                    <span class="requirement-text">Science Level 10</span>
+                                    <span class="requirement-value">✓</span>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip for stats</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="card-status">
+                                <span class="card-tier">UNLOCKS</span>
+                            </div>
+                            <div class="card-title">Basic Scanner</div>
+                            <div class="stats-grid">
+                                <div class="stat-block">
+                                    <div class="stat-label-small">RANGE</div>
+                                    <div class="stat-value-small">1.2x</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">POWER</div>
+                                    <div class="stat-value-small">-5%</div>
+                                </div>
+                            </div>
+                            <div class="unlock-item">
+                                <span class="unlock-icon">🔍</span>
+                                <div>
+                                    <div class="unlock-name">Basic Scanner</div>
+                                    <div class="unlock-type">Equipment · Tier 1</div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip back</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Analyst - In Progress -->
+                <div class="card-container">
+                    <div class="card-flip">
+                        <div class="card-front">
+                            <div class="card-status">
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-locked">IN PROGRESS</span>
+                            </div>
+                            <div class="card-title">Analyst</div>
+                            <div class="card-subtitle">Science Certificate</div>
+                            <div class="card-requirements">
+                                <div class="requirement-row">
+                                    <span class="requirement-icon">🔬</span>
+                                    <span class="requirement-text">Science Level 25</span>
+                                    <span class="requirement-value">48/50</span>
+                                </div>
+                            </div>
+                            <div class="card-progress">
+                                <div class="progress-row">
+                                    <span>Progress to unlock</span>
+                                    <span>96%</span>
+                                </div>
+                                <div class="progress-bar-small">
+                                    <div class="progress-fill-small" style="width: 96%"></div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip for stats</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="card-status">
+                                <span class="card-tier">UNLOCKS</span>
+                            </div>
+                            <div class="card-title">Surveyor Ship</div>
+                            <div class="stats-grid">
+                                <div class="stat-block">
+                                    <div class="stat-label-small">SCAN</div>
+                                    <div class="stat-value-small">1.3x</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">RARE</div>
+                                    <div class="stat-value-small">+3%</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">HIDDEN</div>
+                                    <div class="stat-value-small">+2</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">CARGO</div>
+                                    <div class="stat-value-small">300</div>
+                                </div>
+                            </div>
+                            <div class="unlock-item">
+                                <span class="unlock-icon">🛸</span>
+                                <div>
+                                    <div class="unlock-name">Surveyor</div>
+                                    <div class="unlock-type">Ship · Science Focus</div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip back</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getEngineeringCertificates() {
+            return `
+                <!-- Builder - Earned -->
+                <div class="card-container">
+                    <div class="card-flip">
+                        <div class="card-front">
+                            <div class="card-status">
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-earned">EARNED</span>
+                            </div>
+                            <div class="card-title">Builder</div>
+                            <div class="card-subtitle">Engineering Certificate</div>
+                            <div class="card-requirements">
+                                <div class="requirement-row">
+                                    <span class="requirement-icon">🔧</span>
+                                    <span class="requirement-text">Engineering Level 10</span>
+                                    <span class="requirement-value">✓</span>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip for stats</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="card-status">
+                                <span class="card-tier">UNLOCKS</span>
+                            </div>
+                            <div class="card-title">Basic Construction</div>
+                            <div class="stats-grid">
+                                <div class="stat-block">
+                                    <div class="stat-label-small">SPEED</div>
+                                    <div class="stat-value-small">1.1x</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">COST</div>
+                                    <div class="stat-value-small">-5%</div>
+                                </div>
+                            </div>
+                            <div class="unlock-item">
+                                <span class="unlock-icon">🏗️</span>
+                                <div>
+                                    <div class="unlock-name">Basic Construction</div>
+                                    <div class="unlock-type">Ability · Tier 1</div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip back</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Engineer - In Progress -->
+                <div class="card-container">
+                    <div class="card-flip">
+                        <div class="card-front">
+                            <div class="card-status">
+                                <span class="card-tier">TIER 1</span>
+                                <span class="card-locked">IN PROGRESS</span>
+                            </div>
+                            <div class="card-title">Engineer</div>
+                            <div class="card-subtitle">Engineering Certificate</div>
+                            <div class="card-requirements">
+                                <div class="requirement-row">
+                                    <span class="requirement-icon">🔧</span>
+                                    <span class="requirement-text">Engineering Level 25</span>
+                                    <span class="requirement-value">17/50</span>
+                                </div>
+                            </div>
+                            <div class="card-progress">
+                                <div class="progress-row">
+                                    <span>Progress to unlock</span>
+                                    <span>34%</span>
+                                </div>
+                                <div class="progress-bar-small">
+                                    <div class="progress-fill-small" style="width: 34%"></div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip for stats</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="card-status">
+                                <span class="card-tier">UNLOCKS</span>
+                            </div>
+                            <div class="card-title">Tug Ship</div>
+                            <div class="stats-grid">
+                                <div class="stat-block">
+                                    <div class="stat-label-small">BUILD</div>
+                                    <div class="stat-value-small">1.2x</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">CARGO</div>
+                                    <div class="stat-value-small">350</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">FUEL</div>
+                                    <div class="stat-value-small">-5%</div>
+                                </div>
+                                <div class="stat-block">
+                                    <div class="stat-label-small">TOW</div>
+                                    <div class="stat-value-small">Yes</div>
+                                </div>
+                            </div>
+                            <div class="unlock-item">
+                                <span class="unlock-icon">🚜</span>
+                                <div>
+                                    <div class="unlock-name">Tug</div>
+                                    <div class="unlock-type">Ship · Utility Focus</div>
+                                </div>
+                            </div>
+                            <div class="card-flip-hint">↻ flip back</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getMiningDonations() {
+            return `
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">⚙️</span>
+                        <span class="element-name">Iron</span>
+                        <span class="donation-rate">+1 skill / 10</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">234</span>
+                        <span class="donate-btn" onclick="donate('iron')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🔴</span>
+                        <span class="element-name">Copper</span>
+                        <span class="donation-rate">+1 skill / 8</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">156</span>
+                        <span class="donate-btn" onclick="donate('copper')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🔷</span>
+                        <span class="element-name">Titanium</span>
+                        <span class="donation-rate">+1 skill / 5</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">42</span>
+                        <span class="donate-btn" onclick="donate('titanium')">DONATE</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getTradingDonations() {
+            return `
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🟡</span>
+                        <span class="element-name">Gold</span>
+                        <span class="donation-rate">+1 skill / 3</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">28</span>
+                        <span class="donate-btn" onclick="donate('gold')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">⚪</span>
+                        <span class="element-name">Platinum</span>
+                        <span class="donation-rate">+1 skill / 2</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">15</span>
+                        <span class="donate-btn" onclick="donate('platinum')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">💎</span>
+                        <span class="element-name">Gems</span>
+                        <span class="donation-rate">+1 skill / 1</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">7</span>
+                        <span class="donate-btn" onclick="donate('gems')">DONATE</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getScienceDonations() {
+            return `
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🧪</span>
+                        <span class="element-name">Rare Earth</span>
+                        <span class="donation-rate">+1 skill / 2</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">23</span>
+                        <span class="donate-btn" onclick="donate('rare-earth')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🔮</span>
+                        <span class="element-name">Crystals</span>
+                        <span class="donation-rate">+1 skill / 3</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">31</span>
+                        <span class="donate-btn" onclick="donate('crystals')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">☢️</span>
+                        <span class="element-name">Uranium</span>
+                        <span class="donation-rate">+1 skill / 1</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">4</span>
+                        <span class="donate-btn" onclick="donate('uranium')">DONATE</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getEngineeringDonations() {
+            return `
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">💾</span>
+                        <span class="element-name">Silicon</span>
+                        <span class="donation-rate">+1 skill / 8</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">92</span>
+                        <span class="donate-btn" onclick="donate('silicon')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">⚫</span>
+                        <span class="element-name">Carbon</span>
+                        <span class="donation-rate">+1 skill / 12</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">187</span>
+                        <span class="donate-btn" onclick="donate('carbon')">DONATE</span>
+                    </div>
+                </div>
+                <div class="donation-row">
+                    <div class="donation-element">
+                        <span class="element-icon">🔩</span>
+                        <span class="element-name">Alloys</span>
+                        <span class="donation-rate">+1 skill / 4</span>
+                    </div>
+                    <div class="donation-controls">
+                        <span class="donation-amount">36</span>
+                        <span class="donate-btn" onclick="donate('alloys')">DONATE</span>
+                    </div>
+                </div>
+            `;
         }
 
         // ===== PATH SWITCHING =====
@@ -1019,24 +1422,48 @@
             });
             event.target.classList.add('active');
             
-            // Update skill display (simulated - will be replaced with real data)
             const skillDisplay = document.getElementById('currentSkill');
             const certContainer = document.getElementById('certificatesContainer');
+            const sectionTitle = document.getElementById('sectionTitle');
+            const trainingTitle = document.querySelector('.training-title');
+            const trainingIcon = document.querySelector('.training-icon');
+            const donationOptions = document.getElementById('donationOptions');
             
             if (path === 'mining') {
                 skillDisplay.innerHTML = `<div class="skill-item"><div class="skill-header"><div class="skill-icon">⛏️</div><div class="skill-info"><div class="skill-name-row"><span class="skill-name">Mining</span><span class="skill-level">Level 35</span></div><div class="skill-bar"><div class="skill-progress" style="width: 70%"></div></div><div class="skill-stats"><span>Progress to Level 36</span><span>350/500</span></div></div></div></div>`;
-                document.querySelector('.section-title').textContent = 'MINING CERTIFICATES';
-                // In real implementation, would reload certificates for mining path
+                certContainer.innerHTML = getMiningCertificates();
+                sectionTitle.textContent = 'MINING CERTIFICATES';
+                trainingTitle.innerHTML = '<span class="training-icon">⛏️</span> Mining Lab · Training';
+                donationOptions.innerHTML = getMiningDonations();
+                
             } else if (path === 'trading') {
                 skillDisplay.innerHTML = `<div class="skill-item"><div class="skill-header"><div class="skill-icon">💹</div><div class="skill-info"><div class="skill-name-row"><span class="skill-name">Trading</span><span class="skill-level">Level 22</span></div><div class="skill-bar"><div class="skill-progress" style="width: 44%"></div></div><div class="skill-stats"><span>Progress to Level 23</span><span>220/500</span></div></div></div></div>`;
-                document.querySelector('.section-title').textContent = 'TRADING CERTIFICATES';
+                certContainer.innerHTML = getTradingCertificates();
+                sectionTitle.textContent = 'TRADING CERTIFICATES';
+                trainingTitle.innerHTML = '<span class="training-icon">💹</span> Trading Floor · Training';
+                donationOptions.innerHTML = getTradingDonations();
+                
             } else if (path === 'science') {
                 skillDisplay.innerHTML = `<div class="skill-item"><div class="skill-header"><div class="skill-icon">🔬</div><div class="skill-info"><div class="skill-name-row"><span class="skill-name">Science</span><span class="skill-level">Level 48</span></div><div class="skill-bar"><div class="skill-progress" style="width: 96%"></div></div><div class="skill-stats"><span>Progress to Level 49</span><span>480/500</span></div></div></div></div>`;
-                document.querySelector('.section-title').textContent = 'SCIENCE CERTIFICATES';
+                certContainer.innerHTML = getScienceCertificates();
+                sectionTitle.textContent = 'SCIENCE CERTIFICATES';
+                trainingTitle.innerHTML = '<span class="training-icon">🔬</span> Science Wing · Training';
+                donationOptions.innerHTML = getScienceDonations();
+                
             } else if (path === 'engineering') {
                 skillDisplay.innerHTML = `<div class="skill-item"><div class="skill-header"><div class="skill-icon">🔧</div><div class="skill-info"><div class="skill-name-row"><span class="skill-name">Engineering</span><span class="skill-level">Level 17</span></div><div class="skill-bar"><div class="skill-progress" style="width: 34%"></div></div><div class="skill-stats"><span>Progress to Level 18</span><span>170/500</span></div></div></div></div>`;
-                document.querySelector('.section-title').textContent = 'ENGINEERING CERTIFICATES';
+                certContainer.innerHTML = getEngineeringCertificates();
+                sectionTitle.textContent = 'ENGINEERING CERTIFICATES';
+                trainingTitle.innerHTML = '<span class="training-icon">🔧</span> Engineering Bay · Training';
+                donationOptions.innerHTML = getEngineeringDonations();
             }
+            
+            // Re-attach flip functionality to new cards
+            document.querySelectorAll('.card-container').forEach(card => {
+                card.onclick = function() {
+                    this.classList.toggle('flipped');
+                };
+            });
             
             // Haptic feedback
             if (tg?.HapticFeedback) {
@@ -1085,6 +1512,23 @@
             }, 500);
         };
 
+        // ===== INITIAL LOAD =====
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load initial certificates (mining)
+            document.getElementById('certificatesContainer').innerHTML = getMiningCertificates();
+            document.getElementById('donationOptions').innerHTML = getMiningDonations();
+            
+            // Attach flip functionality
+            document.querySelectorAll('.card-container').forEach(card => {
+                card.onclick = function() {
+                    this.classList.toggle('flipped');
+                };
+            });
+            
+            // Load player data
+            loadPlayerData();
+        });
+
         // ===== LOAD PLAYER DATA =====
         async function loadPlayerData() {
             try {
@@ -1101,9 +1545,6 @@
                 console.error('Error loading player data:', error);
             }
         }
-
-        // ===== INIT =====
-        loadPlayerData();
     </script>
 </body>
 </html>
