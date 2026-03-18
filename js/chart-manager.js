@@ -75,11 +75,11 @@ export const Indicators = {
 // ===== CHART MANAGER CLASS =====
 export class ChartManager {
     constructor() {
-        self.charts = new Map();        // Active charts by element
-        self.currentElement = 'Gold';    // Default element
-        self.currentTimeframe = CHART_CONFIG.defaultTimeframe;
-        self.currentIndicators = [Indicators.SMA];
-        self.chartType = ChartType.CANDLESTICK;
+        this.charts = new Map();        // Active charts by element
+        this.currentElement = 'Gold';    // Default element
+        this.currentTimeframe = CHART_CONFIG.defaultTimeframe;
+        this.currentIndicators = [Indicators.SMA];
+        this.chartType = ChartType.CANDLESTICK;
         
         // Bind methods
         this.createChart = this.createChart.bind(this);
@@ -104,7 +104,7 @@ export class ChartManager {
             const ctx = canvas.getContext('2d');
             
             // Clear existing chart for this element
-            if (self.charts.has(elementName)) {
+            if (this.charts.has(elementName)) {
                 this.destroyChart(elementName);
             }
             
@@ -119,11 +119,11 @@ export class ChartManager {
                 width: canvas.width,
                 height: canvas.height,
                 animationFrame: null,
-                indicators: [...self.currentIndicators]
+                indicators: [...this.currentIndicators]
             };
             
             // Store chart
-            self.charts.set(elementName, chart);
+            this.charts.set(elementName, chart);
             
             // Load initial data
             this.loadChartData(chart);
@@ -818,7 +818,7 @@ export class ChartManager {
      * Update chart data
      */
     updateChartData(elementName) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (!chart) return;
         
         this.loadChartData(chart);
@@ -828,7 +828,7 @@ export class ChartManager {
      * Change chart type
      */
     setChartType(elementName, type) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (!chart) return;
         
         chart.type = type;
@@ -839,7 +839,7 @@ export class ChartManager {
      * Change timeframe
      */
     setTimeframe(elementName, timeframe) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (!chart) return;
         
         chart.timeframe = timeframe;
@@ -850,7 +850,7 @@ export class ChartManager {
      * Toggle indicator
      */
     toggleIndicator(elementName, indicator) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (!chart) return;
         
         const index = chart.indicators.indexOf(indicator);
@@ -867,12 +867,12 @@ export class ChartManager {
      * Destroy chart
      */
     destroyChart(elementName) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (chart) {
             if (chart.animationFrame) {
                 cancelAnimationFrame(chart.animationFrame);
             }
-            self.charts.delete(elementName);
+            this.charts.delete(elementName);
         }
     }
     
@@ -880,7 +880,7 @@ export class ChartManager {
      * Resize chart
      */
     resizeChart(elementName, width, height) {
-        const chart = self.charts.get(elementName);
+        const chart = this.charts.get(elementName);
         if (!chart) return;
         
         chart.width = width;
