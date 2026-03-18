@@ -496,7 +496,7 @@ export class ChartManager {
      * Draw time labels
      */
     drawTimeLabels(ctx, chart) {
-        const { data, width } = chart;
+        const { data, width, height } = chart; // FIXED: Added height to destructuring
         const padding = 40;
         
         ctx.font = '11px Inter';
