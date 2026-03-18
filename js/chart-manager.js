@@ -75,6 +75,7 @@ export const Indicators = {
 // ===== CHART MANAGER CLASS =====
 export class ChartManager {
     constructor() {
+        // Initialize properties FIRST
         this.charts = new Map();        // Active charts by element
         this.currentElement = 'Gold';    // Default element
         this.currentTimeframe = CHART_CONFIG.defaultTimeframe;
