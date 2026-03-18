@@ -341,19 +341,26 @@ export class OrderBook {
                     ask.order.remainingQuantity
                 );
                 
-                // Execute trade
-                this.executeTrade(bid.order, ask.order, matchQuantity, matchPrice);
-                
-                // Check if orders are filled
-                if (bid.order.isFilled()) {
-                    bid.order.status = OrderStatus.COMPLETED;
-                    this.removeFromOrderBook(bid.order);
+                // Only execute if quantity > 0
+                if (matchQuantity > 0) {
+                    // Execute trade
+                    this.executeTrade(bid.order, ask.order, matchQuantity, matchPrice);
+                    
+                    // Check if orders are filled
+                    if (bid.order.isFilled()) {
+                        bid.order.status = OrderStatus.COMPLETED;
+                        this.removeFromOrderBook(bid.order);
+                        bidIndex++;
+                    }
+                    
+                    if (ask.order.isFilled()) {
+                        ask.order.status = OrderStatus.COMPLETED;
+                        this.removeFromOrderBook(ask.order);
+                        askIndex++;
+                    }
+                } else {
+                    // Skip if quantity is zero
                     bidIndex++;
-                }
-                
-                if (ask.order.isFilled()) {
-                    ask.order.status = OrderStatus.COMPLETED;
-                    this.removeFromOrderBook(ask.order);
                     askIndex++;
                 }
             } else {
@@ -596,7 +603,11 @@ export class OrderBook {
             
             // Match orders for each element
             elements.forEach(elementName => {
-                this.matchOrders(elementName);
+                try {
+                    this.matchOrders(elementName);
+                } catch (error) {
+                    console.error(`Error matching orders for ${elementName}:`, error);
+                }
             });
             
             // Clean up expired orders every minute
@@ -618,10 +629,32 @@ export class OrderBook {
             const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
             const key = `voidfarer_orders_${playerId}`;
             
+            // Convert orders to plain objects for storage
+            const ordersPlain = [];
+            for (let [id, order] of this.allOrders.entries()) {
+                ordersPlain.push([id, {
+                    id: order.id,
+                    side: order.side,
+                    elementName: order.elementName,
+                    quantity: order.quantity,
+                    remainingQuantity: order.remainingQuantity,
+                    price: order.price,
+                    orderType: order.orderType,
+                    stopPrice: order.stopPrice,
+                    status: order.status,
+                    createdAt: order.createdAt,
+                    expiresAt: order.expiresAt,
+                    filledQuantity: order.filledQuantity,
+                    averageFillPrice: order.averageFillPrice,
+                    trades: order.trades,
+                    playerId: order.playerId
+                }]);
+            }
+            
             const data = {
                 bids: Array.from(this.bids.entries()),
                 asks: Array.from(this.asks.entries()),
-                orders: Array.from(this.allOrders.entries()),
+                orders: ordersPlain,
                 tradeHistory: this.tradeHistory,
                 timestamp: Date.now()
             };
@@ -645,8 +678,8 @@ export class OrderBook {
                 const data = JSON.parse(saved);
                 
                 // Restore maps
-                this.bids = new Map(data.bids);
-                this.asks = new Map(data.asks);
+                this.bids = new Map(data.bids || []);
+                this.asks = new Map(data.asks || []);
                 
                 // Restore orders and ensure they have all methods
                 const ordersArray = data.orders || [];
@@ -663,7 +696,7 @@ export class OrderBook {
                         orderData.stopPrice
                     );
                     
-                    // Copy over properties
+                    // Copy over all properties
                     order.id = orderData.id;
                     order.remainingQuantity = orderData.remainingQuantity;
                     order.status = orderData.status;
