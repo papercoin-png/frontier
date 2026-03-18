@@ -188,9 +188,10 @@
             font-family: 'Roboto Mono', monospace;
         }
         
-        .balance-usd {
+        .balance-value span {
+            font-size: 14px;
             color: #848E9C;
-            font-size: 12px;
+            margin-left: 2px;
         }
         
         .portfolio-btn {
@@ -1277,9 +1278,8 @@
             <!-- Account Bar -->
             <div class="account-bar">
                 <div class="balance-info">
-                    <span class="balance-label">TOTAL BALANCE</span>
-                    <span class="balance-value" id="totalBalance">0 <span style="font-size: 14px;">⭐</span></span>
-                    <span class="balance-usd" id="balanceUSD">≈ $0 USD</span>
+                    <span class="balance-label">YOUR BALANCE</span>
+                    <span class="balance-value" id="totalBalance">0 <span>⭐</span></span>
                 </div>
                 <button class="portfolio-btn" onclick="window.togglePortfolio()">PORTFOLIO</button>
             </div>
@@ -1491,8 +1491,7 @@
 
         // ===== BALANCE =====
         updateBalance = function() {
-            document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span style="font-size: 14px;">⭐</span>`;
-            document.getElementById('balanceUSD').textContent = `≈ $${(currentCredits * 0.12).toFixed(2)} USD`;
+            document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
         };
 
         // ===== MARKET TICKER =====
@@ -2052,25 +2051,26 @@
                 if (result.success) {
                     showToast(result.message, 'success');
                     
-                    // Refresh data
+                    // Force refresh credits from storage
                     currentCredits = await getCredits();
                     currentCollection = await getCollection();
                     
+                    // Update all displays
                     updateBalance();
                     updateAmountButtons();
                     updateOrderSummary();
                     renderMarketTable();
                     renderOrderBook();
                     
-                    // Update max labels
-                    const price = marketData.getCurrentPrice(selectedElement.name);
-                    const maxBuy = calculateMaxBuy(currentCredits, price);
-                    const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
+                    // Update max labels in trading panel
+                    const currentPrice = marketData.getCurrentPrice(selectedElement.name);
+                    const newMaxBuy = calculateMaxBuy(currentCredits, currentPrice);
+                    const newOwnedQuantity = currentCollection[selectedElement.name]?.count || 0;
                     
                     const buyMaxLabel = document.querySelector('.amount-max[onclick*="setMaxBuyAmount"]');
                     const sellMaxLabel = document.querySelector('.amount-max[onclick*="setMaxSellAmount"]');
-                    if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${maxBuy}`;
-                    if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${ownedQuantity}`;
+                    if (buyMaxLabel) buyMaxLabel.textContent = `MAX: ${newMaxBuy}`;
+                    if (sellMaxLabel) sellMaxLabel.textContent = `MAX: ${newOwnedQuantity}`;
                     
                     // Reset amount to 1 after trade
                     if (document.getElementById('buyAmount')) document.getElementById('buyAmount').value = '1';
