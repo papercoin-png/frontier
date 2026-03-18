@@ -1850,7 +1850,8 @@ export async function craftItem(recipeId, count = 1) {
             newProgress: newProgress,
             leveledUp: oldLevel.name !== newLevel.name,
             newLevel: newLevel.name,
-            multiplier: newLevel.multiplier
+            multiplier: newLevel.multiplier,
+            skillGain: recipe.skillGain
         };
         
     } catch (error) {
@@ -2055,3 +2056,17 @@ export default {
     getMasteryMultiplier,
     getProgressToNextLevel
 };
+
+// ===== GLOBAL EXPOSURE FOR HTML ACCESS =====
+// Make functions available globally for HTML onclick handlers
+window.getCurrentInventory = getCurrentInventory;
+window.craftItem = craftItem;
+window.getLevelFromProgress = getLevelFromProgress;
+window.getRecipesWithProgress = getRecipesWithProgress;
+window.ALCHEMY_RECIPES = ALCHEMY_RECIPES;
+window.LEVEL_THRESHOLDS = LEVEL_THRESHOLDS;
+window.hasIngredients = hasIngredients;
+window.getTotalCrafts = getTotalCrafts;
+window.getMasteryLevelName = getMasteryLevelName;
+window.getMasteryMultiplier = getMasteryMultiplier;
+window.getProgressToNextLevel = getProgressToNextLevel;
