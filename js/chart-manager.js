@@ -81,10 +81,13 @@ export class ChartManager {
         this.currentIndicators = [Indicators.SMA];
         this.chartType = ChartType.CANDLESTICK;
         
-        // Bind methods
+        // Bind methods AFTER properties are initialized
         this.createChart = this.createChart.bind(this);
         this.updateChart = this.updateChart.bind(this);
         this.destroyChart = this.destroyChart.bind(this);
+        this.setChartType = this.setChartType.bind(this);
+        this.setTimeframe = this.setTimeframe.bind(this);
+        this.toggleIndicator = this.toggleIndicator.bind(this);
     }
     
     // ===== CHART CREATION =====
