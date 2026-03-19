@@ -2,6 +2,7 @@
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 // UPDATED: Removed self-import that was causing errors
 // UPDATED: Added filtering to only include chemical elements (no ship parts)
+// UPDATED: Filtered getCurrentPrices to exclude ship parts at the source
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -203,12 +204,39 @@ function calculateEventEffects(events) {
 // ===== PRICE MANAGEMENT =====
 
 /**
- * Get current market prices
- * @returns {Object} Current prices
+ * Get current market prices - FILTERED to only include chemical elements
+ * @returns {Object} Current prices (only chemical elements)
  */
 export function getCurrentPrices() {
     const prices = localStorage.getItem(STORAGE_KEYS.CURRENT_PRICES);
-    return prices ? JSON.parse(prices) : {};
+    const allPrices = prices ? JSON.parse(prices) : {};
+    
+    // Filter out ship parts and non-element items
+    const filteredPrices = {};
+    
+    for (const [name, priceData] of Object.entries(allPrices)) {
+        // Skip ship parts and other non-element items
+        if (name.includes('ship_') || 
+            name.includes('cargo_') ||
+            name.includes('engine_') ||
+            name.includes('weapon_') ||
+            name.includes('module_') ||
+            name.includes('reactor_') ||
+            name.includes('shield_') ||
+            name.includes('thruster_') ||
+            name.includes('drive_') ||
+            name.includes('scanner_') ||
+            name.includes('mining_') ||
+            name.includes('crystal_') ||
+            name.includes('component_') ||
+            name.includes('system_')) {
+            continue;
+        }
+        
+        filteredPrices[name] = priceData;
+    }
+    
+    return filteredPrices;
 }
 
 /**
@@ -472,7 +500,7 @@ export function getSupplyDemandRatio(elementName) {
  */
 export function getAvailableElements(rarity = null) {
     const elements = [];
-    const prices = getCurrentPrices();
+    const prices = getCurrentPrices(); // This now returns filtered prices
     
     for (const [name, element] of Object.entries(ELEMENT_DATABASE)) {
         // ===== FILTER OUT SHIP PARTS AND NON-ELEMENT ITEMS =====
