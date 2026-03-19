@@ -19,7 +19,6 @@ import {
     cancelTraderOrder,
     updateNPCTraderAfterTrade 
 } from './npc-traders.js';
-import { updateNPCTraderAfterTrade as storageUpdateNPCTrader } from './storage.js';
 
 // ===== MARKET ENGINE CONFIGURATION =====
 
@@ -541,7 +540,7 @@ function checkStopOrders(element, currentPrice) {
  * Get combined order book with both player and NPC orders
  * @param {string} element - Element name
  * @param {number} depth - Number of orders to return
- * @returns {Object} Order book with bids and asks
+ * @returns {Promise<Object>} Order book with bids and asks
  */
 export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
     // Get player orders
@@ -668,7 +667,7 @@ export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
 /**
  * Get market depth (cumulative quantities at each price level)
  * @param {string} element - Element name
- * @returns {Object} Market depth
+ * @returns {Promise<Object>} Market depth
  */
 export async function getMarketDepth(element) {
     const orderBook = await getCombinedOrderBook(element, 100);
@@ -768,7 +767,7 @@ function saveUserOrder(order) {
  * Cancel an order
  * @param {string} userId - User ID
  * @param {string} orderId - Order ID
- * @returns {Object} Result
+ * @returns {Promise<Object>} Result
  */
 export async function cancelOrder(userId, orderId) {
     try {
