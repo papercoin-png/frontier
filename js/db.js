@@ -1212,7 +1212,9 @@ async function dbGetNPCTradersByPersonality(personality) {
  */
 async function dbGetActiveNPCTraders(isActive = true) {
     try {
-        return await getByIndex(STORES.NPC_TRADERS, 'isActive', isActive);
+        // Get all traders and filter in JavaScript to avoid index key type issues
+        const allTraders = await getAll(STORES.NPC_TRADERS);
+        return allTraders.filter(trader => trader.isActive === isActive);
     } catch (error) {
         console.error('Error in dbGetActiveNPCTraders:', error);
         return [];
