@@ -2,7 +2,7 @@
 // Provides persistent storage with async/await interface
 
 const DB_NAME = 'voidfarer_db';
-const DB_VERSION = 3; // Increment for schema changes
+const DB_VERSION = 4; // Increment for schema changes (added certificate holders)
 
 // Store names
 const STORES = {
@@ -33,7 +33,9 @@ const STORES = {
     // Labor pool stores
     LABOR_POOL: 'laborPool',
     LABOR_EARNINGS: 'laborEarnings',
-    LABOR_HISTORY: 'laborHistory'
+    LABOR_HISTORY: 'laborHistory',
+    // Certificate holders store (NEW)
+    CERTIFICATE_HOLDERS: 'certificateHolders'
 };
 
 // Database connection
@@ -226,6 +228,16 @@ async function initDB() {
                 laborHistoryStore.createIndex('timestamp', 'timestamp', { unique: false });
                 laborHistoryStore.createIndex('type', 'type', { unique: false });
                 console.log('Created labor history store');
+            }
+            
+            // Certificate holders store (NEW)
+            if (!db.objectStoreNames.contains(STORES.CERTIFICATE_HOLDERS)) {
+                const certHoldersStore = db.createObjectStore(STORES.CERTIFICATE_HOLDERS, { keyPath: 'id', autoIncrement: true });
+                certHoldersStore.createIndex('certificateId', 'certificateId', { unique: false });
+                certHoldersStore.createIndex('playerId', 'playerId', { unique: false });
+                certHoldersStore.createIndex('masteryLevel', 'masteryLevel', { unique: false });
+                certHoldersStore.createIndex('playerName', 'playerName', { unique: false });
+                console.log('Created certificate holders store');
             }
         };
     });
@@ -906,6 +918,138 @@ async function dbGetLaborEarnings(playerId) {
     }
 }
 
+// ===== CERTIFICATE HOLDER FUNCTIONS (NEW) =====
+
+/**
+ * Update certificate holder mastery
+ * @param {string} certificateId - Certificate ID
+ * @param {string} playerId - Player ID
+ * @param {string} playerName - Player name
+ * @param {number} masteryLevel - Mastery level (1-10)
+ * @returns {Promise<Object>} Result
+ */
+async function dbUpdateCertificateHolder(certificateId, playerId, playerName, masteryLevel) {
+    try {
+        const db = await initDB();
+        const transaction = db.transaction(STORES.CERTIFICATE_HOLDERS, 'readwrite');
+        const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
+        
+        return new Promise((resolve, reject) => {
+            // First, try to find existing entry for this player and certificate
+            const index = store.index('playerId');
+            const getRequest = index.getAll(playerId);
+            
+            getRequest.onsuccess = () => {
+                const existingEntries = getRequest.result || [];
+                const existingEntry = existingEntries.find(e => e.certificateId === certificateId);
+                
+                const now = Date.now();
+                const entry = {
+                    certificateId: certificateId,
+                    playerId: playerId,
+                    playerName: playerName,
+                    masteryLevel: masteryLevel,
+                    lastUpdated: now
+                };
+                
+                // If entry exists, preserve its ID
+                if (existingEntry && existingEntry.id) {
+                    entry.id = existingEntry.id;
+                }
+                
+                const putRequest = store.put(entry);
+                
+                putRequest.onsuccess = () => {
+                    resolve({ 
+                        success: true, 
+                        id: putRequest.result 
+                    });
+                };
+                
+                putRequest.onerror = () => reject(putRequest.error);
+            };
+            
+            getRequest.onerror = () => reject(getRequest.error);
+        });
+        
+    } catch (error) {
+        console.error('Error in dbUpdateCertificateHolder:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get all certificate holders for a specific certificate
+ * @param {string} certificateId - Certificate ID
+ * @returns {Promise<Array>} Array of certificate holders
+ */
+async function dbGetCertificateHolders(certificateId) {
+    try {
+        const db = await initDB();
+        const transaction = db.transaction(STORES.CERTIFICATE_HOLDERS, 'readonly');
+        const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
+        const index = store.index('certificateId');
+        
+        return new Promise((resolve, reject) => {
+            const request = index.getAll(certificateId);
+            
+            request.onsuccess = () => {
+                resolve(request.result || []);
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+        
+    } catch (error) {
+        console.error('Error in dbGetCertificateHolders:', error);
+        return [];
+    }
+}
+
+/**
+ * Get all certificates held by a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Array of certificates
+ */
+async function dbGetPlayerCertificates(playerId) {
+    try {
+        const db = await initDB();
+        const transaction = db.transaction(STORES.CERTIFICATE_HOLDERS, 'readonly');
+        const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
+        const index = store.index('playerId');
+        
+        return new Promise((resolve, reject) => {
+            const request = index.getAll(playerId);
+            
+            request.onsuccess = () => {
+                resolve(request.result || []);
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+        
+    } catch (error) {
+        console.error('Error in dbGetPlayerCertificates:', error);
+        return [];
+    }
+}
+
+/**
+ * Get a specific certificate holder entry
+ * @param {string} certificateId - Certificate ID
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object|null>} Certificate holder entry or null
+ */
+async function dbGetCertificateHolder(certificateId, playerId) {
+    try {
+        const holders = await dbGetCertificateHolders(certificateId);
+        return holders.find(h => h.playerId === playerId) || null;
+    } catch (error) {
+        console.error('Error in dbGetCertificateHolder:', error);
+        return null;
+    }
+}
+
 // ===== RESET FUNCTIONS =====
 
 /**
@@ -967,7 +1111,13 @@ window.dbGetLaborPoolTotal = dbGetLaborPoolTotal;
 window.dbAddLaborEarnings = dbAddLaborEarnings;
 window.dbGetLaborEarnings = dbGetLaborEarnings;
 
+// Certificate holder functions (NEW)
+window.dbUpdateCertificateHolder = dbUpdateCertificateHolder;
+window.dbGetCertificateHolders = dbGetCertificateHolders;
+window.dbGetPlayerCertificates = dbGetPlayerCertificates;
+window.dbGetCertificateHolder = dbGetCertificateHolder;
+
 // Export STORES for use in other modules
 window.DB_STORES = STORES;
 
-console.log('✅ db.js initialized - IndexedDB ready');
+console.log('✅ db.js initialized - IndexedDB ready with certificate holders');
