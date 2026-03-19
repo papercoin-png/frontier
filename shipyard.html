@@ -197,6 +197,33 @@
             color: #ffd966;
         }
         
+        /* Market Link */
+        .market-link {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 16px;
+        }
+        
+        .market-btn {
+            background: rgba(138, 106, 255, 0.15);
+            border: 1px solid #8a6aff;
+            border-radius: 30px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #8a6aff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        
+        .market-btn:active {
+            background: rgba(138, 106, 255, 0.3);
+            transform: scale(0.96);
+        }
+        
         /* Section Headers */
         .section-header {
             display: flex;
@@ -479,14 +506,6 @@
             font-style: italic;
         }
         
-        .cost-note {
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.4);
-            text-align: center;
-            margin-top: 8px;
-            font-style: italic;
-        }
-        
         .price-update-note {
             font-size: 9px;
             color: #F0B90B;
@@ -650,6 +669,13 @@
                 </div>
             </div>
             
+            <!-- Market Link -->
+            <div class="market-link">
+                <div class="market-btn" onclick="goToMarket()">
+                    <span>📊</span> VIEW MARKET PRICES
+                </div>
+            </div>
+            
             <!-- Section Header -->
             <div class="section-header">
                 <div class="section-line"></div>
@@ -683,6 +709,8 @@
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
     <script type="module" src="js/labor-pool.js"></script>
+    <script type="module" src="js/element-prices.js"></script>
+    <script type="module" src="js/market-dynamics.js"></script>
 
     <script>
         // ===== TELEGRAM INITIALIZATION =====
@@ -707,6 +735,14 @@
                     const prices = JSON.parse(savedPrices);
                     if (prices[element] !== undefined) {
                         return prices[element];
+                    }
+                }
+                
+                // Try to get from market dynamics
+                if (typeof window.getElementPrice === 'function') {
+                    const priceData = window.getElementPrice(element);
+                    if (priceData && priceData.current) {
+                        return priceData.current;
                     }
                 }
                 
@@ -1209,6 +1245,12 @@
             setTimeout(() => {
                 window.location.href = 'earth-hub.html';
             }, 500);
+        };
+
+        // ===== GO TO MARKET =====
+        window.goToMarket = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'element-market.html';
         };
 
         // ===== LOAD SHIPS =====
