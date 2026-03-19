@@ -1,5 +1,6 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
+// UPDATED: Added NPC trader integration for 1000 simulated traders
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 import { 
@@ -12,11 +13,19 @@ import {
     getDemandIndex,
     getVolumeLast24h
 } from './market-dynamics.js';
+import { 
+    getNPCOrdersForElement, 
+    getNPCOrders,
+    cancelTraderOrder,
+    updateNPCTraderAfterTrade 
+} from './npc-traders.js';
+import { updateNPCTraderAfterTrade as storageUpdateNPCTrader } from './storage.js';
 
 // ===== MARKET ENGINE CONFIGURATION =====
 
 const ENGINE_CONFIG = {
     MAX_ORDERS_PER_USER: 50,
+    MAX_ORDERS_PER_NPC: 10,           // NPCs have lower limit
     ORDER_EXPIRY_HOURS: 72,
     MIN_ORDER_QUANTITY: 1,
     MAX_ORDER_QUANTITY: 10000,
@@ -25,6 +34,9 @@ const ENGINE_CONFIG = {
     PRICE_IMPACT_FACTOR: 0.1, // How much large orders impact price
     ORDER_BOOK_DEPTH: 20, // Number of orders to show on each side
     MAX_SPREAD_MULTIPLIER: 5, // Maximum spread relative to market price
+    INCLUDE_NPC_ORDERS: true,         // Whether to include NPC orders
+    SHOW_NPC_NAMES: true,              // Show NPC names in order book
+    NPC_ORDER_PREFIX: 'npc_'           // Prefix for NPC order IDs
 };
 
 // ===== STORAGE KEYS =====
@@ -94,7 +106,7 @@ export function initializeMarketEngine() {
         }));
     }
     
-    console.log('Market engine initialized');
+    console.log('Market engine initialized with NPC support');
     
     // Start matching engine
     startMatchingEngine();
@@ -120,10 +132,19 @@ export function createOrder(orderData) {
         const element = getElementByName(orderData.element);
         if (!element) throw new Error('Element not found');
         
-        // Check user order limit
-        const userOrders = getUserOrders(orderData.userId);
-        if (userOrders.length >= ENGINE_CONFIG.MAX_ORDERS_PER_USER) {
-            throw new Error(`Maximum orders (${ENGINE_CONFIG.MAX_ORDERS_PER_USER}) reached`);
+        // Check if this is an NPC order
+        const isNPC = orderData.userId.startsWith('npc_') || orderData.isNPC === true;
+        
+        // Check order limits based on user type
+        if (isNPC) {
+            // NPCs have their own limit (but we don't strictly enforce here - NPC manager handles it)
+            console.log(`Processing NPC order from ${orderData.userId}`);
+        } else {
+            // Check player order limit
+            const userOrders = getUserOrders(orderData.userId);
+            if (userOrders.length >= ENGINE_CONFIG.MAX_ORDERS_PER_USER) {
+                throw new Error(`Maximum orders (${ENGINE_CONFIG.MAX_ORDERS_PER_USER}) reached`);
+            }
         }
         
         // Validate quantity
@@ -158,6 +179,7 @@ export function createOrder(orderData) {
         const order = {
             id: generateOrderId(),
             userId: orderData.userId,
+            playerName: orderData.playerName || (isNPC ? orderData.traderName : 'Voidfarer'),
             element: orderData.element,
             side: orderData.side,
             type: orderData.type,
@@ -169,7 +191,9 @@ export function createOrder(orderData) {
             status: ORDER_STATUS.ACTIVE,
             createdAt: Date.now(),
             expiresAt: Date.now() + (ENGINE_CONFIG.ORDER_EXPIRY_HOURS * 60 * 60 * 1000),
-            trades: []
+            trades: [],
+            isNPC: isNPC,
+            traderName: orderData.traderName || (isNPC ? 'NPC Trader' : null)
         };
         
         // For market orders, attempt immediate execution
@@ -187,8 +211,10 @@ export function createOrder(orderData) {
             addStopOrder(order);
         }
         
-        // Save order to user's list
-        saveUserOrder(order);
+        // Save order to user's list (only for players, NPCs are managed separately)
+        if (!isNPC) {
+            saveUserOrder(order);
+        }
         
         // Record order creation
         recordOrderHistory(order, 'created');
@@ -243,19 +269,25 @@ function executeMarketOrder(order) {
             id: generateTradeId(),
             orderId: order.id,
             userId: order.userId,
+            playerName: order.playerName,
             element: order.element,
             side: order.side,
             quantity: order.quantity,
             price: executionPrice,
             total: totalCost,
             fee: fee,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            isNPC: order.isNPC
         };
         
         recordTrade(order.element, order.quantity, order.side);
         addToMatchedTrades(trade);
         recordOrderHistory(order, 'filled');
-        saveUserOrder(order);
+        
+        // Save user order if player
+        if (!order.isNPC) {
+            saveUserOrder(order);
+        }
         
         // Update market stats
         updateMarketStats(order.quantity, totalCost);
@@ -363,7 +395,11 @@ function matchOrders(element) {
                 quantity: matchQuantity,
                 price: matchPrice,
                 total: matchQuantity * matchPrice,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                buyIsNPC: buy.isNPC || false,
+                sellIsNPC: sell.isNPC || false,
+                buyerName: buy.playerName || (buy.isNPC ? buy.traderName : 'Player'),
+                sellerName: sell.playerName || (sell.isNPC ? sell.traderName : 'Player')
             };
             
             // Update orders
@@ -398,9 +434,30 @@ function matchOrders(element) {
             recordOrderHistory(buy, 'matched');
             recordOrderHistory(sell, 'matched');
             
-            // Update user orders
-            saveUserOrder(buy);
-            saveUserOrder(sell);
+            // Update user orders (players only)
+            if (!buy.isNPC) saveUserOrder(buy);
+            if (!sell.isNPC) saveUserOrder(sell);
+            
+            // Update NPC traders if involved
+            if (buy.isNPC) {
+                updateNPCTraderAfterTrade(buy.userId, {
+                    element,
+                    quantity: matchQuantity,
+                    price: matchPrice,
+                    side: ORDER_SIDES.BUY,
+                    orderId: buy.id
+                }).catch(err => console.error('Error updating NPC buyer:', err));
+            }
+            
+            if (sell.isNPC) {
+                updateNPCTraderAfterTrade(sell.userId, {
+                    element,
+                    quantity: matchQuantity,
+                    price: matchPrice,
+                    side: ORDER_SIDES.SELL,
+                    orderId: sell.id
+                }).catch(err => console.error('Error updating NPC seller:', err));
+            }
             
             // Update market stats
             updateMarketStats(matchQuantity, trade.total);
@@ -481,7 +538,83 @@ function checkStopOrders(element, currentPrice) {
 // ===== ORDER BOOK QUERIES =====
 
 /**
- * Get order book for an element
+ * Get combined order book with both player and NPC orders
+ * @param {string} element - Element name
+ * @param {number} depth - Number of orders to return
+ * @returns {Object} Order book with bids and asks
+ */
+export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
+    // Get player orders
+    const buyOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.BUY_ORDERS) || '{}');
+    const sellOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.SELL_ORDERS) || '{}');
+    
+    const playerBuys = (buyOrders[element] || [])
+        .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL);
+    
+    const playerSells = (sellOrders[element] || [])
+        .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL);
+    
+    // Get NPC orders
+    let npcBuys = [];
+    let npcSells = [];
+    
+    if (ENGINE_CONFIG.INCLUDE_NPC_ORDERS) {
+        try {
+            const npcOrders = await getNPCOrdersForElement(element);
+            npcBuys = npcOrders.bids || [];
+            npcSells = npcOrders.asks || [];
+        } catch (error) {
+            console.error('Error fetching NPC orders:', error);
+        }
+    }
+    
+    // Combine and sort
+    const allBuys = [...playerBuys, ...npcBuys].sort((a, b) => b.price - a.price);
+    const allSells = [...playerSells, ...npcSells].sort((a, b) => a.price - b.price);
+    
+    // Format for display
+    const bids = allBuys.slice(0, depth).map(o => ({
+        price: o.price,
+        quantity: o.remainingQuantity,
+        total: o.price * o.remainingQuantity,
+        orderId: o.id,
+        isNPC: o.isNPC || false,
+        traderName: o.isNPC ? (o.traderName || 'NPC Trader') : null,
+        userId: o.userId
+    }));
+    
+    const asks = allSells.slice(0, depth).map(o => ({
+        price: o.price,
+        quantity: o.remainingQuantity,
+        total: o.price * o.remainingQuantity,
+        orderId: o.id,
+        isNPC: o.isNPC || false,
+        traderName: o.isNPC ? (o.traderName || 'NPC Trader') : null,
+        userId: o.userId
+    }));
+    
+    // Calculate spread
+    const bestBid = bids.length > 0 ? bids[0].price : null;
+    const bestAsk = asks.length > 0 ? asks[0].price : null;
+    const spread = bestBid && bestAsk ? bestAsk - bestBid : null;
+    const spreadPercent = spread && bestBid ? (spread / bestBid) * 100 : null;
+    
+    return {
+        element,
+        bids,
+        asks,
+        bestBid,
+        bestAsk,
+        spread,
+        spreadPercent,
+        playerCount: playerBuys.length + playerSells.length,
+        npcCount: npcBuys.length + npcSells.length,
+        timestamp: Date.now()
+    };
+}
+
+/**
+ * Get order book for an element (legacy - returns only player orders)
  * @param {string} element - Element name
  * @param {number} depth - Number of orders to return
  * @returns {Object} Order book with bids and asks
@@ -497,7 +630,9 @@ export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
             price: o.price,
             quantity: o.remainingQuantity,
             total: o.price * o.remainingQuantity,
-            orderId: o.id
+            orderId: o.id,
+            isNPC: o.isNPC || false,
+            traderName: o.traderName
         }));
     
     const sells = (sellOrders[element] || [])
@@ -507,7 +642,9 @@ export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
             price: o.price,
             quantity: o.remainingQuantity,
             total: o.price * o.remainingQuantity,
-            orderId: o.id
+            orderId: o.id,
+            isNPC: o.isNPC || false,
+            traderName: o.traderName
         }));
     
     // Calculate spread
@@ -533,8 +670,8 @@ export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
  * @param {string} element - Element name
  * @returns {Object} Market depth
  */
-export function getMarketDepth(element) {
-    const orderBook = getOrderBook(element, 100);
+export async function getMarketDepth(element) {
+    const orderBook = await getCombinedOrderBook(element, 100);
     
     // Group by price levels
     const bidLevels = {};
@@ -562,6 +699,8 @@ export function getMarketDepth(element) {
         asks: Object.entries(askLevels)
             .map(([price, quantity]) => ({ price: parseFloat(price), quantity }))
             .sort((a, b) => a.price - b.price),
+        playerCount: orderBook.playerCount,
+        npcCount: orderBook.npcCount,
         timestamp: Date.now()
     };
 }
@@ -572,11 +711,14 @@ export function getMarketDepth(element) {
  * Get orders for a user
  * @param {string} userId - User ID
  * @param {Object} filters - Optional filters
- * @returns {Array} User orders
+ * @returns {Array} User orders (players only, NPCs filtered out)
  */
 export function getUserOrders(userId, filters = {}) {
     const userOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_ORDERS) || '{}');
     let orders = userOrders[userId] || [];
+    
+    // Filter out any NPC orders that might have snuck in (shouldn't happen, but safety)
+    orders = orders.filter(o => !o.isNPC);
     
     // Apply filters
     if (filters.element) {
@@ -603,6 +745,9 @@ export function getUserOrders(userId, filters = {}) {
  * @param {Object} order - Order object
  */
 function saveUserOrder(order) {
+    // Don't save NPC orders to user storage
+    if (order.isNPC) return;
+    
     const userOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.USER_ORDERS) || '{}');
     
     if (!userOrders[order.userId]) {
@@ -625,8 +770,17 @@ function saveUserOrder(order) {
  * @param {string} orderId - Order ID
  * @returns {Object} Result
  */
-export function cancelOrder(userId, orderId) {
+export async function cancelOrder(userId, orderId) {
     try {
+        // Check if this is an NPC order
+        if (orderId.startsWith('npc_')) {
+            // Handle NPC order cancellation
+            const traderId = userId; // For NPCs, userId is the trader ID
+            const result = await cancelTraderOrder(orderId, { id: traderId });
+            return result;
+        }
+        
+        // Handle player order cancellation
         // Check in buy orders
         const buyOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.BUY_ORDERS) || '{}');
         // Check in sell orders
@@ -708,13 +862,15 @@ function recordOrderHistory(order, action) {
     history.push({
         orderId: order.id,
         userId: order.userId,
+        playerName: order.playerName,
         element: order.element,
         side: order.side,
         type: order.type,
         quantity: order.originalQuantity,
         price: order.price,
         action: action,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        isNPC: order.isNPC || false
     });
     
     // Keep last 10000 records
@@ -789,6 +945,19 @@ export function getUserTrades(userId, limit = 50) {
         .reverse();
 }
 
+/**
+ * Get all recent trades (including NPC trades)
+ * @param {number} limit - Number of trades
+ * @returns {Array} Recent trades
+ */
+export function getAllRecentTrades(limit = 50) {
+    const trades = JSON.parse(localStorage.getItem(STORAGE_KEYS.MATCHED_TRADES) || '[]');
+    
+    return trades
+        .slice(-limit)
+        .reverse();
+}
+
 // ===== MARKET STATISTICS =====
 
 /**
@@ -834,10 +1003,16 @@ export function get24HourSummary() {
     const change = last - first;
     const changePercent = first > 0 ? (change / first) * 100 : 0;
     
+    // Count NPC vs Player trades
+    const npcTrades = recentTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
+    const playerTrades = recentTrades.length - npcTrades;
+    
     return {
         volume,
         value,
         trades: recentTrades.length,
+        npcTrades,
+        playerTrades,
         high,
         low,
         open: first,
@@ -987,23 +1162,62 @@ export function stopMatchingEngine() {
     }
 }
 
+// ===== NPC INTEGRATION HELPERS =====
+
+/**
+ * Get order book with NPC orders (async version for UI)
+ * @param {string} element - Element name
+ * @param {number} depth - Order depth
+ * @returns {Promise<Object>} Combined order book
+ */
+export async function getOrderBookWithNPC(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
+    return await getCombinedOrderBook(element, depth);
+}
+
+/**
+ * Check if an order is from an NPC
+ * @param {Object} order - Order object
+ * @returns {boolean} True if NPC order
+ */
+export function isNPCOrder(order) {
+    return order.isNPC === true || order.userId?.startsWith('npc_') || order.id?.startsWith('npc_');
+}
+
+/**
+ * Get trader name for display
+ * @param {Object} order - Order object
+ * @returns {string} Display name
+ */
+export function getTraderDisplayName(order) {
+    if (order.isNPC) {
+        return order.traderName || 'NPC Trader';
+    }
+    return order.playerName || 'Player';
+}
+
 // ===== EXPORT =====
 
 export default {
     ORDER_TYPES,
     ORDER_SIDES,
     ORDER_STATUS,
+    ENGINE_CONFIG,
     initializeMarketEngine,
     createOrder,
     cancelOrder,
     getOrderBook,
+    getCombinedOrderBook,
+    getOrderBookWithNPC,
     getMarketDepth,
     getUserOrders,
     getUserOrderHistory,
     getRecentTrades,
     getUserTrades,
+    getAllRecentTrades,
     getMarketStats,
     get24HourSummary,
+    isNPCOrder,
+    getTraderDisplayName,
     startMatchingEngine,
     stopMatchingEngine
 };
@@ -1015,16 +1229,22 @@ initializeMarketEngine();
 window.ORDER_TYPES = ORDER_TYPES;
 window.ORDER_SIDES = ORDER_SIDES;
 window.ORDER_STATUS = ORDER_STATUS;
+window.ENGINE_CONFIG = ENGINE_CONFIG;
 window.initializeMarketEngine = initializeMarketEngine;
 window.createOrder = createOrder;
 window.cancelOrder = cancelOrder;
 window.getOrderBook = getOrderBook;
+window.getCombinedOrderBook = getCombinedOrderBook;
+window.getOrderBookWithNPC = getOrderBookWithNPC;
 window.getMarketDepth = getMarketDepth;
 window.getUserOrders = getUserOrders;
 window.getUserOrderHistory = getUserOrderHistory;
 window.getRecentTrades = getRecentTrades;
 window.getUserTrades = getUserTrades;
+window.getAllRecentTrades = getAllRecentTrades;
 window.getMarketStats = getMarketStats;
 window.get24HourSummary = get24HourSummary;
+window.isNPCOrder = isNPCOrder;
+window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - Trading engine ready');
+console.log('✅ market-engine.js loaded - NPC-integrated trading engine ready');
