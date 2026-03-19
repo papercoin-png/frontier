@@ -1133,7 +1133,7 @@ async function dbGetCertificateHolder(certificateId, playerId) {
     }
 }
 
-// ===== NPC TRADER FUNCTIONS (NEW) =====
+// ===== NPC TRADER FUNCTIONS =====
 
 /**
  * Save an NPC trader
@@ -1561,7 +1561,33 @@ async function resetNPCData() {
     }
 }
 
-// ===== EXPORT FUNCTIONS =====
+// ===== ES6 EXPORTS (for module imports) =====
+export {
+    initDB,
+    getItem, setItem, deleteItem, getAll, getByIndex, getByIndexRange, clearStore,
+    getCollectionAsObject, dbAddElementToCollection, dbRemoveElementFromCollection,
+    dbSaveElementLocation, dbGetElementLocations,
+    dbSaveAlchemyProgress, dbGetAlchemyProgress, dbGetAllAlchemyProgress,
+    dbUnlockRecipe, dbIsRecipeUnlocked,
+    getAllProperties, addProperty,
+    dbAddToLaborPool, dbGetLaborPoolTotal, dbAddLaborEarnings, dbGetLaborEarnings,
+    dbUpdateCertificateHolder, dbGetCertificateHolders, dbGetPlayerCertificates, dbGetCertificateHolder,
+    // NPC Trader Functions
+    dbSaveNPCTrader, dbGetNPCTrader, dbGetAllNPCTraders,
+    dbGetNPCTradersByType, dbGetNPCTradersByPersonality,
+    dbGetActiveNPCTraders, dbGetNPCTradersByLastActivity, dbDeleteNPCTrader,
+    // NPC Order Functions
+    dbSaveNPCOrder, dbGetNPCOrder, dbGetAllNPCOrders,
+    dbGetNPCOrdersByTrader, dbGetNPCOrdersByElement, dbGetNPCOrdersBySide,
+    dbGetNPCOrdersByStatus, dbGetActiveNPCOrders, dbGetNPCOrdersByPriceRange,
+    dbDeleteNPCOrder,
+    // NPC History Functions
+    dbRecordNPCTrade, dbGetNPCTraderHistory, dbGetNPCElementHistory,
+    dbGetNPCTradesByTimeRange, dbGetNPCElementVolume,
+    resetNPCData
+};
+
+// ===== WINDOW EXPORTS (for global access) =====
 
 // Core functions
 window.initDB = initDB;
@@ -1626,7 +1652,7 @@ window.dbGetNPCOrdersBySide = dbGetNPCOrdersBySide;
 window.dbGetNPCOrdersByStatus = dbGetNPCOrdersByStatus;
 window.dbGetActiveNPCOrders = dbGetActiveNPCOrders;
 window.dbGetNPCOrdersByPriceRange = dbGetNPCOrdersByPriceRange;
-window.dbDeleteNPCOrder = dbDeleteNPCOrder;  // ← ADDED THIS MISSING EXPORT
+window.dbDeleteNPCOrder = dbDeleteNPCOrder;
 
 // NPC History functions
 window.dbRecordNPCTrade = dbRecordNPCTrade;
