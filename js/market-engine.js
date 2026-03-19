@@ -1,9 +1,13 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
 // UPDATED: Added NPC trader integration for 1000 simulated traders
+// UPDATED: Fixed imports for market-dynamics.js (default export)
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
-import { 
+
+// Fix: Import market-dynamics as default and destructure
+import marketDynamics from './market-dynamics.js';
+const { 
     getCurrentPrices, 
     getBidPrice, 
     getAskPrice, 
@@ -12,7 +16,8 @@ import {
     getSupplyIndex,
     getDemandIndex,
     getVolumeLast24h
-} from './market-dynamics.js';
+} = marketDynamics;
+
 import { 
     getNPCOrdersForElement, 
     getNPCOrders,
