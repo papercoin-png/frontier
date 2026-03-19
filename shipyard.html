@@ -460,6 +460,17 @@
             color: #8a6aff;
         }
         
+        .labor-note {
+            font-size: 10px;
+            color: #8a6aff;
+            text-align: center;
+            margin-top: 8px;
+            font-style: italic;
+            background: rgba(138, 106, 255, 0.1);
+            padding: 6px;
+            border-radius: 30px;
+        }
+        
         .cost-note {
             font-size: 10px;
             color: rgba(255, 255, 255, 0.4);
@@ -653,6 +664,7 @@
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/labor-pool.js"></script>
 
     <script>
         // ===== TELEGRAM INITIALIZATION =====
@@ -699,7 +711,8 @@
                     'Titanium': 50,
                     'Carbon': 100
                 },
-                description: 'Specialized mining ship with enhanced extraction capabilities.'
+                description: 'Specialized mining ship with enhanced extraction capabilities.',
+                requiredCertificate: 'excavator'
             },
             {
                 id: 'courier',
@@ -718,7 +731,8 @@
                     'Silicon': 100,
                     'Copper': 100
                 },
-                description: 'Fast transport ship with expanded cargo capacity.'
+                description: 'Fast transport ship with expanded cargo capacity.',
+                requiredCertificate: 'trader'
             },
             {
                 id: 'surveyor',
@@ -737,7 +751,8 @@
                     'Silicon': 100,
                     'Platinum': 25
                 },
-                description: 'Advanced scanner ship that reveals hidden resources.'
+                description: 'Advanced scanner ship that reveals hidden resources.',
+                requiredCertificate: 'analyst'
             },
             {
                 id: 'tug',
@@ -756,7 +771,8 @@
                     'Iron': 200,
                     'Tungsten': 30
                 },
-                description: 'Construction support ship with towing capabilities.'
+                description: 'Construction support ship with towing capabilities.',
+                requiredCertificate: 'engineer'
             },
             {
                 id: 'pathfinder',
@@ -776,7 +792,8 @@
                     'Platinum': 25,
                     'Nickel': 80
                 },
-                description: 'Long-range explorer with advanced navigation systems.'
+                description: 'Long-range explorer with advanced navigation systems.',
+                requiredCertificate: 'pioneer'
             }
         ];
 
@@ -930,7 +947,10 @@
                             <span class="cost-label">TOTAL COST:</span>
                             <span class="cost-total">${totalCost.toLocaleString()} ⭐</span>
                         </div>
-                        <div class="cost-note">Labor equals material cost • Market prices apply</div>
+                        <div class="labor-note">
+                            👷 ${laborCost.toLocaleString()}⭐ goes to ${ship.requiredCertificate} certificate holders
+                        </div>
+                        <div class="cost-note">Market prices apply • Labor supports skilled players</div>
                     </div>
                     
                     <div class="build-btn ${!canBuild ? 'disabled' : ''}" 
@@ -1029,6 +1049,14 @@
                 // Deduct total cost
                 localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
                 
+                // Add labor cost to labor pool for certificate holders
+                if (typeof window.addLaborFromBuild === 'function') {
+                    window.addLaborFromBuild(ship.id, laborCost);
+                    console.log(`Added ${laborCost}⭐ labor to pool for ${ship.requiredCertificate} holders`);
+                } else {
+                    console.warn('Labor pool function not available');
+                }
+                
                 // Add ship to player's fleet
                 const playerShips = JSON.parse(localStorage.getItem('voidfarer_ships') || '[]');
                 playerShips.push({
@@ -1047,7 +1075,7 @@
                         tg.HapticFeedback.notificationOccurred?.('success');
                     }
                     
-                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.\nTotal cost: ${totalCost}⭐`);
+                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.\nTotal cost: ${totalCost}⭐\nLabor: ${laborCost}⭐ distributed to ${ship.requiredCertificate} certificate holders`);
                     
                     // Refresh the page to update counts
                     window.location.reload();
