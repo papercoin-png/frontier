@@ -4,7 +4,7 @@
 // UPDATED: Fixed price validation to prevent "Price data not available" errors
 // UPDATED: Fixed element filtering to use current price instead of bid/ask
 // UPDATED: Added updatePrices() call to ensure fresh price data each cycle
-// UPDATED: Added debug logging to diagnose zero actions issue
+// UPDATED: Added enhanced debug logging to diagnose zero actions issue
 // UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
 
 import { 
@@ -718,6 +718,7 @@ export async function updateTrader(trader, marketData) {
         if (Math.random() < 0.15) {
             trader.isActive = true;
             trader.personality = TRADER_PERSONALITIES.RANDOM;
+            console.log(`💤 ${trader.name} woke up and is now active!`);
         } else {
             return { traderId: trader.id, actions: [] };
         }
@@ -726,11 +727,30 @@ export async function updateTrader(trader, marketData) {
     const actions = [];
     const prices = marketData.prices || {};
     
+    // ===== ENHANCED DEBUG LOGGING =====
+    console.log(`\n🔍 TRADER: ${trader.name} (${trader.personality})`);
+    console.log(`   Credits: ${trader.credits}`);
+    console.log(`   Inventory:`, trader.inventory);
+    console.log(`   Favorite elements:`, trader.favoriteElements);
+    
+    // Check if prices exist
+    const priceKeys = Object.keys(prices);
+    console.log(`   Total price keys: ${priceKeys.length}`);
+    
+    if (priceKeys.length > 0) {
+        console.log(`   Sample price data for ${priceKeys[0]}:`, prices[priceKeys[0]]);
+    } else {
+        console.log(`   ⚠️ NO PRICE DATA FOUND!`);
+    }
+    // ===== END DEBUG =====
+    
     // ===== FIXED FILTERING =====
     // Get all elements that have ANY price data - use current price as the reliable indicator
     const allTradableElements = Object.keys(prices).filter(el => 
         prices[el] && prices[el].current > 0
     );
+    
+    console.log(`   Tradable elements found: ${allTradableElements.length}`);
     
     // Use favorites if they exist and are tradable
     let elements = [];
@@ -738,20 +758,30 @@ export async function updateTrader(trader, marketData) {
         elements = trader.favoriteElements.filter(el => 
             prices[el] && prices[el].current > 0
         );
+        console.log(`   Favorite elements tradable: ${elements.length} of ${trader.favoriteElements.length}`);
+    } else {
+        console.log(`   No favorite elements defined`);
     }
     
     // If no valid favorites, use first 5 tradable elements
     if (elements.length === 0) {
         elements = allTradableElements.slice(0, 5);
+        console.log(`   Using fallback elements: ${elements.length}`);
+        if (elements.length > 0) {
+            console.log(`   Fallback elements:`, elements);
+        }
     }
     
     // If still no elements, return
     if (elements.length === 0) {
+        console.log(`   ❌ No tradable elements for ${trader.name}`);
         return { traderId: trader.id, actions: [] };
     }
     
     const fallbackElements = elements;
     // ===== END FIXED FILTERING =====
+    
+    console.log(`   ⚡ Updating with elements:`, fallbackElements);
     
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
@@ -770,7 +800,13 @@ export async function updateTrader(trader, marketData) {
             await updateMarketMaker(trader, marketData, fallbackElements, actions);
             break;
         default:
+            console.log(`   ❓ Unknown personality: ${trader.personality}`);
             break;
+    }
+    
+    console.log(`   📝 Took ${actions.length} actions`);
+    if (actions.length > 0) {
+        console.log(`   Actions:`, actions);
     }
     
     await cleanupExpiredOrders(trader);
@@ -1192,7 +1228,7 @@ export function stopNPCTraderUpdates() {
 }
 
 export async function processNPCTradingCycle(batchSize = 100) {
-    console.log(`Processing NPC trading cycle (${batchSize} traders)...`);
+    console.log(`\n🔄 Processing NPC trading cycle (${batchSize} traders)...`);
     
     // ===== FIX: Ensure prices are updated before trading =====
     // This will calculate new bid/ask spreads based on market dynamics
