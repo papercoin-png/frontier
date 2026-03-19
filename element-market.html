@@ -1648,8 +1648,29 @@
                 // Initialize market if needed
                 initializeMarket();
                 
-                // Load all elements
-                allElements = getAvailableElements();
+                // Load all elements with proper price data
+                console.log('Loading available elements...');
+                const rawElements = getAvailableElements();
+                console.log('Raw elements from getAvailableElements:', rawElements.length);
+                
+                // Get current prices to merge
+                const prices = getCurrentPrices();
+                console.log('Current prices available:', Object.keys(prices).length);
+                
+                // Merge price data into elements
+                allElements = rawElements.map(el => {
+                    const priceData = prices[el.name] || {};
+                    return {
+                        ...el,
+                        currentPrice: priceData.current || el.basePrice || 100,
+                        bidPrice: priceData.bid || Math.floor((priceData.current || el.basePrice || 100) * 0.99),
+                        askPrice: priceData.ask || Math.ceil((priceData.current || el.basePrice || 100) * 1.01),
+                        priceChangePercent: priceData.priceChangePercent || 0,
+                        volume24h: priceData.volume24h || 0
+                    };
+                });
+                
+                console.log('Sample element with price:', allElements[0]);
                 filteredElements = [...allElements];
                 
                 // Load player data
@@ -1660,13 +1681,13 @@
                 updateBalance();
                 renderMarketTicker();
                 renderMarketTable();
-                await renderOrderBook(); // Now async
+                await renderOrderBook();
                 updateMarketStats();
                 
                 // Save initial prices
                 saveMarketPrices();
                 
-                // Initialize NPC traders (but don't wait for it)
+                // Initialize NPC traders
                 initializeNPCs().catch(console.error);
                 
                 // Setup chart for default element
@@ -1717,15 +1738,18 @@
             const topElements = allElements.slice(0, 8);
             const ticker = document.getElementById('marketTicker');
             
+            if (!ticker) return;
+            
             ticker.innerHTML = topElements.map(el => {
+                const price = el.currentPrice || el.basePrice || 100;
                 const change = el.priceChangePercent || 0;
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 const changeSymbol = change > 0 ? '+' : '';
                 
                 return `
                     <div class="ticker-item" onclick="window.openElementModal('${el.name}')">
-                        <span class="ticker-symbol">${el.symbol}</span>
-                        <span class="ticker-price">${el.currentPrice}⭐</span>
+                        <span class="ticker-symbol">${el.symbol || '??'}</span>
+                        <span class="ticker-price">${Math.round(price)}⭐</span>
                         <span class="ticker-change ${changeClass}">${changeSymbol}${change.toFixed(1)}%</span>
                     </div>
                 `;
@@ -1759,7 +1783,7 @@
             }).join('');
         }
 
-        // ===== ORDER BOOK (UPDATED for NPC orders) =====
+        // ===== ORDER BOOK =====
         async function renderOrderBook() {
             if (!selectedElement) {
                 document.getElementById('orderBookBids').innerHTML = '<div class="order-row">Select an element</div>';
@@ -1837,26 +1861,40 @@
             document.getElementById('depthSpread').textContent = `${spreadPercent.toFixed(2)}% spread`;
         }
 
-        // ===== IMPROVED MARKET STATS WITH DEBUG =====
+        // ===== FORCED MARKET STATS UPDATE =====
         function updateMarketStats() {
             try {
                 console.log('📊 Updating market stats...');
                 
-                const prices = getCurrentPrices();
-                console.log('Current prices:', Object.keys(prices).length, 'elements');
+                // Get DOM elements
+                const volumeEl = document.getElementById('volume24h');
+                const marketCapEl = document.getElementById('marketCap');
+                const tradesEl = document.getElementById('trades24h');
+                const tradesChangeEl = document.getElementById('tradesChange');
+                const topGainerEl = document.getElementById('topGainer');
+                const gainerChangeEl = document.getElementById('gainerChange');
+                const volumeChangeEl = document.getElementById('volumeChange');
                 
-                const recentTrades = getAllRecentTrades(200);
-                console.log('Recent trades count:', recentTrades.length);
+                // Log if elements are found
+                console.log('DOM elements found:', {
+                    volume: !!volumeEl,
+                    marketCap: !!marketCapEl,
+                    trades: !!tradesEl,
+                    topGainer: !!topGainerEl
+                });
                 
-                if (recentTrades.length > 0) {
-                    console.log('Sample trade:', recentTrades[0]);
+                if (!volumeEl || !marketCapEl || !tradesEl) {
+                    console.error('❌ Market stats DOM elements missing!');
+                    return;
                 }
                 
-                // Calculate 24h volume and trades
+                // Get data
+                const prices = getCurrentPrices();
+                const recentTrades = getAllRecentTrades(200);
+                
+                // Calculate 24h stats
                 const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
                 const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
-                console.log('Last 24h trades:', last24hTrades.length);
-                
                 const volume24h = last24hTrades.reduce((sum, t) => sum + (t.quantity || 0), 0);
                 const npcTrades = last24hTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
                 
@@ -1878,30 +1916,32 @@
                     }
                 });
                 
-                console.log('Top gainer:', topGainer);
-                console.log('Volume 24h:', volume24h);
-                console.log('Market Cap:', marketCap);
-                
-                // Update DOM elements
-                document.getElementById('volume24h').textContent = volume24h.toLocaleString();
-                document.getElementById('marketCap').textContent = Math.round(marketCap).toLocaleString();
-                document.getElementById('trades24h').textContent = last24hTrades.length.toString();
-                document.getElementById('tradesChange').innerHTML = `NPC: ${npcTrades}`;
+                // FORCE UPDATE DOM - use direct property assignment
+                volumeEl.innerText = volume24h.toLocaleString();
+                marketCapEl.innerText = Math.round(marketCap).toLocaleString();
+                tradesEl.innerText = last24hTrades.length.toString();
+                tradesChangeEl.innerHTML = `NPC: ${npcTrades}`;
                 
                 if (topGainer.name !== '---') {
-                    document.getElementById('topGainer').textContent = topGainer.name;
-                    document.getElementById('gainerChange').textContent = `+${topGainer.change.toFixed(1)}%`;
+                    topGainerEl.innerText = topGainer.name;
+                    gainerChangeEl.innerText = `+${topGainer.change.toFixed(1)}%`;
                 }
                 
-                // Update volume change (simulated based on actual volume)
-                const volumeChange = volume24h > 0 ? ((volume24h / 1000) || 0).toFixed(1) : '0.0';
-                document.getElementById('volumeChange').textContent = `+${volumeChange}%`;
+                volumeChangeEl.innerText = `+${((volume24h / 1000) || 0).toFixed(1)}%`;
                 
-                // Force NPC stats update
-                updateNPCStats();
+                console.log('✅ Stats updated:', {
+                    volume: volume24h,
+                    trades: last24hTrades.length,
+                    marketCap: marketCap,
+                    topGainer: topGainer
+                });
+                
+                // Also update the market ticker and table
+                renderMarketTicker();
+                renderMarketTable();
                 
             } catch (error) {
-                console.error('Error updating market stats:', error);
+                console.error('❌ Error updating market stats:', error);
             }
         }
 
@@ -1944,7 +1984,7 @@
             selectedElement = element;
             renderMarketTable();
             setupChart(elementName);
-            renderOrderBook(); // Now async
+            renderOrderBook();
         };
 
         // ===== OPEN ELEMENT MODAL =====
