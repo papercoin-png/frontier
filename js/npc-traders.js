@@ -4,7 +4,7 @@
 // UPDATED: Fixed price validation to prevent "Price data not available" errors
 // UPDATED: Fixed element filtering to use current price instead of bid/ask
 // UPDATED: Added updatePrices() call to ensure fresh price data each cycle
-// UPDATED: Fixed imports for market-dynamics.js (default export)
+// UPDATED: Added debug logging to diagnose zero actions issue
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -23,7 +23,6 @@ import {
     dbGetNPCTradersByLastActivity, dbGetNPCOrder
 } from './db.js';
 
-// Fix: Import market-dynamics as default and destructure
 import marketDynamics from './market-dynamics.js';
 const { getCurrentPrices, getBidPrice, getAskPrice, updatePrices } = marketDynamics;
 
@@ -666,6 +665,7 @@ export async function updateTrader(trader, marketData) {
         if (Math.random() < 0.15) {
             trader.isActive = true;
             trader.personality = TRADER_PERSONALITIES.RANDOM;
+            console.log(`💤 ${trader.name} woke up and is now active!`);
         } else {
             return { traderId: trader.id, actions: [] };
         }
@@ -674,11 +674,28 @@ export async function updateTrader(trader, marketData) {
     const actions = [];
     const prices = marketData.prices || {};
     
+    // ===== DEBUG LOGGING =====
+    console.log(`🔍 Trader ${trader.name} (${trader.personality}):`, {
+        credits: trader.credits,
+        inventoryCount: Object.keys(trader.inventory).length,
+        inventory: trader.inventory,
+        favoriteCount: trader.favoriteElements.length,
+        favorites: trader.favoriteElements,
+        priceKeys: Object.keys(prices).length,
+        samplePrice: prices[Object.keys(prices)[0]]
+    });
+    // ===== END DEBUG =====
+    
     // ===== FIXED FILTERING =====
     // Get all elements that have ANY price data - use current price as the reliable indicator
     const allTradableElements = Object.keys(prices).filter(el => 
         prices[el] && prices[el].current > 0
     );
+    
+    console.log(`📊 Tradable elements found: ${allTradableElements.length}`);
+    if (allTradableElements.length > 0) {
+        console.log(`📊 First few tradable elements:`, allTradableElements.slice(0, 3));
+    }
     
     // Use favorites if they exist and are tradable
     let elements = [];
@@ -688,18 +705,27 @@ export async function updateTrader(trader, marketData) {
         );
     }
     
+    console.log(`🎯 Favorite elements tradable: ${elements.length}`);
+    
     // If no valid favorites, use first 5 tradable elements
     if (elements.length === 0) {
         elements = allTradableElements.slice(0, 5);
+        console.log(`🔄 Using fallback elements: ${elements.length}`);
+        if (elements.length > 0) {
+            console.log(`🔄 Fallback elements:`, elements);
+        }
     }
     
     // If still no elements, return
     if (elements.length === 0) {
+        console.log(`❌ No tradable elements for ${trader.name}`);
         return { traderId: trader.id, actions: [] };
     }
     
     const fallbackElements = elements;
     // ===== END FIXED FILTERING =====
+    
+    console.log(`⚡ Updating ${trader.name} with elements:`, fallbackElements);
     
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
@@ -718,8 +744,11 @@ export async function updateTrader(trader, marketData) {
             await updateMarketMaker(trader, marketData, fallbackElements, actions);
             break;
         default:
+            console.log(`❓ Unknown personality: ${trader.personality}`);
             break;
     }
+    
+    console.log(`📝 ${trader.name} took ${actions.length} actions`);
     
     await cleanupExpiredOrders(trader);
     
