@@ -1156,6 +1156,52 @@
             transform: scale(0.9);
         }
         
+        /* Fixed Bottom Navigation Bar */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            max-width: 390px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(15px);
+            border-top: 1px solid #F0B90B;
+            padding: 12px 20px;
+            z-index: 1000;
+            margin: 0 auto;
+            right: 0;
+        }
+        
+        .back-btn-fixed {
+            background: rgba(240, 185, 11, 0.15);
+            border: 1px solid #F0B90B;
+            border-radius: 40px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        
+        .back-btn-fixed:active {
+            transform: scale(0.97);
+            background: rgba(240, 185, 11, 0.3);
+        }
+        
+        .back-icon {
+            font-size: 20px;
+            color: #F0B90B;
+        }
+        
+        .back-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #F0B90B;
+        }
+        
         /* Toast Notification */
         .toast-notification {
             position: fixed;
@@ -1200,41 +1246,6 @@
             border-radius: 60px 20px 60px 20px;
             border: 2px dashed #2B2F36;
             font-style: italic;
-        }
-        
-        /* Back button */
-        .back-button {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1E2026;
-            border: 2px solid #F0B90B;
-            color: #EAECEF;
-            padding: 14px 25px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            width: fit-content;
-            min-width: 220px;
-            box-shadow: 0 0 20px rgba(240, 185, 11, 0.3);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .back-button:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #2B2F36;
-        }
-        
-        .back-arrow {
-            font-size: 20px;
-            color: #F0B90B;
         }
         
         /* Scrollbar */
@@ -1406,12 +1417,14 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Back button -->
-            <button class="back-button" onclick="window.returnToHub()">
-                <span class="back-arrow">←</span>
+        </div>
+        
+        <!-- Fixed Bottom Navigation Bar -->
+        <div class="bottom-nav">
+            <div class="back-btn-fixed" onclick="window.returnToHub()">
+                <span class="back-icon">←</span>
                 <span class="back-text">MARKET HUB</span>
-            </button>
+            </div>
         </div>
         
         <!-- Loading Overlay -->
@@ -1446,6 +1459,7 @@
             getOrderBook as getEngineOrderBook,
             ORDER_TYPES, 
             ORDER_SIDES,
+            ORDER_STATUS,
             getUserOrders
         } from './js/market-engine.js';
         import { getCollection } from './js/storage.js';
@@ -1993,6 +2007,11 @@
             document.getElementById('loadingText').textContent = 'PLACING ORDER...';
             
             try {
+                // For market orders, use the current ask/bid price
+                if (orderType === ORDER_TYPES.MARKET) {
+                    orderPrice = orderSide === ORDER_SIDES.BUY ? selectedElement.askPrice : selectedElement.bidPrice;
+                }
+                
                 const orderData = {
                     userId: playerId,
                     playerName: localStorage.getItem('voidfarer_player_name') || 'Voidfarer',
@@ -2010,18 +2029,18 @@
                     showToast('Order placed successfully', 'success');
                     
                     // Update balances for market orders (immediate execution)
-                    if (orderType === ORDER_TYPES.MARKET) {
+                    if (orderType === ORDER_TYPES.MARKET && result.trade) {
                         if (orderSide === ORDER_SIDES.BUY) {
-                            currentCredits -= total;
+                            currentCredits -= result.totalCost;
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
                             
                             await window.addElementToCollection(selectedElement.name, orderQuantity, {
                                 source: 'market',
-                                price: orderPrice
+                                price: result.executionPrice
                             });
                         } else {
                             await window.removeElementFromCollection(selectedElement.name, orderQuantity);
-                            currentCredits += total;
+                            currentCredits += result.totalCost;
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
                         }
                         
@@ -2061,6 +2080,7 @@
             orderSide = ORDER_SIDES.BUY;
             orderType = ORDER_TYPES.MARKET;
             orderPrice = selectedElement.askPrice;
+            orderQuantity = 1;
             createOrderEntry();
             
             setTimeout(() => {
@@ -2084,7 +2104,7 @@
             orderSide = ORDER_SIDES.SELL;
             orderType = ORDER_TYPES.MARKET;
             orderPrice = selectedElement.bidPrice;
-            orderQuantity = owned;
+            orderQuantity = 1;
             createOrderEntry();
             
             setTimeout(() => {
