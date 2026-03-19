@@ -3,6 +3,7 @@
 // UPDATED: Removed self-import that was causing errors
 // UPDATED: Added filtering to only include chemical elements (no ship parts)
 // UPDATED: Filtered getCurrentPrices to exclude ship parts at the source
+// UPDATED: Added temporary reset to clear old ship part data from localStorage
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -42,6 +43,48 @@ const STORAGE_KEYS = {
  * Initialize market data for all elements
  */
 export function initializeMarket() {
+    // ===== TEMPORARY RESET - REMOVE AFTER FIX =====
+    // Force clear any old ship part data from localStorage
+    try {
+        const oldPrices = localStorage.getItem(STORAGE_KEYS.CURRENT_PRICES);
+        if (oldPrices) {
+            const prices = JSON.parse(oldPrices);
+            // Check if it contains ship parts or non-element items
+            const hasNonElements = Object.keys(prices).some(key => 
+                key.includes('ship_') || 
+                key.includes('thruster_') ||
+                key.includes('cannon_') ||
+                key.includes('laser_') ||
+                key.includes('missile_') ||
+                key.includes('plasma_') ||
+                key.includes('railgun') ||
+                key.includes('drive_') ||
+                key.includes('reactor_') ||
+                key.includes('shield_') ||
+                key.includes('mining_') ||
+                key.includes('scanner_') ||
+                key.includes('cargo_') ||
+                key.includes('engine_') ||
+                key.includes('weapon_') ||
+                key.includes('module_')
+            );
+            
+            if (hasNonElements) {
+                console.log('🚮 Clearing old ship part data from localStorage...');
+                localStorage.removeItem(STORAGE_KEYS.CURRENT_PRICES);
+                localStorage.removeItem(STORAGE_KEYS.PRICE_HISTORY);
+                localStorage.removeItem(STORAGE_KEYS.MARKET_TRENDS);
+                localStorage.removeItem(STORAGE_KEYS.MARKET_VOLUME);
+                localStorage.removeItem(STORAGE_KEYS.SUPPLY_INDEX);
+                localStorage.removeItem(STORAGE_KEYS.DEMAND_INDEX);
+                console.log('✅ Old data cleared. Market will reinitialize with chemical elements only.');
+            }
+        }
+    } catch (e) {
+        console.error('Error checking localStorage during initialization:', e);
+    }
+    // ===== END TEMPORARY RESET =====
+    
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_PRICES)) {
         const initialPrices = {};
         const initialTrends = {};
@@ -78,9 +121,11 @@ export function initializeMarket() {
         localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify({}));
         localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify({}));
         localStorage.setItem(STORAGE_KEYS.LAST_UPDATE, Date.now().toString());
+        
+        console.log('✅ Market initialized with chemical elements only');
+    } else {
+        console.log('Market system already initialized');
     }
-    
-    console.log('Market system initialized with 118 elements');
 }
 
 /**
@@ -229,7 +274,12 @@ export function getCurrentPrices() {
             name.includes('mining_') ||
             name.includes('crystal_') ||
             name.includes('component_') ||
-            name.includes('system_')) {
+            name.includes('system_') ||
+            name.includes('cannon_') ||
+            name.includes('laser_') ||
+            name.includes('missile_') ||
+            name.includes('plasma_') ||
+            name.includes('railgun')) {
             continue;
         }
         
@@ -518,7 +568,12 @@ export function getAvailableElements(rarity = null) {
             name.includes('mining_') ||
             name.includes('crystal_') ||
             name.includes('component_') ||
-            name.includes('system_')) {
+            name.includes('system_') ||
+            name.includes('cannon_') ||
+            name.includes('laser_') ||
+            name.includes('missile_') ||
+            name.includes('plasma_') ||
+            name.includes('railgun')) {
             continue;
         }
         
