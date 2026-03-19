@@ -964,58 +964,6 @@
             color: #848E9C;
         }
         
-        /* Order Confirmation */
-        .order-confirmation {
-            background: #1E2026;
-            border: 2px solid #F0B90B;
-            border-radius: 60px 20px 60px 20px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        
-        .confirmation-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        
-        .confirmation-title {
-            color: #F0B90B;
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        
-        .confirmation-details {
-            color: #848E9C;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        
-        .confirmation-buttons {
-            display: flex;
-            gap: 12px;
-        }
-        
-        .confirmation-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 40px 10px 40px 10px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .confirm-yes {
-            background: #0ECB81;
-            color: #fff;
-        }
-        
-        .confirm-no {
-            background: #F6465D;
-            color: #fff;
-        }
-        
         /* My Orders Link */
         .my-orders-link {
             display: flex;
@@ -1482,7 +1430,7 @@
     <script type="module" src="js/chart-manager.js"></script>
 
     <script type="module">
-        import { ELEMENT_DATABASE, getElementByName, getElementIcon, getElementRarity } from './js/element-prices.js';
+        import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './js/element-prices.js';
         import { 
             getCurrentPrices, 
             getBidPrice, 
@@ -1490,7 +1438,8 @@
             getVolumeLast24h,
             getMarketSummary,
             recordTrade,
-            getAvailableElements
+            getAvailableElements,
+            initializeMarket
         } from './js/market-dynamics.js';
         import { 
             createOrder, 
@@ -1587,6 +1536,9 @@
                 // Ensure default prices exist
                 ensureDefaultPrices();
                 
+                // Initialize market if needed
+                initializeMarket();
+                
                 // Load all elements
                 allElements = getAvailableElements();
                 filteredElements = [...allElements];
@@ -1607,7 +1559,12 @@
                 
                 // Setup chart for default element
                 setTimeout(() => {
-                    selectElement('Gold');
+                    const goldElement = allElements.find(e => e.name === 'Gold');
+                    if (goldElement) {
+                        selectElement('Gold');
+                    } else if (allElements.length > 0) {
+                        selectElement(allElements[0].name);
+                    }
                 }, 100);
                 
                 // Setup timeframe buttons
@@ -1747,7 +1704,7 @@
             
             document.getElementById('volume24h').textContent = (summary.totalVolume24h || 0).toLocaleString();
             document.getElementById('marketCap').textContent = (summary.totalMarketCap || 0).toLocaleString();
-            document.getElementById('trades24h').textContent = summary.totalTrades || '0';
+            document.getElementById('trades24h').textContent = summary.elementCount || '0';
             
             if (summary.topGainers && summary.topGainers.length > 0) {
                 document.getElementById('topGainer').textContent = summary.topGainers[0].name;
@@ -2052,21 +2009,26 @@
                 if (result.success) {
                     showToast('Order placed successfully', 'success');
                     
-                    // Update balances
-                    if (orderSide === ORDER_SIDES.BUY && orderType === ORDER_TYPES.MARKET) {
-                        // Market orders execute immediately
-                        currentCredits -= total;
-                        localStorage.setItem('voidfarer_credits', currentCredits.toString());
-                        
-                        await window.addElementToCollection(selectedElement.name, orderQuantity, {
-                            source: 'market',
-                            price: orderPrice
-                        });
+                    // Update balances for market orders (immediate execution)
+                    if (orderType === ORDER_TYPES.MARKET) {
+                        if (orderSide === ORDER_SIDES.BUY) {
+                            currentCredits -= total;
+                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
+                            await window.addElementToCollection(selectedElement.name, orderQuantity, {
+                                source: 'market',
+                                price: orderPrice
+                            });
+                        } else {
+                            await window.removeElementFromCollection(selectedElement.name, orderQuantity);
+                            currentCredits += total;
+                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                        }
                         
                         currentCollection = await getCollection();
+                        updateBalance();
                     }
                     
-                    updateBalance();
                     renderOrderBook();
                     
                     if (tg?.HapticFeedback) {
