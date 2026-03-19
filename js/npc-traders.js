@@ -1,5 +1,6 @@
 // js/npc-traders.js - NPC Trader System for Voidfarer Marketplace
 // Creates and manages 1000 simulated traders with personalities
+// UPDATED: Added market orders and liquidity taking for real trading behavior
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -19,7 +20,7 @@ import {
 } from './db.js';
 
 import { getCurrentPrices, getBidPrice, getAskPrice } from './market-dynamics.js';
-import { ORDER_TYPES, ORDER_SIDES, ORDER_STATUS } from './market-engine.js';
+import { ORDER_TYPES, ORDER_SIDES, ORDER_STATUS, createOrder } from './market-engine.js';
 
 // ===== TRADER TYPE DEFINITIONS =====
 
@@ -36,7 +37,8 @@ export const TRADER_PERSONALITIES = {
     TREND_FOLLOWER: 'trendFollower',
     VALUE_TRADER: 'valueTrader',
     RANDOM: 'random',
-    INACTIVE: 'inactive'
+    INACTIVE: 'inactive',
+    MARKET_MAKER: 'marketMaker' // Added market maker personality
 };
 
 // Type configuration
@@ -85,11 +87,12 @@ const TRADER_TYPE_CONFIG = {
 
 // Personality distribution (percentages)
 const PERSONALITY_DISTRIBUTION = {
-    [TRADER_PERSONALITIES.SCALPER]: 30,        // 30%
-    [TRADER_PERSONALITIES.TREND_FOLLOWER]: 25, // 25%
-    [TRADER_PERSONALITIES.VALUE_TRADER]: 20,   // 20%
+    [TRADER_PERSONALITIES.SCALPER]: 28,        // 28%
+    [TRADER_PERSONALITIES.TREND_FOLLOWER]: 23, // 23%
+    [TRADER_PERSONALITIES.VALUE_TRADER]: 18,   // 18%
     [TRADER_PERSONALITIES.RANDOM]: 15,         // 15%
-    [TRADER_PERSONALITIES.INACTIVE]: 10        // 10%
+    [TRADER_PERSONALITIES.MARKET_MAKER]: 8,    // 8% (new)
+    [TRADER_PERSONALITIES.INACTIVE]: 8         // 8%
 };
 
 // ===== TRADER NAMES =====
@@ -265,18 +268,20 @@ function generateStrategyParams(personality) {
     switch (personality) {
         case TRADER_PERSONALITIES.SCALPER:
             return {
-                profitTarget: 0.01 + Math.random() * 0.02, // 1-3% profit target
-                stopLoss: 0.005 + Math.random() * 0.01,    // 0.5-1.5% stop loss
-                orderFrequency: 0.7 + Math.random() * 0.3, // 70-100% (active)
-                maxHoldTime: 5 * 60 * 1000, // 5 minutes
-                useMarketOrders: Math.random() > 0.5
+                profitTarget: 0.005 + Math.random() * 0.01, // 0.5-1.5% profit target
+                stopLoss: 0.003 + Math.random() * 0.007,    // 0.3-1% stop loss
+                orderFrequency: 0.8 + Math.random() * 0.2, // 80-100% (active)
+                marketOrderChance: 0.4, // 40% chance to take liquidity
+                maxHoldTime: 2 * 60 * 1000, // 2 minutes
+                useMarketOrders: Math.random() > 0.3
             };
             
         case TRADER_PERSONALITIES.TREND_FOLLOWER:
             return {
                 lookbackPeriods: [5, 10, 20], // SMA periods
-                trendThreshold: 0.02 + Math.random() * 0.03, // 2-5% trend signal
+                trendThreshold: 0.01 + Math.random() * 0.02, // 1-3% trend signal
                 momentumMultiplier: 0.5 + Math.random() * 1.0, // 0.5-1.5x
+                marketOrderChance: 0.25, // 25% chance to take liquidity
                 useStopLoss: Math.random() > 0.3,
                 stopLossPercent: 0.03 + Math.random() * 0.05 // 3-8%
             };
@@ -284,25 +289,36 @@ function generateStrategyParams(personality) {
         case TRADER_PERSONALITIES.VALUE_TRADER:
             return {
                 historicalPeriod: 7 * 24 * 60 * 60 * 1000, // 7 days
-                undervaluedThreshold: 0.1 + Math.random() * 0.15, // 10-25% below avg
-                overvaluedThreshold: 0.15 + Math.random() * 0.2, // 15-35% above avg
+                undervaluedThreshold: 0.05 + Math.random() * 0.1, // 5-15% below avg
+                overvaluedThreshold: 0.1 + Math.random() * 0.15, // 10-25% above avg
                 holdTime: 3 * 24 * 60 * 60 * 1000, // 3 days average
+                marketOrderChance: 0.15, // 15% chance to take liquidity
                 rebalanceFrequency: 24 * 60 * 60 * 1000 // Daily rebalance
             };
             
         case TRADER_PERSONALITIES.RANDOM:
             return {
-                randomness: 0.8 + Math.random() * 0.2, // 80-100% random
+                randomness: 0.9 + Math.random() * 0.1, // 90-100% random
                 crazyFactor: Math.random(), // 0-1 how wild
                 ignoreSpread: Math.random() > 0.5,
-                placeAnyPrice: Math.random() > 0.7
+                marketOrderChance: 0.5, // 50% chance to take liquidity
+                placeAnyPrice: Math.random() > 0.5
+            };
+            
+        case TRADER_PERSONALITIES.MARKET_MAKER:
+            return {
+                spreadTarget: 0.002 + Math.random() * 0.003, // 0.2-0.5% spread
+                inventoryTarget: 0.3 + Math.random() * 0.2, // 30-50% of credits in inventory
+                replenishThreshold: 0.1, // 10% of max
+                marketOrderChance: 0.2, // 20% chance to take liquidity
+                rebalanceFrequency: 5 * 60 * 1000 // 5 minutes
             };
             
         case TRADER_PERSONALITIES.INACTIVE:
         default:
             return {
                 inactivityPeriod: 12 * 60 * 60 * 1000, // 12 hours
-                wakeupChance: 0.1, // 10% chance to wake up each cycle
+                wakeupChance: 0.15, // 15% chance to wake up each cycle
                 holdingPattern: true
             };
     }
@@ -482,9 +498,6 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
         trader.credits -= price * quantity;
     }
     
-    // Reserve inventory for sell orders (mark as pending)
-    // We'll handle actual removal when order fills
-    
     // Add to trader's active orders
     trader.activeOrders.push(order.id);
     trader.lastActivity = Date.now();
@@ -500,6 +513,74 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
         success: true,
         order
     };
+}
+
+/**
+ * Execute an immediate market trade (TAKE LIQUIDITY)
+ * @param {Object} trader - Trader object
+ * @param {string} element - Element name
+ * @param {string} side - 'buy' or 'sell'
+ * @param {number} quantity - Quantity
+ * @returns {Promise<Object>} Trade result
+ */
+async function executeImmediateTrade(trader, element, side, quantity) {
+    try {
+        // Get current best price
+        const bid = getBidPrice(element);
+        const ask = getAskPrice(element);
+        
+        if (side === ORDER_SIDES.BUY && ask) {
+            // Buy at ask price
+            const total = ask * quantity;
+            if (trader.credits >= total) {
+                // Create and execute market order
+                const orderData = {
+                    userId: trader.id,
+                    playerName: trader.name,
+                    traderName: trader.name,
+                    element,
+                    side: ORDER_SIDES.BUY,
+                    type: ORDER_TYPES.MARKET,
+                    quantity,
+                    isNPC: true
+                };
+                
+                // This will execute immediately via market-engine
+                const result = await createOrder(orderData);
+                if (result && result.success) {
+                    console.log(`🟢 ${trader.name} bought ${quantity} ${element} at market ${ask}⭐`);
+                    
+                    // Update trader inventory (will be done by updateNPCTraderAfterTrade callback)
+                    return result;
+                }
+            }
+        } else if (side === ORDER_SIDES.SELL && bid) {
+            // Sell at bid price
+            const owned = trader.inventory[element] || 0;
+            if (owned >= quantity) {
+                const orderData = {
+                    userId: trader.id,
+                    playerName: trader.name,
+                    traderName: trader.name,
+                    element,
+                    side: ORDER_SIDES.SELL,
+                    type: ORDER_TYPES.MARKET,
+                    quantity,
+                    isNPC: true
+                };
+                
+                const result = await createOrder(orderData);
+                if (result && result.success) {
+                    console.log(`🔴 ${trader.name} sold ${quantity} ${element} at market ${bid}⭐`);
+                    return result;
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`Error in executeImmediateTrade for ${trader.name}:`, error);
+    }
+    
+    return { success: false };
 }
 
 /**
@@ -682,9 +763,10 @@ export async function getNPCOrdersForElement(element) {
 export async function updateTrader(trader, marketData) {
     if (!trader.isActive) {
         // Check if inactive traders should wake up
-        if (Math.random() < 0.1) { // 10% chance
+        if (Math.random() < 0.15) { // 15% chance
             trader.isActive = true;
             trader.personality = TRADER_PERSONALITIES.RANDOM; // Become random when waking
+            console.log(`💤 ${trader.name} woke up and is now trading!`);
         } else {
             return { traderId: trader.id, actions: [] };
         }
@@ -711,6 +793,10 @@ export async function updateTrader(trader, marketData) {
             
         case TRADER_PERSONALITIES.RANDOM:
             await updateRandomTrader(trader, marketData, elements, actions);
+            break;
+            
+        case TRADER_PERSONALITIES.MARKET_MAKER:
+            await updateMarketMaker(trader, marketData, elements, actions);
             break;
             
         default:
@@ -748,27 +834,48 @@ async function updateScalper(trader, marketData, elements, actions) {
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
+        // First: Take liquidity with market orders (30% chance)
+        if (Math.random() < 0.3) {
+            const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
+            const quantity = Math.floor(Math.random() * 3) + 1; // 1-3 units
+            
+            // Check if they can actually do this
+            if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ type: 'market_buy', element, price: ask, quantity });
+                    continue; // Skip limit order this cycle
+                }
+            } else if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) >= quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ type: 'market_sell', element, price: bid, quantity });
+                    continue; // Skip limit order this cycle
+                }
+            }
+        }
+        
+        // Second: Provide liquidity with tight limit orders
         // Look for small profit opportunities
-        if (trader.credits > 1000 && Math.random() > 0.5) {
-            // Place a buy order slightly below market
-            const buyPrice = Math.floor(bid * 0.99);
-            const quantity = Math.floor(Math.random() * 
-                (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin);
+        if (trader.credits > 1000 && Math.random() > 0.4) {
+            // Place a buy order very close to market
+            const buyPrice = Math.floor(bid * 0.998); // 0.2% below bid
+            const quantity = Math.floor(Math.random() * 3) + 1;
             
             const result = await placeTraderOrder(
                 trader, element, ORDER_SIDES.BUY, buyPrice, quantity
             );
             
             if (result.success) {
-                actions.push({ type: 'place_buy', element, price: buyPrice, quantity });
+                actions.push({ type: 'limit_buy', element, price: buyPrice, quantity });
             }
         }
         
         // Check for sells if they have inventory
-        if (trader.inventory[element] > 0 && Math.random() > 0.5) {
-            const sellPrice = Math.floor(ask * 1.01);
+        if (trader.inventory[element] > 0 && Math.random() > 0.4) {
+            const sellPrice = Math.floor(ask * 1.002); // 0.2% above ask
             const quantity = Math.min(
-                Math.floor(Math.random() * (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin),
+                Math.floor(Math.random() * 3) + 1,
                 trader.inventory[element]
             );
             
@@ -777,7 +884,7 @@ async function updateScalper(trader, marketData, elements, actions) {
             );
             
             if (result.success) {
-                actions.push({ type: 'place_sell', element, price: sellPrice, quantity });
+                actions.push({ type: 'limit_sell', element, price: sellPrice, quantity });
             }
         }
     }
@@ -792,6 +899,8 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
     for (const element of elements) {
         // Get price history (simplified - would need actual history)
         const currentPrice = marketData.prices[element]?.current || 100;
+        const bid = getBidPrice(element);
+        const ask = getAskPrice(element);
         
         // Simple trend detection (compare with stored price)
         const lastPrice = trader.priceMemory[element] || currentPrice;
@@ -803,34 +912,59 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
         // Detect trend
         if (Math.abs(change) > params.trendThreshold) {
             if (change > 0) {
-                // Uptrend - buy
+                // Uptrend - buy aggressively
                 if (trader.credits > 5000) {
-                    const quantity = Math.floor(
-                        Math.random() * (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin
-                    );
+                    // 25% chance to take market
+                    if (Math.random() < 0.25) {
+                        const quantity = Math.floor(Math.random() * 5) + 1;
+                        const result = await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, quantity);
+                        if (result.success) {
+                            actions.push({ type: 'trend_market_buy', element, price: ask, quantity });
+                            continue;
+                        }
+                    }
+                    
+                    // Otherwise place limit order
+                    const quantity = Math.floor(Math.random() * 5) + 1;
+                    const buyPrice = Math.floor(bid * 0.999); // Very tight
                     
                     const result = await placeTraderOrder(
-                        trader, element, ORDER_SIDES.BUY, currentPrice, quantity
+                        trader, element, ORDER_SIDES.BUY, buyPrice, quantity
                     );
                     
                     if (result.success) {
-                        actions.push({ type: 'trend_buy', element, price: currentPrice, quantity });
+                        actions.push({ type: 'trend_limit_buy', element, price: buyPrice, quantity });
                     }
                 }
             } else {
-                // Downtrend - sell if have inventory
+                // Downtrend - sell aggressively if have inventory
                 if (trader.inventory[element] > 0) {
+                    // 25% chance to take market
+                    if (Math.random() < 0.25) {
+                        const quantity = Math.min(
+                            Math.floor(Math.random() * 5) + 1,
+                            trader.inventory[element]
+                        );
+                        const result = await executeImmediateTrade(trader, element, ORDER_SIDES.SELL, quantity);
+                        if (result.success) {
+                            actions.push({ type: 'trend_market_sell', element, price: bid, quantity });
+                            return;
+                        }
+                    }
+                    
+                    // Otherwise place limit order
                     const quantity = Math.min(
-                        Math.floor(Math.random() * (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin),
+                        Math.floor(Math.random() * 5) + 1,
                         trader.inventory[element]
                     );
+                    const sellPrice = Math.floor(ask * 1.001); // Very tight
                     
                     const result = await placeTraderOrder(
-                        trader, element, ORDER_SIDES.SELL, currentPrice, quantity
+                        trader, element, ORDER_SIDES.SELL, sellPrice, quantity
                     );
                     
                     if (result.success) {
-                        actions.push({ type: 'trend_sell', element, price: currentPrice, quantity });
+                        actions.push({ type: 'trend_limit_sell', element, price: sellPrice, quantity });
                     }
                 }
             }
@@ -846,39 +980,66 @@ async function updateValueTrader(trader, marketData, elements, actions) {
     
     for (const element of elements) {
         const currentPrice = marketData.prices[element]?.current || 100;
+        const bid = getBidPrice(element);
+        const ask = getAskPrice(element);
         
         // Simple value detection (would use historical average in real implementation)
-        const historicalAvg = currentPrice * (0.8 + Math.random() * 0.4); // Fake historical
+        const historicalAvg = currentPrice * (0.85 + Math.random() * 0.3); // Fake historical
         
         if (currentPrice < historicalAvg * (1 - params.undervaluedThreshold)) {
             // Undervalued - buy
             if (trader.credits > 5000) {
-                const quantity = Math.floor(
-                    Math.random() * (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin
-                );
+                // 15% chance to take market
+                if (Math.random() < 0.15) {
+                    const quantity = Math.floor(Math.random() * 10) + 1;
+                    const result = await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, quantity);
+                    if (result.success) {
+                        actions.push({ type: 'value_market_buy', element, price: ask, quantity });
+                        continue;
+                    }
+                }
+                
+                // Otherwise place limit order slightly below market
+                const quantity = Math.floor(Math.random() * 10) + 1;
+                const buyPrice = Math.floor(currentPrice * 0.995); // 0.5% below
                 
                 const result = await placeTraderOrder(
-                    trader, element, ORDER_SIDES.BUY, currentPrice, quantity
+                    trader, element, ORDER_SIDES.BUY, buyPrice, quantity
                 );
                 
                 if (result.success) {
-                    actions.push({ type: 'value_buy', element, price: currentPrice, quantity });
+                    actions.push({ type: 'value_limit_buy', element, price: buyPrice, quantity });
                 }
             }
         } else if (currentPrice > historicalAvg * (1 + params.overvaluedThreshold)) {
             // Overvalued - sell
             if (trader.inventory[element] > 0) {
+                // 15% chance to take market
+                if (Math.random() < 0.15) {
+                    const quantity = Math.min(
+                        Math.floor(Math.random() * 10) + 1,
+                        trader.inventory[element]
+                    );
+                    const result = await executeImmediateTrade(trader, element, ORDER_SIDES.SELL, quantity);
+                    if (result.success) {
+                        actions.push({ type: 'value_market_sell', element, price: bid, quantity });
+                        return;
+                    }
+                }
+                
+                // Otherwise place limit order slightly above market
                 const quantity = Math.min(
-                    Math.floor(Math.random() * (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin),
+                    Math.floor(Math.random() * 10) + 1,
                     trader.inventory[element]
                 );
+                const sellPrice = Math.floor(currentPrice * 1.005); // 0.5% above
                 
                 const result = await placeTraderOrder(
-                    trader, element, ORDER_SIDES.SELL, currentPrice, quantity
+                    trader, element, ORDER_SIDES.SELL, sellPrice, quantity
                 );
                 
                 if (result.success) {
-                    actions.push({ type: 'value_sell', element, price: currentPrice, quantity });
+                    actions.push({ type: 'value_limit_sell', element, price: sellPrice, quantity });
                 }
             }
         }
@@ -895,34 +1056,165 @@ async function updateRandomTrader(trader, marketData, elements, actions) {
     if (Math.random() > params.randomness) return;
     
     for (const element of elements) {
-        if (Math.random() > 0.3) continue; // Only act on 30% of elements
+        if (Math.random() > 0.4) continue; // Act on 60% of elements
         
         const currentPrice = marketData.prices[element]?.current || 100;
+        const bid = getBidPrice(element);
+        const ask = getAskPrice(element);
         const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
         
-        // Random price (could be anywhere)
-        let price = currentPrice;
-        if (params.placeAnyPrice && Math.random() > 0.5) {
-            price = Math.floor(currentPrice * (0.5 + Math.random() * 1.5)); // 50-150% of market
+        // Decide: market or limit?
+        const useMarket = Math.random() < 0.5; // 50% market, 50% limit
+        
+        if (useMarket) {
+            // Market order
+            const quantity = Math.floor(Math.random() * 10) + 1;
+            
+            // Check if they can actually do this
+            if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ 
+                        type: 'random_market', 
+                        element, 
+                        price: side === ORDER_SIDES.BUY ? ask : bid, 
+                        quantity,
+                        crazy: params.crazyFactor > 0.7 
+                    });
+                }
+            } else if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) >= quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ 
+                        type: 'random_market', 
+                        element, 
+                        price: bid, 
+                        quantity,
+                        crazy: params.crazyFactor > 0.7 
+                    });
+                }
+            }
+        } else {
+            // Limit order with random price
+            let price = currentPrice;
+            if (params.placeAnyPrice && Math.random() > 0.5) {
+                price = Math.floor(currentPrice * (0.8 + Math.random() * 0.6)); // 80-140% of market
+            } else {
+                // Within 2% of market
+                price = Math.floor(currentPrice * (0.98 + Math.random() * 0.04));
+            }
+            
+            const quantity = Math.floor(Math.random() * 15) + 1;
+            
+            // Check if they can actually do this
+            if (side === ORDER_SIDES.BUY && trader.credits < price * quantity) continue;
+            if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) < quantity) continue;
+            
+            const result = await placeTraderOrder(trader, element, side, price, quantity);
+            
+            if (result.success) {
+                actions.push({ 
+                    type: `random_limit_${side}`, 
+                    element, 
+                    price, 
+                    quantity,
+                    crazy: params.crazyFactor > 0.7 
+                });
+            }
+        }
+    }
+}
+
+/**
+ * Update market maker trader
+ * These provide liquidity by keeping tight spreads and taking the other side
+ */
+async function updateMarketMaker(trader, marketData, elements, actions) {
+    const params = trader.strategyParams;
+    
+    for (const element of elements) {
+        const currentPrice = marketData.prices[element]?.current || 100;
+        const bid = getBidPrice(element);
+        const ask = getAskPrice(element);
+        
+        // Market makers maintain both sides
+        const spread = ask - bid;
+        const targetSpread = currentPrice * params.spreadTarget;
+        
+        // If spread is too wide, tighten it
+        if (spread > targetSpread || Math.random() < 0.3) {
+            // Place both a buy and sell order very close to market
+            
+            // Buy order slightly below market
+            if (trader.credits > 10000) {
+                const buyPrice = Math.floor(currentPrice * (1 - params.spreadTarget / 2));
+                const buyQuantity = Math.floor(Math.random() * 20) + 10;
+                
+                const buyResult = await placeTraderOrder(
+                    trader, element, ORDER_SIDES.BUY, buyPrice, buyQuantity
+                );
+                
+                if (buyResult.success) {
+                    actions.push({ type: 'mm_buy', element, price: buyPrice, quantity: buyQuantity });
+                }
+            }
+            
+            // Sell order slightly above market
+            if (trader.inventory[element] > 0 || Math.random() < 0.5) {
+                const sellPrice = Math.floor(currentPrice * (1 + params.spreadTarget / 2));
+                const sellQuantity = Math.floor(Math.random() * 20) + 10;
+                
+                // Only sell what they have
+                const finalQuantity = Math.min(sellQuantity, trader.inventory[element] || 999999);
+                
+                const sellResult = await placeTraderOrder(
+                    trader, element, ORDER_SIDES.SELL, sellPrice, finalQuantity
+                );
+                
+                if (sellResult.success) {
+                    actions.push({ type: 'mm_sell', element, price: sellPrice, quantity: finalQuantity });
+                }
+            }
         }
         
-        const quantity = Math.floor(Math.random() * 
-            (trader.orderSizeMax - trader.orderSizeMin) + trader.orderSizeMin);
+        // Also take the other side occasionally to create volume (20% chance)
+        if (Math.random() < 0.2) {
+            const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
+            const quantity = Math.floor(Math.random() * 10) + 1;
+            
+            // Check if they can do this
+            if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ type: 'mm_take_buy', element, price: ask, quantity });
+                }
+            } else if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) >= quantity) {
+                const result = await executeImmediateTrade(trader, element, side, quantity);
+                if (result.success) {
+                    actions.push({ type: 'mm_take_sell', element, price: bid, quantity });
+                }
+            }
+        }
         
-        // Check if they can actually do this
-        if (side === ORDER_SIDES.BUY && trader.credits < price * quantity) continue;
-        if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) < quantity) continue;
+        // Rebalance inventory if needed
+        const totalValue = Object.entries(trader.inventory).reduce((sum, [elem, qty]) => {
+            return sum + (qty * (marketData.prices[elem]?.current || 100));
+        }, 0);
         
-        const result = await placeTraderOrder(trader, element, side, price, quantity);
+        const targetInventory = trader.credits * params.inventoryTarget;
         
-        if (result.success) {
-            actions.push({ 
-                type: `random_${side}`, 
-                element, 
-                price, 
-                quantity,
-                crazy: params.crazyFactor > 0.7 
-            });
+        if (totalValue > targetInventory * 1.2) {
+            // Too much inventory - sell some
+            if (trader.inventory[element] > 0 && Math.random() < 0.3) {
+                const sellQuantity = Math.floor(trader.inventory[element] * 0.1) + 1;
+                await executeImmediateTrade(trader, element, ORDER_SIDES.SELL, sellQuantity);
+            }
+        } else if (totalValue < targetInventory * 0.8 && trader.credits > 10000) {
+            // Too little inventory - buy some
+            if (Math.random() < 0.3) {
+                const buyQuantity = Math.floor(Math.random() * 10) + 5;
+                await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, buyQuantity);
+            }
         }
     }
 }
@@ -1016,6 +1308,8 @@ export async function processNPCTradingCycle(batchSize = 100) {
     
     let actions = [];
     let updatedCount = 0;
+    let marketOrders = 0;
+    let limitOrders = 0;
     
     // Update each trader
     for (const trader of batch) {
@@ -1023,6 +1317,13 @@ export async function processNPCTradingCycle(batchSize = 100) {
             const result = await updateTrader(trader, marketData);
             actions = actions.concat(result.actions);
             updatedCount++;
+            
+            // Count order types
+            result.actions.forEach(a => {
+                if (a.type.includes('market')) marketOrders++;
+                else limitOrders++;
+            });
+            
         } catch (error) {
             console.error(`Error updating trader ${trader.id}:`, error);
         }
@@ -1037,11 +1338,13 @@ export async function processNPCTradingCycle(batchSize = 100) {
     // Update timestamp
     await setLastNPCUpdate();
     
-    console.log(`✅ Updated ${updatedCount} NPC traders, ${actions.length} actions taken`);
+    console.log(`✅ Updated ${updatedCount} NPC traders, ${actions.length} actions (${marketOrders} market, ${limitOrders} limit)`);
     
     return {
         updated: updatedCount,
         actions: actions.length,
+        marketOrders,
+        limitOrders,
         timestamp: Date.now()
     };
 }
@@ -1171,6 +1474,6 @@ window.stopNPCTraderUpdates = stopNPCTraderUpdates;
 window.getNPCTraderStats = getNPCTraderStats;
 window.getNPCOrders = getNPCOrders;
 window.resetNPCTraders = resetNPCTraders;
-window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;  // ← ADDED THIS
+window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
-console.log('✅ npc-traders.js loaded - NPC trader system ready');
+console.log('✅ npc-traders.js loaded - NPC trader system ready with market orders');
