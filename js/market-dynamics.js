@@ -1,6 +1,7 @@
 // js/market-dynamics.js - Dynamic market pricing and element trading for Voidfarer
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 // UPDATED: Removed self-import that was causing errors
+// UPDATED: Added filtering to only include chemical elements (no ship parts)
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -474,6 +475,25 @@ export function getAvailableElements(rarity = null) {
     const prices = getCurrentPrices();
     
     for (const [name, element] of Object.entries(ELEMENT_DATABASE)) {
+        // ===== FILTER OUT SHIP PARTS AND NON-ELEMENT ITEMS =====
+        // Only include actual chemical elements
+        if (name.includes('ship_') || 
+            name.includes('cargo_') ||
+            name.includes('engine_') ||
+            name.includes('weapon_') ||
+            name.includes('module_') ||
+            name.includes('reactor_') ||
+            name.includes('shield_') ||
+            name.includes('thruster_') ||
+            name.includes('drive_') ||
+            name.includes('scanner_') ||
+            name.includes('mining_') ||
+            name.includes('crystal_') ||
+            name.includes('component_') ||
+            name.includes('system_')) {
+            continue;
+        }
+        
         if (rarity && element.rarity !== rarity) continue;
         
         const priceData = prices[name] || {
@@ -501,6 +521,7 @@ export function getAvailableElements(rarity = null) {
         });
     }
     
+    console.log(`📊 getAvailableElements returning ${elements.length} chemical elements`);
     return elements;
 }
 
