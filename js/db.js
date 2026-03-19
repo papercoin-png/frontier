@@ -1,8 +1,9 @@
 // js/db.js - IndexedDB wrapper for Voidfarer
 // Provides persistent storage with async/await interface
+// UPDATED: Version 5 - Added NPC trader stores for marketplace NPCs
 
 const DB_NAME = 'voidfarer_db';
-const DB_VERSION = 4; // Increment for schema changes (added certificate holders)
+const DB_VERSION = 5; // Increment for schema changes (added NPC trader stores)
 
 // Store names
 const STORES = {
@@ -34,8 +35,12 @@ const STORES = {
     LABOR_POOL: 'laborPool',
     LABOR_EARNINGS: 'laborEarnings',
     LABOR_HISTORY: 'laborHistory',
-    // Certificate holders store (NEW)
-    CERTIFICATE_HOLDERS: 'certificateHolders'
+    // Certificate holders store
+    CERTIFICATE_HOLDERS: 'certificateHolders',
+    // ===== NPC TRADER STORES (NEW) =====
+    NPC_TRADERS: 'npcTraders',
+    NPC_TRADER_ORDERS: 'npcTraderOrders',
+    NPC_TRADER_HISTORY: 'npcTraderHistory'
 };
 
 // Database connection
@@ -60,7 +65,7 @@ async function initDB() {
         
         request.onsuccess = () => {
             db = request.result;
-            console.log('Database opened successfully');
+            console.log('Database opened successfully, version:', DB_VERSION);
             resolve(db);
         };
         
@@ -230,7 +235,7 @@ async function initDB() {
                 console.log('Created labor history store');
             }
             
-            // Certificate holders store (NEW)
+            // Certificate holders store
             if (!db.objectStoreNames.contains(STORES.CERTIFICATE_HOLDERS)) {
                 const certHoldersStore = db.createObjectStore(STORES.CERTIFICATE_HOLDERS, { keyPath: 'id', autoIncrement: true });
                 certHoldersStore.createIndex('certificateId', 'certificateId', { unique: false });
@@ -238,6 +243,44 @@ async function initDB() {
                 certHoldersStore.createIndex('masteryLevel', 'masteryLevel', { unique: false });
                 certHoldersStore.createIndex('playerName', 'playerName', { unique: false });
                 console.log('Created certificate holders store');
+            }
+            
+            // ===== NPC TRADER STORES (NEW) =====
+            
+            // NPC Traders master list
+            if (!db.objectStoreNames.contains(STORES.NPC_TRADERS)) {
+                const npcTradersStore = db.createObjectStore(STORES.NPC_TRADERS, { keyPath: 'id' });
+                npcTradersStore.createIndex('type', 'type', { unique: false });
+                npcTradersStore.createIndex('personality', 'personality', { unique: false });
+                npcTradersStore.createIndex('creditRange', 'creditRange', { unique: false });
+                npcTradersStore.createIndex('lastActivity', 'lastActivity', { unique: false });
+                npcTradersStore.createIndex('isActive', 'isActive', { unique: false });
+                console.log('Created NPC traders store');
+            }
+            
+            // NPC Trader Orders
+            if (!db.objectStoreNames.contains(STORES.NPC_TRADER_ORDERS)) {
+                const npcOrdersStore = db.createObjectStore(STORES.NPC_TRADER_ORDERS, { keyPath: 'id', autoIncrement: true });
+                npcOrdersStore.createIndex('traderId', 'traderId', { unique: false });
+                npcOrdersStore.createIndex('element', 'element', { unique: false });
+                npcOrdersStore.createIndex('side', 'side', { unique: false });
+                npcOrdersStore.createIndex('status', 'status', { unique: false });
+                npcOrdersStore.createIndex('price', 'price', { unique: false });
+                npcOrdersStore.createIndex('createdAt', 'createdAt', { unique: false });
+                npcOrdersStore.createIndex('expiresAt', 'expiresAt', { unique: false });
+                console.log('Created NPC trader orders store');
+            }
+            
+            // NPC Trader History
+            if (!db.objectStoreNames.contains(STORES.NPC_TRADER_HISTORY)) {
+                const npcHistoryStore = db.createObjectStore(STORES.NPC_TRADER_HISTORY, { keyPath: 'id', autoIncrement: true });
+                npcHistoryStore.createIndex('traderId', 'traderId', { unique: false });
+                npcHistoryStore.createIndex('element', 'element', { unique: false });
+                npcHistoryStore.createIndex('side', 'side', { unique: false });
+                npcHistoryStore.createIndex('timestamp', 'timestamp', { unique: false });
+                npcHistoryStore.createIndex('price', 'price', { unique: false });
+                npcHistoryStore.createIndex('quantity', 'quantity', { unique: false });
+                console.log('Created NPC trader history store');
             }
         };
     });
@@ -310,6 +353,46 @@ async function getAll(storeName) {
         const transaction = db.transaction(storeName, 'readonly');
         const store = transaction.objectStore(storeName);
         const request = store.getAll();
+        
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Get items by index from a store
+ * @param {string} storeName - Name of the store
+ * @param {string} indexName - Name of the index
+ * @param {any} value - Value to match
+ * @returns {Promise<Array>} Array of items
+ */
+async function getByIndex(storeName, indexName, value) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const index = store.index(indexName);
+        const request = index.getAll(value);
+        
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Get a range of items by index
+ * @param {string} storeName - Name of the store
+ * @param {string} indexName - Name of the index
+ * @param {IDBKeyRange} range - Key range
+ * @returns {Promise<Array>} Array of items
+ */
+async function getByIndexRange(storeName, indexName, range) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const index = store.index(indexName);
+        const request = index.getAll(range);
         
         request.onsuccess = () => resolve(request.result || []);
         request.onerror = () => reject(request.error);
@@ -918,7 +1001,7 @@ async function dbGetLaborEarnings(playerId) {
     }
 }
 
-// ===== CERTIFICATE HOLDER FUNCTIONS (NEW) =====
+// ===== CERTIFICATE HOLDER FUNCTIONS =====
 
 /**
  * Update certificate holder mastery
@@ -1050,6 +1133,391 @@ async function dbGetCertificateHolder(certificateId, playerId) {
     }
 }
 
+// ===== NPC TRADER FUNCTIONS (NEW) =====
+
+/**
+ * Save an NPC trader
+ * @param {Object} trader - NPC trader object (must have id)
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveNPCTrader(trader) {
+    try {
+        const id = await setItem(STORES.NPC_TRADERS, trader);
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error in dbSaveNPCTrader:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get an NPC trader by ID
+ * @param {string} traderId - Trader ID
+ * @returns {Promise<Object|null>} Trader object or null
+ */
+async function dbGetNPCTrader(traderId) {
+    try {
+        return await getItem(STORES.NPC_TRADERS, traderId);
+    } catch (error) {
+        console.error('Error in dbGetNPCTrader:', error);
+        return null;
+    }
+}
+
+/**
+ * Get all NPC traders
+ * @returns {Promise<Array>} Array of traders
+ */
+async function dbGetAllNPCTraders() {
+    try {
+        return await getAll(STORES.NPC_TRADERS);
+    } catch (error) {
+        console.error('Error in dbGetAllNPCTraders:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC traders by type
+ * @param {string} type - Trader type (small, medium, large, whale, marketMaker)
+ * @returns {Promise<Array>} Array of traders
+ */
+async function dbGetNPCTradersByType(type) {
+    try {
+        return await getByIndex(STORES.NPC_TRADERS, 'type', type);
+    } catch (error) {
+        console.error('Error in dbGetNPCTradersByType:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC traders by personality
+ * @param {string} personality - Personality type
+ * @returns {Promise<Array>} Array of traders
+ */
+async function dbGetNPCTradersByPersonality(personality) {
+    try {
+        return await getByIndex(STORES.NPC_TRADERS, 'personality', personality);
+    } catch (error) {
+        console.error('Error in dbGetNPCTradersByPersonality:', error);
+        return [];
+    }
+}
+
+/**
+ * Get active NPC traders
+ * @param {boolean} isActive - Active status
+ * @returns {Promise<Array>} Array of traders
+ */
+async function dbGetActiveNPCTraders(isActive = true) {
+    try {
+        return await getByIndex(STORES.NPC_TRADERS, 'isActive', isActive);
+    } catch (error) {
+        console.error('Error in dbGetActiveNPCTraders:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC traders by last activity range
+ * @param {number} since - Timestamp to filter from
+ * @returns {Promise<Array>} Array of traders active since timestamp
+ */
+async function dbGetNPCTradersByLastActivity(since) {
+    try {
+        const range = IDBKeyRange.lowerBound(since);
+        return await getByIndexRange(STORES.NPC_TRADERS, 'lastActivity', range);
+    } catch (error) {
+        console.error('Error in dbGetNPCTradersByLastActivity:', error);
+        return [];
+    }
+}
+
+/**
+ * Delete an NPC trader
+ * @param {string} traderId - Trader ID
+ * @returns {Promise<Object>} Result
+ */
+async function dbDeleteNPCTrader(traderId) {
+    try {
+        await deleteItem(STORES.NPC_TRADERS, traderId);
+        return { success: true };
+    } catch (error) {
+        console.error('Error in dbDeleteNPCTrader:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ===== NPC TRADER ORDER FUNCTIONS =====
+
+/**
+ * Save an NPC trader order
+ * @param {Object} order - Order object
+ * @returns {Promise<Object>} Result with order ID
+ */
+async function dbSaveNPCOrder(order) {
+    try {
+        const id = await setItem(STORES.NPC_TRADER_ORDERS, order);
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error in dbSaveNPCOrder:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get an NPC order by ID
+ * @param {string} orderId - Order ID
+ * @returns {Promise<Object|null>} Order object or null
+ */
+async function dbGetNPCOrder(orderId) {
+    try {
+        return await getItem(STORES.NPC_TRADER_ORDERS, orderId);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrder:', error);
+        return null;
+    }
+}
+
+/**
+ * Get all NPC orders
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetAllNPCOrders() {
+    try {
+        return await getAll(STORES.NPC_TRADER_ORDERS);
+    } catch (error) {
+        console.error('Error in dbGetAllNPCOrders:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC orders by trader ID
+ * @param {string} traderId - Trader ID
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetNPCOrdersByTrader(traderId) {
+    try {
+        return await getByIndex(STORES.NPC_TRADER_ORDERS, 'traderId', traderId);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrdersByTrader:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC orders by element
+ * @param {string} element - Element name
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetNPCOrdersByElement(element) {
+    try {
+        return await getByIndex(STORES.NPC_TRADER_ORDERS, 'element', element);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrdersByElement:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC orders by side
+ * @param {string} side - 'buy' or 'sell'
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetNPCOrdersBySide(side) {
+    try {
+        return await getByIndex(STORES.NPC_TRADER_ORDERS, 'side', side);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrdersBySide:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC orders by status
+ * @param {string} status - Order status
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetNPCOrdersByStatus(status) {
+    try {
+        return await getByIndex(STORES.NPC_TRADER_ORDERS, 'status', status);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrdersByStatus:', error);
+        return [];
+    }
+}
+
+/**
+ * Get active NPC orders (status 'active' or 'partial')
+ * @returns {Promise<Array>} Array of active orders
+ */
+async function dbGetActiveNPCOrders() {
+    try {
+        const allOrders = await dbGetAllNPCOrders();
+        return allOrders.filter(o => o.status === 'active' || o.status === 'partial');
+    } catch (error) {
+        console.error('Error in dbGetActiveNPCOrders:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC orders by price range
+ * @param {string} element - Element name
+ * @param {string} side - 'buy' or 'sell'
+ * @param {number} minPrice - Minimum price
+ * @param {number} maxPrice - Maximum price
+ * @returns {Promise<Array>} Array of orders
+ */
+async function dbGetNPCOrdersByPriceRange(element, side, minPrice, maxPrice) {
+    try {
+        const orders = await dbGetNPCOrdersByElement(element);
+        const sideOrders = orders.filter(o => o.side === side);
+        return sideOrders.filter(o => o.price >= minPrice && o.price <= maxPrice);
+    } catch (error) {
+        console.error('Error in dbGetNPCOrdersByPriceRange:', error);
+        return [];
+    }
+}
+
+/**
+ * Delete an NPC order
+ * @param {string} orderId - Order ID
+ * @returns {Promise<Object>} Result
+ */
+async function dbDeleteNPCOrder(orderId) {
+    try {
+        await deleteItem(STORES.NPC_TRADER_ORDERS, orderId);
+        return { success: true };
+    } catch (error) {
+        console.error('Error in dbDeleteNPCOrder:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ===== NPC TRADER HISTORY FUNCTIONS =====
+
+/**
+ * Record an NPC trade in history
+ * @param {Object} trade - Trade object
+ * @returns {Promise<Object>} Result with trade ID
+ */
+async function dbRecordNPCTrade(trade) {
+    try {
+        const id = await setItem(STORES.NPC_TRADER_HISTORY, trade);
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error in dbRecordNPCTrade:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get trade history for an NPC trader
+ * @param {string} traderId - Trader ID
+ * @param {number} limit - Max number of records
+ * @returns {Promise<Array>} Array of trades
+ */
+async function dbGetNPCTraderHistory(traderId, limit = 50) {
+    try {
+        const trades = await getByIndex(STORES.NPC_TRADER_HISTORY, 'traderId', traderId);
+        // Sort by timestamp descending (newest first)
+        trades.sort((a, b) => b.timestamp - a.timestamp);
+        return trades.slice(0, limit);
+    } catch (error) {
+        console.error('Error in dbGetNPCTraderHistory:', error);
+        return [];
+    }
+}
+
+/**
+ * Get trade history for an element
+ * @param {string} element - Element name
+ * @param {number} limit - Max number of records
+ * @returns {Promise<Array>} Array of trades
+ */
+async function dbGetNPCElementHistory(element, limit = 50) {
+    try {
+        const trades = await getByIndex(STORES.NPC_TRADER_HISTORY, 'element', element);
+        // Sort by timestamp descending (newest first)
+        trades.sort((a, b) => b.timestamp - a.timestamp);
+        return trades.slice(0, limit);
+    } catch (error) {
+        console.error('Error in dbGetNPCElementHistory:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC trades within a time range
+ * @param {number} startTime - Start timestamp
+ * @param {number} endTime - End timestamp
+ * @returns {Promise<Array>} Array of trades
+ */
+async function dbGetNPCTradesByTimeRange(startTime, endTime) {
+    try {
+        const allTrades = await getAll(STORES.NPC_TRADER_HISTORY);
+        return allTrades.filter(t => t.timestamp >= startTime && t.timestamp <= endTime);
+    } catch (error) {
+        console.error('Error in dbGetNPCTradesByTimeRange:', error);
+        return [];
+    }
+}
+
+/**
+ * Get NPC trading volume for an element in a time range
+ * @param {string} element - Element name
+ * @param {number} startTime - Start timestamp
+ * @param {number} endTime - End timestamp
+ * @returns {Promise<Object>} Volume stats
+ */
+async function dbGetNPCElementVolume(element, startTime, endTime) {
+    try {
+        const trades = await dbGetNPCElementHistory(element);
+        const timeRangeTrades = trades.filter(t => t.timestamp >= startTime && t.timestamp <= endTime);
+        
+        let buyVolume = 0;
+        let sellVolume = 0;
+        let totalValue = 0;
+        
+        timeRangeTrades.forEach(t => {
+            const value = t.price * t.quantity;
+            totalValue += value;
+            
+            if (t.side === 'buy') {
+                buyVolume += t.quantity;
+            } else {
+                sellVolume += t.quantity;
+            }
+        });
+        
+        return {
+            element,
+            buyVolume,
+            sellVolume,
+            totalVolume: buyVolume + sellVolume,
+            totalValue,
+            tradeCount: timeRangeTrades.length,
+            startTime,
+            endTime
+        };
+    } catch (error) {
+        console.error('Error in dbGetNPCElementVolume:', error);
+        return {
+            element,
+            buyVolume: 0,
+            sellVolume: 0,
+            totalVolume: 0,
+            totalValue: 0,
+            tradeCount: 0,
+            startTime,
+            endTime
+        };
+    }
+}
+
 // ===== RESET FUNCTIONS =====
 
 /**
@@ -1074,6 +1542,25 @@ async function resetAllData() {
     }
 }
 
+/**
+ * Reset only NPC trader data
+ * @returns {Promise<Object>} Result
+ */
+async function resetNPCData() {
+    try {
+        await clearStore(STORES.NPC_TRADERS);
+        await clearStore(STORES.NPC_TRADER_ORDERS);
+        await clearStore(STORES.NPC_TRADER_HISTORY);
+        
+        console.log('NPC trader data reset successfully');
+        return { success: true };
+        
+    } catch (error) {
+        console.error('Error resetting NPC data:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ===== EXPORT FUNCTIONS =====
 
 // Core functions
@@ -1082,6 +1569,8 @@ window.getItem = getItem;
 window.setItem = setItem;
 window.deleteItem = deleteItem;
 window.getAll = getAll;
+window.getByIndex = getByIndex;
+window.getByIndexRange = getByIndexRange;
 window.clearStore = clearStore;
 window.resetAllData = resetAllData;
 
@@ -1111,13 +1600,43 @@ window.dbGetLaborPoolTotal = dbGetLaborPoolTotal;
 window.dbAddLaborEarnings = dbAddLaborEarnings;
 window.dbGetLaborEarnings = dbGetLaborEarnings;
 
-// Certificate holder functions (NEW)
+// Certificate holder functions
 window.dbUpdateCertificateHolder = dbUpdateCertificateHolder;
 window.dbGetCertificateHolders = dbGetCertificateHolders;
 window.dbGetPlayerCertificates = dbGetPlayerCertificates;
 window.dbGetCertificateHolder = dbGetCertificateHolder;
 
+// ===== NPC TRADER FUNCTIONS (NEW) =====
+window.dbSaveNPCTrader = dbSaveNPCTrader;
+window.dbGetNPCTrader = dbGetNPCTrader;
+window.dbGetAllNPCTraders = dbGetAllNPCTraders;
+window.dbGetNPCTradersByType = dbGetNPCTradersByType;
+window.dbGetNPCTradersByPersonality = dbGetNPCTradersByPersonality;
+window.dbGetActiveNPCTraders = dbGetActiveNPCTraders;
+window.dbGetNPCTradersByLastActivity = dbGetNPCTradersByLastActivity;
+window.dbDeleteNPCTrader = dbDeleteNPCTrader;
+
+// NPC Order functions
+window.dbSaveNPCOrder = dbSaveNPCOrder;
+window.dbGetNPCOrder = dbGetNPCOrder;
+window.dbGetAllNPCOrders = dbGetAllNPCOrders;
+window.dbGetNPCOrdersByTrader = dbGetNPCOrdersByTrader;
+window.dbGetNPCOrdersByElement = dbGetNPCOrdersByElement;
+window.dbGetNPCOrdersBySide = dbGetNPCOrdersBySide;
+window.dbGetNPCOrdersByStatus = dbGetNPCOrdersByStatus;
+window.dbGetActiveNPCOrders = dbGetActiveNPCOrders;
+window.dbGetNPCOrdersByPriceRange = dbGetNPCOrdersByPriceRange;
+window.dbDeleteNPCOrder = dbDeleteNPCOrder;
+
+// NPC History functions
+window.dbRecordNPCTrade = dbRecordNPCTrade;
+window.dbGetNPCTraderHistory = dbGetNPCTraderHistory;
+window.dbGetNPCElementHistory = dbGetNPCElementHistory;
+window.dbGetNPCTradesByTimeRange = dbGetNPCTradesByTimeRange;
+window.dbGetNPCElementVolume = dbGetNPCElementVolume;
+window.resetNPCData = resetNPCData;
+
 // Export STORES for use in other modules
 window.DB_STORES = STORES;
 
-console.log('✅ db.js initialized - IndexedDB ready with certificate holders');
+console.log('✅ db.js initialized - Version 5 with NPC trader stores');
