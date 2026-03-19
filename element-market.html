@@ -1837,23 +1837,58 @@
             document.getElementById('depthSpread').textContent = `${spreadPercent.toFixed(2)}% spread`;
         }
 
-        // ===== MARKET STATS =====
+        // ===== IMPROVED MARKET STATS =====
         function updateMarketStats() {
-            const summary = getMarketSummary();
-            const recentTrades = getAllRecentTrades(100);
-            const npcTrades = recentTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
-            
-            document.getElementById('volume24h').textContent = (summary.totalVolume24h || 0).toLocaleString();
-            document.getElementById('marketCap').textContent = (summary.totalMarketCap || 0).toLocaleString();
-            document.getElementById('trades24h').textContent = recentTrades.length.toString();
-            document.getElementById('tradesChange').innerHTML = `NPC: ${npcTrades}`;
-            
-            if (summary.topGainers && summary.topGainers.length > 0) {
-                document.getElementById('topGainer').textContent = summary.topGainers[0].name;
-                document.getElementById('gainerChange').textContent = `+${summary.topGainers[0].change.toFixed(1)}%`;
+            try {
+                const prices = getCurrentPrices();
+                const recentTrades = getAllRecentTrades(200);
+                
+                // Calculate 24h volume and trades
+                const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+                const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
+                const volume24h = last24hTrades.reduce((sum, t) => sum + t.quantity, 0);
+                const npcTrades = last24hTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
+                
+                // Calculate market cap (price * 1M supply for each element)
+                let marketCap = 0;
+                Object.values(prices).forEach(priceData => {
+                    marketCap += (priceData.current || 100) * 1000000;
+                });
+                
+                // Find top gainer (highest % change)
+                let topGainer = { name: '---', change: 0 };
+                let topLoser = { name: '---', change: 0 };
+                
+                Object.entries(prices).forEach(([name, data]) => {
+                    if (data.priceChangePercent > topGainer.change) {
+                        topGainer = { name, change: data.priceChangePercent };
+                    }
+                    if (data.priceChangePercent < topLoser.change) {
+                        topLoser = { name, change: data.priceChangePercent };
+                    }
+                });
+                
+                // Update DOM elements
+                document.getElementById('volume24h').textContent = volume24h.toLocaleString();
+                document.getElementById('marketCap').textContent = Math.round(marketCap).toLocaleString();
+                document.getElementById('trades24h').textContent = last24hTrades.length.toString();
+                document.getElementById('tradesChange').innerHTML = `NPC: ${npcTrades}`;
+                
+                if (topGainer.name !== '---') {
+                    document.getElementById('topGainer').textContent = topGainer.name;
+                    document.getElementById('gainerChange').textContent = `+${topGainer.change.toFixed(1)}%`;
+                }
+                
+                // Update volume change (simulated)
+                const volumeChange = ((volume24h / 1000) || 0).toFixed(1);
+                document.getElementById('volumeChange').textContent = `+${volumeChange}%`;
+                
+                // Update NPC stats
+                updateNPCStats();
+                
+            } catch (error) {
+                console.error('Error updating market stats:', error);
             }
-            
-            document.getElementById('volumeChange').textContent = `+${(Math.random() * 10).toFixed(1)}%`;
         }
 
         // ===== CHART SETUP =====
@@ -2347,26 +2382,26 @@
             window.location.href = 'my-orders.html';
         };
 
-        // ===== REAL-TIME UPDATES =====
+        // ===== IMPROVED REAL-TIME UPDATES =====
         function startRealTimeUpdates() {
-            // Update display every 5 seconds
+            // Update display every 2 seconds (more frequent)
             updateInterval = setInterval(async () => {
                 renderMarketTicker();
                 renderMarketTable();
-                await renderOrderBook(); // Now async
-                updateMarketStats();
+                await renderOrderBook();
+                updateMarketStats(); // This now updates all stats
                 await updateNPCStats();
-            }, 5000);
+            }, 2000);
             
             // Auto-save prices every minute
             priceUpdateInterval = setInterval(() => {
                 saveMarketPrices();
             }, 60000);
             
-            // Update NPC stats every 30 seconds
+            // Update NPC stats every 10 seconds
             npcStatsUpdateInterval = setInterval(async () => {
                 await updateNPCStats();
-            }, 30000);
+            }, 10000);
         }
 
         // ===== TOAST =====
