@@ -784,7 +784,7 @@
                     <span class="orders-badge">VOIDEX</span>
                 </div>
                 <div class="header-actions">
-                    <button class="refresh-btn" onclick="refreshOrders()">↻</button>
+                    <button class="refresh-btn" onclick="window.refreshOrders()">↻</button>
                 </div>
             </div>
             
@@ -823,10 +823,10 @@
             
             <!-- Tab Navigation -->
             <div class="order-tabs">
-                <button class="order-tab active" onclick="switchOrderTab('all')">ALL</button>
-                <button class="order-tab" onclick="switchOrderTab('buy')">BUY</button>
-                <button class="order-tab" onclick="switchOrderTab('sell')">SELL</button>
-                <button class="order-tab" onclick="switchOrderTab('history')">HISTORY</button>
+                <button class="order-tab active" onclick="window.switchOrderTab('all')">ALL</button>
+                <button class="order-tab" onclick="window.switchOrderTab('buy')">BUY</button>
+                <button class="order-tab" onclick="window.switchOrderTab('sell')">SELL</button>
+                <button class="order-tab" onclick="window.switchOrderTab('history')">HISTORY</button>
             </div>
             
             <!-- Filter Bar (dynamic) -->
@@ -836,7 +836,7 @@
             <div id="ordersContainer"></div>
             
             <!-- Back button -->
-            <button class="back-button" onclick="returnToMarket()">
+            <button class="back-button" onclick="window.returnToMarket()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">RETURN TO MARKET</span>
             </button>
@@ -857,7 +857,7 @@
     <script type="module" src="js/market-engine.js"></script>
 
     <script type="module">
-        import { ELEMENT_DATABASE, getElementByName, getElementIcon } from './js/element-prices.js';
+        import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './js/element-prices.js';
         import { getCurrentPrices, getBidPrice, getAskPrice } from './js/market-dynamics.js';
         import { getUserOrders, getUserTrades, cancelOrder, ORDER_TYPES, ORDER_SIDES, ORDER_STATUS } from './js/market-engine.js';
         import { getPlayer, getCollection } from './js/storage.js';
@@ -1012,17 +1012,17 @@
             
             if (currentTab === 'history') {
                 filterBar.innerHTML = `
-                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">ALL</span>
-                    <span class="filter-btn ${currentFilter === 'today' ? 'active' : ''}" onclick="setFilter('today')">TODAY</span>
-                    <span class="filter-btn ${currentFilter === 'week' ? 'active' : ''}" onclick="setFilter('week')">THIS WEEK</span>
-                    <span class="filter-btn ${currentFilter === 'month' ? 'active' : ''}" onclick="setFilter('month')">THIS MONTH</span>
+                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="window.setFilter('all')">ALL</span>
+                    <span class="filter-btn ${currentFilter === 'today' ? 'active' : ''}" onclick="window.setFilter('today')">TODAY</span>
+                    <span class="filter-btn ${currentFilter === 'week' ? 'active' : ''}" onclick="window.setFilter('week')">THIS WEEK</span>
+                    <span class="filter-btn ${currentFilter === 'month' ? 'active' : ''}" onclick="window.setFilter('month')">THIS MONTH</span>
                 `;
             } else {
                 filterBar.innerHTML = `
-                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">ALL</span>
-                    <span class="filter-btn ${currentFilter === 'active' ? 'active' : ''}" onclick="setFilter('active')">ACTIVE</span>
-                    <span class="filter-btn ${currentFilter === 'partial' ? 'active' : ''}" onclick="setFilter('partial')">PARTIAL</span>
-                    <span class="filter-btn ${currentFilter === 'filled' ? 'active' : ''}" onclick="setFilter('filled')">FILLED</span>
+                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="window.setFilter('all')">ALL</span>
+                    <span class="filter-btn ${currentFilter === 'active' ? 'active' : ''}" onclick="window.setFilter('active')">ACTIVE</span>
+                    <span class="filter-btn ${currentFilter === 'partial' ? 'active' : ''}" onclick="window.setFilter('partial')">PARTIAL</span>
+                    <span class="filter-btn ${currentFilter === 'filled' ? 'active' : ''}" onclick="window.setFilter('filled')">FILLED</span>
                 `;
             }
         }
@@ -1043,7 +1043,15 @@
             currentTab = tab;
             
             document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
+            // Find the clicked button and set it active
+            const buttons = document.querySelectorAll('.order-tab');
+            for (let i = 0; i < buttons.length; i++) {
+                if (buttons[i].textContent.toLowerCase().includes(tab) || 
+                    (tab === 'all' && buttons[i].textContent === 'ALL')) {
+                    buttons[i].classList.add('active');
+                    break;
+                }
+            }
             
             currentFilter = 'all';
             renderFilterBar();
@@ -1099,7 +1107,6 @@
         function renderOrderCard(order) {
             const element = order.elementData;
             const icon = element.icon || '📦';
-            const statusClass = order.status.toLowerCase();
             const progressPercent = (order.filledQuantity / order.originalQuantity) * 100;
             const canCancel = order.status === ORDER_STATUS.ACTIVE || order.status === ORDER_STATUS.PARTIAL;
             
@@ -1176,9 +1183,9 @@
                         </div>
                         <div class="order-actions">
                             ${canCancel ? `
-                                <button class="action-btn cancel-btn" onclick="cancelOrder('${order.id}')">CANCEL</button>
+                                <button class="action-btn cancel-btn" onclick="window.cancelOrder('${order.id}')">CANCEL</button>
                             ` : ''}
-                            <button class="action-btn view-btn" onclick="viewOrder('${order.id}')">VIEW</button>
+                            <button class="action-btn view-btn" onclick="window.viewOrder('${order.id}')">VIEW</button>
                         </div>
                     </div>
                 </div>
@@ -1325,6 +1332,9 @@
             
             setTimeout(() => toast.remove(), 3000);
         }
+
+        // ===== ATTACH FUNCTIONS TO WINDOW =====
+        // Already attached via window.functionName = function above
 
         // ===== START =====
         init();
