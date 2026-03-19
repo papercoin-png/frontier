@@ -2,6 +2,7 @@
 // Creates and manages 1000 simulated traders with personalities
 // UPDATED: Added market orders and liquidity taking for real trading behavior
 // UPDATED: Fixed price validation to prevent "Price data not available" errors
+// UPDATED: Fixed element filtering to use current price instead of bid/ask
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -39,7 +40,7 @@ export const TRADER_PERSONALITIES = {
     VALUE_TRADER: 'valueTrader',
     RANDOM: 'random',
     INACTIVE: 'inactive',
-    MARKET_MAKER: 'marketMaker' // Added market maker personality
+    MARKET_MAKER: 'marketMaker'
 };
 
 // Type configuration
@@ -92,14 +93,13 @@ const PERSONALITY_DISTRIBUTION = {
     [TRADER_PERSONALITIES.TREND_FOLLOWER]: 23, // 23%
     [TRADER_PERSONALITIES.VALUE_TRADER]: 18,   // 18%
     [TRADER_PERSONALITIES.RANDOM]: 15,         // 15%
-    [TRADER_PERSONALITIES.MARKET_MAKER]: 8,    // 8% (new)
+    [TRADER_PERSONALITIES.MARKET_MAKER]: 8,    // 8%
     [TRADER_PERSONALITIES.INACTIVE]: 8         // 8%
 };
 
 // ===== TRADER NAMES =====
 
 export const NPC_TRADER_NAMES = [
-    // First names
     'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa',
     'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon',
     'Phi', 'Chi', 'Psi', 'Omega', 'Astra', 'Nova', 'Vega', 'Sirius', 'Orion', 'Andromeda',
@@ -159,13 +159,11 @@ export function generateTraderNames(count = 500) {
     
     const names = [];
     
-    // Use the base names and combine them
     for (let i = 0; i < count; i++) {
         const name = NPC_TRADER_NAMES[i % NPC_TRADER_NAMES.length];
         const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
         const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
         
-        // 50% chance to use prefix, 30% chance to use suffix, 20% chance plain
         const rand = Math.random();
         let fullName = name;
         
@@ -175,7 +173,6 @@ export function generateTraderNames(count = 500) {
             fullName = `${name} ${suffix}`;
         }
         
-        // Add a number suffix for variation
         if (Math.random() > 0.7) {
             fullName += ` ${Math.floor(Math.random() * 100)}`;
         }
@@ -183,24 +180,13 @@ export function generateTraderNames(count = 500) {
         names.push(fullName);
     }
     
-    // Remove duplicates (just in case)
     return [...new Set(names)];
 }
 
-// Pre-generated names list (will be filled on init)
 export let TRADER_NAMES = [];
 
 // ===== TRADER DATA STRUCTURE =====
 
-/**
- * Create a new NPC trader
- * @param {string} id - Trader ID
- * @param {string} type - Trader type from TRADER_TYPES
- * @param {string} personality - Personality from TRADER_PERSONALITIES
- * @param {string} name - Trader name
- * @param {number} credits - Starting credits
- * @returns {Object} Trader object
- */
 export function createNPCTrader(id, type, personality, name, credits) {
     const config = TRADER_TYPE_CONFIG[type];
     
@@ -211,9 +197,9 @@ export function createNPCTrader(id, type, personality, name, credits) {
         name,
         credits,
         initialCredits: credits,
-        inventory: {}, // Elements owned: { elementName: quantity }
-        activeOrders: [], // Order IDs
-        orderHistory: [], // Past order IDs
+        inventory: {},
+        activeOrders: [],
+        orderHistory: [],
         totalTrades: 0,
         totalVolume: 0,
         profitLoss: 0,
@@ -221,32 +207,18 @@ export function createNPCTrader(id, type, personality, name, credits) {
         createdAt: Date.now(),
         lastActivity: Date.now(),
         isActive: personality !== TRADER_PERSONALITIES.INACTIVE,
-        
-        // Trader-specific settings
         orderSizeMin: config.orderSizeMin,
         orderSizeMax: config.orderSizeMax,
-        
-        // Strategy parameters (will vary by personality)
         strategyParams: generateStrategyParams(personality),
-        
-        // Market memory for trend followers
         priceMemory: {},
-        
-        // Favorite elements (random selection)
         favoriteElements: []
     };
 }
 
-/**
- * Generate random inventory for a new trader
- * @param {Object} trader - Trader object
- * @param {Array} elements - Available elements
- */
 export function generateRandomInventory(trader, elements) {
     const inventory = {};
-    const numElements = Math.floor(Math.random() * 5) + 1; // 1-5 elements
+    const numElements = Math.floor(Math.random() * 5) + 1;
     
-    // Filter to elements with price data
     const tradableElements = elements.filter(el => el.currentPrice && el.currentPrice > 0);
     
     if (tradableElements.length === 0) return inventory;
@@ -254,10 +226,8 @@ export function generateRandomInventory(trader, elements) {
     for (let i = 0; i < numElements; i++) {
         const element = tradableElements[Math.floor(Math.random() * tradableElements.length)];
         const quantity = Math.floor(Math.random() * 50) + 1;
-        
-        // Calculate total value to ensure they don't exceed credits too much
         const totalValue = quantity * (element.currentPrice || 100);
-        if (totalValue < trader.credits * 0.5) { // Don't exceed 50% of credits in inventory
+        if (totalValue < trader.credits * 0.5) {
             inventory[element.name] = quantity;
         }
     }
@@ -265,66 +235,61 @@ export function generateRandomInventory(trader, elements) {
     return inventory;
 }
 
-/**
- * Generate strategy parameters based on personality
- * @param {string} personality - Trader personality
- * @returns {Object} Strategy parameters
- */
 function generateStrategyParams(personality) {
     switch (personality) {
         case TRADER_PERSONALITIES.SCALPER:
             return {
-                profitTarget: 0.005 + Math.random() * 0.01, // 0.5-1.5% profit target
-                stopLoss: 0.003 + Math.random() * 0.007,    // 0.3-1% stop loss
-                orderFrequency: 0.8 + Math.random() * 0.2, // 80-100% (active)
-                marketOrderChance: 0.4, // 40% chance to take liquidity
-                maxHoldTime: 2 * 60 * 1000, // 2 minutes
+                profitTarget: 0.005 + Math.random() * 0.01,
+                stopLoss: 0.003 + Math.random() * 0.007,
+                orderFrequency: 0.8 + Math.random() * 0.2,
+                marketOrderChance: 0.4,
+                maxHoldTime: 2 * 60 * 1000,
                 useMarketOrders: Math.random() > 0.3
             };
             
         case TRADER_PERSONALITIES.TREND_FOLLOWER:
             return {
-                lookbackPeriods: [5, 10, 20], // SMA periods
-                trendThreshold: 0.01 + Math.random() * 0.02, // 1-3% trend signal
-                momentumMultiplier: 0.5 + Math.random() * 1.0, // 0.5-1.5x
-                marketOrderChance: 0.25, // 25% chance to take liquidity
+                lookbackPeriods: [5, 10, 20],
+                trendThreshold: 0.01 + Math.random() * 0.02,
+                momentumMultiplier: 0.5 + Math.random() * 1.0,
+                marketOrderChance: 0.25,
                 useStopLoss: Math.random() > 0.3,
-                stopLossPercent: 0.03 + Math.random() * 0.05 // 3-8%
+                stopLossPercent: 0.03 + Math.random() * 0.05
             };
             
         case TRADER_PERSONALITIES.VALUE_TRADER:
             return {
-                historicalPeriod: 7 * 24 * 60 * 60 * 1000, // 7 days
-                undervaluedThreshold: 0.05 + Math.random() * 0.1, // 5-15% below avg
-                overvaluedThreshold: 0.1 + Math.random() * 0.15, // 10-25% above avg
-                holdTime: 3 * 24 * 60 * 60 * 1000, // 3 days average
-                marketOrderChance: 0.15, // 15% chance to take liquidity
-                rebalanceFrequency: 24 * 60 * 60 * 1000 // Daily rebalance
+                historicalPeriod: 7 * 24 * 60 * 60 * 1000,
+                undervaluedThreshold: 0.05 + Math.random() * 0.1,
+                overvaluedThreshold: 0.1 + Math.random() * 0.15,
+                holdTime: 3 * 24 * 60 * 60 * 1000,
+                marketOrderChance: 0.15,
+                rebalanceFrequency: 24 * 60 * 60 * 1000
             };
             
         case TRADER_PERSONALITIES.RANDOM:
             return {
-                randomness: 0.9 + Math.random() * 0.1, // 90-100% random
-                crazyFactor: Math.random(), // 0-1 how wild
+                randomness: 0.9 + Math.random() * 0.1,
+                crazyFactor: Math.random(),
                 ignoreSpread: Math.random() > 0.5,
-                marketOrderChance: 0.5, // 50% chance to take liquidity
+                marketOrderChance: 0.5,
                 placeAnyPrice: Math.random() > 0.5
             };
             
         case TRADER_PERSONALITIES.MARKET_MAKER:
             return {
-                spreadTarget: 0.002 + Math.random() * 0.003, // 0.2-0.5% spread
-                inventoryTarget: 0.3 + Math.random() * 0.2, // 30-50% of credits in inventory
-                replenishThreshold: 0.1, // 10% of max
-                marketOrderChance: 0.2, // 20% chance to take liquidity
-                rebalanceFrequency: 5 * 60 * 1000 // 5 minutes
+                spreadTarget: 0.002 + Math.random() * 0.003,
+                inventoryTarget: 0.3 + Math.random() * 0.2,
+                replenishThreshold: 0.1,
+                marketOrderChance: 0.2,
+                rebalanceFrequency: 5 * 60 * 1000
             };
             
         case TRADER_PERSONALITIES.INACTIVE:
         default:
             return {
-                inactivityPeriod: 12 * 60 * 60 * 1000, // 12 hours
-                wakeupChance: 0.15, // 15% chance to wake up each cycle
+                inactivityPeriod: 12 * 60 * 60 * 1000,
+                wakeupChance: 0.15,
                 holdingPattern: true
             };
     }
@@ -332,15 +297,9 @@ function generateStrategyParams(personality) {
 
 // ===== INITIALIZATION =====
 
-/**
- * Initialize all NPC traders
- * @param {Array} availableElements - List of available elements from market
- * @returns {Promise<Object>} Result with counts
- */
 export async function initializeNPCTraders(availableElements = []) {
     console.log('Initializing 1000 NPC traders...');
     
-    // Generate names if needed
     if (TRADER_NAMES.length === 0) {
         TRADER_NAMES = generateTraderNames(500);
     }
@@ -349,48 +308,36 @@ export async function initializeNPCTraders(availableElements = []) {
     const counts = {};
     let nameIndex = 0;
     
-    // Filter to elements with price data
     const tradableElements = availableElements.filter(el => 
         el.currentPrice && el.currentPrice > 0
     );
     
     console.log(`Found ${tradableElements.length} tradable elements with price data`);
     
-    // Create traders by type
     for (const [type, config] of Object.entries(TRADER_TYPE_CONFIG)) {
         counts[type] = config.count;
         
         for (let i = 0; i < config.count; i++) {
             const id = `npc_${type}_${i}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-            
-            // Assign personality based on distribution
             const personality = assignPersonality();
-            
-            // Generate credits within range
             const credits = Math.floor(
                 config.creditMin + Math.random() * (config.creditMax - config.creditMin)
             );
-            
-            // Get name (cycle through list)
             const name = TRADER_NAMES[nameIndex % TRADER_NAMES.length];
             nameIndex++;
             
-            // Create trader
             const trader = createNPCTrader(id, type, personality, name, credits);
             
-            // Add random inventory if they're not inactive and we have tradable elements
             if (personality !== TRADER_PERSONALITIES.INACTIVE && tradableElements.length > 0) {
                 trader.inventory = generateRandomInventory(trader, tradableElements);
             }
             
-            // Select favorite elements (3-5 random from tradable elements)
             if (tradableElements.length > 0) {
                 const numFavorites = Math.floor(Math.random() * 3) + 3;
                 for (let f = 0; f < numFavorites; f++) {
                     const element = tradableElements[Math.floor(Math.random() * tradableElements.length)];
                     trader.favoriteElements.push(element.name);
                 }
-                // Remove duplicates
                 trader.favoriteElements = [...new Set(trader.favoriteElements)];
             }
             
@@ -398,10 +345,8 @@ export async function initializeNPCTraders(availableElements = []) {
         }
     }
     
-    // Save to storage
     await saveNPCTraders(traders);
     
-    // Initialize stats
     const stats = {
         totalTraders: Object.keys(traders).length,
         activeTraders: Object.values(traders).filter(t => t.isActive).length,
@@ -424,10 +369,6 @@ export async function initializeNPCTraders(availableElements = []) {
     };
 }
 
-/**
- * Assign personality based on distribution
- * @returns {string} Personality type
- */
 function assignPersonality() {
     const rand = Math.random() * 100;
     let cumulative = 0;
@@ -439,14 +380,9 @@ function assignPersonality() {
         }
     }
     
-    return TRADER_PERSONALITIES.RANDOM; // Fallback
+    return TRADER_PERSONALITIES.RANDOM;
 }
 
-/**
- * Count traders by personality
- * @param {Object} traders - Traders object
- * @returns {Object} Counts by personality
- */
 function countByPersonality(traders) {
     const counts = {};
     
@@ -460,17 +396,7 @@ function countByPersonality(traders) {
 
 // ===== ORDER MANAGEMENT =====
 
-/**
- * Place an order for an NPC trader
- * @param {Object} trader - Trader object
- * @param {string} element - Element name
- * @param {string} side - 'buy' or 'sell'
- * @param {number} price - Price per unit
- * @param {number} quantity - Quantity
- * @returns {Promise<Object>} Order result
- */
 export async function placeTraderOrder(trader, element, side, price, quantity) {
-    // Validate credits for buy orders
     if (side === ORDER_SIDES.BUY) {
         const totalCost = price * quantity;
         if (trader.credits < totalCost) {
@@ -478,7 +404,6 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
         }
     }
     
-    // Validate inventory for sell orders
     if (side === ORDER_SIDES.SELL) {
         const owned = trader.inventory[element] || 0;
         if (owned < quantity) {
@@ -486,7 +411,6 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
         }
     }
     
-    // Create order object
     const order = {
         id: generateOrderId(),
         traderId: trader.id,
@@ -501,25 +425,20 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
         filledQuantity: 0,
         status: ORDER_STATUS.ACTIVE,
         createdAt: Date.now(),
-        expiresAt: Date.now() + (72 * 60 * 60 * 1000), // 72 hours
+        expiresAt: Date.now() + (72 * 60 * 60 * 1000),
         isNPC: true,
         trades: []
     };
     
-    // Reserve credits for buy orders
     if (side === ORDER_SIDES.BUY) {
         trader.credits -= price * quantity;
     }
     
-    // Add to trader's active orders
     trader.activeOrders.push(order.id);
     trader.lastActivity = Date.now();
     
-    // Save to storage
     await dbSaveNPCOrder(order);
     await saveNPCTrader(trader.id, trader);
-    
-    // Update orders in localStorage for market-engine compatibility
     await addOrderToLocalStorage(order);
     
     return {
@@ -528,21 +447,11 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
     };
 }
 
-/**
- * Execute an immediate market trade (TAKE LIQUIDITY) - FIXED VERSION
- * @param {Object} trader - Trader object
- * @param {string} element - Element name
- * @param {string} side - 'buy' or 'sell'
- * @param {number} quantity - Quantity
- * @returns {Promise<Object>} Trade result
- */
 async function executeImmediateTrade(trader, element, side, quantity) {
     try {
-        // Get current best price
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Validate prices exist before attempting trade
         if (side === ORDER_SIDES.BUY && (!ask || ask <= 0)) {
             return { success: false, reason: 'no_ask_price' };
         }
@@ -552,10 +461,8 @@ async function executeImmediateTrade(trader, element, side, quantity) {
         }
         
         if (side === ORDER_SIDES.BUY && ask && ask > 0) {
-            // Buy at ask price
             const total = ask * quantity;
             if (trader.credits >= total) {
-                // Create and execute market order
                 const orderData = {
                     userId: trader.id,
                     playerName: trader.name,
@@ -567,14 +474,12 @@ async function executeImmediateTrade(trader, element, side, quantity) {
                     isNPC: true
                 };
                 
-                // This will execute immediately via market-engine
                 const result = await createOrder(orderData);
                 if (result && result.success) {
                     return result;
                 }
             }
         } else if (side === ORDER_SIDES.SELL && bid && bid > 0) {
-            // Sell at bid price
             const owned = trader.inventory[element] || 0;
             if (owned >= quantity) {
                 const orderData = {
@@ -595,43 +500,31 @@ async function executeImmediateTrade(trader, element, side, quantity) {
             }
         }
     } catch (error) {
-        // Silent fail - don't log errors for missing prices
-        // This prevents the "Price data not available" console spam
+        // Silent fail
     }
     
     return { success: false };
 }
 
-/**
- * Add NPC order to localStorage for market-engine to see
- * @param {Object} order - NPC order
- */
 async function addOrderToLocalStorage(order) {
     try {
-        // Get existing orders
         const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
         const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
         
-        // Initialize element arrays if needed
         if (!buyOrders[order.element]) buyOrders[order.element] = [];
         if (!sellOrders[order.element]) sellOrders[order.element] = [];
         
-        // Add to appropriate side
         if (order.side === ORDER_SIDES.BUY) {
             buyOrders[order.element].push(order);
-            // Sort by highest price first
             buyOrders[order.element].sort((a, b) => b.price - a.price);
         } else {
             sellOrders[order.element].push(order);
-            // Sort by lowest price first
             sellOrders[order.element].sort((a, b) => a.price - b.price);
         }
         
-        // Save back
         localStorage.setItem('voidfarer_market_buy_orders', JSON.stringify(buyOrders));
         localStorage.setItem('voidfarer_market_sell_orders', JSON.stringify(sellOrders));
         
-        // Also save to NPC order storage
         const npcOrders = await loadNPCOrders() || {};
         if (!npcOrders[order.element]) npcOrders[order.element] = [];
         npcOrders[order.element].push(order);
@@ -642,15 +535,8 @@ async function addOrderToLocalStorage(order) {
     }
 }
 
-/**
- * Cancel an NPC order
- * @param {string} orderId - Order ID
- * @param {Object} trader - Trader object
- * @returns {Promise<Object>} Result
- */
 export async function cancelTraderOrder(orderId, trader) {
     try {
-        // Remove from localStorage
         const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
         const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
         
@@ -659,7 +545,6 @@ export async function cancelTraderOrder(orderId, trader) {
         let element = null;
         let side = null;
         
-        // Search in buy orders
         for (const elem in buyOrders) {
             const index = buyOrders[elem].findIndex(o => o.id === orderId);
             if (index >= 0) {
@@ -672,7 +557,6 @@ export async function cancelTraderOrder(orderId, trader) {
             }
         }
         
-        // Search in sell orders if not found
         if (!found) {
             for (const elem in sellOrders) {
                 const index = sellOrders[elem].findIndex(o => o.id === orderId);
@@ -691,16 +575,13 @@ export async function cancelTraderOrder(orderId, trader) {
             return { success: false, reason: 'order_not_found' };
         }
         
-        // Update status
         order.status = ORDER_STATUS.CANCELLED;
         
-        // Return reserved credits/inventory
         if (side === ORDER_SIDES.BUY && trader) {
             const total = order.price * order.remainingQuantity;
             trader.credits += total;
         }
         
-        // Remove from trader's active orders
         if (trader) {
             const index = trader.activeOrders.indexOf(orderId);
             if (index >= 0) {
@@ -709,11 +590,9 @@ export async function cancelTraderOrder(orderId, trader) {
             await saveNPCTrader(trader.id, trader);
         }
         
-        // Save back to localStorage
         localStorage.setItem('voidfarer_market_buy_orders', JSON.stringify(buyOrders));
         localStorage.setItem('voidfarer_market_sell_orders', JSON.stringify(sellOrders));
         
-        // Remove from NPC order storage
         const npcOrders = await loadNPCOrders() || {};
         if (npcOrders[element]) {
             const index = npcOrders[element].findIndex(o => o.id === orderId);
@@ -723,7 +602,6 @@ export async function cancelTraderOrder(orderId, trader) {
             }
         }
         
-        // Delete from IndexedDB
         await dbDeleteNPCOrder(orderId);
         
         return { success: true, order };
@@ -734,10 +612,6 @@ export async function cancelTraderOrder(orderId, trader) {
     }
 }
 
-/**
- * Get all active NPC orders
- * @returns {Promise<Array>} Array of orders
- */
 export async function getNPCOrders() {
     try {
         return await dbGetActiveNPCOrders();
@@ -747,11 +621,6 @@ export async function getNPCOrders() {
     }
 }
 
-/**
- * Get NPC orders for a specific element
- * @param {string} element - Element name
- * @returns {Promise<Object>} Object with bids and asks
- */
 export async function getNPCOrdersForElement(element) {
     try {
         const orders = await dbGetNPCOrdersByElement(element);
@@ -781,10 +650,9 @@ export async function getNPCOrdersForElement(element) {
  */
 export async function updateTrader(trader, marketData) {
     if (!trader.isActive) {
-        // Check if inactive traders should wake up
-        if (Math.random() < 0.15) { // 15% chance
+        if (Math.random() < 0.15) {
             trader.isActive = true;
-            trader.personality = TRADER_PERSONALITIES.RANDOM; // Become random when waking
+            trader.personality = TRADER_PERSONALITIES.RANDOM;
         } else {
             return { traderId: trader.id, actions: [] };
         }
@@ -793,48 +661,55 @@ export async function updateTrader(trader, marketData) {
     const actions = [];
     const prices = marketData.prices || {};
     
-    // Filter favorite elements to only those with price data
-    const elements = trader.favoriteElements.filter(el => 
-        prices[el] && (prices[el].bid > 0 || prices[el].ask > 0)
+    // ===== FIXED FILTERING =====
+    // Get all elements that have ANY price data - use current price as the reliable indicator
+    const allTradableElements = Object.keys(prices).filter(el => 
+        prices[el] && prices[el].current > 0
     );
     
-    // If no valid favorites, use first 5 elements with price data
-    const fallbackElements = elements.length > 0 ? elements : 
-        Object.keys(prices).filter(el => prices[el] && (prices[el].bid > 0 || prices[el].ask > 0)).slice(0, 5);
+    // Use favorites if they exist and are tradable
+    let elements = [];
+    if (trader.favoriteElements && trader.favoriteElements.length > 0) {
+        elements = trader.favoriteElements.filter(el => 
+            prices[el] && prices[el].current > 0
+        );
+    }
     
-    if (fallbackElements.length === 0) return { traderId: trader.id, actions: [] };
+    // If no valid favorites, use first 5 tradable elements
+    if (elements.length === 0) {
+        elements = allTradableElements.slice(0, 5);
+    }
     
-    // Decide based on personality
+    // If still no elements, return
+    if (elements.length === 0) {
+        return { traderId: trader.id, actions: [] };
+    }
+    
+    const fallbackElements = elements;
+    // ===== END FIXED FILTERING =====
+    
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
             await updateScalper(trader, marketData, fallbackElements, actions);
             break;
-            
         case TRADER_PERSONALITIES.TREND_FOLLOWER:
             await updateTrendFollower(trader, marketData, fallbackElements, actions);
             break;
-            
         case TRADER_PERSONALITIES.VALUE_TRADER:
             await updateValueTrader(trader, marketData, fallbackElements, actions);
             break;
-            
         case TRADER_PERSONALITIES.RANDOM:
             await updateRandomTrader(trader, marketData, fallbackElements, actions);
             break;
-            
         case TRADER_PERSONALITIES.MARKET_MAKER:
             await updateMarketMaker(trader, marketData, fallbackElements, actions);
             break;
-            
         default:
-            // Do nothing
             break;
     }
     
-    // Clean up expired orders
     await cleanupExpiredOrders(trader);
     
-    // Update last activity
     trader.lastActivity = Date.now();
     await saveNPCTrader(trader.id, trader);
     
@@ -844,14 +719,10 @@ export async function updateTrader(trader, marketData) {
     };
 }
 
-/**
- * Update scalper trader
- */
 async function updateScalper(trader, marketData, elements, actions) {
     const params = trader.strategyParams;
     const prices = marketData.prices;
     
-    // Scalpers trade frequently
     if (Math.random() > params.orderFrequency) return;
     
     for (const element of elements) {
@@ -860,35 +731,29 @@ async function updateScalper(trader, marketData, elements, actions) {
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Skip if no valid prices
         if (!bid || !ask || bid <= 0 || ask <= 0) continue;
         
-        // First: Take liquidity with market orders (30% chance)
         if (Math.random() < 0.3) {
             const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
-            const quantity = Math.floor(Math.random() * 3) + 1; // 1-3 units
+            const quantity = Math.floor(Math.random() * 3) + 1;
             
-            // Check if they can actually do this
             if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
                 const result = await executeImmediateTrade(trader, element, side, quantity);
                 if (result.success) {
                     actions.push({ type: 'market_buy', element, price: ask, quantity });
-                    continue; // Skip limit order this cycle
+                    continue;
                 }
             } else if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) >= quantity) {
                 const result = await executeImmediateTrade(trader, element, side, quantity);
                 if (result.success) {
                     actions.push({ type: 'market_sell', element, price: bid, quantity });
-                    continue; // Skip limit order this cycle
+                    continue;
                 }
             }
         }
         
-        // Second: Provide liquidity with tight limit orders
-        // Look for small profit opportunities
         if (trader.credits > 1000 && Math.random() > 0.4) {
-            // Place a buy order very close to market
-            const buyPrice = Math.floor(bid * 0.998); // 0.2% below bid
+            const buyPrice = Math.floor(bid * 0.998);
             const quantity = Math.floor(Math.random() * 3) + 1;
             
             const result = await placeTraderOrder(
@@ -900,9 +765,8 @@ async function updateScalper(trader, marketData, elements, actions) {
             }
         }
         
-        // Check for sells if they have inventory
         if (trader.inventory[element] > 0 && Math.random() > 0.4) {
-            const sellPrice = Math.floor(ask * 1.002); // 0.2% above ask
+            const sellPrice = Math.floor(ask * 1.002);
             const quantity = Math.min(
                 Math.floor(Math.random() * 3) + 1,
                 trader.inventory[element]
@@ -919,34 +783,24 @@ async function updateScalper(trader, marketData, elements, actions) {
     }
 }
 
-/**
- * Update trend follower trader
- */
 async function updateTrendFollower(trader, marketData, elements, actions) {
     const params = trader.strategyParams;
     
     for (const element of elements) {
-        // Get price history (simplified - would need actual history)
         const currentPrice = marketData.prices[element]?.current || 100;
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Skip if no valid prices
         if (!bid || !ask || bid <= 0 || ask <= 0) continue;
         
-        // Simple trend detection (compare with stored price)
         const lastPrice = trader.priceMemory[element] || currentPrice;
         const change = (currentPrice - lastPrice) / lastPrice;
         
-        // Store current price
         trader.priceMemory[element] = currentPrice;
         
-        // Detect trend
         if (Math.abs(change) > params.trendThreshold) {
             if (change > 0) {
-                // Uptrend - buy aggressively
                 if (trader.credits > 5000) {
-                    // 25% chance to take market
                     if (Math.random() < 0.25) {
                         const quantity = Math.floor(Math.random() * 5) + 1;
                         const result = await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, quantity);
@@ -956,9 +810,8 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
                         }
                     }
                     
-                    // Otherwise place limit order
                     const quantity = Math.floor(Math.random() * 5) + 1;
-                    const buyPrice = Math.floor(bid * 0.999); // Very tight
+                    const buyPrice = Math.floor(bid * 0.999);
                     
                     const result = await placeTraderOrder(
                         trader, element, ORDER_SIDES.BUY, buyPrice, quantity
@@ -969,9 +822,7 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
                     }
                 }
             } else {
-                // Downtrend - sell aggressively if have inventory
                 if (trader.inventory[element] > 0) {
-                    // 25% chance to take market
                     if (Math.random() < 0.25) {
                         const quantity = Math.min(
                             Math.floor(Math.random() * 5) + 1,
@@ -984,12 +835,11 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
                         }
                     }
                     
-                    // Otherwise place limit order
                     const quantity = Math.min(
                         Math.floor(Math.random() * 5) + 1,
                         trader.inventory[element]
                     );
-                    const sellPrice = Math.floor(ask * 1.001); // Very tight
+                    const sellPrice = Math.floor(ask * 1.001);
                     
                     const result = await placeTraderOrder(
                         trader, element, ORDER_SIDES.SELL, sellPrice, quantity
@@ -1004,9 +854,6 @@ async function updateTrendFollower(trader, marketData, elements, actions) {
     }
 }
 
-/**
- * Update value trader
- */
 async function updateValueTrader(trader, marketData, elements, actions) {
     const params = trader.strategyParams;
     
@@ -1015,16 +862,12 @@ async function updateValueTrader(trader, marketData, elements, actions) {
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Skip if no valid prices
         if (!bid || !ask || bid <= 0 || ask <= 0) continue;
         
-        // Simple value detection (would use historical average in real implementation)
-        const historicalAvg = currentPrice * (0.85 + Math.random() * 0.3); // Fake historical
+        const historicalAvg = currentPrice * (0.85 + Math.random() * 0.3);
         
         if (currentPrice < historicalAvg * (1 - params.undervaluedThreshold)) {
-            // Undervalued - buy
             if (trader.credits > 5000) {
-                // 15% chance to take market
                 if (Math.random() < 0.15) {
                     const quantity = Math.floor(Math.random() * 10) + 1;
                     const result = await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, quantity);
@@ -1034,9 +877,8 @@ async function updateValueTrader(trader, marketData, elements, actions) {
                     }
                 }
                 
-                // Otherwise place limit order slightly below market
                 const quantity = Math.floor(Math.random() * 10) + 1;
-                const buyPrice = Math.floor(currentPrice * 0.995); // 0.5% below
+                const buyPrice = Math.floor(currentPrice * 0.995);
                 
                 const result = await placeTraderOrder(
                     trader, element, ORDER_SIDES.BUY, buyPrice, quantity
@@ -1047,9 +889,7 @@ async function updateValueTrader(trader, marketData, elements, actions) {
                 }
             }
         } else if (currentPrice > historicalAvg * (1 + params.overvaluedThreshold)) {
-            // Overvalued - sell
             if (trader.inventory[element] > 0) {
-                // 15% chance to take market
                 if (Math.random() < 0.15) {
                     const quantity = Math.min(
                         Math.floor(Math.random() * 10) + 1,
@@ -1062,12 +902,11 @@ async function updateValueTrader(trader, marketData, elements, actions) {
                     }
                 }
                 
-                // Otherwise place limit order slightly above market
                 const quantity = Math.min(
                     Math.floor(Math.random() * 10) + 1,
                     trader.inventory[element]
                 );
-                const sellPrice = Math.floor(currentPrice * 1.005); // 0.5% above
+                const sellPrice = Math.floor(currentPrice * 1.005);
                 
                 const result = await placeTraderOrder(
                     trader, element, ORDER_SIDES.SELL, sellPrice, quantity
@@ -1081,38 +920,29 @@ async function updateValueTrader(trader, marketData, elements, actions) {
     }
 }
 
-/**
- * Update random trader
- */
 async function updateRandomTrader(trader, marketData, elements, actions) {
     const params = trader.strategyParams;
     
-    // Random traders are unpredictable
     if (Math.random() > params.randomness) return;
     
     for (const element of elements) {
-        if (Math.random() > 0.4) continue; // Act on 60% of elements
+        if (Math.random() > 0.4) continue;
         
         const currentPrice = marketData.prices[element]?.current || 100;
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Skip if no valid prices for market orders
         if ((!bid || bid <= 0) && (!ask || ask <= 0)) continue;
         
         const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
-        
-        // Decide: market or limit?
-        const useMarket = Math.random() < 0.5; // 50% market, 50% limit
+        const useMarket = Math.random() < 0.5;
         
         if (useMarket) {
-            // Market order - check if we have valid price for this side
             if (side === ORDER_SIDES.BUY && (!ask || ask <= 0)) continue;
             if (side === ORDER_SIDES.SELL && (!bid || bid <= 0)) continue;
             
             const quantity = Math.floor(Math.random() * 10) + 1;
             
-            // Check if they can actually do this
             if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
                 const result = await executeImmediateTrade(trader, element, side, quantity);
                 if (result.success) {
@@ -1137,18 +967,15 @@ async function updateRandomTrader(trader, marketData, elements, actions) {
                 }
             }
         } else {
-            // Limit order with random price
             let price = currentPrice;
             if (params.placeAnyPrice && Math.random() > 0.5) {
-                price = Math.floor(currentPrice * (0.8 + Math.random() * 0.6)); // 80-140% of market
+                price = Math.floor(currentPrice * (0.8 + Math.random() * 0.6));
             } else {
-                // Within 2% of market
                 price = Math.floor(currentPrice * (0.98 + Math.random() * 0.04));
             }
             
             const quantity = Math.floor(Math.random() * 15) + 1;
             
-            // Check if they can actually do this
             if (side === ORDER_SIDES.BUY && trader.credits < price * quantity) continue;
             if (side === ORDER_SIDES.SELL && (trader.inventory[element] || 0) < quantity) continue;
             
@@ -1167,10 +994,6 @@ async function updateRandomTrader(trader, marketData, elements, actions) {
     }
 }
 
-/**
- * Update market maker trader
- * These provide liquidity by keeping tight spreads and taking the other side
- */
 async function updateMarketMaker(trader, marketData, elements, actions) {
     const params = trader.strategyParams;
     
@@ -1179,18 +1002,12 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
         const bid = getBidPrice(element);
         const ask = getAskPrice(element);
         
-        // Skip if no valid prices
         if (!bid || !ask || bid <= 0 || ask <= 0) continue;
         
-        // Market makers maintain both sides
         const spread = ask - bid;
         const targetSpread = currentPrice * params.spreadTarget;
         
-        // If spread is too wide, tighten it
         if (spread > targetSpread || Math.random() < 0.3) {
-            // Place both a buy and sell order very close to market
-            
-            // Buy order slightly below market
             if (trader.credits > 10000) {
                 const buyPrice = Math.floor(currentPrice * (1 - params.spreadTarget / 2));
                 const buyQuantity = Math.floor(Math.random() * 20) + 10;
@@ -1204,12 +1021,9 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
                 }
             }
             
-            // Sell order slightly above market
             if (trader.inventory[element] > 0 || Math.random() < 0.5) {
                 const sellPrice = Math.floor(currentPrice * (1 + params.spreadTarget / 2));
                 const sellQuantity = Math.floor(Math.random() * 20) + 10;
-                
-                // Only sell what they have
                 const finalQuantity = Math.min(sellQuantity, trader.inventory[element] || 999999);
                 
                 const sellResult = await placeTraderOrder(
@@ -1222,12 +1036,10 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
             }
         }
         
-        // Also take the other side occasionally to create volume (20% chance)
         if (Math.random() < 0.2) {
             const side = Math.random() > 0.5 ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
             const quantity = Math.floor(Math.random() * 10) + 1;
             
-            // Check if they can do this
             if (side === ORDER_SIDES.BUY && trader.credits > ask * quantity) {
                 const result = await executeImmediateTrade(trader, element, side, quantity);
                 if (result.success) {
@@ -1241,7 +1053,6 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
             }
         }
         
-        // Rebalance inventory if needed
         const totalValue = Object.entries(trader.inventory).reduce((sum, [elem, qty]) => {
             return sum + (qty * (marketData.prices[elem]?.current || 100));
         }, 0);
@@ -1249,13 +1060,11 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
         const targetInventory = trader.credits * params.inventoryTarget;
         
         if (totalValue > targetInventory * 1.2) {
-            // Too much inventory - sell some
             if (trader.inventory[element] > 0 && Math.random() < 0.3) {
                 const sellQuantity = Math.floor(trader.inventory[element] * 0.1) + 1;
                 await executeImmediateTrade(trader, element, ORDER_SIDES.SELL, sellQuantity);
             }
         } else if (totalValue < targetInventory * 0.8 && trader.credits > 10000) {
-            // Too little inventory - buy some
             if (Math.random() < 0.3) {
                 const buyQuantity = Math.floor(Math.random() * 10) + 5;
                 await executeImmediateTrade(trader, element, ORDER_SIDES.BUY, buyQuantity);
@@ -1264,10 +1073,6 @@ async function updateMarketMaker(trader, marketData, elements, actions) {
     }
 }
 
-/**
- * Clean up expired orders for a trader
- * @param {Object} trader - Trader object
- */
 async function cleanupExpiredOrders(trader) {
     const now = Date.now();
     const ordersToRemove = [];
@@ -1290,11 +1095,6 @@ async function cleanupExpiredOrders(trader) {
 let updateInterval = null;
 let isUpdating = false;
 
-/**
- * Start the NPC trader update cycle (staggered)
- * @param {number} tradersPerBatch - Number to update per cycle
- * @param {number} intervalMs - Milliseconds between batches
- */
 export function startNPCTraderUpdates(tradersPerBatch = 100, intervalMs = 60000) {
     if (updateInterval) {
         clearInterval(updateInterval);
@@ -1315,13 +1115,9 @@ export function startNPCTraderUpdates(tradersPerBatch = 100, intervalMs = 60000)
         }
     }, intervalMs);
     
-    // Also set last update time
     setLastNPCUpdate();
 }
 
-/**
- * Stop the NPC trader update cycle
- */
 export function stopNPCTraderUpdates() {
     if (updateInterval) {
         clearInterval(updateInterval);
@@ -1330,24 +1126,17 @@ export function stopNPCTraderUpdates() {
     }
 }
 
-/**
- * Process one trading cycle (update a batch of traders)
- * @param {number} batchSize - Number of traders to update
- */
 export async function processNPCTradingCycle(batchSize = 100) {
     console.log(`Processing NPC trading cycle (${batchSize} traders)...`);
     
-    // Get all traders
     const traders = await loadNPCTraders();
     const traderList = Object.values(traders);
     
-    // Get current market data
     const marketData = {
         prices: getCurrentPrices(),
         timestamp: Date.now()
     };
     
-    // Select random batch
     const shuffled = traderList.sort(() => 0.5 - Math.random());
     const batch = shuffled.slice(0, Math.min(batchSize, traderList.length));
     
@@ -1356,14 +1145,12 @@ export async function processNPCTradingCycle(batchSize = 100) {
     let marketOrders = 0;
     let limitOrders = 0;
     
-    // Update each trader
     for (const trader of batch) {
         try {
             const result = await updateTrader(trader, marketData);
             actions = actions.concat(result.actions);
             updatedCount++;
             
-            // Count order types
             result.actions.forEach(a => {
                 if (a.type.includes('market')) marketOrders++;
                 else limitOrders++;
@@ -1374,13 +1161,11 @@ export async function processNPCTradingCycle(batchSize = 100) {
         }
     }
     
-    // Update stats
     const stats = await loadNPCStats();
     stats.activeTraders = (await dbGetActiveNPCTraders(true)).length;
     stats.lastUpdated = Date.now();
     await saveNPCStats(stats);
     
-    // Update timestamp
     await setLastNPCUpdate();
     
     console.log(`✅ Updated ${updatedCount} NPC traders, ${actions.length} actions (${marketOrders} market, ${limitOrders} limit)`);
@@ -1394,10 +1179,6 @@ export async function processNPCTradingCycle(batchSize = 100) {
     };
 }
 
-/**
- * Force update a specific trader
- * @param {string} traderId - Trader ID
- */
 export async function forceTraderUpdate(traderId) {
     const trader = await loadNPCTrader(traderId);
     if (!trader) return { success: false, reason: 'not_found' };
@@ -1412,23 +1193,14 @@ export async function forceTraderUpdate(traderId) {
 
 // ===== UTILITY FUNCTIONS =====
 
-/**
- * Generate unique order ID
- * @returns {string} Order ID
- */
 function generateOrderId() {
     return 'npc_ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-/**
- * Get NPC trader statistics
- * @returns {Promise<Object>} Statistics
- */
 export async function getNPCTraderStats() {
     const stats = await loadNPCStats();
     const activeOrders = await dbGetActiveNPCOrders();
     
-    // Count orders by side
     const buyOrders = activeOrders.filter(o => o.side === ORDER_SIDES.BUY).length;
     const sellOrders = activeOrders.filter(o => o.side === ORDER_SIDES.SELL).length;
     
@@ -1441,13 +1213,9 @@ export async function getNPCTraderStats() {
     };
 }
 
-/**
- * Reset all NPC trader data (for testing)
- */
 export async function resetNPCTraders() {
     stopNPCTraderUpdates();
     
-    // Clear storage
     await saveNPCTraders({});
     await saveNPCOrders({});
     await saveNPCStats({
@@ -1461,23 +1229,9 @@ export async function resetNPCTraders() {
     console.log('NPC trader data reset');
 }
 
-// ===== NPC TRADER AFTER TRADE UPDATE =====
-
-/**
- * Update NPC trader after a trade is executed
- * @param {string} traderId - NPC trader ID
- * @param {Object} tradeData - Trade data (element, quantity, price, side, orderId)
- * @returns {Promise<Object>} Result
- */
 export async function updateNPCTraderAfterTrade(traderId, tradeData) {
     try {
-        // Call the storage function
         const result = await storageUpdateNPCTraderAfterTrade(traderId, tradeData);
-        
-        if (result.success) {
-            // Silent success - don't log every trade
-        }
-        
         return result;
     } catch (error) {
         console.error('Error in updateNPCTraderAfterTrade:', error);
@@ -1510,7 +1264,6 @@ export default {
     resetNPCTraders
 };
 
-// Attach to window for global access
 window.NPC_TRADER_TYPES = TRADER_TYPES;
 window.NPC_TRADER_PERSONALITIES = TRADER_PERSONALITIES;
 window.initializeNPCTraders = initializeNPCTraders;
