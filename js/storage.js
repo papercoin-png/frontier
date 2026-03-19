@@ -3,6 +3,7 @@
 // UPDATED: Added material inventory, recipe unlocks, skill progression across all fields
 // UPDATED: Added market data persistence for trading system
 // UPDATED: Added certificate holder tracking for labor pool distribution
+// UPDATED: Added NPC trader persistence for marketplace NPCs
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -125,7 +126,7 @@ const STORAGE_KEYS = {
     LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
     PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
     
-    // Certificate tracking (NEW)
+    // Certificate tracking
     CERTIFICATE_HOLDERS: 'voidfarer_certificate_holders',
     
     // Products & marketplace
@@ -143,11 +144,17 @@ const STORAGE_KEYS = {
     CLAIM_HISTORY: 'voidfarer_claim_history',
     CLAIM_NOTIFICATIONS: 'voidfarer_claim_notifications',
     
-    // Crafting recipes unlocked (new)
+    // Crafting recipes unlocked
     RECIPE_UNLOCKS: 'voidfarer_recipe_unlocks',
     
-    // Field mastery levels (new)
-    FIELD_MASTERY: 'voidfarer_field_mastery'
+    // Field mastery levels
+    FIELD_MASTERY: 'voidfarer_field_mastery',
+    
+    // ===== NPC TRADER KEYS (NEW) =====
+    NPC_TRADERS: 'voidfarer_npc_traders',
+    NPC_TRADER_ORDERS: 'voidfarer_npc_trader_orders',
+    NPC_TRADER_STATS: 'voidfarer_npc_trader_stats',
+    LAST_NPC_UPDATE: 'voidfarer_last_npc_update'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE =====
@@ -301,7 +308,7 @@ export async function createDefaultPlayer(name = 'Voidfarer', playerId = 'main')
 }
 
 // ============================================================================
-// FIELD PROGRESSION (NEW)
+// FIELD PROGRESSION
 // ============================================================================
 
 /**
@@ -383,7 +390,7 @@ function getFieldKey(field) {
 }
 
 // ============================================================================
-// RECIPE UNLOCKS (NEW)
+// RECIPE UNLOCKS
 // ============================================================================
 
 /**
@@ -463,7 +470,7 @@ export async function isRecipeUnlocked(playerId, field, recipeId) {
 }
 
 // ============================================================================
-// FIELD MASTERY (NEW)
+// FIELD MASTERY
 // ============================================================================
 
 /**
@@ -1241,6 +1248,33 @@ export async function initializeStorage(playerId = 'main') {
         localStorage.setItem(certKey, '{}');
     }
     
+    // Initialize NPC trader storage (NEW)
+    const npcTradersKey = STORAGE_KEYS.NPC_TRADERS;
+    if (!localStorage.getItem(npcTradersKey)) {
+        localStorage.setItem(npcTradersKey, '{}');
+    }
+    
+    const npcOrdersKey = STORAGE_KEYS.NPC_TRADER_ORDERS;
+    if (!localStorage.getItem(npcOrdersKey)) {
+        localStorage.setItem(npcOrdersKey, '{}');
+    }
+    
+    const npcStatsKey = STORAGE_KEYS.NPC_TRADER_STATS;
+    if (!localStorage.getItem(npcStatsKey)) {
+        localStorage.setItem(npcStatsKey, JSON.stringify({
+            totalTraders: 0,
+            activeTraders: 0,
+            totalOrders: 0,
+            totalVolume: 0,
+            lastUpdated: Date.now()
+        }));
+    }
+    
+    const lastUpdateKey = STORAGE_KEYS.LAST_NPC_UPDATE;
+    if (!localStorage.getItem(lastUpdateKey)) {
+        localStorage.setItem(lastUpdateKey, Date.now().toString());
+    }
+    
     // Initialize location if not set
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
@@ -1367,7 +1401,7 @@ function setAmbientVolume(volume) {
 }
 
 // ============================================================================
-// MARKET DATA PERSISTENCE (NEW)
+// MARKET DATA PERSISTENCE
 // ============================================================================
 
 /**
@@ -1402,7 +1436,7 @@ export async function loadMarketData() {
 }
 
 // ============================================================================
-// ORDER BOOK PERSISTENCE (NEW)
+// ORDER BOOK PERSISTENCE
 // ============================================================================
 
 /**
@@ -1441,7 +1475,7 @@ export async function loadOrderBook(playerId = null) {
 }
 
 // ============================================================================
-// PORTFOLIO PERSISTENCE (NEW)
+// PORTFOLIO PERSISTENCE
 // ============================================================================
 
 /**
@@ -1480,7 +1514,7 @@ export async function loadPortfolio(playerId = null) {
 }
 
 // ============================================================================
-// TRADE HISTORY PERSISTENCE (NEW)
+// TRADE HISTORY PERSISTENCE
 // ============================================================================
 
 /**
@@ -1515,6 +1549,266 @@ export async function loadTradeHistory(playerId = null) {
     } catch (error) {
         console.error('Error loading trade history:', error);
         return [];
+    }
+}
+
+// ============================================================================
+// NPC TRADER FUNCTIONS (NEW)
+// ============================================================================
+
+/**
+ * Save all NPC traders
+ * @param {Object} traders - NPC traders object keyed by ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveNPCTraders(traders) {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADERS;
+        localStorage.setItem(key, JSON.stringify(traders));
+        
+        // Update stats
+        const stats = await loadNPCStats();
+        stats.totalTraders = Object.keys(traders).length;
+        stats.lastUpdated = Date.now();
+        await saveNPCStats(stats);
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving NPC traders:', error);
+        return false;
+    }
+}
+
+/**
+ * Load all NPC traders
+ * @returns {Promise<Object>} NPC traders object
+ */
+export async function loadNPCTraders() {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADERS;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error loading NPC traders:', error);
+        return {};
+    }
+}
+
+/**
+ * Save a single NPC trader
+ * @param {string} traderId - NPC trader ID
+ * @param {Object} traderData - Trader data
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveNPCTrader(traderId, traderData) {
+    try {
+        const traders = await loadNPCTraders();
+        traders[traderId] = traderData;
+        return await saveNPCTraders(traders);
+    } catch (error) {
+        console.error('Error saving NPC trader:', error);
+        return false;
+    }
+}
+
+/**
+ * Load a single NPC trader
+ * @param {string} traderId - NPC trader ID
+ * @returns {Promise<Object|null>} Trader data or null
+ */
+export async function loadNPCTrader(traderId) {
+    try {
+        const traders = await loadNPCTraders();
+        return traders[traderId] || null;
+    } catch (error) {
+        console.error('Error loading NPC trader:', error);
+        return null;
+    }
+}
+
+/**
+ * Save all NPC trader orders
+ * @param {Object} orders - NPC orders object (could be keyed by element or order ID)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveNPCOrders(orders) {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADER_ORDERS;
+        localStorage.setItem(key, JSON.stringify(orders));
+        
+        // Update stats
+        const stats = await loadNPCStats();
+        
+        // Count total orders (flatten if needed)
+        let totalOrders = 0;
+        if (typeof orders === 'object') {
+            if (Array.isArray(orders)) {
+                totalOrders = orders.length;
+            } else {
+                // Could be nested by element
+                for (const element in orders) {
+                    if (Array.isArray(orders[element])) {
+                        totalOrders += orders[element].length;
+                    }
+                }
+            }
+        }
+        
+        stats.totalOrders = totalOrders;
+        stats.lastUpdated = Date.now();
+        await saveNPCStats(stats);
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving NPC orders:', error);
+        return false;
+    }
+}
+
+/**
+ * Load all NPC trader orders
+ * @returns {Promise<Object>} NPC orders object
+ */
+export async function loadNPCOrders() {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADER_ORDERS;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.error('Error loading NPC orders:', error);
+        return {};
+    }
+}
+
+/**
+ * Save NPC trader stats
+ * @param {Object} stats - NPC stats object
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveNPCStats(stats) {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADER_STATS;
+        localStorage.setItem(key, JSON.stringify(stats));
+        return true;
+    } catch (error) {
+        console.error('Error saving NPC stats:', error);
+        return false;
+    }
+}
+
+/**
+ * Load NPC trader stats
+ * @returns {Promise<Object>} NPC stats object
+ */
+export async function loadNPCStats() {
+    try {
+        const key = STORAGE_KEYS.NPC_TRADER_STATS;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {
+            totalTraders: 0,
+            activeTraders: 0,
+            totalOrders: 0,
+            totalVolume: 0,
+            lastUpdated: Date.now()
+        };
+    } catch (error) {
+        console.error('Error loading NPC stats:', error);
+        return {
+            totalTraders: 0,
+            activeTraders: 0,
+            totalOrders: 0,
+            totalVolume: 0,
+            lastUpdated: Date.now()
+        };
+    }
+}
+
+/**
+ * Get last NPC update timestamp
+ * @returns {Promise<number>} Timestamp
+ */
+export async function getLastNPCUpdate() {
+    try {
+        const key = STORAGE_KEYS.LAST_NPC_UPDATE;
+        const saved = localStorage.getItem(key);
+        return saved ? parseInt(saved) : 0;
+    } catch (error) {
+        console.error('Error getting last NPC update:', error);
+        return 0;
+    }
+}
+
+/**
+ * Set last NPC update timestamp
+ * @param {number} timestamp - Update timestamp
+ * @returns {Promise<boolean>} Success status
+ */
+export async function setLastNPCUpdate(timestamp = Date.now()) {
+    try {
+        const key = STORAGE_KEYS.LAST_NPC_UPDATE;
+        localStorage.setItem(key, timestamp.toString());
+        return true;
+    } catch (error) {
+        console.error('Error setting last NPC update:', error);
+        return false;
+    }
+}
+
+/**
+ * Update NPC trader after trade
+ * @param {string} traderId - NPC trader ID
+ * @param {Object} tradeData - Trade data (element, quantity, price, side)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function updateNPCTraderAfterTrade(traderId, tradeData) {
+    try {
+        const trader = await loadNPCTrader(traderId);
+        if (!trader) return false;
+        
+        // Update credits
+        const total = tradeData.quantity * tradeData.price;
+        if (tradeData.side === 'sell') {
+            // Sold elements, gain credits
+            trader.credits += total;
+            
+            // Remove from inventory
+            if (trader.inventory[tradeData.element]) {
+                trader.inventory[tradeData.element] -= tradeData.quantity;
+                if (trader.inventory[tradeData.element] <= 0) {
+                    delete trader.inventory[tradeData.element];
+                }
+            }
+        } else {
+            // Bought elements, spend credits
+            trader.credits -= total;
+            
+            // Add to inventory
+            if (!trader.inventory[tradeData.element]) {
+                trader.inventory[tradeData.element] = 0;
+            }
+            trader.inventory[tradeData.element] += tradeData.quantity;
+        }
+        
+        // Update last activity
+        trader.lastActivity = Date.now();
+        
+        // Update stats
+        trader.totalTrades = (trader.totalTrades || 0) + 1;
+        trader.totalVolume = (trader.totalVolume || 0) + total;
+        
+        // Save trader
+        await saveNPCTrader(traderId, trader);
+        
+        // Update global stats
+        const stats = await loadNPCStats();
+        stats.totalVolume = (stats.totalVolume || 0) + total;
+        stats.lastUpdated = Date.now();
+        await saveNPCStats(stats);
+        
+        return true;
+    } catch (error) {
+        console.error('Error updating NPC trader after trade:', error);
+        return false;
     }
 }
 
@@ -1745,12 +2039,25 @@ export default {
     addCredits,
     spendCredits,
     
-    // Certificate holders (NEW)
+    // Certificate holders
     getCertificateHolders,
     updateCertificateHolder,
     addPlayerLaborEarnings,
     getPlayerLaborEarnings,
     claimPlayerLaborEarnings,
+    
+    // NPC Trader Functions (NEW)
+    saveNPCTraders,
+    loadNPCTraders,
+    saveNPCTrader,
+    loadNPCTrader,
+    saveNPCOrders,
+    loadNPCOrders,
+    saveNPCStats,
+    loadNPCStats,
+    getLastNPCUpdate,
+    setLastNPCUpdate,
+    updateNPCTraderAfterTrade,
     
     // Location
     isAtEarth,
@@ -1785,7 +2092,7 @@ export default {
     getAmbientVolume,
     setAmbientVolume,
     
-    // Market Data (NEW)
+    // Market Data
     saveMarketData,
     loadMarketData,
     saveOrderBook,
@@ -1795,7 +2102,7 @@ export default {
     saveTradeHistory,
     loadTradeHistory,
     
-    // Element Locations (ADDED)
+    // Element Locations
     getElementLocations,
     
     // System
@@ -1846,12 +2153,25 @@ window.getCurrentRegion = getCurrentRegion;
 window.setCurrentLocation = setCurrentLocation;
 window.setCurrentPlanet = setCurrentPlanet;
 
-// Certificate holder functions (NEW)
+// Certificate holder functions
 window.getCertificateHolders = getCertificateHolders;
 window.updateCertificateHolder = updateCertificateHolder;
 window.addPlayerLaborEarnings = addPlayerLaborEarnings;
 window.getPlayerLaborEarnings = getPlayerLaborEarnings;
 window.claimPlayerLaborEarnings = claimPlayerLaborEarnings;
+
+// NPC Trader Functions (NEW)
+window.saveNPCTraders = saveNPCTraders;
+window.loadNPCTraders = loadNPCTraders;
+window.saveNPCTrader = saveNPCTrader;
+window.loadNPCTrader = loadNPCTrader;
+window.saveNPCOrders = saveNPCOrders;
+window.loadNPCOrders = loadNPCOrders;
+window.saveNPCStats = saveNPCStats;
+window.loadNPCStats = loadNPCStats;
+window.getLastNPCUpdate = getLastNPCUpdate;
+window.setLastNPCUpdate = setLastNPCUpdate;
+window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
 // Market data functions
 window.saveMarketData = saveMarketData;
@@ -1866,4 +2186,4 @@ window.loadTradeHistory = loadTradeHistory;
 // Element locations function
 window.getElementLocations = getElementLocations;
 
-console.log('✅ storage.js fully loaded with window exports');
+console.log('✅ storage.js fully loaded with NPC trader support');
