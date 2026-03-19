@@ -6,7 +6,7 @@ import {
     saveNPCOrders, loadNPCOrders,
     saveNPCStats, loadNPCStats,
     getLastNPCUpdate, setLastNPCUpdate,
-    updateNPCTraderAfterTrade
+    updateNPCTraderAfterTrade as storageUpdateNPCTraderAfterTrade
 } from './storage.js';
 
 import {
@@ -15,7 +15,7 @@ import {
     dbRecordNPCTrade, dbGetActiveNPCOrders,
     dbGetNPCOrdersByElement, dbGetNPCOrdersBySide,
     dbGetNPCTradersByType, dbGetActiveNPCTraders,
-    dbGetNPCTradersByLastActivity
+    dbGetNPCTradersByLastActivity, dbGetNPCOrder
 } from './db.js';
 
 import { getCurrentPrices, getBidPrice, getAskPrice } from './market-dynamics.js';
@@ -1113,6 +1113,30 @@ export async function resetNPCTraders() {
     console.log('NPC trader data reset');
 }
 
+// ===== NPC TRADER AFTER TRADE UPDATE =====
+
+/**
+ * Update NPC trader after a trade is executed
+ * @param {string} traderId - NPC trader ID
+ * @param {Object} tradeData - Trade data (element, quantity, price, side, orderId)
+ * @returns {Promise<Object>} Result
+ */
+export async function updateNPCTraderAfterTrade(traderId, tradeData) {
+    try {
+        // Call the storage function
+        const result = await storageUpdateNPCTraderAfterTrade(traderId, tradeData);
+        
+        if (result.success) {
+            console.log(`NPC trader ${traderId} updated after trade: ${tradeData.quantity}x ${tradeData.element} @ ${tradeData.price}⭐`);
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('Error in updateNPCTraderAfterTrade:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ===== EXPORTS =====
 
 export default {
@@ -1129,6 +1153,7 @@ export default {
     getNPCOrders,
     getNPCOrdersForElement,
     updateTrader,
+    updateNPCTraderAfterTrade,
     startNPCTraderUpdates,
     stopNPCTraderUpdates,
     processNPCTradingCycle,
@@ -1146,5 +1171,6 @@ window.stopNPCTraderUpdates = stopNPCTraderUpdates;
 window.getNPCTraderStats = getNPCTraderStats;
 window.getNPCOrders = getNPCOrders;
 window.resetNPCTraders = resetNPCTraders;
+window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;  // ← ADDED THIS
 
 console.log('✅ npc-traders.js loaded - NPC trader system ready');
