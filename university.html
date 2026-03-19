@@ -56,7 +56,7 @@
             z-index: 10;
             display: flex;
             flex-direction: column;
-            padding: 40px 20px 100px 20px;
+            padding: 40px 20px 120px 20px;
             color: white;
             min-height: 100%;
         }
@@ -181,7 +181,7 @@
             color: #8a6aff;
         }
         
-        .donation-total {
+        .player-stats-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -191,10 +191,10 @@
             color: rgba(255, 255, 255, 0.7);
         }
         
-        .donation-value {
+        .stat-highlight {
             font-size: 18px;
             font-weight: 600;
-            color: white;
+            color: #ffd966;
         }
         
         /* Path Selector */
@@ -224,6 +224,68 @@
             background: rgba(138, 106, 255, 0.2);
             border-color: #8a6aff;
             color: #8a6aff;
+        }
+        
+        /* Earnings Card */
+        .earnings-card {
+            background: rgba(138, 106, 255, 0.15);
+            border: 1px solid rgba(138, 106, 255, 0.3);
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .earnings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .earnings-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #8a6aff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .earnings-amount {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .claim-btn {
+            background: rgba(138, 106, 255, 0.3);
+            border: 1px solid #8a6aff;
+            border-radius: 40px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #8a6aff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-top: 12px;
+        }
+        
+        .claim-btn:active {
+            transform: scale(0.97);
+            background: rgba(138, 106, 255, 0.4);
+        }
+        
+        .claim-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .earnings-note {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            margin-top: 8px;
         }
         
         /* Section Headers */
@@ -505,6 +567,33 @@
             margin-top: 4px;
         }
         
+        /* Earnings Display on Card Back */
+        .earnings-block {
+            background: rgba(74, 255, 170, 0.1);
+            border: 1px solid rgba(74, 255, 170, 0.2);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .earnings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .earnings-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .earnings-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
         /* Donation Section */
         .donation-section {
             background: rgba(138, 106, 255, 0.1);
@@ -642,25 +731,22 @@
             cursor: pointer;
             transition: all 0.2s ease;
             width: 100%;
-            box-shadow: 0 4px 15px rgba(138, 106, 255, 0.2);
         }
         
         .back-btn-fixed:active {
             transform: scale(0.97);
             background: rgba(138, 106, 255, 0.3);
-            box-shadow: 0 4px 20px rgba(138, 106, 255, 0.4);
         }
         
-        .back-icon-fixed {
+        .back-icon {
             font-size: 20px;
             color: #8a6aff;
         }
         
-        .back-text-fixed {
+        .back-text {
             font-size: 16px;
             font-weight: 600;
             color: #8a6aff;
-            letter-spacing: 1px;
         }
         
         /* Loading Overlay */
@@ -732,13 +818,23 @@
             <!-- Player Stats Card -->
             <div class="player-card">
                 <div class="player-row">
-                    <span class="player-name">VOIDFARER #1234</span>
-                    <span class="player-badge">MASTER LEVEL 8</span>
+                    <span class="player-name" id="playerName">VOIDFARER #1234</span>
+                    <span class="player-badge">CITIZEN</span>
                 </div>
-                <div class="donation-total">
-                    <span>Lifetime Donations</span>
-                    <span class="donation-value">12,450</span>
+                <div class="player-stats-row">
+                    <span>Total Donations</span>
+                    <span class="stat-highlight" id="totalDonations">12,450</span>
                 </div>
+            </div>
+            
+            <!-- Unclaimed Earnings Card -->
+            <div class="earnings-card" id="earningsCard">
+                <div class="earnings-header">
+                    <span class="earnings-title">📈 Unclaimed Labor Earnings</span>
+                    <span class="earnings-amount" id="unclaimedEarnings">0 ⭐</span>
+                </div>
+                <button class="claim-btn" id="claimBtn" onclick="claimAllEarnings()">CLAIM ALL EARNINGS</button>
+                <div class="earnings-note">Earned from ships built by other players</div>
             </div>
             
             <!-- Path Selector -->
@@ -764,9 +860,9 @@
         
         <!-- Fixed Bottom Navigation Bar -->
         <div class="bottom-nav">
-            <div class="back-btn-fixed" onclick="goBack()">
-                <span class="back-icon-fixed">←</span>
-                <span class="back-text-fixed">RETURN TO EARTH HUB</span>
+            <div class="back-btn-fixed" onclick="returnToEarthHub()">
+                <span class="back-icon">←</span>
+                <span class="back-text">RETURN TO EARTH HUB</span>
             </div>
         </div>
         
@@ -777,6 +873,11 @@
         </div>
     </div>
 
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/navigation.js"></script>
+    <script type="module" src="js/labor-pool.js"></script>
+
     <script>
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -785,7 +886,7 @@
             tg.expand();
         }
 
-        // ===== PLAYER DATA (SIMULATED - REPLACE WITH ACTUAL STORAGE) =====
+        // ===== PLAYER DATA =====
         const playerData = {
             name: 'VOIDFARER #1234',
             totalDonations: 12450,
@@ -1213,14 +1314,33 @@
             return 'available';
         }
 
+        // ===== GET EARNINGS FOR CERTIFICATE =====
+        function getCertificateEarnings(certId) {
+            // This would come from labor pool data
+            // For demo, generate random values
+            const earnings = {
+                prospector: { last24h: 245, total: 1250, holders: 847, share: 0.35 },
+                excavator: { last24h: 180, total: 890, holders: 621, share: 0.28 },
+                merchant: { last24h: 320, total: 2100, holders: 512, share: 0.42 },
+                trader: { last24h: 150, total: 750, holders: 423, share: 0.31 },
+                observer: { last24h: 410, total: 3200, holders: 389, share: 0.58 },
+                analyst: { last24h: 220, total: 1450, holders: 278, share: 0.45 },
+                builder: { last24h: 195, total: 980, holders: 534, share: 0.33 },
+                engineer: { last24h: 85, total: 420, holders: 312, share: 0.19 }
+            };
+            
+            return earnings[certId] || { last24h: 50, total: 200, holders: 100, share: 0.1 };
+        }
+
         // ===== GENERATE CERTIFICATE CARD HTML =====
         function generateCertificateCard(certData, path, tier) {
             const status = getCertificateStatus(certData, path);
             const masteryData = playerData.mastery[certData.id] || { level: 0, xp: 0, nextLevelXp: 100 };
-            const progressPercent = (masteryData.xp / masteryData.nextLevelXp) * 100;
+            const progressPercent = masteryData.nextLevelXp > 0 ? (masteryData.xp / masteryData.nextLevelXp) * 100 : 0;
             const skillLevel = playerData.skills[path];
             const skillRequired = certData.skillReq;
             const skillMet = skillLevel >= skillRequired;
+            const earnings = getCertificateEarnings(certData.id);
             
             let statusBadge = '';
             let requirementsHtml = '';
@@ -1233,30 +1353,32 @@
                 statusBadge = '<span class="status-badge status-locked">🔒 LOCKED</span>';
             }
             
-            // Build requirements list
-            requirementsHtml = `
-                <div class="requirements-list">
-                    <div class="requirement-item">
-                        <span class="requirement-icon">📈</span>
-                        <span class="requirement-text">${path.charAt(0).toUpperCase() + path.slice(1)} Level ${skillRequired}</span>
-                        <span class="requirement-status ${skillMet ? 'status-met' : 'status-unmet'}">${skillLevel}/${skillRequired}</span>
-                    </div>
-            `;
-            
-            if (certData.requires) {
-                const requiredCertName = certificateData[path][Object.keys(certificateData[path]).find(key => 
-                    certificateData[path][key].id === certData.requires)].name;
-                const requiredMet = hasCertificate(certData.requires);
-                requirementsHtml += `
-                    <div class="requirement-item">
-                        <span class="requirement-icon">📜</span>
-                        <span class="requirement-text">${requiredCertName} Certificate</span>
-                        <span class="requirement-status ${requiredMet ? 'status-met' : 'status-unmet'}">${requiredMet ? '✓' : '✗'}</span>
-                    </div>
+            // Build requirements list for locked/available
+            if (status !== 'earned') {
+                requirementsHtml = `
+                    <div class="requirements-list">
+                        <div class="requirement-item">
+                            <span class="requirement-icon">📈</span>
+                            <span class="requirement-text">${path.charAt(0).toUpperCase() + path.slice(1)} Level ${skillRequired}</span>
+                            <span class="requirement-status ${skillMet ? 'status-met' : 'status-unmet'}">${skillLevel}/${skillRequired}</span>
+                        </div>
                 `;
+                
+                if (certData.requires) {
+                    const requiredCertName = certificateData[path][Object.keys(certificateData[path]).find(key => 
+                        certificateData[path][key].id === certData.requires)].name;
+                    const requiredMet = hasCertificate(certData.requires);
+                    requirementsHtml += `
+                        <div class="requirement-item">
+                            <span class="requirement-icon">📜</span>
+                            <span class="requirement-text">${requiredCertName} Certificate</span>
+                            <span class="requirement-status ${requiredMet ? 'status-met' : 'status-unmet'}">${requiredMet ? '✓' : '✗'}</span>
+                        </div>
+                    `;
+                }
+                
+                requirementsHtml += `</div>`;
             }
-            
-            requirementsHtml += `</div>`;
             
             return `
                 <div class="card-container">
@@ -1276,7 +1398,7 @@
                                 </div>
                             </div>
                             
-                            ${status === 'earned' || status === 'available' ? `
+                            ${status === 'earned' ? `
                                 <div class="progress-section">
                                     <div class="progress-row">
                                         <span class="progress-label">Mastery Progress</span>
@@ -1288,6 +1410,25 @@
                                     <div class="xp-details">
                                         <span>Level ${masteryData.level} → ${masteryData.level + 1}</span>
                                         <span>${masteryData.nextLevelXp - masteryData.xp} XP needed</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="earnings-block">
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Last 24h Earnings:</span>
+                                        <span class="earnings-value">${earnings.last24h} ⭐</span>
+                                    </div>
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Total Earned:</span>
+                                        <span class="earnings-value">${earnings.total} ⭐</span>
+                                    </div>
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Active Holders:</span>
+                                        <span class="earnings-value">${earnings.holders}</span>
+                                    </div>
+                                    <div class="earnings-row">
+                                        <span class="earnings-label">Your Share:</span>
+                                        <span class="earnings-value">${earnings.share}%</span>
                                     </div>
                                 </div>
                             ` : requirementsHtml}
@@ -1394,9 +1535,9 @@
                                     <div class="stat-note">among ${path}s</div>
                                 </div>
                                 <div class="stat-block">
-                                    <div class="stat-label">TOTAL EARNED</div>
-                                    <div class="stat-number">${(masteryData.level * 2.1).toFixed(1)}k</div>
-                                    <div class="stat-note">credits</div>
+                                    <div class="stat-label">UNCLAIMED</div>
+                                    <div class="stat-number">${Math.floor(Math.random() * 500) + 50}⭐</div>
+                                    <div class="stat-note">pending</div>
                                 </div>
                             </div>
                             
@@ -1407,7 +1548,7 @@
                                 </div>
                                 <div class="progress-row">
                                     <span class="progress-label">Est. Weekly Earnings</span>
-                                    <span class="progress-value">${(masteryData.level * 280).toFixed(0)} credits</span>
+                                    <span class="progress-value">${(masteryData.level * 280).toFixed(0)} ⭐</span>
                                 </div>
                                 <div class="progress-row">
                                     <span class="progress-label">Active ${path}s</span>
@@ -1426,7 +1567,7 @@
         function generatePathCertificates(path) {
             const certs = certificateData[path];
             let html = '';
-            let lastStatus = 'earned'; // Track to add tier separators
+            let lastStatus = 'earned';
             
             for (let tier = 1; tier <= 10; tier++) {
                 const certKey = `tier${tier}`;
@@ -1506,7 +1647,7 @@
                     tg.HapticFeedback.notificationOccurred?.('success');
                 }
                 
-                // Update button or show success message
+                // Update button
                 if (btn) {
                     const originalText = btn.textContent;
                     btn.textContent = '✓';
@@ -1521,16 +1662,69 @@
                         btn.style.color = '#8a6aff';
                     }, 1000);
                 }
-                
-                // Simulate skill increase (would be replaced with actual storage update)
-                if (path) {
-                    playerData.skills[path] += 1;
-                }
             }, 800);
         };
 
+        // ===== CLAIM EARNINGS =====
+        window.claimAllEarnings = function() {
+            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+            
+            // Show loading
+            document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingText').textContent = 'CLAIMING EARNINGS...';
+            
+            // Haptic feedback
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            
+            // Call labor pool claim function
+            setTimeout(() => {
+                let claimed = 0;
+                if (typeof window.claimEarnings === 'function') {
+                    const result = window.claimEarnings(playerId);
+                    claimed = result.claimed || 0;
+                } else {
+                    // Simulate for demo
+                    claimed = Math.floor(Math.random() * 500) + 100;
+                }
+                
+                document.getElementById('loadingOverlay').classList.remove('active');
+                
+                if (claimed > 0) {
+                    alert(`✅ Successfully claimed ${claimed}⭐!`);
+                    document.getElementById('unclaimedEarnings').textContent = '0 ⭐';
+                    
+                    // Update credits display
+                    const credits = parseInt(localStorage.getItem('voidfarer_credits') || '5000') + claimed;
+                    localStorage.setItem('voidfarer_credits', credits.toString());
+                    
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred?.('success');
+                    }
+                } else {
+                    alert('No earnings to claim.');
+                }
+            }, 1000);
+        };
+
+        // ===== UPDATE UNCLAIMED EARNINGS DISPLAY =====
+        function updateUnclaimedEarnings() {
+            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+            let earnings = 0;
+            
+            if (typeof window.getPlayerEarnings === 'function') {
+                earnings = window.getPlayerEarnings(playerId);
+            } else {
+                // Simulate for demo
+                earnings = 345;
+            }
+            
+            document.getElementById('unclaimedEarnings').textContent = earnings + ' ⭐';
+        }
+
         // ===== NAVIGATION =====
-        window.goBack = function() {
+        window.returnToEarthHub = function() {
             // Show loading
             document.getElementById('loadingOverlay').classList.add('active');
             document.getElementById('loadingText').textContent = 'RETURNING TO HUB...';
@@ -1562,6 +1756,9 @@
                 };
             });
             
+            // Update unclaimed earnings
+            updateUnclaimedEarnings();
+            
             // Load player data
             loadPlayerData();
         });
@@ -1569,15 +1766,14 @@
         // ===== LOAD PLAYER DATA =====
         async function loadPlayerData() {
             try {
-                // This will be replaced with actual storage calls
-                // const player = await window.getPlayer?.();
-                // if (player) {
-                //     document.querySelector('.player-name').textContent = player.name || 'VOIDFARER';
-                //     document.querySelector('.donation-value').textContent = player.totalDonations?.toLocaleString() || '0';
-                //     // Update mastery levels, XP, etc.
-                // }
+                // Update player name
+                const playerId = localStorage.getItem('voidfarer_player_id') || '1234';
+                document.getElementById('playerName').textContent = `VOIDFARER #${playerId.slice(-4)}`;
                 
-                console.log('University page loaded');
+                // Update total donations
+                const donations = localStorage.getItem('voidfarer_total_donations') || '12450';
+                document.getElementById('totalDonations').textContent = parseInt(donations).toLocaleString();
+                
             } catch (error) {
                 console.error('Error loading player data:', error);
             }
