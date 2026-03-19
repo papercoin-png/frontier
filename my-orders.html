@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - My Orders</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0B0E14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            background: #0B0E14;
+        }
+        
+        .orders-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0B0E14;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px 100px 16px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0B0E14;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #F0B90B;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Header */
+        .orders-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .orders-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #F0B90B;
+            letter-spacing: -0.5px;
+        }
+        
+        .orders-badge {
+            background: #2B2F36;
+            color: #848E9C;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .refresh-btn {
+            background: #2B2F36;
+            border: none;
+            color: #EAECEF;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-size: 18px;
+        }
+        
+        .refresh-btn:active {
+            background: #3A3F4A;
+            transform: scale(0.95);
+        }
+        
+        /* Account Bar */
+        .account-bar {
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .player-name {
+            color: #EAECEF;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .player-id {
+            color: #848E9C;
+            font-size: 10px;
+        }
+        
+        .credits-value {
+            color: #F0B90B;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .credits-value span {
+            font-size: 12px;
+            color: #848E9C;
+        }
+        
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .summary-card {
+            background: #1E2026;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            border: 1px solid #2B2F36;
+        }
+        
+        .summary-label {
+            color: #848E9C;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .summary-number {
+            color: #F0B90B;
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .summary-sub {
+            color: #848E9C;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        /* Tab Navigation */
+        .order-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 4px;
+        }
+        
+        .order-tab {
+            flex: 1;
+            padding: 10px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #848E9C;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .order-tab.active {
+            background: #F0B90B;
+            color: #0B0E14;
+        }
+        
+        /* Filter Bar */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        
+        .filter-btn {
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #1E2026;
+            border: 1px solid #2B2F36;
+            color: #848E9C;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.1s;
+        }
+        
+        .filter-btn.active {
+            background: #F0B90B;
+            border-color: #F0B90B;
+            color: #0B0E14;
+        }
+        
+        .filter-btn:active {
+            background: #3A3F4A;
+        }
+        
+        /* Orders List */
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .order-card {
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            border: 1px solid #2B2F36;
+            transition: all 0.2s ease;
+        }
+        
+        .order-card:hover {
+            border-color: #F0B90B;
+        }
+        
+        .order-card.cancelled {
+            opacity: 0.6;
+            border-color: #F6465D;
+        }
+        
+        .order-card.filled {
+            border-color: #0ECB81;
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .order-type-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .order-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        
+        .order-icon.buy {
+            background: rgba(14, 203, 129, 0.2);
+            color: #0ECB81;
+        }
+        
+        .order-icon.sell {
+            background: rgba(246, 70, 93, 0.2);
+            color: #F6465D;
+        }
+        
+        .order-type {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .order-type.buy {
+            color: #0ECB81;
+        }
+        
+        .order-type.sell {
+            color: #F6465D;
+        }
+        
+        .order-status {
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: rgba(240, 185, 11, 0.2);
+            color: #F0B90B;
+        }
+        
+        .status-partial {
+            background: rgba(74, 138, 192, 0.2);
+            color: #4a8ac0;
+        }
+        
+        .status-filled {
+            background: rgba(14, 203, 129, 0.2);
+            color: #0ECB81;
+        }
+        
+        .status-cancelled {
+            background: rgba(246, 70, 93, 0.2);
+            color: #F6465D;
+        }
+        
+        .order-details {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .element-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .element-icon {
+            font-size: 28px;
+            width: 48px;
+            height: 48px;
+            background: #2B2F36;
+            border-radius: 40px 10px 40px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .element-name-symbol {
+            flex: 1;
+        }
+        
+        .element-name {
+            color: #EAECEF;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .element-symbol {
+            color: #848E9C;
+            font-size: 12px;
+        }
+        
+        .order-price-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            background: #2B2F36;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px;
+        }
+        
+        .price-item {
+            text-align: center;
+        }
+        
+        .price-label {
+            color: #848E9C;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .price-value {
+            color: #F0B90B;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .quantity-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2B2F36;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px;
+        }
+        
+        .quantity-item {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .quantity-label {
+            color: #848E9C;
+            font-size: 10px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .quantity-value {
+            color: #EAECEF;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .quantity-filled {
+            color: #0ECB81;
+        }
+        
+        .quantity-remaining {
+            color: #F0B90B;
+        }
+        
+        .progress-bar {
+            grid-column: span 2;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #F0B90B;
+            border-radius: 2px;
+        }
+        
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #2B2F36;
+        }
+        
+        .order-time {
+            color: #848E9C;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .order-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s;
+            border: none;
+        }
+        
+        .cancel-btn {
+            background: rgba(246, 70, 93, 0.2);
+            border: 1px solid #F6465D;
+            color: #F6465D;
+        }
+        
+        .cancel-btn:active {
+            background: rgba(246, 70, 93, 0.3);
+            transform: scale(0.95);
+        }
+        
+        .view-btn {
+            background: rgba(74, 138, 192, 0.2);
+            border: 1px solid #4a8ac0;
+            color: #4a8ac0;
+        }
+        
+        .view-btn:active {
+            background: rgba(74, 138, 192, 0.3);
+            transform: scale(0.95);
+        }
+        
+        .cancel-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        /* Trade History Section */
+        .history-section {
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin: 20px 0;
+            border: 1px solid #2B2F36;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .section-title {
+            color: #EAECEF;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .view-all-link {
+            color: #F0B90B;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #2B2F36;
+        }
+        
+        .history-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .history-icon.buy {
+            background: rgba(14, 203, 129, 0.2);
+            color: #0ECB81;
+        }
+        
+        .history-icon.sell {
+            background: rgba(246, 70, 93, 0.2);
+            color: #F6465D;
+        }
+        
+        .history-details {
+            flex: 1;
+        }
+        
+        .history-title {
+            color: #EAECEF;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .history-sub {
+            color: #848E9C;
+            font-size: 10px;
+        }
+        
+        .history-price {
+            text-align: right;
+        }
+        
+        .history-value {
+            color: #F0B90B;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .history-date {
+            color: #848E9C;
+            font-size: 9px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #848E9C;
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #2B2F36;
+            font-style: italic;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-title {
+            color: #EAECEF;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-sub {
+            font-size: 12px;
+            color: #848E9C;
+        }
+        
+        /* Back button */
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1E2026;
+            border: 2px solid #F0B90B;
+            color: #EAECEF;
+            padding: 14px 25px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 220px;
+            box-shadow: 0 0 20px rgba(240, 185, 11, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #2B2F36;
+        }
+        
+        .back-arrow {
+            font-size: 20px;
+            color: #F0B90B;
+        }
+        
+        /* Toast Notification */
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1E2026;
+            border: 2px solid #F0B90B;
+            color: #EAECEF;
+            padding: 12px 20px;
+            border-radius: 60px 20px 60px 20px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 3000;
+            animation: toast-slide 3s ease-in-out forwards;
+            text-align: center;
+            min-width: 250px;
+        }
+        
+        .toast-notification.error {
+            border-color: #F6465D;
+        }
+        
+        .toast-notification.success {
+            border-color: #0ECB81;
+        }
+        
+        @keyframes toast-slide {
+            0% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            10% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            90% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1E2026;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #F0B90B;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="orders-view" id="ordersView">
+            <!-- Header -->
+            <div class="orders-header">
+                <div class="logo-area">
+                    <span class="orders-logo">MY ORDERS</span>
+                    <span class="orders-badge">VOIDEX</span>
+                </div>
+                <div class="header-actions">
+                    <button class="refresh-btn" onclick="refreshOrders()">↻</button>
+                </div>
+            </div>
+            
+            <!-- Account Bar -->
+            <div class="account-bar">
+                <div class="player-info">
+                    <span class="player-name" id="playerName">VOIDFARER #1234</span>
+                    <span class="player-id" id="playerId">ID: 0x7f3a...b9c2</span>
+                </div>
+                <div class="credits-value" id="totalBalance">12,450 <span>⭐</span></div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Active Orders</div>
+                    <div class="summary-number" id="activeOrdersCount">0</div>
+                    <div class="summary-sub">Buy / Sell</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Total Value</div>
+                    <div class="summary-number" id="totalOrderValue">0</div>
+                    <div class="summary-sub">⭐ locked</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Filled</div>
+                    <div class="summary-number" id="filledOrdersCount">0</div>
+                    <div class="summary-sub">completed</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Volume 24h</div>
+                    <div class="summary-number" id="userVolume24h">0</div>
+                    <div class="summary-sub">elements</div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="order-tabs">
+                <button class="order-tab active" onclick="switchOrderTab('all')">ALL</button>
+                <button class="order-tab" onclick="switchOrderTab('buy')">BUY</button>
+                <button class="order-tab" onclick="switchOrderTab('sell')">SELL</button>
+                <button class="order-tab" onclick="switchOrderTab('history')">HISTORY</button>
+            </div>
+            
+            <!-- Filter Bar (dynamic) -->
+            <div class="filter-bar" id="filterBar"></div>
+            
+            <!-- Orders List Container -->
+            <div id="ordersContainer"></div>
+            
+            <!-- Back button -->
+            <button class="back-button" onclick="returnToMarket()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">RETURN TO MARKET</span>
+            </button>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">LOADING ORDERS...</div>
+        </div>
+    </div>
+
+    <!-- Script imports -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/element-prices.js"></script>
+    <script type="module" src="js/market-dynamics.js"></script>
+    <script type="module" src="js/market-engine.js"></script>
+
+    <script type="module">
+        import { ELEMENT_DATABASE, getElementByName, getElementIcon } from './js/element-prices.js';
+        import { getCurrentPrices, getBidPrice, getAskPrice } from './js/market-dynamics.js';
+        import { getUserOrders, getUserTrades, cancelOrder, ORDER_TYPES, ORDER_SIDES, ORDER_STATUS } from './js/market-engine.js';
+        import { getPlayer, getCollection } from './js/storage.js';
+
+        // ===== TELEGRAM =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== STATE =====
+        let playerId = null;
+        let playerName = 'VOIDFARER';
+        let currentCredits = 5000;
+        let currentCollection = {};
+        let currentTab = 'all';
+        let currentFilter = 'all';
+        let orders = [];
+        let trades = [];
+
+        // ===== INIT =====
+        async function init() {
+            showLoading(true);
+            
+            try {
+                // Get player info
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Math.random().toString(36).substr(2, 9);
+                const storedName = localStorage.getItem('voidfarer_player_name');
+                playerName = storedName ? storedName : `VOIDFARER #${playerId.slice(-4)}`;
+                
+                // Get player data
+                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                currentCollection = await getCollection();
+                
+                // Load orders and trades
+                await loadUserOrders();
+                await loadUserTrades();
+                
+                // Update UI
+                updatePlayerInfo();
+                updateSummaryCards();
+                renderFilterBar();
+                renderOrders();
+                
+                showLoading(false);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                showToast('Error loading orders', 'error');
+                showLoading(false);
+            }
+        }
+
+        // ===== LOADING =====
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (show) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // ===== PLAYER INFO =====
+        function updatePlayerInfo() {
+            document.getElementById('playerName').textContent = playerName;
+            document.getElementById('playerId').textContent = `ID: ${playerId.slice(0, 6)}...${playerId.slice(-4)}`;
+            document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+        }
+
+        // ===== LOAD USER ORDERS =====
+        async function loadUserOrders() {
+            try {
+                orders = await getUserOrders(playerId) || [];
+                
+                // Enrich with element data
+                orders = orders.map(order => {
+                    const element = getElementByName(order.element) || {
+                        name: order.element,
+                        symbol: '??',
+                        icon: '📦',
+                        rarity: 'common'
+                    };
+                    
+                    return {
+                        ...order,
+                        elementData: element
+                    };
+                });
+                
+                // Sort by date (newest first)
+                orders.sort((a, b) => b.createdAt - a.createdAt);
+                
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                orders = [];
+            }
+        }
+
+        // ===== LOAD USER TRADES =====
+        async function loadUserTrades() {
+            try {
+                trades = await getUserTrades(playerId, 20) || [];
+                
+                // Enrich with element data
+                trades = trades.map(trade => {
+                    const element = getElementByName(trade.element) || {
+                        name: trade.element,
+                        icon: '📦'
+                    };
+                    
+                    return {
+                        ...trade,
+                        elementData: element
+                    };
+                });
+                
+            } catch (error) {
+                console.error('Error loading trades:', error);
+                trades = [];
+            }
+        }
+
+        // ===== UPDATE SUMMARY CARDS =====
+        function updateSummaryCards() {
+            const activeOrders = orders.filter(o => 
+                o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
+            );
+            
+            const filledOrders = orders.filter(o => o.status === ORDER_STATUS.FILLED);
+            
+            const totalValue = activeOrders.reduce((sum, o) => {
+                const price = o.price || 0;
+                return sum + (price * o.remainingQuantity);
+            }, 0);
+            
+            // Calculate 24h volume for user
+            const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+            const recentTrades = trades.filter(t => t.timestamp >= oneDayAgo);
+            const volume24h = recentTrades.reduce((sum, t) => sum + t.quantity, 0);
+            
+            document.getElementById('activeOrdersCount').textContent = activeOrders.length;
+            document.getElementById('totalOrderValue').textContent = totalValue.toLocaleString();
+            document.getElementById('filledOrdersCount').textContent = filledOrders.length;
+            document.getElementById('userVolume24h').textContent = volume24h.toLocaleString();
+        }
+
+        // ===== RENDER FILTER BAR =====
+        function renderFilterBar() {
+            const filterBar = document.getElementById('filterBar');
+            
+            if (currentTab === 'history') {
+                filterBar.innerHTML = `
+                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">ALL</span>
+                    <span class="filter-btn ${currentFilter === 'today' ? 'active' : ''}" onclick="setFilter('today')">TODAY</span>
+                    <span class="filter-btn ${currentFilter === 'week' ? 'active' : ''}" onclick="setFilter('week')">THIS WEEK</span>
+                    <span class="filter-btn ${currentFilter === 'month' ? 'active' : ''}" onclick="setFilter('month')">THIS MONTH</span>
+                `;
+            } else {
+                filterBar.innerHTML = `
+                    <span class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">ALL</span>
+                    <span class="filter-btn ${currentFilter === 'active' ? 'active' : ''}" onclick="setFilter('active')">ACTIVE</span>
+                    <span class="filter-btn ${currentFilter === 'partial' ? 'active' : ''}" onclick="setFilter('partial')">PARTIAL</span>
+                    <span class="filter-btn ${currentFilter === 'filled' ? 'active' : ''}" onclick="setFilter('filled')">FILLED</span>
+                `;
+            }
+        }
+
+        // ===== SET FILTER =====
+        window.setFilter = function(filter) {
+            currentFilter = filter;
+            renderFilterBar();
+            renderOrders();
+            
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        };
+
+        // ===== SWITCH TAB =====
+        window.switchOrderTab = function(tab) {
+            currentTab = tab;
+            
+            document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            currentFilter = 'all';
+            renderFilterBar();
+            renderOrders();
+            
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        };
+
+        // ===== RENDER ORDERS =====
+        function renderOrders() {
+            const container = document.getElementById('ordersContainer');
+            
+            if (currentTab === 'history') {
+                renderTradeHistory(container);
+                return;
+            }
+            
+            // Filter orders
+            let filteredOrders = orders;
+            
+            if (currentTab !== 'all') {
+                filteredOrders = filteredOrders.filter(o => o.side === currentTab);
+            }
+            
+            if (currentFilter !== 'all') {
+                filteredOrders = filteredOrders.filter(o => o.status === currentFilter);
+            }
+            
+            if (filteredOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <div class="empty-title">No orders found</div>
+                        <div class="empty-sub">Visit VoidEx to place your first order</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="orders-list">';
+            
+            filteredOrders.forEach(order => {
+                html += renderOrderCard(order);
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // ===== RENDER ORDER CARD =====
+        function renderOrderCard(order) {
+            const element = order.elementData;
+            const icon = element.icon || '📦';
+            const statusClass = order.status.toLowerCase();
+            const progressPercent = (order.filledQuantity / order.originalQuantity) * 100;
+            const canCancel = order.status === ORDER_STATUS.ACTIVE || order.status === ORDER_STATUS.PARTIAL;
+            
+            let statusText = order.status;
+            if (order.status === ORDER_STATUS.ACTIVE) statusText = 'ACTIVE';
+            else if (order.status === ORDER_STATUS.PARTIAL) statusText = 'PARTIAL';
+            else if (order.status === ORDER_STATUS.FILLED) statusText = 'FILLED';
+            else if (order.status === ORDER_STATUS.CANCELLED) statusText = 'CANCELLED';
+            
+            let statusClassname = 'status-active';
+            if (order.status === ORDER_STATUS.PARTIAL) statusClassname = 'status-partial';
+            else if (order.status === ORDER_STATUS.FILLED) statusClassname = 'status-filled';
+            else if (order.status === ORDER_STATUS.CANCELLED) statusClassname = 'status-cancelled';
+            
+            const date = new Date(order.createdAt);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            const orderType = order.side === ORDER_SIDES.BUY ? 'BUY' : 'SELL';
+            const orderClass = order.side === ORDER_SIDES.BUY ? 'buy' : 'sell';
+            
+            return `
+                <div class="order-card ${order.status.toLowerCase()}" data-order-id="${order.id}">
+                    <div class="order-header">
+                        <div class="order-type-badge">
+                            <div class="order-icon ${orderClass}">${order.side === ORDER_SIDES.BUY ? '↓' : '↑'}</div>
+                            <span class="order-type ${orderClass}">${orderType}</span>
+                        </div>
+                        <span class="order-status ${statusClassname}">${statusText}</span>
+                    </div>
+                    
+                    <div class="order-details">
+                        <div class="element-info">
+                            <div class="element-icon">${icon}</div>
+                            <div class="element-name-symbol">
+                                <div class="element-name">${order.element}</div>
+                                <div class="element-symbol">${element.symbol || '??'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="order-price-info">
+                            <div class="price-item">
+                                <div class="price-label">PRICE</div>
+                                <div class="price-value">${order.price}⭐</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-label">TYPE</div>
+                                <div class="price-value">${order.type.toUpperCase()}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="quantity-info">
+                            <div class="quantity-item">
+                                <div class="quantity-label">ORIGINAL</div>
+                                <div class="quantity-value">${order.originalQuantity}</div>
+                            </div>
+                            <div class="quantity-item">
+                                <div class="quantity-label">FILLED</div>
+                                <div class="quantity-value quantity-filled">${order.filledQuantity}</div>
+                            </div>
+                            <div class="quantity-item">
+                                <div class="quantity-label">REMAINING</div>
+                                <div class="quantity-value quantity-remaining">${order.remainingQuantity}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="order-footer">
+                        <div class="order-time">
+                            <span>🕒</span> ${dateStr}
+                        </div>
+                        <div class="order-actions">
+                            ${canCancel ? `
+                                <button class="action-btn cancel-btn" onclick="cancelOrder('${order.id}')">CANCEL</button>
+                            ` : ''}
+                            <button class="action-btn view-btn" onclick="viewOrder('${order.id}')">VIEW</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== RENDER TRADE HISTORY =====
+        function renderTradeHistory(container) {
+            if (trades.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📜</div>
+                        <div class="empty-title">No trade history</div>
+                        <div class="empty-sub">Your completed trades will appear here</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Filter trades based on time
+            let filteredTrades = trades;
+            const now = Date.now();
+            
+            if (currentFilter === 'today') {
+                const startOfDay = new Date().setHours(0, 0, 0, 0);
+                filteredTrades = trades.filter(t => t.timestamp >= startOfDay);
+            } else if (currentFilter === 'week') {
+                const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+                filteredTrades = trades.filter(t => t.timestamp >= weekAgo);
+            } else if (currentFilter === 'month') {
+                const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
+                filteredTrades = trades.filter(t => t.timestamp >= monthAgo);
+            }
+            
+            let html = '<div class="history-section"><div class="section-header"><span class="section-title">RECENT TRADES</span></div><div class="history-list">';
+            
+            filteredTrades.slice(0, 10).forEach(trade => {
+                const date = new Date(trade.timestamp);
+                const dateStr = date.toLocaleDateString();
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const side = trade.buyOrderId?.includes(playerId) ? 'BUY' : 'SELL';
+                const icon = trade.elementData?.icon || '📦';
+                
+                html += `
+                    <div class="history-item">
+                        <div class="history-icon ${side.toLowerCase()}">${side === 'BUY' ? '↓' : '↑'}</div>
+                        <div class="history-details">
+                            <div class="history-title">${side} ${trade.quantity}x ${trade.element}</div>
+                            <div class="history-sub">${icon} ${trade.price}⭐ each</div>
+                        </div>
+                        <div class="history-price">
+                            <div class="history-value">${trade.total}⭐</div>
+                            <div class="history-date">${dateStr} ${timeStr}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+
+        // ===== CANCEL ORDER =====
+        window.cancelOrder = async function(orderId) {
+            if (!confirm('Are you sure you want to cancel this order?')) return;
+            
+            showLoading(true);
+            document.getElementById('loadingText').textContent = 'CANCELLING ORDER...';
+            
+            try {
+                const result = await cancelOrder(playerId, orderId);
+                
+                if (result.success) {
+                    showToast('Order cancelled successfully', 'success');
+                    
+                    // Reload orders
+                    await loadUserOrders();
+                    updateSummaryCards();
+                    renderOrders();
+                    
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred?.('success');
+                    }
+                } else {
+                    showToast(result.error || 'Failed to cancel order', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Cancel error:', error);
+                showToast('Error cancelling order', 'error');
+            }
+            
+            showLoading(false);
+        };
+
+        // ===== VIEW ORDER =====
+        window.viewOrder = function(orderId) {
+            // Navigate to element-market.html with order ID
+            window.location.href = `element-market.html?order=${orderId}`;
+        };
+
+        // ===== REFRESH ORDERS =====
+        window.refreshOrders = async function() {
+            showLoading(true);
+            document.getElementById('loadingText').textContent = 'REFRESHING...';
+            
+            try {
+                await loadUserOrders();
+                await loadUserTrades();
+                
+                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                currentCollection = await getCollection();
+                
+                updatePlayerInfo();
+                updateSummaryCards();
+                renderOrders();
+                
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('light');
+                }
+                
+                showToast('Orders updated', 'success');
+                
+            } catch (error) {
+                console.error('Refresh error:', error);
+                showToast('Error refreshing orders', 'error');
+            }
+            
+            showLoading(false);
+        };
+
+        // ===== RETURN TO MARKET =====
+        window.returnToMarket = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'element-market.html';
+        };
+
+        // ===== TOAST =====
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // ===== START =====
+        init();
+    </script>
+</body>
+</html>
