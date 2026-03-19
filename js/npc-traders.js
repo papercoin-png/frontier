@@ -5,6 +5,7 @@
 // UPDATED: Fixed element filtering to use current price instead of bid/ask
 // UPDATED: Added updatePrices() call to ensure fresh price data each cycle
 // UPDATED: Added debug logging to diagnose zero actions issue
+// UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -301,8 +302,13 @@ function generateStrategyParams(personality) {
 
 // ===== INITIALIZATION =====
 
+/**
+ * Initialize all NPC traders - ONLY with chemical elements for VoidEx
+ * @param {Array} availableElements - List of available elements from market
+ * @returns {Promise<Object>} Result with counts
+ */
 export async function initializeNPCTraders(availableElements = []) {
-    console.log('Initializing 1000 NPC traders...');
+    console.log('Initializing 1000 NPC traders for VoidEx...');
     
     if (TRADER_NAMES.length === 0) {
         TRADER_NAMES = generateTraderNames(500);
@@ -312,11 +318,54 @@ export async function initializeNPCTraders(availableElements = []) {
     const counts = {};
     let nameIndex = 0;
     
-    const tradableElements = availableElements.filter(el => 
-        el.currentPrice && el.currentPrice > 0
-    );
+    // ===== FIX: Only use chemical elements (no ship parts) =====
+    // Filter out anything that's not a real chemical element
+    let chemicalElements = availableElements.filter(el => {
+        // Check if it's a chemical element (not a ship part)
+        const isChemical = el.symbol && 
+                          el.symbol.length <= 3 && 
+                          el.symbol.match(/^[A-Z][a-z]?$|^[A-Z][a-z]?[a-z]?$/) &&
+                          !el.name.includes('ship_') &&
+                          !el.name.includes('cargo_') &&
+                          !el.name.includes('engine_') &&
+                          !el.name.includes('weapon_') &&
+                          !el.name.includes('module_') &&
+                          !el.name.includes('reactor_') &&
+                          !el.name.includes('shield_') &&
+                          !el.name.includes('thruster_');
+        
+        return isChemical && el.currentPrice && el.currentPrice > 0;
+    });
     
-    console.log(`Found ${tradableElements.length} tradable elements with price data`);
+    // If no chemical elements found, use the element database directly
+    if (chemicalElements.length === 0) {
+        console.warn('No chemical elements in availableElements, using built-in element list');
+        
+        // Use a predefined list of common elements as fallback
+        const commonElements = [
+            'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 
+            'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Magnesium',
+            'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon',
+            'Potassium', 'Calcium', 'Scandium', 'Titanium', 'Vanadium', 'Chromium',
+            'Manganese', 'Iron', 'Cobalt', 'Nickel', 'Copper', 'Zinc',
+            'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton',
+            'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
+            'Silver', 'Tin', 'Iodine', 'Gold', 'Platinum', 'Uranium'
+        ];
+        
+        chemicalElements = commonElements.map(name => ({
+            name,
+            symbol: name.substring(0, 2),
+            currentPrice: 50 + Math.random() * 200,
+            rarity: 'common'
+        }));
+        
+        console.log(`Using ${chemicalElements.length} fallback chemical elements`);
+    }
+    
+    console.log(`Found ${chemicalElements.length} chemical elements for VoidEx trading`);
+    
+    const tradableElements = chemicalElements;
     
     for (const [type, config] of Object.entries(TRADER_TYPE_CONFIG)) {
         counts[type] = config.count;
@@ -332,16 +381,19 @@ export async function initializeNPCTraders(availableElements = []) {
             
             const trader = createNPCTrader(id, type, personality, name, credits);
             
+            // Add random inventory if they're not inactive
             if (personality !== TRADER_PERSONALITIES.INACTIVE && tradableElements.length > 0) {
                 trader.inventory = generateRandomInventory(trader, tradableElements);
             }
             
+            // Select favorite elements (3-5 random chemical elements)
             if (tradableElements.length > 0) {
                 const numFavorites = Math.floor(Math.random() * 3) + 3;
                 for (let f = 0; f < numFavorites; f++) {
                     const element = tradableElements[Math.floor(Math.random() * tradableElements.length)];
                     trader.favoriteElements.push(element.name);
                 }
+                // Remove duplicates
                 trader.favoriteElements = [...new Set(trader.favoriteElements)];
             }
             
@@ -364,7 +416,8 @@ export async function initializeNPCTraders(availableElements = []) {
     await saveNPCStats(stats);
     await setLastNPCUpdate();
     
-    console.log(`✅ Created ${Object.keys(traders).length} NPC traders`);
+    console.log(`✅ Created ${Object.keys(traders).length} NPC traders for VoidEx`);
+    console.log(`📊 Trading ${tradableElements.length} chemical elements`);
     
     return {
         success: true,
@@ -665,7 +718,6 @@ export async function updateTrader(trader, marketData) {
         if (Math.random() < 0.15) {
             trader.isActive = true;
             trader.personality = TRADER_PERSONALITIES.RANDOM;
-            console.log(`💤 ${trader.name} woke up and is now active!`);
         } else {
             return { traderId: trader.id, actions: [] };
         }
@@ -674,28 +726,11 @@ export async function updateTrader(trader, marketData) {
     const actions = [];
     const prices = marketData.prices || {};
     
-    // ===== DEBUG LOGGING =====
-    console.log(`🔍 Trader ${trader.name} (${trader.personality}):`, {
-        credits: trader.credits,
-        inventoryCount: Object.keys(trader.inventory).length,
-        inventory: trader.inventory,
-        favoriteCount: trader.favoriteElements.length,
-        favorites: trader.favoriteElements,
-        priceKeys: Object.keys(prices).length,
-        samplePrice: prices[Object.keys(prices)[0]]
-    });
-    // ===== END DEBUG =====
-    
     // ===== FIXED FILTERING =====
     // Get all elements that have ANY price data - use current price as the reliable indicator
     const allTradableElements = Object.keys(prices).filter(el => 
         prices[el] && prices[el].current > 0
     );
-    
-    console.log(`📊 Tradable elements found: ${allTradableElements.length}`);
-    if (allTradableElements.length > 0) {
-        console.log(`📊 First few tradable elements:`, allTradableElements.slice(0, 3));
-    }
     
     // Use favorites if they exist and are tradable
     let elements = [];
@@ -705,27 +740,18 @@ export async function updateTrader(trader, marketData) {
         );
     }
     
-    console.log(`🎯 Favorite elements tradable: ${elements.length}`);
-    
     // If no valid favorites, use first 5 tradable elements
     if (elements.length === 0) {
         elements = allTradableElements.slice(0, 5);
-        console.log(`🔄 Using fallback elements: ${elements.length}`);
-        if (elements.length > 0) {
-            console.log(`🔄 Fallback elements:`, elements);
-        }
     }
     
     // If still no elements, return
     if (elements.length === 0) {
-        console.log(`❌ No tradable elements for ${trader.name}`);
         return { traderId: trader.id, actions: [] };
     }
     
     const fallbackElements = elements;
     // ===== END FIXED FILTERING =====
-    
-    console.log(`⚡ Updating ${trader.name} with elements:`, fallbackElements);
     
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
@@ -744,11 +770,8 @@ export async function updateTrader(trader, marketData) {
             await updateMarketMaker(trader, marketData, fallbackElements, actions);
             break;
         default:
-            console.log(`❓ Unknown personality: ${trader.personality}`);
             break;
     }
-    
-    console.log(`📝 ${trader.name} took ${actions.length} actions`);
     
     await cleanupExpiredOrders(trader);
     
