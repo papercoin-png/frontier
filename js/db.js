@@ -1626,7 +1626,7 @@ window.dbGetNPCOrdersBySide = dbGetNPCOrdersBySide;
 window.dbGetNPCOrdersByStatus = dbGetNPCOrdersByStatus;
 window.dbGetActiveNPCOrders = dbGetActiveNPCOrders;
 window.dbGetNPCOrdersByPriceRange = dbGetNPCOrdersByPriceRange;
-window.dbDeleteNPCOrder = dbDeleteNPCOrder;
+window.dbDeleteNPCOrder = dbDeleteNPCOrder;  // ← ADDED THIS MISSING EXPORT
 
 // NPC History functions
 window.dbRecordNPCTrade = dbRecordNPCTrade;
