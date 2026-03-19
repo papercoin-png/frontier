@@ -1546,7 +1546,7 @@
             openPortfolioModal, closePortfolioModal, updatePortfolioModal,
             openPortfolioTrade, closePortfolioTrade, executePortfolioTrade,
             incrementPortfolioTrade, decrementPortfolioTrade, setMaxPortfolioTrade,
-            updatePortfolioTradeButtons;
+            updatePortfolioTradeButtons, saveMarketPrices, ensureDefaultPrices;
 
         // ===== HELPER FUNCTIONS =====
         function calculateMaxBuy(credits, price) {
@@ -1557,11 +1557,52 @@
             return collection[elementName]?.count || 0;
         }
 
+        // ===== SAVE MARKET PRICES TO STORAGE (NEW) =====
+        saveMarketPrices = function() {
+            try {
+                // Build price object from all elements
+                const prices = {};
+                ELEMENTS.forEach(el => {
+                    prices[el.name] = marketData.getCurrentPrice(el.name);
+                });
+                
+                // Save to localStorage
+                localStorage.setItem('voidfarer_market_prices', JSON.stringify(prices));
+                
+                // Also save via storage.js if available
+                if (typeof window.saveMarketData === 'function') {
+                    window.saveMarketData({ prices: prices, timestamp: Date.now() });
+                }
+                
+                console.log('✅ Market prices saved to storage');
+            } catch (error) {
+                console.error('Error saving market prices:', error);
+            }
+        };
+
+        // ===== ENSURE DEFAULT PRICES (NEW) =====
+        ensureDefaultPrices = function() {
+            const existing = localStorage.getItem('voidfarer_market_prices');
+            if (!existing) {
+                const defaultPrices = {
+                    'Iron': 2, 'Copper': 3, 'Titanium': 8, 'Aluminum': 4,
+                    'Carbon': 5, 'Silicon': 6, 'Gold': 25, 'Platinum': 40,
+                    'Nickel': 7, 'Chromium': 9, 'Tin': 10, 'Zinc': 8,
+                    'Steel': 6, 'Tungsten': 15
+                };
+                localStorage.setItem('voidfarer_market_prices', JSON.stringify(defaultPrices));
+                console.log('✅ Default market prices initialized');
+            }
+        };
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
             
             try {
+                // Ensure default prices exist
+                ensureDefaultPrices();
+                
                 // Load player data
                 currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 currentCollection = await getCollection();
@@ -1572,6 +1613,9 @@
                 renderMarketTable();
                 renderOrderBook();
                 updateMarketStats();
+                
+                // Save initial prices
+                saveMarketPrices();
                 
                 // Create chart for default element
                 setTimeout(() => {
@@ -2174,6 +2218,9 @@
                     renderMarketTable();
                     renderOrderBook();
                     
+                    // Save updated prices to storage
+                    saveMarketPrices();
+                    
                     const currentPrice = marketData.getCurrentPrice(selectedElement.name);
                     const newMaxBuy = calculateMaxBuy(currentCredits, currentPrice);
                     const newOwnedQuantity = currentCollection[selectedElement.name]?.count || 0;
@@ -2424,6 +2471,9 @@
                 renderMarketTable();
                 renderOrderBook();
                 
+                // Save updated prices to storage
+                saveMarketPrices();
+                
                 closePortfolioTrade();
                 updatePortfolioModal();
                 
@@ -2501,6 +2551,9 @@
                 
                 updateMarketStats();
                 
+                // Save prices periodically
+                saveMarketPrices();
+                
                 if (document.getElementById('portfolioModal').classList.contains('active')) {
                     updatePortfolioModal();
                 }
@@ -2563,6 +2616,9 @@
         window.setMaxPortfolioTrade = setMaxPortfolioTrade;
         window.updatePortfolioTradeButtons = updatePortfolioTradeButtons;
         window.executePortfolioTrade = executePortfolioTrade;
+
+        // Expose save function for external use
+        window.saveMarketPrices = saveMarketPrices;
 
         window.chartManager = chartManager;
 
