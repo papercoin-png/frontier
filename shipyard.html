@@ -471,6 +471,14 @@
             border-radius: 30px;
         }
         
+        .market-note {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.3);
+            text-align: center;
+            margin-top: 4px;
+            font-style: italic;
+        }
+        
         .cost-note {
             font-size: 10px;
             color: rgba(255, 255, 255, 0.4);
@@ -643,6 +651,7 @@
             <!-- Ships Grid -->
             <div class="ships-grid" id="shipsContainer">
                 <!-- Dynamically filled by JavaScript -->
+                <div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.5);">Loading shipyard...</div>
             </div>
         </div>
         
@@ -674,23 +683,58 @@
             tg.expand();
         }
 
-        // ===== MARKET PRICES (simulated - would come from market data) =====
-        const MARKET_PRICES = {
-            'Iron': 2,
-            'Copper': 3,
-            'Titanium': 8,
-            'Aluminum': 4,
-            'Carbon': 5,
-            'Silicon': 6,
-            'Gold': 25,
-            'Platinum': 40,
-            'Nickel': 7,
-            'Chromium': 9,
-            'Tin': 10,
-            'Zinc': 8,
-            'Steel': 6,
-            'Tungsten': 15
-        };
+        // ===== MARKET PRICE FUNCTIONS (LIVE FROM ELEMENT-MARKET) =====
+        
+        /**
+         * Get current market price for a single element
+         * @param {string} element - Element name
+         * @returns {Promise<number>} Current price in credits
+         */
+        async function getMarketPrice(element) {
+            try {
+                // Try to get from market data storage (saved from element-market.html)
+                const marketData = await window.loadMarketData?.() || {};
+                
+                // Check if we have price data for this element
+                if (marketData.prices && marketData.prices[element] !== undefined) {
+                    return marketData.prices[element];
+                }
+                
+                // Fallback: Check localStorage for legacy price data
+                const savedPrices = localStorage.getItem('voidfarer_market_prices');
+                if (savedPrices) {
+                    const prices = JSON.parse(savedPrices);
+                    if (prices[element] !== undefined) {
+                        return prices[element];
+                    }
+                }
+                
+                // Default fallback price if nothing found
+                console.log(`No market price found for ${element}, using default 5⭐`);
+                return 5;
+            } catch (error) {
+                console.error('Error fetching market price:', error);
+                return 5; // Safe fallback
+            }
+        }
+
+        /**
+         * Get current market prices for multiple elements
+         * @param {Array} elements - Array of element names
+         * @returns {Promise<Object>} Object with element-price pairs
+         */
+        async function getMarketPrices(elements) {
+            const prices = {};
+            const uniqueElements = [...new Set(elements)]; // Remove duplicates
+            
+            // Fetch prices in parallel for efficiency
+            const pricePromises = uniqueElements.map(async (element) => {
+                prices[element] = await getMarketPrice(element);
+            });
+            
+            await Promise.all(pricePromises);
+            return prices;
+        }
 
         // ===== TIER 1 SHIP DATA =====
         const TIER1_SHIPS = [
@@ -797,11 +841,14 @@
             }
         ];
 
-        // ===== CALCULATE TOTAL COST =====
-        function calculateTotalCost(requirements) {
+        // ===== CALCULATE TOTAL COST USING LIVE MARKET PRICES =====
+        async function calculateTotalCost(requirements) {
             let total = 0;
+            const elements = Object.keys(requirements);
+            const prices = await getMarketPrices(elements);
+            
             for (const [element, amount] of Object.entries(requirements)) {
-                const price = MARKET_PRICES[element] || 5;
+                const price = prices[element] || 5;
                 total += amount * price;
             }
             return total;
@@ -810,6 +857,9 @@
         // ===== CHECK IF PLAYER HAS ENOUGH ELEMENTS =====
         async function checkElementAvailability(requirements) {
             const collection = await window.getCollection?.() || {};
+            const elements = Object.keys(requirements);
+            const prices = await getMarketPrices(elements);
+            
             const availability = {};
             let allMet = true;
             
@@ -820,7 +870,7 @@
                     have,
                     needed,
                     met,
-                    price: MARKET_PRICES[element] || 5
+                    price: prices[element] || 5
                 };
                 if (!met) allMet = false;
             }
@@ -852,7 +902,7 @@
         // ===== GENERATE SHIP CARD HTML =====
         async function generateShipCard(ship) {
             const { availability, allMet } = await checkElementAvailability(ship.requirements);
-            const materialCost = calculateTotalCost(ship.requirements);
+            const materialCost = await calculateTotalCost(ship.requirements);
             const laborCost = materialCost; // Labor cost equals material cost
             const totalCost = materialCost + laborCost;
             const playerCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
@@ -877,7 +927,7 @@
                         </div>
                         <div class="requirement-status">
                             <div class="requirement-have">${have}/${needed}</div>
-                            <div class="requirement-cost">${needed * price}⭐</div>
+                            <div class="requirement-cost">${(needed * price).toLocaleString()}⭐</div>
                         </div>
                         <span class="${met ? 'requirement-met' : 'requirement-unmet'}">${met ? '✓' : '✗'}</span>
                     </div>
@@ -888,7 +938,7 @@
                         <div class="auto-buy-row" onclick="event.stopPropagation()">
                             <div class="auto-buy-info">
                                 <span class="auto-buy-text">Missing ${missing} ${element}</span>
-                                <span class="auto-buy-cost">${buyCost}⭐</span>
+                                <span class="auto-buy-cost">${buyCost.toLocaleString()}⭐</span>
                             </div>
                             <button class="auto-buy-btn" onclick="autoBuyElement('${element}', ${missing}, '${ship.id}')">
                                 AUTO-BUY
@@ -932,6 +982,7 @@
                     <div class="requirements-section">
                         <div class="requirements-title">⚒️ Construction Requirements</div>
                         ${requirementsHtml}
+                        <div class="market-note">* Prices reflect current market value</div>
                     </div>
                     
                     <div class="cost-summary">
@@ -950,7 +1001,7 @@
                         <div class="labor-note">
                             👷 ${laborCost.toLocaleString()}⭐ goes to ${ship.requiredCertificate} certificate holders
                         </div>
-                        <div class="cost-note">Market prices apply • Labor supports skilled players</div>
+                        <div class="cost-note">Labor equals material cost • Market prices update automatically</div>
                     </div>
                     
                     <div class="build-btn ${!canBuild ? 'disabled' : ''}" 
@@ -970,12 +1021,12 @@
             document.getElementById('loadingText').textContent = `BUYING ${quantity} ${element.toUpperCase()}...`;
             
             try {
-                const price = MARKET_PRICES[element] || 5;
+                const price = await getMarketPrice(element);
                 const totalCost = quantity * price;
                 const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
                 
                 if (currentCredits < totalCost) {
-                    alert(`Insufficient credits! Need ${totalCost}⭐`);
+                    alert(`Insufficient credits! Need ${totalCost.toLocaleString()}⭐`);
                     document.getElementById('loadingOverlay').classList.remove('active');
                     return;
                 }
@@ -991,13 +1042,8 @@
                     tg.HapticFeedback.notificationOccurred?.('success');
                 }
                 
-                // Refresh ship card
-                const container = document.getElementById('shipsContainer');
-                container.innerHTML = '';
-                for (const ship of TIER1_SHIPS) {
-                    const cardHtml = await generateShipCard(ship);
-                    container.innerHTML += cardHtml;
-                }
+                // Refresh ship cards
+                await refreshShipCards();
                 
                 // Update credits display
                 document.getElementById('credits').textContent = parseInt(localStorage.getItem('voidfarer_credits') || '5000').toLocaleString() + ' ⭐';
@@ -1029,14 +1075,14 @@
                     return;
                 }
                 
-                // Calculate total cost
-                const materialCost = calculateTotalCost(ship.requirements);
+                // Calculate total cost with current market prices
+                const materialCost = await calculateTotalCost(ship.requirements);
                 const laborCost = materialCost;
                 const totalCost = materialCost + laborCost;
                 const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
                 
                 if (currentCredits < totalCost) {
-                    alert(`Insufficient credits! Need ${totalCost}⭐`);
+                    alert(`Insufficient credits! Need ${totalCost.toLocaleString()}⭐`);
                     document.getElementById('loadingOverlay').classList.remove('active');
                     return;
                 }
@@ -1075,7 +1121,7 @@
                         tg.HapticFeedback.notificationOccurred?.('success');
                     }
                     
-                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.\nTotal cost: ${totalCost}⭐\nLabor: ${laborCost}⭐ distributed to ${ship.requiredCertificate} certificate holders`);
+                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.\nTotal cost: ${totalCost.toLocaleString()}⭐\nLabor: ${laborCost.toLocaleString()}⭐ distributed to ${ship.requiredCertificate} certificate holders`);
                     
                     // Refresh the page to update counts
                     window.location.reload();
@@ -1087,6 +1133,19 @@
                 alert('Construction failed: ' + error.message);
             }
         };
+
+        // ===== REFRESH SHIP CARDS =====
+        async function refreshShipCards() {
+            const container = document.getElementById('shipsContainer');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.5);">Updating prices...</div>';
+            
+            let html = '';
+            for (const ship of TIER1_SHIPS) {
+                const cardHtml = await generateShipCard(ship);
+                html += cardHtml;
+            }
+            container.innerHTML = html;
+        }
 
         // ===== NAVIGATION =====
         window.returnToEarthHub = function() {
@@ -1133,9 +1192,33 @@
             }
         }
 
+        // ===== AUTO-REFRESH PRICES EVERY 30 SECONDS =====
+        let priceRefreshInterval;
+        
+        function startPriceRefresh() {
+            // Clear any existing interval
+            if (priceRefreshInterval) {
+                clearInterval(priceRefreshInterval);
+            }
+            
+            // Refresh prices every 30 seconds
+            priceRefreshInterval = setInterval(async () => {
+                console.log('Refreshing market prices...');
+                await refreshShipCards();
+            }, 30000);
+        }
+
         // ===== INIT =====
         document.addEventListener('DOMContentLoaded', () => {
             loadShips();
+            startPriceRefresh();
+        });
+
+        // Clean up interval on page unload
+        window.addEventListener('beforeunload', () => {
+            if (priceRefreshInterval) {
+                clearInterval(priceRefreshInterval);
+            }
         });
     </script>
 </body>
