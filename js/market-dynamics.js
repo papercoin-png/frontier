@@ -1,7 +1,7 @@
 // js/market-dynamics.js - Dynamic market pricing and element trading for Voidfarer
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 
-import { ELEMENT_DATABASE, getElementById, getElementsByRarity } from './element-prices.js';
+import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
 // ===== MARKET CONFIGURATION =====
 
@@ -88,7 +88,6 @@ export function initializeMarket() {
 export function updatePrices(activeEvents = []) {
     const prices = getCurrentPrices();
     const trends = getMarketTrends();
-    const volume = getMarketVolume();
     const now = Date.now();
     const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_UPDATE)) || now;
     const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60);
