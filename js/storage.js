@@ -2,6 +2,7 @@
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
 // UPDATED: Added material inventory, recipe unlocks, skill progression across all fields
 // UPDATED: Added market data persistence for trading system
+// UPDATED: Added certificate holder tracking for labor pool distribution
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -123,6 +124,9 @@ const STORAGE_KEYS = {
     LABOR_POOL_DISTRIBUTED: 'voidfarer_labor_pool_distributed',
     LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
     PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
+    
+    // Certificate tracking (NEW)
+    CERTIFICATE_HOLDERS: 'voidfarer_certificate_holders',
     
     // Products & marketplace
     PLAYER_PRODUCTS: 'voidfarer_player_products',
@@ -1231,6 +1235,12 @@ export async function initializeStorage(playerId = 'main') {
         localStorage.setItem(masteryKey, '{}');
     }
     
+    // Initialize certificate holders storage
+    const certKey = STORAGE_KEYS.CERTIFICATE_HOLDERS;
+    if (!localStorage.getItem(certKey)) {
+        localStorage.setItem(certKey, '{}');
+    }
+    
     // Initialize location if not set
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
@@ -1309,7 +1319,8 @@ export async function resetGame(playerId = 'main') {
         STORAGE_KEYS.PLANET_CLAIMS,
         STORAGE_KEYS.PLAYER_CLAIMS,
         STORAGE_KEYS.CLAIM_HISTORY,
-        STORAGE_KEYS.CLAIM_NOTIFICATIONS
+        STORAGE_KEYS.CLAIM_NOTIFICATIONS,
+        STORAGE_KEYS.CERTIFICATE_HOLDERS
     ];
     
     keysToRemove.forEach(key => {
@@ -1508,6 +1519,141 @@ export async function loadTradeHistory(playerId = null) {
 }
 
 // ============================================================================
+// CERTIFICATE HOLDER FUNCTIONS (FOR LABOR POOL)
+// ============================================================================
+
+/**
+ * Get all certificate holders
+ * @param {string} certificateId - Optional specific certificate
+ * @returns {Object|Array} Certificate holders data
+ */
+export async function getCertificateHolders(certificateId = null) {
+    try {
+        const key = STORAGE_KEYS.CERTIFICATE_HOLDERS;
+        const saved = localStorage.getItem(key);
+        const holders = saved ? JSON.parse(saved) : {};
+        
+        if (certificateId) {
+            return holders[certificateId] || [];
+        }
+        return holders;
+    } catch (error) {
+        console.error('Error getting certificate holders:', error);
+        return certificateId ? [] : {};
+    }
+}
+
+/**
+ * Update certificate holder mastery
+ * @param {string} playerId - Player ID
+ * @param {string} playerName - Player name
+ * @param {string} certificateId - Certificate ID
+ * @param {number} masteryLevel - Mastery level (1-10)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function updateCertificateHolder(playerId, playerName, certificateId, masteryLevel) {
+    try {
+        const key = STORAGE_KEYS.CERTIFICATE_HOLDERS;
+        const saved = localStorage.getItem(key);
+        const holders = saved ? JSON.parse(saved) : {};
+        
+        if (!holders[certificateId]) {
+            holders[certificateId] = [];
+        }
+        
+        // Find existing entry
+        const existingIndex = holders[certificateId].findIndex(h => h.playerId === playerId);
+        const holderData = {
+            playerId,
+            playerName,
+            masteryLevel,
+            lastUpdated: Date.now()
+        };
+        
+        if (existingIndex >= 0) {
+            holders[certificateId][existingIndex] = holderData;
+        } else {
+            holders[certificateId].push(holderData);
+        }
+        
+        localStorage.setItem(key, JSON.stringify(holders));
+        return true;
+    } catch (error) {
+        console.error('Error updating certificate holder:', error);
+        return false;
+    }
+}
+
+/**
+ * Add labor earnings to a player's unclaimed balance
+ * @param {string} playerId - Player ID
+ * @param {number} amount - Amount to add
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addPlayerLaborEarnings(playerId, amount) {
+    try {
+        const key = STORAGE_KEYS.PLAYER_LABOR_EARNINGS;
+        const saved = localStorage.getItem(key);
+        const earnings = saved ? JSON.parse(saved) : {};
+        
+        if (!earnings[playerId]) {
+            earnings[playerId] = 0;
+        }
+        
+        earnings[playerId] += amount;
+        localStorage.setItem(key, JSON.stringify(earnings));
+        return true;
+    } catch (error) {
+        console.error('Error adding player labor earnings:', error);
+        return false;
+    }
+}
+
+/**
+ * Get player's unclaimed labor earnings
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Unclaimed earnings
+ */
+export async function getPlayerLaborEarnings(playerId) {
+    try {
+        const key = STORAGE_KEYS.PLAYER_LABOR_EARNINGS;
+        const saved = localStorage.getItem(key);
+        const earnings = saved ? JSON.parse(saved) : {};
+        return earnings[playerId] || 0;
+    } catch (error) {
+        console.error('Error getting player labor earnings:', error);
+        return 0;
+    }
+}
+
+/**
+ * Claim player's labor earnings
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Amount claimed
+ */
+export async function claimPlayerLaborEarnings(playerId) {
+    try {
+        const key = STORAGE_KEYS.PLAYER_LABOR_EARNINGS;
+        const saved = localStorage.getItem(key);
+        const earnings = saved ? JSON.parse(saved) : {};
+        
+        const amount = earnings[playerId] || 0;
+        if (amount > 0) {
+            delete earnings[playerId];
+            localStorage.setItem(key, JSON.stringify(earnings));
+            
+            // Add to player credits
+            await addCredits(amount, playerId);
+        }
+        
+        return amount;
+    } catch (error) {
+        console.error('Error claiming player labor earnings:', error);
+        return 0;
+    }
+}
+
+// ============================================================================
 // ELEMENT LOCATIONS FUNCTIONS (ADDED FOR JOURNAL)
 // ============================================================================
 
@@ -1599,6 +1745,13 @@ export default {
     addCredits,
     spendCredits,
     
+    // Certificate holders (NEW)
+    getCertificateHolders,
+    updateCertificateHolder,
+    addPlayerLaborEarnings,
+    getPlayerLaborEarnings,
+    claimPlayerLaborEarnings,
+    
     // Location
     isAtEarth,
     getCurrentPlanetName,
@@ -1656,10 +1809,11 @@ export default {
 // ============================================================================
 // Make all commonly used functions available globally for non-module scripts
 
-// Player functions (ADDED)
+// Player functions
 window.getPlayer = getPlayer;
 window.savePlayer = savePlayer;
 
+// Collection functions
 window.getCollection = getCollection;
 window.addElementToCollection = addElementToCollection;
 window.removeElementFromCollection = removeElementFromCollection;
@@ -1670,14 +1824,20 @@ window.getRemainingHubStorage = getRemainingHubStorage;
 window.getRemainingShipStorage = getRemainingShipStorage;
 window.isAtEarth = isAtEarth;
 window.getElementMass = getElementMass;
+
+// Credit functions
 window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
+
+// Ship functions
 window.getShipFuel = getShipFuel;
 window.saveShipFuel = saveShipFuel;
 window.getShipPower = getShipPower;
 window.saveShipPower = saveShipPower;
+
+// Location functions
 window.getCurrentPlanetName = getCurrentPlanetName;
 window.getCurrentPlanetType = getCurrentPlanetType;
 window.getCurrentPlanetResources = getCurrentPlanetResources;
@@ -1686,7 +1846,14 @@ window.getCurrentRegion = getCurrentRegion;
 window.setCurrentLocation = setCurrentLocation;
 window.setCurrentPlanet = setCurrentPlanet;
 
-// Market data functions (NEW)
+// Certificate holder functions (NEW)
+window.getCertificateHolders = getCertificateHolders;
+window.updateCertificateHolder = updateCertificateHolder;
+window.addPlayerLaborEarnings = addPlayerLaborEarnings;
+window.getPlayerLaborEarnings = getPlayerLaborEarnings;
+window.claimPlayerLaborEarnings = claimPlayerLaborEarnings;
+
+// Market data functions
 window.saveMarketData = saveMarketData;
 window.loadMarketData = loadMarketData;
 window.saveOrderBook = saveOrderBook;
@@ -1696,7 +1863,7 @@ window.loadPortfolio = loadPortfolio;
 window.saveTradeHistory = saveTradeHistory;
 window.loadTradeHistory = loadTradeHistory;
 
-// Element locations function (ADDED)
+// Element locations function
 window.getElementLocations = getElementLocations;
 
 console.log('✅ storage.js fully loaded with window exports');
