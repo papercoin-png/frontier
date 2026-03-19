@@ -319,8 +319,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
-            padding: 8px 0;
+            margin-bottom: 8px;
+            padding: 6px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         
@@ -328,6 +328,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex: 2;
         }
         
         .requirement-icon {
@@ -341,12 +342,13 @@
         }
         
         .requirement-need {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.5);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
         }
         
         .requirement-status {
             text-align: right;
+            flex: 1;
         }
         
         .requirement-have {
@@ -364,12 +366,59 @@
             color: #4affaa;
             font-size: 16px;
             margin-left: 8px;
+            min-width: 20px;
         }
         
         .requirement-unmet {
             color: #ff6b6b;
             font-size: 16px;
             margin-left: 8px;
+            min-width: 20px;
+        }
+        
+        /* Auto-buy styles */
+        .auto-buy-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(138, 106, 255, 0.1);
+            border: 1px solid rgba(138, 106, 255, 0.2);
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin: 4px 0 12px 30px;
+        }
+        
+        .auto-buy-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .auto-buy-text {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .auto-buy-cost {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffd966;
+        }
+        
+        .auto-buy-btn {
+            background: rgba(138, 106, 255, 0.2);
+            border: 1px solid #8a6aff;
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #8a6aff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .auto-buy-btn:active {
+            transform: scale(0.94);
+            background: rgba(138, 106, 255, 0.3);
         }
         
         /* Cost Summary */
@@ -397,6 +446,12 @@
             font-size: 16px;
             font-weight: 600;
             color: #ffd966;
+        }
+        
+        .total-row {
+            margin-top: 8px;
+            border-top: 2px solid rgba(138, 106, 255, 0.3);
+            padding-top: 8px;
         }
         
         .cost-total {
@@ -756,10 +811,33 @@
             return { availability, allMet };
         }
 
+        // ===== GET ELEMENT ICON =====
+        function getElementIcon(element) {
+            const icons = {
+                'Iron': '⚙️',
+                'Copper': '🔴',
+                'Titanium': '🔷',
+                'Aluminum': '🛸',
+                'Carbon': '⚫',
+                'Silicon': '💾',
+                'Gold': '🟡',
+                'Platinum': '⚪',
+                'Nickel': '🔩',
+                'Chromium': '⚙️',
+                'Tin': '🥫',
+                'Zinc': '⚡',
+                'Steel': '⚒️',
+                'Tungsten': '💎'
+            };
+            return icons[element] || '📦';
+        }
+
         // ===== GENERATE SHIP CARD HTML =====
         async function generateShipCard(ship) {
             const { availability, allMet } = await checkElementAvailability(ship.requirements);
-            const totalCost = calculateTotalCost(ship.requirements);
+            const materialCost = calculateTotalCost(ship.requirements);
+            const laborCost = materialCost; // Labor cost equals material cost
+            const totalCost = materialCost + laborCost;
             const playerCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
             const canAfford = playerCredits >= totalCost;
             
@@ -768,6 +846,8 @@
                 const have = availability[element]?.have || 0;
                 const price = availability[element]?.price || 5;
                 const met = have >= needed;
+                const missing = Math.max(0, needed - have);
+                const buyCost = missing * price;
                 
                 requirementsHtml += `
                     <div class="requirement-item">
@@ -779,15 +859,29 @@
                             </div>
                         </div>
                         <div class="requirement-status">
-                            <div class="requirement-have">${have}</div>
+                            <div class="requirement-have">${have}/${needed}</div>
                             <div class="requirement-cost">${needed * price}⭐</div>
                         </div>
                         <span class="${met ? 'requirement-met' : 'requirement-unmet'}">${met ? '✓' : '✗'}</span>
                     </div>
                 `;
+                
+                if (!met) {
+                    requirementsHtml += `
+                        <div class="auto-buy-row" onclick="event.stopPropagation()">
+                            <div class="auto-buy-info">
+                                <span class="auto-buy-text">Missing ${missing} ${element}</span>
+                                <span class="auto-buy-cost">${buyCost}⭐</span>
+                            </div>
+                            <button class="auto-buy-btn" onclick="autoBuyElement('${element}', ${missing}, '${ship.id}')">
+                                AUTO-BUY
+                            </button>
+                        </div>
+                    `;
+                }
             }
             
-            const canBuild = allMet;
+            const canBuild = allMet && canAfford;
             
             return `
                 <div class="ship-card" id="ship-${ship.id}">
@@ -826,47 +920,76 @@
                     <div class="cost-summary">
                         <div class="cost-row">
                             <span class="cost-label">Materials Cost:</span>
-                            <span class="cost-value">${totalCost.toLocaleString()} ⭐</span>
+                            <span class="cost-value">${materialCost.toLocaleString()} ⭐</span>
                         </div>
                         <div class="cost-row">
                             <span class="cost-label">Labor Cost:</span>
-                            <span class="cost-value">0 ⭐</span>
+                            <span class="cost-value">${laborCost.toLocaleString()} ⭐</span>
                         </div>
-                        <div class="cost-row" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                            <span class="cost-label">Total:</span>
+                        <div class="cost-row total-row">
+                            <span class="cost-label">TOTAL COST:</span>
                             <span class="cost-total">${totalCost.toLocaleString()} ⭐</span>
                         </div>
-                        <div class="cost-note">Labor included in material market prices</div>
+                        <div class="cost-note">Labor equals material cost • Market prices apply</div>
                     </div>
                     
                     <div class="build-btn ${!canBuild ? 'disabled' : ''}" 
                          onclick="${canBuild ? `buildShip('${ship.id}')` : ''}">
-                        ${canBuild ? '⚡ BUILD NOW' : '⚠️ INSUFFICIENT MATERIALS'}
+                        ${canBuild ? '🚀 BUILD NOW' : allMet ? '⚠️ INSUFFICIENT CREDITS' : '⚠️ MISSING MATERIALS'}
                     </div>
                 </div>
             `;
         }
 
-        // ===== GET ELEMENT ICON =====
-        function getElementIcon(element) {
-            const icons = {
-                'Iron': '⚙️',
-                'Copper': '🔴',
-                'Titanium': '🔷',
-                'Aluminum': '🛸',
-                'Carbon': '⚫',
-                'Silicon': '💾',
-                'Gold': '🟡',
-                'Platinum': '⚪',
-                'Nickel': '🔩',
-                'Chromium': '⚙️',
-                'Tin': '🥫',
-                'Zinc': '⚡',
-                'Steel': '⚒️',
-                'Tungsten': '💎'
-            };
-            return icons[element] || '📦';
-        }
+        // ===== AUTO-BUY FUNCTION =====
+        window.autoBuyElement = async function(element, quantity, shipId) {
+            event.stopPropagation();
+            
+            // Show loading
+            document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingText').textContent = `BUYING ${quantity} ${element.toUpperCase()}...`;
+            
+            try {
+                const price = MARKET_PRICES[element] || 5;
+                const totalCost = quantity * price;
+                const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
+                
+                if (currentCredits < totalCost) {
+                    alert(`Insufficient credits! Need ${totalCost}⭐`);
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                    return;
+                }
+                
+                // Deduct credits
+                localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
+                
+                // Add elements to inventory
+                await window.addElementToCollection?.(element, quantity);
+                
+                // Success feedback
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred?.('success');
+                }
+                
+                // Refresh ship card
+                const container = document.getElementById('shipsContainer');
+                container.innerHTML = '';
+                for (const ship of TIER1_SHIPS) {
+                    const cardHtml = await generateShipCard(ship);
+                    container.innerHTML += cardHtml;
+                }
+                
+                // Update credits display
+                document.getElementById('credits').textContent = parseInt(localStorage.getItem('voidfarer_credits') || '5000').toLocaleString() + ' ⭐';
+                
+                document.getElementById('loadingOverlay').classList.remove('active');
+                
+            } catch (error) {
+                console.error('Auto-buy error:', error);
+                document.getElementById('loadingOverlay').classList.remove('active');
+                alert('Purchase failed: ' + error.message);
+            }
+        };
 
         // ===== BUILD SHIP =====
         window.buildShip = async function(shipId) {
@@ -877,11 +1000,6 @@
             document.getElementById('loadingOverlay').classList.add('active');
             document.getElementById('loadingText').textContent = `CONSTRUCTING ${ship.name.toUpperCase()}...`;
             
-            // Haptic feedback
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
-            
             try {
                 // Check materials again
                 const { allMet } = await checkElementAvailability(ship.requirements);
@@ -891,17 +1009,27 @@
                     return;
                 }
                 
+                // Calculate total cost
+                const materialCost = calculateTotalCost(ship.requirements);
+                const laborCost = materialCost;
+                const totalCost = materialCost + laborCost;
+                const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
+                
+                if (currentCredits < totalCost) {
+                    alert(`Insufficient credits! Need ${totalCost}⭐`);
+                    document.getElementById('loadingOverlay').classList.remove('active');
+                    return;
+                }
+                
                 // Remove materials from inventory
                 for (const [element, amount] of Object.entries(ship.requirements)) {
                     await window.removeElementFromCollection?.(element, amount);
                 }
                 
-                // Deduct credits (materials cost)
-                const totalCost = calculateTotalCost(ship.requirements);
-                const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
+                // Deduct total cost
                 localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
                 
-                // Add ship to player's fleet (store in localStorage)
+                // Add ship to player's fleet
                 const playerShips = JSON.parse(localStorage.getItem('voidfarer_ships') || '[]');
                 playerShips.push({
                     id: ship.id,
@@ -919,7 +1047,7 @@
                         tg.HapticFeedback.notificationOccurred?.('success');
                     }
                     
-                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.`);
+                    alert(`✅ ${ship.name} successfully constructed!\n\nShip added to your fleet.\nTotal cost: ${totalCost}⭐`);
                     
                     // Refresh the page to update counts
                     window.location.reload();
@@ -953,13 +1081,15 @@
         async function loadShips() {
             try {
                 const container = document.getElementById('shipsContainer');
-                container.innerHTML = ''; // Clear loading
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.5);">Loading shipyard...</div>';
                 
                 // Load each ship card sequentially
+                let html = '';
                 for (const ship of TIER1_SHIPS) {
                     const cardHtml = await generateShipCard(ship);
-                    container.innerHTML += cardHtml;
+                    html += cardHtml;
                 }
+                container.innerHTML = html;
                 
                 // Update player credits display
                 const credits = localStorage.getItem('voidfarer_credits') || '5000';
@@ -971,6 +1101,7 @@
                 
             } catch (error) {
                 console.error('Error loading ships:', error);
+                document.getElementById('shipsContainer').innerHTML = '<div style="text-align: center; padding: 40px; color: #ff6b6b;">Error loading shipyard</div>';
             }
         }
 
