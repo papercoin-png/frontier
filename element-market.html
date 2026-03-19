@@ -1332,14 +1332,18 @@
         let updateInterval = null;
         let priceUpdateInterval = null;
 
-        // ===== FUNCTION DECLARATIONS =====
+        // ===== FUNCTION DECLARATIONS (will be attached to window) =====
         let filterMarket, returnToHub, selectElement, setOrderSide, setOrderType,
             incrementQuantity, decrementQuantity, setMaxQuantity,
             placeOrder, searchMarket, setTimeframe, quickBuyMarket, quickSellMarket,
             openPortfolioModal, closePortfolioModal, updatePortfolioModal,
             openElementModal, closeElementModal, buyFromModal, sellFromModal,
-            updateOrderModal, closeOrderModal, updateOrderEntry, saveMarketPrices, 
-            ensureDefaultPrices, goToMyOrders;
+            openOrderModal, closeOrderModal, updateOrderModal, 
+            updateOrderEntry, saveMarketPrices, ensureDefaultPrices, goToMyOrders,
+            setOrderSideModal, setOrderTypeModal, setMarketPriceModal, 
+            updateModalOrderPrice, updateModalOrderQuantity, incrementQuantityModal,
+            decrementQuantityModal, setMaxQuantityModal, placeOrderModal,
+            buyFromPortfolio, sellFromPortfolio;
 
         // ===== HELPER FUNCTIONS =====
         function calculateMaxBuy(credits, price) {
@@ -1762,7 +1766,7 @@
         };
 
         // ===== MODAL FUNCTIONS =====
-        window.setOrderSideModal = function(side) {
+        setOrderSideModal = function(side) {
             orderSide = side === 'buy' ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
             if (selectedElement) {
                 orderPrice = orderSide === ORDER_SIDES.BUY ? selectedElement.askPrice : selectedElement.bidPrice;
@@ -1770,22 +1774,22 @@
             openOrderModal(selectedElement.name, side, orderPrice);
         };
 
-        window.setOrderTypeModal = function(type) {
+        setOrderTypeModal = function(type) {
             orderType = type;
             openOrderModal(selectedElement.name, orderSide === ORDER_SIDES.BUY ? 'buy' : 'sell', orderPrice);
         };
 
-        window.updateModalOrderPrice = function(price) {
+        updateModalOrderPrice = function(price) {
             orderPrice = parseInt(price) || 1;
             updateModalDisplay();
         };
 
-        window.updateModalOrderQuantity = function(quantity) {
+        updateModalOrderQuantity = function(quantity) {
             orderQuantity = parseInt(quantity) || 1;
             updateModalDisplay();
         };
 
-        window.incrementQuantityModal = function() {
+        incrementQuantityModal = function() {
             const ownedQuantity = currentCollection[selectedElement?.name]?.count || 0;
             const maxBuy = calculateMaxBuy(currentCredits, orderPrice);
             const maxQty = orderSide === ORDER_SIDES.BUY ? maxBuy : ownedQuantity;
@@ -1794,12 +1798,12 @@
             updateModalDisplay();
         };
 
-        window.decrementQuantityModal = function() {
+        decrementQuantityModal = function() {
             orderQuantity = Math.max(orderQuantity - 1, 1);
             updateModalDisplay();
         };
 
-        window.setMaxQuantityModal = function() {
+        setMaxQuantityModal = function() {
             const ownedQuantity = currentCollection[selectedElement?.name]?.count || 0;
             const maxBuy = calculateMaxBuy(currentCredits, orderPrice);
             
@@ -1807,7 +1811,7 @@
             updateModalDisplay();
         };
 
-        window.setMarketPriceModal = function() {
+        setMarketPriceModal = function() {
             if (!selectedElement) return;
             orderPrice = orderSide === ORDER_SIDES.BUY ? selectedElement.askPrice : selectedElement.bidPrice;
             updateModalDisplay();
@@ -1842,7 +1846,7 @@
             }
         }
 
-        window.placeOrderModal = async function() {
+        placeOrderModal = async function() {
             if (!selectedElement) return;
             
             const total = orderPrice * orderQuantity;
@@ -1929,7 +1933,7 @@
             }
             
             openOrderModal(selectedElement.name, 'buy', selectedElement.askPrice);
-            window.setOrderTypeModal('market');
+            setOrderTypeModal('market');
         };
 
         // ===== QUICK SELL MARKET =====
@@ -1946,7 +1950,7 @@
             }
             
             openOrderModal(selectedElement.name, 'sell', selectedElement.bidPrice);
-            window.setOrderTypeModal('market');
+            setOrderTypeModal('market');
         };
 
         // ===== PORTFOLIO MODAL FUNCTIONS =====
@@ -2020,13 +2024,13 @@
             listElement.innerHTML = html;
         };
 
-        window.buyFromPortfolio = function(elementName) {
+        buyFromPortfolio = function(elementName) {
             selectElement(elementName);
             closePortfolioModal();
             openElementModal(elementName);
         };
 
-        window.sellFromPortfolio = function(elementName) {
+        sellFromPortfolio = function(elementName) {
             selectElement(elementName);
             closePortfolioModal();
             openElementModal(elementName);
@@ -2112,20 +2116,35 @@
         window.filterMarket = filterMarket;
         window.returnToHub = returnToHub;
         window.selectElement = selectElement;
+        window.setTimeframe = setTimeframe;
+        window.quickBuyMarket = quickBuyMarket;
+        window.quickSellMarket = quickSellMarket;
+        window.searchMarket = searchMarket;
+        window.goToMyOrders = goToMyOrders;
+        
+        // Modal functions
         window.openElementModal = openElementModal;
         window.closeElementModal = closeElementModal;
         window.buyFromModal = buyFromModal;
         window.sellFromModal = sellFromModal;
         window.openOrderModal = openOrderModal;
         window.closeOrderModal = closeOrderModal;
-        window.setTimeframe = setTimeframe;
-        window.quickBuyMarket = quickBuyMarket;
-        window.quickSellMarket = quickSellMarket;
+        window.setOrderSideModal = setOrderSideModal;
+        window.setOrderTypeModal = setOrderTypeModal;
+        window.setMarketPriceModal = setMarketPriceModal;
+        window.updateModalOrderPrice = updateModalOrderPrice;
+        window.updateModalOrderQuantity = updateModalOrderQuantity;
+        window.incrementQuantityModal = incrementQuantityModal;
+        window.decrementQuantityModal = decrementQuantityModal;
+        window.setMaxQuantityModal = setMaxQuantityModal;
+        window.placeOrderModal = placeOrderModal;
+        
+        // Portfolio functions
         window.openPortfolioModal = openPortfolioModal;
         window.closePortfolioModal = closePortfolioModal;
         window.updatePortfolioModal = updatePortfolioModal;
-        window.goToMyOrders = goToMyOrders;
-        window.searchMarket = searchMarket;
+        window.buyFromPortfolio = buyFromPortfolio;
+        window.sellFromPortfolio = sellFromPortfolio;
 
         console.log('✅ Window functions attached');
 
