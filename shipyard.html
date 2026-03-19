@@ -487,6 +487,15 @@
             font-style: italic;
         }
         
+        .price-update-note {
+            font-size: 9px;
+            color: #F0B90B;
+            text-align: center;
+            margin-top: 4px;
+            font-style: italic;
+            opacity: 0.7;
+        }
+        
         /* Build Button */
         .build-btn {
             background: rgba(138, 106, 255, 0.2);
@@ -683,7 +692,7 @@
             tg.expand();
         }
 
-        // ===== MARKET PRICE FUNCTIONS (LIVE FROM ELEMENT-MARKET) =====
+        // ===== MARKET PRICE FUNCTIONS =====
         
         /**
          * Get current market price for a single element
@@ -692,15 +701,7 @@
          */
         async function getMarketPrice(element) {
             try {
-                // Try to get from market data storage (saved from element-market.html)
-                const marketData = await window.loadMarketData?.() || {};
-                
-                // Check if we have price data for this element
-                if (marketData.prices && marketData.prices[element] !== undefined) {
-                    return marketData.prices[element];
-                }
-                
-                // Fallback: Check localStorage for legacy price data
+                // Check localStorage first (updated by VoidEx or auto-refresh)
                 const savedPrices = localStorage.getItem('voidfarer_market_prices');
                 if (savedPrices) {
                     const prices = JSON.parse(savedPrices);
@@ -709,12 +710,12 @@
                     }
                 }
                 
-                // Default fallback price if nothing found
+                // Fallback to default
                 console.log(`No market price found for ${element}, using default 5⭐`);
                 return 5;
             } catch (error) {
                 console.error('Error fetching market price:', error);
-                return 5; // Safe fallback
+                return 5;
             }
         }
 
@@ -734,6 +735,43 @@
             
             await Promise.all(pricePromises);
             return prices;
+        }
+
+        /**
+         * Auto-update market prices with random walk simulation
+         * This ensures prices change even if no one visits VoidEx
+         */
+        function autoUpdateMarketPrices() {
+            try {
+                const savedPrices = localStorage.getItem('voidfarer_market_prices');
+                if (!savedPrices) {
+                    // Initialize with default prices if none exist
+                    const defaultPrices = {
+                        'Iron': 2, 'Copper': 3, 'Titanium': 8, 'Aluminum': 4,
+                        'Carbon': 5, 'Silicon': 6, 'Gold': 25, 'Platinum': 40,
+                        'Nickel': 7, 'Chromium': 9, 'Tin': 10, 'Zinc': 8,
+                        'Steel': 6, 'Tungsten': 15
+                    };
+                    localStorage.setItem('voidfarer_market_prices', JSON.stringify(defaultPrices));
+                    return;
+                }
+                
+                const prices = JSON.parse(savedPrices);
+                
+                // Random walk price changes (-3% to +3%)
+                for (const [element, price] of Object.entries(prices)) {
+                    // More volatile for rare elements
+                    const volatility = element.includes('Gold') || element.includes('Platinum') || element.includes('Tungsten') ? 0.05 : 0.03;
+                    const change = (Math.random() * volatility * 2 - volatility);
+                    // Ensure price never goes below 1
+                    prices[element] = Math.max(1, Math.round(price * (1 + change)));
+                }
+                
+                localStorage.setItem('voidfarer_market_prices', JSON.stringify(prices));
+                console.log('📈 Market prices auto-updated at', new Date().toLocaleTimeString());
+            } catch (error) {
+                console.error('Error auto-updating prices:', error);
+            }
         }
 
         // ===== TIER 1 SHIP DATA =====
@@ -908,6 +946,11 @@
             const playerCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
             const canAfford = playerCredits >= totalCost;
             
+            // Get current timestamp for display
+            const lastUpdate = localStorage.getItem('voidfarer_prices_last_update') 
+                ? new Date(parseInt(localStorage.getItem('voidfarer_prices_last_update'))).toLocaleTimeString() 
+                : 'just now';
+            
             let requirementsHtml = '';
             for (const [element, needed] of Object.entries(ship.requirements)) {
                 const have = availability[element]?.have || 0;
@@ -983,6 +1026,7 @@
                         <div class="requirements-title">⚒️ Construction Requirements</div>
                         ${requirementsHtml}
                         <div class="market-note">* Prices reflect current market value</div>
+                        <div class="price-update-note">⏱️ Updated: ${lastUpdate}</div>
                     </div>
                     
                     <div class="cost-summary">
@@ -1145,6 +1189,9 @@
                 html += cardHtml;
             }
             container.innerHTML = html;
+            
+            // Update timestamp
+            localStorage.setItem('voidfarer_prices_last_update', Date.now().toString());
         }
 
         // ===== NAVIGATION =====
@@ -1192,20 +1239,32 @@
             }
         }
 
-        // ===== AUTO-REFRESH PRICES EVERY 30 SECONDS =====
+        // ===== AUTO-REFRESH PRICES =====
         let priceRefreshInterval;
+        let autoUpdateInterval;
         
         function startPriceRefresh() {
-            // Clear any existing interval
+            // Clear any existing intervals
             if (priceRefreshInterval) {
                 clearInterval(priceRefreshInterval);
             }
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+            }
             
-            // Refresh prices every 30 seconds
+            // Refresh display every 30 seconds (reads from localStorage)
             priceRefreshInterval = setInterval(async () => {
-                console.log('Refreshing market prices...');
+                console.log('Refreshing ship display with current prices...');
                 await refreshShipCards();
             }, 30000);
+            
+            // Auto-update market prices every 5 minutes (simulates market activity)
+            autoUpdateInterval = setInterval(() => {
+                console.log('Auto-updating market prices...');
+                autoUpdateMarketPrices();
+                // Also update the timestamp
+                localStorage.setItem('voidfarer_prices_last_update', Date.now().toString());
+            }, 300000); // 5 minutes
         }
 
         // ===== INIT =====
@@ -1214,10 +1273,13 @@
             startPriceRefresh();
         });
 
-        // Clean up interval on page unload
+        // Clean up intervals on page unload
         window.addEventListener('beforeunload', () => {
             if (priceRefreshInterval) {
                 clearInterval(priceRefreshInterval);
+            }
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
             }
         });
     </script>
