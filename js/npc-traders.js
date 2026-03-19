@@ -3,6 +3,8 @@
 // UPDATED: Added market orders and liquidity taking for real trading behavior
 // UPDATED: Fixed price validation to prevent "Price data not available" errors
 // UPDATED: Fixed element filtering to use current price instead of bid/ask
+// UPDATED: Added updatePrices() call to ensure fresh price data each cycle
+// UPDATED: Fixed imports for market-dynamics.js (default export)
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -21,7 +23,10 @@ import {
     dbGetNPCTradersByLastActivity, dbGetNPCOrder
 } from './db.js';
 
-import { getCurrentPrices, getBidPrice, getAskPrice } from './market-dynamics.js';
+// Fix: Import market-dynamics as default and destructure
+import marketDynamics from './market-dynamics.js';
+const { getCurrentPrices, getBidPrice, getAskPrice, updatePrices } = marketDynamics;
+
 import { ORDER_TYPES, ORDER_SIDES, ORDER_STATUS, createOrder } from './market-engine.js';
 
 // ===== TRADER TYPE DEFINITIONS =====
@@ -449,8 +454,16 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
 
 async function executeImmediateTrade(trader, element, side, quantity) {
     try {
-        const bid = getBidPrice(element);
-        const ask = getAskPrice(element);
+        let bid = getBidPrice(element);
+        let ask = getAskPrice(element);
+        
+        // If bid/ask are missing, calculate from current price
+        if ((!bid || bid <= 0) || (!ask || ask <= 0)) {
+            const prices = getCurrentPrices();
+            const currentPrice = prices[element]?.current || 100;
+            bid = Math.floor(currentPrice * 0.98);
+            ask = Math.ceil(currentPrice * 1.02);
+        }
         
         if (side === ORDER_SIDES.BUY && (!ask || ask <= 0)) {
             return { success: false, reason: 'no_ask_price' };
@@ -1129,11 +1142,15 @@ export function stopNPCTraderUpdates() {
 export async function processNPCTradingCycle(batchSize = 100) {
     console.log(`Processing NPC trading cycle (${batchSize} traders)...`);
     
+    // ===== FIX: Ensure prices are updated before trading =====
+    // This will calculate new bid/ask spreads based on market dynamics
+    const updatedPrices = updatePrices();
+    
     const traders = await loadNPCTraders();
     const traderList = Object.values(traders);
     
     const marketData = {
-        prices: getCurrentPrices(),
+        prices: getCurrentPrices(), // This will now have fresh prices with valid bid/ask
         timestamp: Date.now()
     };
     
