@@ -1245,7 +1245,6 @@
             ORDER_TYPES, ORDER_SIDES, getAllRecentTrades
         } from './js/market-engine.js';
         
-        // Import the correct storage functions
         import { 
             getCollection, getCredits, addCredits, spendCredits,
             getPlayer, savePlayer
@@ -1277,7 +1276,6 @@
         let sortColumn = 'element';
         let sortDirection = 'asc';
         
-        // Use 'main' as the player ID for storage.js (default)
         const PLAYER_ID = 'main';
 
         // ===== HELPER FUNCTIONS =====
@@ -1292,16 +1290,54 @@
             return value.toString();
         }
 
-        // ===== FIXED BALANCE FUNCTION - USES STORAGE.JS =====
+        // ===== STORAGE CLEANUP FUNCTION =====
+        window.clearOldStorageData = function() {
+            console.log('🧹 Cleaning up old storage data...');
+            
+            const keysToKeep = [
+                'voidfarer_player_main',
+                'voidfarer_player_id',
+                'voidfarer_collection',
+                'voidfarer_credits',
+                'voidfarer_market_prices'
+            ];
+            
+            let removedCount = 0;
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                let shouldKeep = false;
+                
+                for (const keepKey of keysToKeep) {
+                    if (key === keepKey || key.startsWith(keepKey)) {
+                        shouldKeep = true;
+                        break;
+                    }
+                }
+                
+                if (!shouldKeep && key.includes('voidfarer')) {
+                    console.log(`🗑️ Removing: ${key}`);
+                    localStorage.removeItem(key);
+                    removedCount++;
+                    i--;
+                }
+            }
+            
+            console.log(`✅ Removed ${removedCount} old storage items`);
+            showToast(`Cleaned up ${removedCount} old data items`, 'success');
+            
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        };
+
+        // ===== FIXED BALANCE FUNCTION =====
         async function updateBalance() {
             try {
-                // Use the correct storage.js function with 'main' player ID
                 const credits = await getCredits(PLAYER_ID);
                 console.log(`💰 Balance from storage.js: ${credits}`);
-                
                 currentCredits = credits;
                 
-                // Update UI
                 const balanceElement = document.getElementById('totalBalance');
                 if (balanceElement) {
                     balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
@@ -1421,6 +1457,12 @@
             let marketCap = 0;
             Object.values(prices).forEach(p => marketCap += (p.current || 100) * 1000000);
             document.getElementById('marketCap').innerHTML = formatMarketCap(marketCap);
+            
+            const recentTrades = getAllRecentTrades(500);
+            const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+            const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
+            document.getElementById('trades24h').innerText = last24hTrades.length;
+            document.getElementById('volume24h').innerText = last24hTrades.reduce((sum, t) => sum + (t.quantity || 0), 0);
         }
 
         function setupChart(elementName) {
@@ -1610,7 +1652,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER WITH STORAGE.JS FUNCTIONS =====
+        // ===== PLACE ORDER =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1653,25 +1695,20 @@
                 
                 if (result.success && result.trade) {
                     if (orderSide === ORDER_SIDES.BUY) {
-                        // Use storage.js spendCredits function
                         const success = await spendCredits(result.totalCost, PLAYER_ID);
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
-                            console.log(`💰 New balance after buy: ${currentCredits}`);
                         }
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
                             price: result.executionPrice
                         });
                     } else {
-                        // Use storage.js addCredits function
                         const newTotal = await addCredits(result.totalCost, PLAYER_ID);
                         currentCredits = newTotal;
-                        console.log(`💰 New balance after sell: ${currentCredits}`);
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                     }
                     
-                    // Force UI update
                     await updateBalance();
                     currentCollection = await getCollection();
                     await renderOrderBook();
@@ -1822,7 +1859,20 @@
             showLoading(true);
             
             try {
-                // Ensure player exists in storage.js with 'main' ID
+                // Check if storage is near quota and offer cleanup
+                let totalSize = 0;
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    const value = localStorage.getItem(key);
+                    totalSize += (key.length + (value?.length || 0)) * 2;
+                }
+                
+                if (totalSize > 4 * 1024 * 1024) {
+                    console.warn('⚠️ localStorage is near quota limit');
+                    showToast('Storage nearly full. Consider clearing old data.', 'error');
+                }
+                
+                // Ensure player exists
                 let mainPlayer = await getPlayer(PLAYER_ID);
                 if (!mainPlayer) {
                     const newPlayer = {
@@ -1858,7 +1908,6 @@
                 filteredElements = [...allElements];
                 currentCollection = await getCollection();
                 
-                // Load balance from storage.js
                 await updateBalance();
                 
                 renderMarketTicker();
@@ -1866,8 +1915,16 @@
                 await renderOrderBook();
                 updateMarketStats();
                 
-                initializeNPCTraders(allElements).catch(console.error);
-                startNPCTraderUpdates(100, 60000);
+                // Initialize NPC traders with error handling
+                try {
+                    await initializeNPCTraders(allElements);
+                    startNPCTraderUpdates(100, 60000);
+                } catch (e) {
+                    console.warn('NPC initialization warning:', e);
+                    if (e.name === 'QuotaExceededError') {
+                        showToast('Storage full. Run cleanup from console: clearOldStorageData()', 'error');
+                    }
+                }
                 
                 setTimeout(() => {
                     const goldElement = allElements.find(e => e.name === 'Gold');
@@ -1889,7 +1946,6 @@
             }
         }
 
-        // Attach functions to window
         window.selectElement = selectElement;
         window.formatMarketCap = formatMarketCap;
 
