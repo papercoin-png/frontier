@@ -7,6 +7,7 @@
 // UPDATED: Added enhanced debug logging to diagnose zero actions issue
 // UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
 // UPDATED: Added inventory pruning to prevent excessive storage growth
+// UPDATED: FIXED - Now writes orders to IndexedDB instead of localStorage
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -22,7 +23,8 @@ import {
     dbRecordNPCTrade, dbGetActiveNPCOrders,
     dbGetNPCOrdersByElement, dbGetNPCOrdersBySide,
     dbGetNPCTradersByType, dbGetActiveNPCTraders,
-    dbGetNPCTradersByLastActivity, dbGetNPCOrder
+    dbGetNPCTradersByLastActivity, dbGetNPCOrder,
+    dbSaveMarketOrders, dbLoadMarketOrders
 } from './db.js';
 
 import marketDynamics from './market-dynamics.js';
@@ -535,12 +537,60 @@ export async function placeTraderOrder(trader, element, side, price, quantity) {
     
     await dbSaveNPCOrder(order);
     await saveNPCTrader(trader.id, trader);
-    await addOrderToLocalStorage(order);
+    await addOrderToMarketBook(order);
     
     return {
         success: true,
         order
     };
+}
+
+/**
+ * ===== FIXED: Add order to market book using IndexedDB instead of localStorage =====
+ */
+async function addOrderToMarketBook(order) {
+    try {
+        // Load existing orders from IndexedDB
+        let buyOrders = await dbLoadMarketOrders('buy_orders');
+        let sellOrders = await dbLoadMarketOrders('sell_orders');
+        
+        if (!buyOrders) buyOrders = {};
+        if (!sellOrders) sellOrders = {};
+        
+        // Initialize element arrays if needed
+        if (!buyOrders[order.element]) buyOrders[order.element] = [];
+        if (!sellOrders[order.element]) sellOrders[order.element] = [];
+        
+        // Add order to appropriate book
+        if (order.side === ORDER_SIDES.BUY) {
+            buyOrders[order.element].push(order);
+            // Sort buy orders: highest price first
+            buyOrders[order.element].sort((a, b) => b.price - a.price);
+        } else {
+            sellOrders[order.element].push(order);
+            // Sort sell orders: lowest price first
+            sellOrders[order.element].sort((a, b) => a.price - b.price);
+        }
+        
+        // Limit orders per element to prevent excessive growth
+        const MAX_ORDERS_PER_ELEMENT = 100;
+        if (buyOrders[order.element].length > MAX_ORDERS_PER_ELEMENT) {
+            buyOrders[order.element] = buyOrders[order.element].slice(0, MAX_ORDERS_PER_ELEMENT);
+        }
+        if (sellOrders[order.element].length > MAX_ORDERS_PER_ELEMENT) {
+            sellOrders[order.element] = sellOrders[order.element].slice(0, MAX_ORDERS_PER_ELEMENT);
+        }
+        
+        // Save back to IndexedDB
+        await dbSaveMarketOrders(buyOrders, 'buy_orders');
+        await dbSaveMarketOrders(sellOrders, 'sell_orders');
+        
+        // Also store NPC order separately
+        await dbSaveNPCOrder(order);
+        
+    } catch (error) {
+        console.error('Error adding NPC order to market book:', error);
+    }
 }
 
 async function executeImmediateTrade(trader, element, side, quantity) {
@@ -609,48 +659,24 @@ async function executeImmediateTrade(trader, element, side, quantity) {
     return { success: false };
 }
 
-async function addOrderToLocalStorage(order) {
-    try {
-        const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
-        const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
-        
-        if (!buyOrders[order.element]) buyOrders[order.element] = [];
-        if (!sellOrders[order.element]) sellOrders[order.element] = [];
-        
-        if (order.side === ORDER_SIDES.BUY) {
-            buyOrders[order.element].push(order);
-            buyOrders[order.element].sort((a, b) => b.price - a.price);
-        } else {
-            sellOrders[order.element].push(order);
-            sellOrders[order.element].sort((a, b) => a.price - b.price);
-        }
-        
-        localStorage.setItem('voidfarer_market_buy_orders', JSON.stringify(buyOrders));
-        localStorage.setItem('voidfarer_market_sell_orders', JSON.stringify(sellOrders));
-        
-        const npcOrders = await loadNPCOrders() || {};
-        if (!npcOrders[order.element]) npcOrders[order.element] = [];
-        npcOrders[order.element].push(order);
-        await saveNPCOrders(npcOrders);
-        
-    } catch (error) {
-        console.error('Error adding NPC order to localStorage:', error);
-    }
-}
-
 export async function cancelTraderOrder(orderId, trader) {
     try {
-        const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
-        const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
+        // Load orders from IndexedDB
+        let buyOrders = await dbLoadMarketOrders('buy_orders');
+        let sellOrders = await dbLoadMarketOrders('sell_orders');
+        
+        if (!buyOrders) buyOrders = {};
+        if (!sellOrders) sellOrders = {};
         
         let found = false;
         let order = null;
         let element = null;
         let side = null;
         
+        // Search in buy orders
         for (const elem in buyOrders) {
-            const index = buyOrders[elem].findIndex(o => o.id === orderId);
-            if (index >= 0) {
+            const index = buyOrders[elem]?.findIndex(o => o.id === orderId);
+            if (index !== undefined && index >= 0) {
                 order = buyOrders[elem][index];
                 element = elem;
                 side = ORDER_SIDES.BUY;
@@ -660,10 +686,11 @@ export async function cancelTraderOrder(orderId, trader) {
             }
         }
         
+        // Search in sell orders if not found
         if (!found) {
             for (const elem in sellOrders) {
-                const index = sellOrders[elem].findIndex(o => o.id === orderId);
-                if (index >= 0) {
+                const index = sellOrders[elem]?.findIndex(o => o.id === orderId);
+                if (index !== undefined && index >= 0) {
                     order = sellOrders[elem][index];
                     element = elem;
                     side = ORDER_SIDES.SELL;
@@ -680,11 +707,13 @@ export async function cancelTraderOrder(orderId, trader) {
         
         order.status = ORDER_STATUS.CANCELLED;
         
+        // Refund credits for cancelled buy order
         if (side === ORDER_SIDES.BUY && trader) {
             const total = order.price * order.remainingQuantity;
             trader.credits += total;
         }
         
+        // Remove from trader's active orders
         if (trader) {
             const index = trader.activeOrders.indexOf(orderId);
             if (index >= 0) {
@@ -693,18 +722,11 @@ export async function cancelTraderOrder(orderId, trader) {
             await saveNPCTrader(trader.id, trader);
         }
         
-        localStorage.setItem('voidfarer_market_buy_orders', JSON.stringify(buyOrders));
-        localStorage.setItem('voidfarer_market_sell_orders', JSON.stringify(sellOrders));
+        // Save updated order books
+        await dbSaveMarketOrders(buyOrders, 'buy_orders');
+        await dbSaveMarketOrders(sellOrders, 'sell_orders');
         
-        const npcOrders = await loadNPCOrders() || {};
-        if (npcOrders[element]) {
-            const index = npcOrders[element].findIndex(o => o.id === orderId);
-            if (index >= 0) {
-                npcOrders[element].splice(index, 1);
-                await saveNPCOrders(npcOrders);
-            }
-        }
-        
+        // Delete from NPC orders
         await dbDeleteNPCOrder(orderId);
         
         return { success: true, order };
