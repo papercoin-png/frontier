@@ -5,6 +5,7 @@
 // UPDATED: Added certificate holder tracking for labor pool distribution
 // UPDATED: Added NPC trader persistence for marketplace NPCs
 // UPDATED: Added market data cleanup functions to prevent localStorage quota issues
+// UPDATED: Added location saving to IndexedDB when collecting elements
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -618,7 +619,7 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
-// COLLECTION FUNCTIONS (Ship Cargo) - FIXED
+// COLLECTION FUNCTIONS (Ship Cargo) - FIXED WITH LOCATION SAVING
 // ============================================================================
 
 /**
@@ -682,6 +683,34 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         console.log('✅ Verified saved data:', saved ? JSON.parse(saved) : 'null');
         
         console.log(`✅ Added ${quantity}x ${elementName} to cargo. New count: ${collection[elementName].count}`);
+        
+        // ===== FIX: Save location to IndexedDB if metadata contains planet info =====
+        if (metadata && metadata.planet) {
+            try {
+                // Check if dbSaveElementLocation is available
+                if (typeof window.dbSaveElementLocation === 'function') {
+                    const locationData = {
+                        planet: metadata.planet,
+                        planetType: metadata.planetType || 'unknown',
+                        quantity: quantity,
+                        timestamp: metadata.timestamp || Date.now(),
+                        discoveredDate: metadata.discoveredDate || new Date().toISOString(),
+                        rarity: metadata.rarity || 'common',
+                        value: metadata.value || 100
+                    };
+                    
+                    await window.dbSaveElementLocation(elementName, metadata.planet, locationData);
+                    console.log(`📍 Saved location for ${elementName} on ${metadata.planet}`);
+                } else {
+                    console.warn('dbSaveElementLocation not available, location not saved');
+                }
+            } catch (error) {
+                console.error('❌ Error saving element location to IndexedDB:', error);
+                // Don't fail the main operation if location saving fails
+            }
+        } else {
+            console.log(`⚠️ No location data provided for ${elementName}, location not saved`);
+        }
         
         return {
             success: true,
