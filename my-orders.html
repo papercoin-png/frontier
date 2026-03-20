@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
+        /* All your existing CSS styles - kept exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -49,7 +50,6 @@
             -webkit-overflow-scrolling: touch;
         }
         
-        /* Loading Overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -95,7 +95,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Header */
         .orders-header {
             display: flex;
             justify-content: space-between;
@@ -150,7 +149,6 @@
             transform: scale(0.95);
         }
         
-        /* Account Bar */
         .account-bar {
             background: #1E2026;
             border-radius: 60px 20px 60px 20px;
@@ -190,7 +188,6 @@
             color: #848E9C;
         }
         
-        /* Summary Cards */
         .summary-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -225,7 +222,6 @@
             margin-top: 4px;
         }
         
-        /* Tab Navigation */
         .order-tabs {
             display: flex;
             gap: 4px;
@@ -254,7 +250,6 @@
             color: #0B0E14;
         }
         
-        /* Filter Bar */
         .filter-bar {
             display: flex;
             gap: 8px;
@@ -286,7 +281,6 @@
             background: #3A3F4A;
         }
         
-        /* Orders List */
         .orders-list {
             display: flex;
             flex-direction: column;
@@ -564,7 +558,6 @@
             pointer-events: none;
         }
         
-        /* Trade History Section */
         .history-section {
             background: #1E2026;
             border-radius: 60px 20px 60px 20px;
@@ -656,7 +649,6 @@
             font-size: 9px;
         }
         
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -684,7 +676,6 @@
             color: #848E9C;
         }
         
-        /* Back button */
         .back-button {
             position: fixed;
             bottom: 20px;
@@ -719,7 +710,6 @@
             color: #F0B90B;
         }
         
-        /* Toast Notification */
         .toast-notification {
             position: fixed;
             top: 20px;
@@ -754,7 +744,6 @@
             100% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
         }
         
-        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 4px;
             height: 4px;
@@ -777,7 +766,6 @@
 <body>
     <div class="phone-frame">
         <div class="orders-view" id="ordersView">
-            <!-- Header -->
             <div class="orders-header">
                 <div class="logo-area">
                     <span class="orders-logo">MY ORDERS</span>
@@ -788,16 +776,14 @@
                 </div>
             </div>
             
-            <!-- Account Bar -->
             <div class="account-bar">
                 <div class="player-info">
                     <span class="player-name" id="playerName">VOIDFARER #1234</span>
                     <span class="player-id" id="playerId">ID: 0x7f3a...b9c2</span>
                 </div>
-                <div class="credits-value" id="totalBalance">12,450 <span>⭐</span></div>
+                <div class="credits-value" id="totalBalance">0 <span>⭐</span></div>
             </div>
             
-            <!-- Summary Cards -->
             <div class="summary-grid">
                 <div class="summary-card">
                     <div class="summary-label">Active Orders</div>
@@ -821,7 +807,6 @@
                 </div>
             </div>
             
-            <!-- Tab Navigation -->
             <div class="order-tabs">
                 <button class="order-tab active" onclick="window.switchOrderTab('all')">ALL</button>
                 <button class="order-tab" onclick="window.switchOrderTab('buy')">BUY</button>
@@ -829,27 +814,21 @@
                 <button class="order-tab" onclick="window.switchOrderTab('history')">HISTORY</button>
             </div>
             
-            <!-- Filter Bar (dynamic) -->
             <div class="filter-bar" id="filterBar"></div>
-            
-            <!-- Orders List Container -->
             <div id="ordersContainer"></div>
             
-            <!-- Back button -->
             <button class="back-button" onclick="window.returnToMarket()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">RETURN TO MARKET</span>
             </button>
         </div>
         
-        <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay">
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">LOADING ORDERS...</div>
         </div>
     </div>
 
-    <!-- Script imports -->
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
     <script type="module" src="js/element-prices.js"></script>
@@ -860,7 +839,7 @@
         import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './js/element-prices.js';
         import { getCurrentPrices, getBidPrice, getAskPrice } from './js/market-dynamics.js';
         import { getUserOrders, getUserTrades, cancelOrder, ORDER_TYPES, ORDER_SIDES, ORDER_STATUS } from './js/market-engine.js';
-        import { getPlayer, getCollection } from './js/storage.js';
+        import { getPlayer, getCollection, getCredits } from './js/storage.js';
 
         // ===== TELEGRAM =====
         const tg = window.Telegram?.WebApp;
@@ -879,18 +858,46 @@
         let orders = [];
         let trades = [];
 
+        // ===== FIXED: UPDATE BALANCE USING STORAGE.JS =====
+        async function updateBalance() {
+            try {
+                // Get the actual player ID from localStorage
+                const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId || 'main';
+                
+                // Use storage.js getCredits function
+                const credits = await getCredits(actualPlayerId);
+                currentCredits = credits;
+                
+                // Update UI
+                const balanceElement = document.getElementById('totalBalance');
+                if (balanceElement) {
+                    balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+                }
+                
+                return credits;
+            } catch (error) {
+                console.error('Error updating balance:', error);
+                return currentCredits;
+            }
+        }
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
             
             try {
-                // Get player info
-                playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Math.random().toString(36).substr(2, 9);
+                // Get player ID from localStorage (same as element-market.html)
+                playerId = localStorage.getItem('voidfarer_player_id');
+                if (!playerId) {
+                    playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('voidfarer_player_id', playerId);
+                }
+                
                 const storedName = localStorage.getItem('voidfarer_player_name');
                 playerName = storedName ? storedName : `VOIDFARER #${playerId.slice(-4)}`;
                 
-                // Get player data
-                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                // Load balance using storage.js
+                await updateBalance();
                 currentCollection = await getCollection();
                 
                 // Load orders and trades
@@ -902,6 +909,15 @@
                 updateSummaryCards();
                 renderFilterBar();
                 renderOrders();
+                
+                // Auto-refresh every 5 seconds
+                setInterval(async () => {
+                    await updateBalance();
+                    await loadUserOrders();
+                    await loadUserTrades();
+                    updateSummaryCards();
+                    renderOrders();
+                }, 5000);
                 
                 showLoading(false);
                 
@@ -926,7 +942,6 @@
         function updatePlayerInfo() {
             document.getElementById('playerName').textContent = playerName;
             document.getElementById('playerId').textContent = `ID: ${playerId.slice(0, 6)}...${playerId.slice(-4)}`;
-            document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
         }
 
         // ===== LOAD USER ORDERS =====
@@ -934,7 +949,6 @@
             try {
                 orders = await getUserOrders(playerId) || [];
                 
-                // Enrich with element data
                 orders = orders.map(order => {
                     const element = getElementByName(order.element) || {
                         name: order.element,
@@ -949,7 +963,6 @@
                     };
                 });
                 
-                // Sort by date (newest first)
                 orders.sort((a, b) => b.createdAt - a.createdAt);
                 
             } catch (error) {
@@ -963,7 +976,6 @@
             try {
                 trades = await getUserTrades(playerId, 20) || [];
                 
-                // Enrich with element data
                 trades = trades.map(trade => {
                     const element = getElementByName(trade.element) || {
                         name: trade.element,
@@ -995,7 +1007,6 @@
                 return sum + (price * o.remainingQuantity);
             }, 0);
             
-            // Calculate 24h volume for user
             const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
             const recentTrades = trades.filter(t => t.timestamp >= oneDayAgo);
             const volume24h = recentTrades.reduce((sum, t) => sum + t.quantity, 0);
@@ -1043,7 +1054,6 @@
             currentTab = tab;
             
             document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
-            // Find the clicked button and set it active
             const buttons = document.querySelectorAll('.order-tab');
             for (let i = 0; i < buttons.length; i++) {
                 if (buttons[i].textContent.toLowerCase().includes(tab) || 
@@ -1071,7 +1081,6 @@
                 return;
             }
             
-            // Filter orders
             let filteredOrders = orders;
             
             if (currentTab !== 'all') {
@@ -1094,11 +1103,9 @@
             }
             
             let html = '<div class="orders-list">';
-            
             filteredOrders.forEach(order => {
                 html += renderOrderCard(order);
             });
-            
             html += '</div>';
             container.innerHTML = html;
         }
@@ -1205,7 +1212,6 @@
                 return;
             }
             
-            // Filter trades based on time
             let filteredTrades = trades;
             const now = Date.now();
             
@@ -1260,8 +1266,6 @@
                 
                 if (result.success) {
                     showToast('Order cancelled successfully', 'success');
-                    
-                    // Reload orders
                     await loadUserOrders();
                     updateSummaryCards();
                     renderOrders();
@@ -1283,7 +1287,6 @@
 
         // ===== VIEW ORDER =====
         window.viewOrder = function(orderId) {
-            // Navigate to element-market.html with order ID
             window.location.href = `element-market.html?order=${orderId}`;
         };
 
@@ -1293,10 +1296,9 @@
             document.getElementById('loadingText').textContent = 'REFRESHING...';
             
             try {
+                await updateBalance();
                 await loadUserOrders();
                 await loadUserTrades();
-                
-                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
                 currentCollection = await getCollection();
                 
                 updatePlayerInfo();
@@ -1329,12 +1331,8 @@
             toast.className = `toast-notification ${type}`;
             toast.textContent = message;
             document.body.appendChild(toast);
-            
             setTimeout(() => toast.remove(), 3000);
         }
-
-        // ===== ATTACH FUNCTIONS TO WINDOW =====
-        // Already attached via window.functionName = function above
 
         // ===== START =====
         init();
