@@ -1,7 +1,8 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
 // UPDATED: Converted to use IndexedDB instead of localStorage for permanent storage
-// UPDATED: Fixed cache reload after adding orders so UI displays new orders immediately
+// UPDATED: Fixed NaN issue in totalCost calculation for market orders
+// UPDATED: Added proper number validation for all calculations
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -285,19 +286,40 @@ async function executeMarketOrder(order) {
             throw new Error('Price data not available');
         }
         
-        // Determine execution price based on side
+        // Determine execution price based on side with proper number validation
         let executionPrice;
         let totalCost;
         let fee;
         
+        // Ensure quantity is a valid number
+        const quantity = Number(order.quantity);
+        if (isNaN(quantity) || quantity <= 0) {
+            throw new Error('Invalid quantity');
+        }
+        
         if (order.side === ORDER_SIDES.BUY) {
             executionPrice = elementPrice.ask || elementPrice.current * 1.01;
-            totalCost = order.quantity * executionPrice;
+            // Ensure executionPrice is a valid number
+            executionPrice = Number(executionPrice);
+            if (isNaN(executionPrice) || executionPrice <= 0) {
+                executionPrice = elementPrice.current || 100;
+            }
+            totalCost = quantity * executionPrice;
             fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
         } else {
             executionPrice = elementPrice.bid || elementPrice.current * 0.99;
-            totalCost = order.quantity * executionPrice;
+            executionPrice = Number(executionPrice);
+            if (isNaN(executionPrice) || executionPrice <= 0) {
+                executionPrice = elementPrice.current || 100;
+            }
+            totalCost = quantity * executionPrice;
             fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
+        }
+        
+        // Validate totalCost is a valid number
+        if (isNaN(totalCost) || totalCost <= 0) {
+            console.error('Invalid totalCost calculation:', { quantity, executionPrice, order });
+            totalCost = quantity * 100; // Fallback
         }
         
         // Update order status
@@ -316,7 +338,7 @@ async function executeMarketOrder(order) {
             playerName: order.playerName,
             element: order.element,
             side: order.side,
-            quantity: order.quantity,
+            quantity: quantity,
             price: executionPrice,
             total: totalCost,
             fee: fee,
@@ -324,7 +346,7 @@ async function executeMarketOrder(order) {
             isNPC: order.isNPC
         };
         
-        recordTrade(order.element, order.quantity, order.side);
+        recordTrade(order.element, quantity, order.side);
         await addToMatchedTrades(trade);
         await recordOrderHistory(order, 'filled');
         
@@ -334,12 +356,12 @@ async function executeMarketOrder(order) {
         }
         
         // Update market stats
-        await updateMarketStats(order.quantity, totalCost);
+        await updateMarketStats(quantity, totalCost);
         
         // Calculate price impact for large orders
         const volume24h = getVolumeLast24h(order.element);
-        if (order.quantity > volume24h * 0.01) {
-            await applyPriceImpact(order.element, order.quantity, order.side);
+        if (quantity > volume24h * 0.01) {
+            await applyPriceImpact(order.element, quantity, order.side);
         }
         
         return { 
@@ -390,7 +412,7 @@ async function addToOrderBook(order) {
     await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
     await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
     
-    // ===== CRITICAL FIX: Reload cache after saving =====
+    // Reload cache after saving
     await reloadOrderCache();
     
     // Attempt to match orders
