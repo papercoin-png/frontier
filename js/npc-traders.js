@@ -6,6 +6,7 @@
 // UPDATED: Added updatePrices() call to ensure fresh price data each cycle
 // UPDATED: Added enhanced debug logging to diagnose zero actions issue
 // UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
+// UPDATED: Added inventory pruning to prevent excessive storage growth
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -48,7 +49,7 @@ export const TRADER_PERSONALITIES = {
     MARKET_MAKER: 'marketMaker'
 };
 
-// Type configuration
+// Type configuration - NPC count remains 1000 total
 const TRADER_TYPE_CONFIG = {
     [TRADER_TYPES.SMALL]: {
         count: 500,
@@ -300,6 +301,49 @@ function generateStrategyParams(personality) {
     }
 }
 
+// ===== INVENTORY PRUNING =====
+
+/**
+ * Prune trader inventory to keep only top N elements by value
+ * @param {Object} trader - Trader object
+ * @param {Object} marketData - Current market data
+ * @param {number} maxItems - Maximum inventory items to keep (default 10)
+ */
+function pruneInventory(trader, marketData, maxItems = 10) {
+    if (!trader.inventory || Object.keys(trader.inventory).length <= maxItems) {
+        return;
+    }
+    
+    // Calculate value of each inventory item
+    const items = Object.entries(trader.inventory).map(([element, quantity]) => {
+        const price = marketData.prices[element]?.current || 100;
+        return {
+            element,
+            quantity,
+            value: quantity * price
+        };
+    });
+    
+    // Sort by value (highest first)
+    items.sort((a, b) => b.value - a.value);
+    
+    // Keep only top N items
+    const keptItems = items.slice(0, maxItems);
+    
+    // Rebuild inventory
+    const newInventory = {};
+    keptItems.forEach(item => {
+        newInventory[item.element] = item.quantity;
+    });
+    
+    const removed = Object.keys(trader.inventory).length - keptItems.length;
+    if (removed > 0) {
+        console.log(`✂️ Pruned ${removed} low-value items from ${trader.name}'s inventory`);
+    }
+    
+    trader.inventory = newInventory;
+}
+
 // ===== INITIALIZATION =====
 
 /**
@@ -319,9 +363,7 @@ export async function initializeNPCTraders(availableElements = []) {
     let nameIndex = 0;
     
     // ===== FIX: Only use chemical elements (no ship parts) =====
-    // Filter out anything that's not a real chemical element
     let chemicalElements = availableElements.filter(el => {
-        // Check if it's a chemical element (not a ship part)
         const isChemical = el.symbol && 
                           el.symbol.length <= 3 && 
                           el.symbol.match(/^[A-Z][a-z]?$|^[A-Z][a-z]?[a-z]?$/) &&
@@ -337,11 +379,9 @@ export async function initializeNPCTraders(availableElements = []) {
         return isChemical && el.currentPrice && el.currentPrice > 0;
     });
     
-    // If no chemical elements found, use the element database directly
     if (chemicalElements.length === 0) {
         console.warn('No chemical elements in availableElements, using built-in element list');
         
-        // Use a predefined list of common elements as fallback
         const commonElements = [
             'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 
             'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Magnesium',
@@ -393,7 +433,6 @@ export async function initializeNPCTraders(availableElements = []) {
                     const element = tradableElements[Math.floor(Math.random() * tradableElements.length)];
                     trader.favoriteElements.push(element.name);
                 }
-                // Remove duplicates
                 trader.favoriteElements = [...new Set(trader.favoriteElements)];
             }
             
@@ -509,7 +548,6 @@ async function executeImmediateTrade(trader, element, side, quantity) {
         let bid = getBidPrice(element);
         let ask = getAskPrice(element);
         
-        // If bid/ask are missing, calculate from current price
         if ((!bid || bid <= 0) || (!ask || ask <= 0)) {
             const prices = getCurrentPrices();
             const currentPrice = prices[element]?.current || 100;
@@ -724,16 +762,18 @@ export async function updateTrader(trader, marketData) {
         }
     }
     
+    // Prune inventory before trading (keep only top 10 items)
+    pruneInventory(trader, marketData, 10);
+    
     const actions = [];
     const prices = marketData.prices || {};
     
     // ===== ENHANCED DEBUG LOGGING =====
     console.log(`\n🔍 TRADER: ${trader.name} (${trader.personality})`);
     console.log(`   Credits: ${trader.credits}`);
-    console.log(`   Inventory:`, trader.inventory);
+    console.log(`   Inventory size: ${Object.keys(trader.inventory).length} items`);
     console.log(`   Favorite elements:`, trader.favoriteElements);
     
-    // Check if prices exist
     const priceKeys = Object.keys(prices);
     console.log(`   Total price keys: ${priceKeys.length}`);
     
@@ -742,17 +782,13 @@ export async function updateTrader(trader, marketData) {
     } else {
         console.log(`   ⚠️ NO PRICE DATA FOUND!`);
     }
-    // ===== END DEBUG =====
     
-    // ===== FIXED FILTERING =====
-    // Get all elements that have ANY price data - use current price as the reliable indicator
     const allTradableElements = Object.keys(prices).filter(el => 
         prices[el] && prices[el].current > 0
     );
     
     console.log(`   Tradable elements found: ${allTradableElements.length}`);
     
-    // Use favorites if they exist and are tradable
     let elements = [];
     if (trader.favoriteElements && trader.favoriteElements.length > 0) {
         elements = trader.favoriteElements.filter(el => 
@@ -763,41 +799,33 @@ export async function updateTrader(trader, marketData) {
         console.log(`   No favorite elements defined`);
     }
     
-    // If no valid favorites, use first 5 tradable elements
     if (elements.length === 0) {
         elements = allTradableElements.slice(0, 5);
         console.log(`   Using fallback elements: ${elements.length}`);
-        if (elements.length > 0) {
-            console.log(`   Fallback elements:`, elements);
-        }
     }
     
-    // If still no elements, return
     if (elements.length === 0) {
         console.log(`   ❌ No tradable elements for ${trader.name}`);
         return { traderId: trader.id, actions: [] };
     }
     
-    const fallbackElements = elements;
-    // ===== END FIXED FILTERING =====
-    
-    console.log(`   ⚡ Updating with elements:`, fallbackElements);
+    console.log(`   ⚡ Updating with elements:`, elements);
     
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
-            await updateScalper(trader, marketData, fallbackElements, actions);
+            await updateScalper(trader, marketData, elements, actions);
             break;
         case TRADER_PERSONALITIES.TREND_FOLLOWER:
-            await updateTrendFollower(trader, marketData, fallbackElements, actions);
+            await updateTrendFollower(trader, marketData, elements, actions);
             break;
         case TRADER_PERSONALITIES.VALUE_TRADER:
-            await updateValueTrader(trader, marketData, fallbackElements, actions);
+            await updateValueTrader(trader, marketData, elements, actions);
             break;
         case TRADER_PERSONALITIES.RANDOM:
-            await updateRandomTrader(trader, marketData, fallbackElements, actions);
+            await updateRandomTrader(trader, marketData, elements, actions);
             break;
         case TRADER_PERSONALITIES.MARKET_MAKER:
-            await updateMarketMaker(trader, marketData, fallbackElements, actions);
+            await updateMarketMaker(trader, marketData, elements, actions);
             break;
         default:
             console.log(`   ❓ Unknown personality: ${trader.personality}`);
@@ -1230,15 +1258,14 @@ export function stopNPCTraderUpdates() {
 export async function processNPCTradingCycle(batchSize = 100) {
     console.log(`\n🔄 Processing NPC trading cycle (${batchSize} traders)...`);
     
-    // ===== FIX: Ensure prices are updated before trading =====
-    // This will calculate new bid/ask spreads based on market dynamics
+    // Ensure prices are updated before trading
     const updatedPrices = updatePrices();
     
     const traders = await loadNPCTraders();
     const traderList = Object.values(traders);
     
     const marketData = {
-        prices: getCurrentPrices(), // This will now have fresh prices with valid bid/ask
+        prices: getCurrentPrices(),
         timestamp: Date.now()
     };
     
@@ -1379,4 +1406,4 @@ window.getNPCOrders = getNPCOrders;
 window.resetNPCTraders = resetNPCTraders;
 window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
-console.log('✅ npc-traders.js loaded - NPC trader system ready with market orders');
+console.log('✅ npc-traders.js loaded - NPC trader system ready with market orders and inventory pruning');
