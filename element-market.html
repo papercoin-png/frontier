@@ -516,6 +516,15 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 1px solid #2B2F36;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 20px !important;
+            transition: background 0.1s;
+        }
+        
+        .market-table th:hover {
+            background: rgba(240, 185, 11, 0.1);
         }
         
         .market-table td {
@@ -587,6 +596,16 @@
         .rarity-rare { background: #4169E1; }
         .rarity-very-rare { background: #e0b0ff; }
         .rarity-legendary { background: #ffd700; box-shadow: 0 0 8px gold; }
+        
+        /* Sort indicators */
+        .sort-indicator {
+            position: absolute;
+            right: 4px;
+            color: #F0B90B;
+            font-size: 10px;
+            display: inline-block;
+            margin-left: 4px;
+        }
         
         /* Order Book */
         .order-book {
@@ -1319,10 +1338,18 @@
                 <table class="market-table">
                     <thead>
                         <tr>
-                            <th>ELEMENT</th>
-                            <th>BID</th>
-                            <th>ASK</th>
-                            <th>24H</th>
+                            <th onclick="window.sortTable('element')">
+                                ELEMENT <span id="sort-element" class="sort-indicator">▼</span>
+                            </th>
+                            <th onclick="window.sortTable('bid')">
+                                BID <span id="sort-bid" class="sort-indicator"></span>
+                            </th>
+                            <th onclick="window.sortTable('ask')">
+                                ASK <span id="sort-ask" class="sort-indicator"></span>
+                            </th>
+                            <th onclick="window.sortTable('change')">
+                                24H <span id="sort-change" class="sort-indicator"></span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="marketTableBody"></tbody>
@@ -1523,6 +1550,10 @@
         let priceUpdateInterval = null;
         let npcStatsUpdateInterval = null;
         let npcInitialized = false;
+        
+        // ===== SORT STATE =====
+        let sortColumn = 'element';
+        let sortDirection = 'asc';
 
         // ===== FUNCTION DECLARATIONS (will be attached to window) =====
         let filterMarket, returnToHub, selectElement, setOrderSide, setOrderType,
@@ -1535,7 +1566,8 @@
             setOrderSideModal, setOrderTypeModal, setMarketPriceModal, 
             updateModalOrderPrice, updateModalOrderQuantity, incrementQuantityModal,
             decrementQuantityModal, setMaxQuantityModal, placeOrderModal,
-            buyFromPortfolio, sellFromPortfolio, initializeNPCs, updateNPCStats;
+            buyFromPortfolio, sellFromPortfolio, initializeNPCs, updateNPCStats,
+            sortTable;
 
         // ===== HELPER FUNCTIONS =====
         function calculateMaxBuy(credits, price) {
@@ -1544,6 +1576,79 @@
 
         function calculateMaxSell(collection, elementName) {
             return collection[elementName]?.count || 0;
+        }
+
+        // ===== SORT TABLE FUNCTION =====
+        sortTable = function(column) {
+            // Toggle direction if same column, otherwise set to asc
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            // Update sort indicators
+            updateSortIndicators();
+            
+            // Sort the elements
+            filteredElements.sort((a, b) => {
+                let valA, valB;
+                
+                switch(column) {
+                    case 'element':
+                        valA = a.name.toLowerCase();
+                        valB = b.name.toLowerCase();
+                        break;
+                    case 'bid':
+                        valA = a.bidPrice || 0;
+                        valB = b.bidPrice || 0;
+                        break;
+                    case 'ask':
+                        valA = a.askPrice || 0;
+                        valB = b.askPrice || 0;
+                        break;
+                    case 'change':
+                        valA = a.priceChangePercent || 0;
+                        valB = b.priceChangePercent || 0;
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                // Compare based on type
+                if (typeof valA === 'string') {
+                    return sortDirection === 'asc' 
+                        ? valA.localeCompare(valB)
+                        : valB.localeCompare(valA);
+                } else {
+                    return sortDirection === 'asc'
+                        ? valA - valB
+                        : valB - valA;
+                }
+            });
+            
+            // Re-render the table
+            renderMarketTable();
+            
+            // Optional haptic feedback
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        };
+
+        // ===== UPDATE SORT INDICATORS =====
+        function updateSortIndicators() {
+            // Clear all indicators
+            document.querySelectorAll('.sort-indicator').forEach(el => {
+                el.textContent = '';
+            });
+            
+            // Set current indicator
+            const indicator = document.getElementById(`sort-${sortColumn}`);
+            if (indicator) {
+                indicator.textContent = sortDirection === 'asc' ? '▼' : '▲';
+            }
         }
 
         // ===== SAVE MARKET PRICES TO STORAGE =====
@@ -1861,10 +1966,10 @@
             document.getElementById('depthSpread').textContent = `${spreadPercent.toFixed(2)}% spread`;
         }
 
-        // ===== FORCED MARKET STATS UPDATE =====
+        // ===== EMERGENCY FORCED MARKET STATS UPDATE =====
         function updateMarketStats() {
             try {
-                console.log('📊 Updating market stats...');
+                console.log('📊 Forcing market stats update...');
                 
                 // Get DOM elements
                 const volumeEl = document.getElementById('volume24h');
@@ -1874,23 +1979,20 @@
                 const topGainerEl = document.getElementById('topGainer');
                 const gainerChangeEl = document.getElementById('gainerChange');
                 const volumeChangeEl = document.getElementById('volumeChange');
+                const npcActiveEl = document.getElementById('npcActiveCount');
+                const npcOrderEl = document.getElementById('npcOrderCount');
                 
-                // Log if elements are found
-                console.log('DOM elements found:', {
-                    volume: !!volumeEl,
-                    marketCap: !!marketCapEl,
-                    trades: !!tradesEl,
-                    topGainer: !!topGainerEl
+                // Log element status
+                console.log('DOM elements status:', {
+                    volume: volumeEl ? '✅' : '❌',
+                    marketCap: marketCapEl ? '✅' : '❌',
+                    trades: tradesEl ? '✅' : '❌',
+                    topGainer: topGainerEl ? '✅' : '❌'
                 });
                 
-                if (!volumeEl || !marketCapEl || !tradesEl) {
-                    console.error('❌ Market stats DOM elements missing!');
-                    return;
-                }
-                
-                // Get data
+                // Get fresh data
                 const prices = getCurrentPrices();
-                const recentTrades = getAllRecentTrades(200);
+                const recentTrades = getAllRecentTrades(500); // Get more trades
                 
                 // Calculate 24h stats
                 const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
@@ -1916,27 +2018,69 @@
                     }
                 });
                 
-                // FORCE UPDATE DOM - use direct property assignment
-                volumeEl.innerText = volume24h.toLocaleString();
-                marketCapEl.innerText = Math.round(marketCap).toLocaleString();
-                tradesEl.innerText = last24hTrades.length.toString();
-                tradesChangeEl.innerHTML = `NPC: ${npcTrades}`;
-                
-                if (topGainer.name !== '---') {
-                    topGainerEl.innerText = topGainer.name;
-                    gainerChangeEl.innerText = `+${topGainer.change.toFixed(1)}%`;
+                // FORCE UPDATE - multiple methods for redundancy
+                if (volumeEl) {
+                    volumeEl.innerText = volume24h.toString();
+                    volumeEl.textContent = volume24h.toString();
+                    volumeEl.innerHTML = volume24h.toString();
                 }
                 
-                volumeChangeEl.innerText = `+${((volume24h / 1000) || 0).toFixed(1)}%`;
+                if (marketCapEl) {
+                    marketCapEl.innerText = Math.round(marketCap).toString();
+                    marketCapEl.textContent = Math.round(marketCap).toString();
+                    marketCapEl.innerHTML = Math.round(marketCap).toString();
+                }
                 
-                console.log('✅ Stats updated:', {
+                if (tradesEl) {
+                    tradesEl.innerText = last24hTrades.length.toString();
+                    tradesEl.textContent = last24hTrades.length.toString();
+                    tradesEl.innerHTML = last24hTrades.length.toString();
+                }
+                
+                if (tradesChangeEl) {
+                    tradesChangeEl.innerText = `NPC: ${npcTrades}`;
+                    tradesChangeEl.innerHTML = `NPC: ${npcTrades}`;
+                }
+                
+                if (topGainerEl && topGainer.name !== '---') {
+                    topGainerEl.innerText = topGainer.name;
+                    topGainerEl.textContent = topGainer.name;
+                    topGainerEl.innerHTML = topGainer.name;
+                }
+                
+                if (gainerChangeEl && topGainer.name !== '---') {
+                    gainerChangeEl.innerText = `+${topGainer.change.toFixed(1)}%`;
+                    gainerChangeEl.innerHTML = `+${topGainer.change.toFixed(1)}%`;
+                }
+                
+                if (volumeChangeEl) {
+                    const volChange = ((volume24h / 1000) || 0).toFixed(1);
+                    volumeChangeEl.innerText = `+${volChange}%`;
+                    volumeChangeEl.innerHTML = `+${volChange}%`;
+                }
+                
+                // Update NPC stats
+                if (npcActiveEl) {
+                    npcActiveEl.innerText = '1000';
+                    npcActiveEl.textContent = '1000';
+                    npcActiveEl.innerHTML = '1000';
+                }
+                
+                if (npcOrderEl) {
+                    npcOrderEl.innerText = '200 orders';
+                    npcOrderEl.textContent = '200 orders';
+                    npcOrderEl.innerHTML = '200 orders';
+                }
+                
+                // Log what we set
+                console.log('✅ Stats set to:', {
                     volume: volume24h,
                     trades: last24hTrades.length,
-                    marketCap: marketCap,
-                    topGainer: topGainer
+                    marketCap: Math.round(marketCap),
+                    topGainer: topGainer.name
                 });
                 
-                // Also update the market ticker and table
+                // Also update ticker and table
                 renderMarketTicker();
                 renderMarketTable();
                 
@@ -2428,7 +2572,13 @@
                 return true;
             });
             
-            renderMarketTable();
+            // Reset sort to default (A-Z by element)
+            sortColumn = 'element';
+            sortDirection = 'asc';
+            updateSortIndicators();
+            
+            // Apply current sort
+            sortTable('element');
         }
 
         // ===== GO TO MY ORDERS =====
@@ -2504,6 +2654,7 @@
         window.quickSellMarket = quickSellMarket;
         window.searchMarket = searchMarket;
         window.goToMyOrders = goToMyOrders;
+        window.sortTable = sortTable;
         
         // Modal functions
         window.openElementModal = openElementModal;
