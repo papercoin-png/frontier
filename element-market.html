@@ -211,14 +211,14 @@
             transform: scale(0.96);
         }
         
-        /* My Orders Link */
+        /* My Orders Link - FIXED VISIBILITY */
         .my-orders-link {
             margin-bottom: 16px;
         }
         
         .my-orders-btn {
-            background: #1E2026;
-            border: 1px solid #F0B90B;
+            background: #1E2026 !important;
+            border: 1px solid #F0B90B !important;
             border-radius: 60px 20px 60px 20px;
             padding: 12px 16px;
             display: flex;
@@ -230,14 +230,18 @@
         }
         
         .my-orders-btn:active {
-            background: #2B2F36;
+            background: #2B2F36 !important;
             transform: scale(0.98);
         }
         
         .my-orders-btn span {
-            color: #F0B90B;
+            color: #F0B90B !important;
             font-weight: 600;
             font-size: 14px;
+        }
+        
+        .my-orders-btn .back-icon {
+            color: #F0B90B !important;
         }
         
         /* Market Ticker */
@@ -1630,7 +1634,7 @@
                 <button class="portfolio-btn" onclick="window.openPortfolioModal()">PORTFOLIO</button>
             </div>
             
-            <!-- My Orders Link -->
+            <!-- My Orders Link - FIXED VISIBILITY -->
             <div class="my-orders-link">
                 <div class="my-orders-btn" onclick="window.goToMyOrders()">
                     <span>📋</span> MY ORDERS
@@ -2195,6 +2199,19 @@
                 // Start real-time updates
                 startRealTimeUpdates();
                 
+                // ===== FIX: Add aggressive balance refresh =====
+                setInterval(() => {
+                    updateBalance();
+                }, 2000);
+
+                // Also refresh after any storage event (other tabs/windows)
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'voidfarer_credits' || (e.key && e.key.includes('voidfarer_player'))) {
+                        console.log('Storage changed, refreshing balance');
+                        updateBalance();
+                    }
+                });
+                
                 showLoading(false);
                 
             } catch (error) {
@@ -2214,14 +2231,46 @@
             }
         }
 
-        // ===== BALANCE - FIXED SYNC =====
+        // ===== BALANCE - ENHANCED SYNC WITH MULTIPLE STORAGE LOCATIONS =====
         function updateBalance() {
-            // Make sure currentCredits is up to date with storage
-            const storedCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+            // Try multiple sources to get the correct balance
+            let storedCredits = null;
             
-            // If there's a discrepancy, log it and sync
+            // Source 1: Direct credits key
+            try {
+                const directCredits = localStorage.getItem('voidfarer_credits');
+                if (directCredits !== null) {
+                    storedCredits = parseInt(directCredits);
+                }
+            } catch (e) {
+                console.warn('Could not read direct credits');
+            }
+            
+            // Source 2: Player object
+            if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
+                try {
+                    const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                    const playerKey = `voidfarer_player_${playerId}`;
+                    const playerData = JSON.parse(localStorage.getItem(playerKey));
+                    if (playerData && playerData.credits !== undefined) {
+                        storedCredits = playerData.credits;
+                        // Sync to direct key
+                        localStorage.setItem('voidfarer_credits', storedCredits.toString());
+                    }
+                } catch (e) {
+                    console.warn('Could not read player object');
+                }
+            }
+            
+            // Fallback to currentCredits or default
+            if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
+                storedCredits = currentCredits || 5000;
+                localStorage.setItem('voidfarer_credits', storedCredits.toString());
+            }
+            
+            // Update memory and UI
             if (currentCredits !== storedCredits) {
-                console.log(`Balance sync: ${currentCredits} (memory) → ${storedCredits} (storage)`);
+                console.log(`💰 Balance sync: ${currentCredits} → ${storedCredits}`);
                 currentCredits = storedCredits;
             }
             
@@ -2229,6 +2278,15 @@
             if (balanceElement) {
                 balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
             }
+            
+            // Also update any other balance displays
+            document.querySelectorAll('.balance-value').forEach(el => {
+                if (el.id !== 'totalBalance') {
+                    el.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+                }
+            });
+            
+            return currentCredits;
         }
 
         // ===== MARKET TICKER =====
@@ -2730,7 +2788,7 @@
             }
         }
 
-        // ===== FIXED PLACE ORDER MODAL =====
+        // ===== FIXED PLACE ORDER MODAL - WITH ENHANCED BALANCE UPDATE =====
         placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -2786,8 +2844,21 @@
                             // Calculate new balance
                             currentCredits = currentCredits - result.totalCost;
                             
-                            // Save to localStorage
+                            // Save to localStorage in MULTIPLE places for redundancy
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
+                            // Also update in player object
+                            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                            const playerKey = `voidfarer_player_${playerId}`;
+                            try {
+                                const playerData = JSON.parse(localStorage.getItem(playerKey));
+                                if (playerData) {
+                                    playerData.credits = currentCredits;
+                                    localStorage.setItem(playerKey, JSON.stringify(playerData));
+                                }
+                            } catch (e) {
+                                console.warn('Could not update player object');
+                            }
                             
                             // Add to collection
                             await window.addElementToCollection(selectedElement.name, orderQuantity, {
@@ -2799,8 +2870,21 @@
                             // Calculate new balance
                             currentCredits = currentCredits + result.totalCost;
                             
-                            // Save to localStorage
+                            // Save to localStorage in MULTIPLE places
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
+                            // Also update in player object
+                            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                            const playerKey = `voidfarer_player_${playerId}`;
+                            try {
+                                const playerData = JSON.parse(localStorage.getItem(playerKey));
+                                if (playerData) {
+                                    playerData.credits = currentCredits;
+                                    localStorage.setItem(playerKey, JSON.stringify(playerData));
+                                }
+                            } catch (e) {
+                                console.warn('Could not update player object');
+                            }
                             
                             // Remove from collection
                             await window.removeElementFromCollection(selectedElement.name, orderQuantity);
@@ -2809,8 +2893,10 @@
                         // Refresh collection data
                         currentCollection = await getCollection();
                         
-                        // Force balance update in UI
+                        // Force balance update in UI (MULTIPLE TIMES for safety)
                         updateBalance();
+                        setTimeout(() => updateBalance(), 100);
+                        setTimeout(() => updateBalance(), 500);
                         
                         // Show success message with price
                         showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
@@ -2867,6 +2953,8 @@
 
         // ===== PORTFOLIO MODAL FUNCTIONS =====
         openPortfolioModal = function() {
+            // Force balance refresh before opening
+            updateBalance();
             updatePortfolioModal();
             document.getElementById('portfolioModal').classList.add('active');
         };
@@ -3009,6 +3097,7 @@
                 renderOrderBook();
                 updateMarketStats();
                 updateNPCStats();
+                updateBalance(); // Added balance refresh on focus
             });
             
             // Auto-save prices every minute
