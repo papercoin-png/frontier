@@ -1,7 +1,8 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
-// FIXED: Quantity validation in executeMarketOrder to prevent NaN errors
-// FIXED: Proper number handling for all calculations
+// FIXED: Market orders now execute against actual order book, not theoretical prices
+// FIXED: Unlimited selling exploit closed
+// FIXED: Proper partial fills and liquidity checks
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -244,97 +245,254 @@ export async function createOrder(orderData) {
 }
 
 /**
- * Execute a market order immediately
+ * Execute a market order against actual order book
+ * FIXED: Now uses real orders, not theoretical prices
  */
 async function executeMarketOrder(order) {
     try {
-        const prices = getCurrentPrices();
-        const elementPrice = prices[order.element];
-        
-        if (!elementPrice) {
-            throw new Error('Price data not available');
-        }
-        
-        // FIX: Get quantity from originalQuantity (set in createOrder)
         let quantity = order.originalQuantity || order.remainingQuantity || order.quantity;
         quantity = Number(quantity);
         
         if (isNaN(quantity) || quantity <= 0) {
-            console.error('Invalid quantity in executeMarketOrder:', { order });
             throw new Error('Invalid quantity');
         }
         
-        let executionPrice;
-        let totalCost;
-        let fee;
-        
+        // ===== BUY MARKET ORDER =====
+        // Finds the best ASK orders (sell orders) and fills against them
         if (order.side === ORDER_SIDES.BUY) {
-            executionPrice = elementPrice.ask || elementPrice.current * 1.01;
-            executionPrice = Number(executionPrice);
-            if (isNaN(executionPrice) || executionPrice <= 0) {
-                executionPrice = elementPrice.current || 100;
+            const sellOrders = sellOrdersCache[order.element] || [];
+            const activeSells = sellOrders.filter(o => 
+                o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
+            ).sort((a, b) => a.price - b.price); // Sort by price ascending (cheapest first)
+            
+            if (activeSells.length === 0) {
+                throw new Error('No sellers available at this time');
             }
-            totalCost = quantity * executionPrice;
-            fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
+            
+            let remainingToBuy = quantity;
+            let totalCost = 0;
+            let filledQuantity = 0;
+            let lastExecutionPrice = activeSells[0].price;
+            const matchedOrders = [];
+            
+            // Fill against available sell orders
+            for (let i = 0; i < activeSells.length && remainingToBuy > 0; i++) {
+                const sell = activeSells[i];
+                const matchQuantity = Math.min(remainingToBuy, sell.remainingQuantity);
+                const matchPrice = sell.price;
+                const matchTotal = matchQuantity * matchPrice;
+                
+                totalCost += matchTotal;
+                remainingToBuy -= matchQuantity;
+                filledQuantity += matchQuantity;
+                lastExecutionPrice = matchPrice;
+                
+                // Update the sell order
+                sell.filledQuantity += matchQuantity;
+                sell.remainingQuantity -= matchQuantity;
+                
+                if (sell.remainingQuantity === 0) {
+                    sell.status = ORDER_STATUS.FILLED;
+                } else {
+                    sell.status = ORDER_STATUS.PARTIAL;
+                }
+                
+                matchedOrders.push({
+                    orderId: sell.id,
+                    userId: sell.userId,
+                    price: matchPrice,
+                    quantity: matchQuantity,
+                    total: matchTotal,
+                    isNPC: sell.isNPC
+                });
+                
+                // Save updated sell order
+                if (!sell.isNPC) {
+                    await saveUserOrder(sell);
+                }
+            }
+            
+            if (filledQuantity === 0) {
+                throw new Error('No sellers available');
+            }
+            
+            const fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
+            const orderStatus = remainingToBuy === 0 ? ORDER_STATUS.FILLED : ORDER_STATUS.PARTIAL;
+            
+            // Update order
+            order.status = orderStatus;
+            order.filledQuantity = filledQuantity;
+            order.remainingQuantity = remainingToBuy;
+            order.executionPrice = lastExecutionPrice;
+            order.fee = fee;
+            order.executedAt = Date.now();
+            order.matchedOrders = matchedOrders;
+            
+            // Create trade record
+            const trade = {
+                id: generateTradeId(),
+                orderId: order.id,
+                userId: order.userId,
+                playerName: order.playerName,
+                element: order.element,
+                side: order.side,
+                quantity: filledQuantity,
+                price: totalCost / filledQuantity, // Average price
+                total: totalCost,
+                fee: fee,
+                timestamp: Date.now(),
+                isNPC: order.isNPC,
+                matchedOrders: matchedOrders
+            };
+            
+            recordTrade(order.element, filledQuantity, order.side);
+            await addToMatchedTrades(trade);
+            await recordOrderHistory(order, orderStatus === ORDER_STATUS.FILLED ? 'filled' : 'partial');
+            
+            if (!order.isNPC) {
+                await saveUserOrder(order);
+            }
+            
+            await updateMarketStats(filledQuantity, totalCost);
+            
+            // Save updated order books
+            await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
+            await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+            await reloadOrderCache();
+            
+            return { 
+                success: true, 
+                order,
+                trade,
+                executionPrice: lastExecutionPrice,
+                averagePrice: totalCost / filledQuantity,
+                totalCost,
+                fee,
+                filledQuantity,
+                remainingQuantity: remainingToBuy,
+                partiallyFilled: remainingToBuy > 0
+            };
+            
+        // ===== SELL MARKET ORDER =====
+        // Finds the best BID orders (buy orders) and fills against them
         } else {
-            executionPrice = elementPrice.bid || elementPrice.current * 0.99;
-            executionPrice = Number(executionPrice);
-            if (isNaN(executionPrice) || executionPrice <= 0) {
-                executionPrice = elementPrice.current || 100;
+            const buyOrders = buyOrdersCache[order.element] || [];
+            const activeBuys = buyOrders.filter(o => 
+                o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
+            ).sort((a, b) => b.price - a.price); // Sort by price descending (highest bid first)
+            
+            if (activeBuys.length === 0) {
+                throw new Error('No buyers available at this time');
             }
-            totalCost = quantity * executionPrice;
-            fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
+            
+            let remainingToSell = quantity;
+            let totalReceived = 0;
+            let filledQuantity = 0;
+            let lastExecutionPrice = activeBuys[0].price;
+            const matchedOrders = [];
+            
+            // Fill against available buy orders
+            for (let i = 0; i < activeBuys.length && remainingToSell > 0; i++) {
+                const buy = activeBuys[i];
+                const matchQuantity = Math.min(remainingToSell, buy.remainingQuantity);
+                const matchPrice = buy.price;
+                const matchTotal = matchQuantity * matchPrice;
+                
+                totalReceived += matchTotal;
+                remainingToSell -= matchQuantity;
+                filledQuantity += matchQuantity;
+                lastExecutionPrice = matchPrice;
+                
+                // Update the buy order
+                buy.filledQuantity += matchQuantity;
+                buy.remainingQuantity -= matchQuantity;
+                
+                if (buy.remainingQuantity === 0) {
+                    buy.status = ORDER_STATUS.FILLED;
+                } else {
+                    buy.status = ORDER_STATUS.PARTIAL;
+                }
+                
+                matchedOrders.push({
+                    orderId: buy.id,
+                    userId: buy.userId,
+                    price: matchPrice,
+                    quantity: matchQuantity,
+                    total: matchTotal,
+                    isNPC: buy.isNPC
+                });
+                
+                // Save updated buy order
+                if (!buy.isNPC) {
+                    await saveUserOrder(buy);
+                }
+            }
+            
+            if (filledQuantity === 0) {
+                throw new Error('No buyers available');
+            }
+            
+            const fee = totalReceived * ENGINE_CONFIG.FEE_PERCENT;
+            const netReceived = totalReceived - fee;
+            const orderStatus = remainingToSell === 0 ? ORDER_STATUS.FILLED : ORDER_STATUS.PARTIAL;
+            
+            // Update order
+            order.status = orderStatus;
+            order.filledQuantity = filledQuantity;
+            order.remainingQuantity = remainingToSell;
+            order.executionPrice = lastExecutionPrice;
+            order.fee = fee;
+            order.netReceived = netReceived;
+            order.executedAt = Date.now();
+            order.matchedOrders = matchedOrders;
+            
+            // Create trade record
+            const trade = {
+                id: generateTradeId(),
+                orderId: order.id,
+                userId: order.userId,
+                playerName: order.playerName,
+                element: order.element,
+                side: order.side,
+                quantity: filledQuantity,
+                price: totalReceived / filledQuantity, // Average price
+                total: totalReceived,
+                fee: fee,
+                netReceived: netReceived,
+                timestamp: Date.now(),
+                isNPC: order.isNPC,
+                matchedOrders: matchedOrders
+            };
+            
+            recordTrade(order.element, filledQuantity, order.side);
+            await addToMatchedTrades(trade);
+            await recordOrderHistory(order, orderStatus === ORDER_STATUS.FILLED ? 'filled' : 'partial');
+            
+            if (!order.isNPC) {
+                await saveUserOrder(order);
+            }
+            
+            await updateMarketStats(filledQuantity, totalReceived);
+            
+            // Save updated order books
+            await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
+            await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+            await reloadOrderCache();
+            
+            return { 
+                success: true, 
+                order,
+                trade,
+                executionPrice: lastExecutionPrice,
+                averagePrice: totalReceived / filledQuantity,
+                totalReceived,
+                fee,
+                netReceived,
+                filledQuantity,
+                remainingQuantity: remainingToSell,
+                partiallyFilled: remainingToSell > 0
+            };
         }
-        
-        if (isNaN(totalCost) || totalCost <= 0) {
-            totalCost = quantity * (executionPrice || 100);
-        }
-        
-        order.status = ORDER_STATUS.FILLED;
-        order.filledQuantity = quantity;
-        order.remainingQuantity = 0;
-        order.executionPrice = executionPrice;
-        order.fee = fee;
-        order.executedAt = Date.now();
-        
-        const trade = {
-            id: generateTradeId(),
-            orderId: order.id,
-            userId: order.userId,
-            playerName: order.playerName,
-            element: order.element,
-            side: order.side,
-            quantity: quantity,
-            price: executionPrice,
-            total: totalCost,
-            fee: fee,
-            timestamp: Date.now(),
-            isNPC: order.isNPC
-        };
-        
-        recordTrade(order.element, quantity, order.side);
-        await addToMatchedTrades(trade);
-        await recordOrderHistory(order, 'filled');
-        
-        if (!order.isNPC) {
-            await saveUserOrder(order);
-        }
-        
-        await updateMarketStats(quantity, totalCost);
-        
-        const volume24h = getVolumeLast24h(order.element);
-        if (quantity > volume24h * 0.01) {
-            await applyPriceImpact(order.element, quantity, order.side);
-        }
-        
-        return { 
-            success: true, 
-            order,
-            trade,
-            executionPrice,
-            totalCost,
-            fee
-        };
         
     } catch (error) {
         console.error('Error executing market order:', error);
@@ -580,6 +738,10 @@ export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_
     const spread = bestBid && bestAsk ? bestAsk - bestBid : null;
     const spreadPercent = spread && bestBid ? (spread / bestBid) * 100 : null;
     
+    // Calculate total liquidity
+    const totalBuyLiquidity = allBuys.reduce((sum, o) => sum + o.remainingQuantity, 0);
+    const totalSellLiquidity = allSells.reduce((sum, o) => sum + o.remainingQuantity, 0);
+    
     return {
         element,
         bids,
@@ -590,6 +752,8 @@ export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_
         spreadPercent,
         playerCount: playerBuys.length + playerSells.length,
         npcCount: npcBuys.length + npcSells.length,
+        totalBuyLiquidity,
+        totalSellLiquidity,
         timestamp: Date.now()
     };
 }
@@ -1008,4 +1172,4 @@ window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - IndexedDB version ready');
+console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix');
