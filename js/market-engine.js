@@ -1,8 +1,7 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
 // UPDATED: Converted to use IndexedDB instead of localStorage for permanent storage
-// UPDATED: All functions now async for IndexedDB compatibility
-// UPDATED: Integrated with db.js market stores
+// UPDATED: Fixed cache reload after adding orders so UI displays new orders immediately
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -58,17 +57,6 @@ const ENGINE_CONFIG = {
     CLEANUP_ON_LOAD: true
 };
 
-// ===== STORAGE KEYS (for localStorage fallback only) =====
-
-const STORAGE_KEYS = {
-    BUY_ORDERS: 'voidfarer_market_buy_orders',
-    SELL_ORDERS: 'voidfarer_market_sell_orders',
-    ORDER_HISTORY: 'voidfarer_order_history',
-    USER_ORDERS: 'voidfarer_user_orders',
-    MATCHED_TRADES: 'voidfarer_matched_trades',
-    MARKET_STATS: 'voidfarer_market_stats'
-};
-
 // ===== ORDER TYPES =====
 
 export const ORDER_TYPES = {
@@ -103,6 +91,34 @@ let sellOrdersCache = {};
 let userOrdersCache = {};
 let matchedTradesCache = [];
 let marketStatsCache = {};
+
+// ===== HELPER FUNCTIONS =====
+
+/**
+ * Reload cache from IndexedDB - Call this after any order change
+ */
+async function reloadOrderCache() {
+    try {
+        const buyOrders = await dbLoadMarketOrders('buy_orders');
+        const sellOrders = await dbLoadMarketOrders('sell_orders');
+        
+        if (buyOrders && typeof buyOrders === 'object') {
+            buyOrdersCache = buyOrders;
+        } else {
+            buyOrdersCache = {};
+        }
+        
+        if (sellOrders && typeof sellOrders === 'object') {
+            sellOrdersCache = sellOrders;
+        } else {
+            sellOrdersCache = {};
+        }
+        
+        console.log('🔄 Order cache reloaded');
+    } catch (error) {
+        console.error('Error reloading cache:', error);
+    }
+}
 
 // ===== INITIALIZATION =====
 
@@ -374,6 +390,9 @@ async function addToOrderBook(order) {
     await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
     await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
     
+    // ===== CRITICAL FIX: Reload cache after saving =====
+    await reloadOrderCache();
+    
     // Attempt to match orders
     await matchOrders(order.element);
 }
@@ -508,6 +527,9 @@ async function matchOrders(element) {
         
         await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
         await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+        
+        // Reload cache after match
+        await reloadOrderCache();
     }
 }
 
@@ -573,6 +595,7 @@ async function checkStopOrders(element, currentPrice) {
  * @returns {Promise<Object>} Order book with bids and asks
  */
 export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
+    // Read directly from cache (which should be fresh)
     const playerBuys = (buyOrdersCache[element] || [])
         .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL);
     
@@ -844,6 +867,7 @@ export async function cancelOrder(userId, orderId) {
         if (cancelled && order) {
             await saveUserOrder(order);
             await recordOrderHistory(order, 'cancelled');
+            await reloadOrderCache();
             return { success: true, order };
         } else {
             return { success: false, error: 'Order not found' };
