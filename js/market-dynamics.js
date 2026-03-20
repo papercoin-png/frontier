@@ -1,6 +1,7 @@
 // js/market-dynamics.js - Dynamic market pricing and element trading for Voidfarer
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 // OPTIMIZED: Cleaned up code, removed redundancies, improved performance
+// FIXED: Added storage limits and error handling for supply/demand indices
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -17,7 +18,12 @@ const MARKET_CONFIG = {
     DEFAULT_TRANSACTION_FEE: 0.02,
     SUPPLY_DEMAND_FACTOR: 0.1,
     VOLUME_DECAY: 0.95,
-    SPREAD_PERCENT: 0.02 // 2% bid-ask spread
+    SPREAD_PERCENT: 0.02, // 2% bid-ask spread
+    // NEW: Storage optimization limits
+    MAX_SUPPLY_DEMAND_VALUE: 10000, // Cap individual values
+    MAX_SUPPLY_DEMAND_ENTRIES: 200, // Max number of elements tracked
+    MAX_HISTORY_AGE_DAYS: 30, // Keep only 30 days of history
+    MAX_VOLUME_HISTORY_DAYS: 30 // Keep volume data for 30 days
 };
 
 const STORAGE_KEYS = {
@@ -100,6 +106,9 @@ export function initializeMarket() {
         localStorage.setItem(STORAGE_KEYS.LAST_UPDATE, Date.now().toString());
         
         console.log('✅ Market initialized with chemical elements only');
+    } else {
+        // Run cleanup on existing data to prevent future issues
+        cleanupOldMarketData();
     }
 }
 
@@ -341,11 +350,11 @@ export function getVolumeLast24h(elementName) {
  */
 function decayVolumeData() {
     const volume = getMarketVolume();
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const cutoffDate = Date.now() - (MARKET_CONFIG.MAX_VOLUME_HISTORY_DAYS * 24 * 60 * 60 * 1000);
     
     Object.keys(volume).forEach(elementName => {
         Object.keys(volume[elementName]).forEach(date => {
-            if (new Date(date).getTime() < thirtyDaysAgo) {
+            if (new Date(date).getTime() < cutoffDate) {
                 delete volume[elementName][date];
             }
         });
@@ -358,47 +367,215 @@ function decayVolumeData() {
     localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
 }
 
-// ===== SUPPLY/DEMAND INDICES =====
+// ===== SUPPLY/DEMAND INDICES - OPTIMIZED WITH STORAGE LIMITS =====
 
 /**
- * Update supply/demand indices
+ * Update supply/demand indices with storage limits and error handling
+ * FIXED: Added capping, entry limits, and fallback mechanisms
  */
 function updateSupplyDemand(elementName, quantity, type) {
-    const supply = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX) || '{}');
-    const demand = JSON.parse(localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX) || '{}');
-    
-    if (type === 'buy') {
-        demand[elementName] = (demand[elementName] || 0) + quantity;
-    } else {
-        supply[elementName] = (supply[elementName] || 0) + quantity;
-    }
-    
-    // Decay old values
-    [supply, demand].forEach(index => {
-        Object.keys(index).forEach(key => {
-            index[key] *= MARKET_CONFIG.VOLUME_DECAY;
-            if (index[key] < 1) delete index[key];
+    try {
+        // Use a more efficient storage format - store as numbers only
+        let supply = {};
+        let demand = {};
+        
+        // Try to load existing data with error handling
+        try {
+            const supplyStr = localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX);
+            const demandStr = localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX);
+            
+            if (supplyStr) {
+                try {
+                    supply = JSON.parse(supplyStr);
+                    // Ensure it's an object
+                    if (typeof supply !== 'object' || supply === null) supply = {};
+                } catch (e) {
+                    console.warn('Corrupted supply data, resetting...');
+                    supply = {};
+                }
+            }
+            
+            if (demandStr) {
+                try {
+                    demand = JSON.parse(demandStr);
+                    // Ensure it's an object
+                    if (typeof demand !== 'object' || demand === null) demand = {};
+                } catch (e) {
+                    console.warn('Corrupted demand data, resetting...');
+                    demand = {};
+                }
+            }
+        } catch (e) {
+            console.warn('Error loading supply/demand data, resetting...');
+            supply = {};
+            demand = {};
+        }
+        
+        // Update the specific element
+        if (type === 'buy') {
+            demand[elementName] = (demand[elementName] || 0) + quantity;
+        } else {
+            supply[elementName] = (supply[elementName] || 0) + quantity;
+        }
+        
+        // Apply decay and clean up in one pass
+        [supply, demand].forEach(index => {
+            Object.keys(index).forEach(key => {
+                // Apply decay
+                index[key] = Math.floor(index[key] * MARKET_CONFIG.VOLUME_DECAY);
+                
+                // Remove tiny values
+                if (index[key] < 1) {
+                    delete index[key];
+                    return;
+                }
+                
+                // Cap maximum value to prevent overflow
+                if (index[key] > MARKET_CONFIG.MAX_SUPPLY_DEMAND_VALUE) {
+                    index[key] = MARKET_CONFIG.MAX_SUPPLY_DEMAND_VALUE;
+                }
+            });
         });
-    });
-    
-    localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify(supply));
-    localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify(demand));
+        
+        // Limit total number of entries (keep only most active elements)
+        [supply, demand].forEach(index => {
+            const entries = Object.entries(index);
+            if (entries.length > MARKET_CONFIG.MAX_SUPPLY_DEMAND_ENTRIES) {
+                // Sort by value and keep highest
+                const sorted = entries.sort((a, b) => b[1] - a[1]);
+                const limited = Object.fromEntries(sorted.slice(0, MARKET_CONFIG.MAX_SUPPLY_DEMAND_ENTRIES));
+                // Clear and reassign
+                Object.keys(index).forEach(key => delete index[key]);
+                Object.assign(index, limited);
+            }
+        });
+        
+        // Store with error handling and fallback
+        try {
+            localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify(supply));
+            localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify(demand));
+        } catch (e) {
+            // If quota exceeded, store minimal version
+            console.warn('Storage quota exceeded for supply/demand, storing minimal version...');
+            
+            // Keep only top 50 entries for each
+            const minimalSupply = Object.fromEntries(
+                Object.entries(supply)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 50)
+            );
+            
+            const minimalDemand = Object.fromEntries(
+                Object.entries(demand)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 50)
+            );
+            
+            try {
+                localStorage.setItem(STORAGE_KEYS.SUPPLY_INDEX, JSON.stringify(minimalSupply));
+                localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify(minimalDemand));
+            } catch (e2) {
+                // If still failing, clear old data entirely
+                console.warn('Storage still full, clearing old supply/demand data...');
+                localStorage.removeItem(STORAGE_KEYS.SUPPLY_INDEX);
+                localStorage.removeItem(STORAGE_KEYS.DEMAND_INDEX);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error in updateSupplyDemand:', error);
+        // Don't let errors propagate - trading should continue
+    }
 }
 
 /**
  * Get supply index for an element
  */
 export function getSupplyIndex(elementName) {
-    const supply = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX) || '{}');
-    return supply[elementName] || 0;
+    try {
+        const supply = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUPPLY_INDEX) || '{}');
+        return supply[elementName] || 0;
+    } catch (e) {
+        return 0;
+    }
 }
 
 /**
  * Get demand index for an element
  */
 export function getDemandIndex(elementName) {
-    const demand = JSON.parse(localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX) || '{}');
-    return demand[elementName] || 0;
+    try {
+        const demand = JSON.parse(localStorage.getItem(STORAGE_KEYS.DEMAND_INDEX) || '{}');
+        return demand[elementName] || 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+/**
+ * Clean up old market data to prevent storage issues
+ * Call this periodically or on initialization
+ */
+export function cleanupOldMarketData() {
+    console.log('🧹 Running market data cleanup...');
+    
+    try {
+        // Clean supply/demand indices
+        [STORAGE_KEYS.SUPPLY_INDEX, STORAGE_KEYS.DEMAND_INDEX].forEach(key => {
+            try {
+                const data = JSON.parse(localStorage.getItem(key) || '{}');
+                if (typeof data === 'object' && data !== null) {
+                    // Apply strong decay to old data
+                    Object.keys(data).forEach(element => {
+                        data[element] = Math.floor(data[element] * 0.5); // 50% decay
+                        if (data[element] < 1) {
+                            delete data[element];
+                        }
+                    });
+                    
+                    // Limit entries
+                    const entries = Object.entries(data);
+                    if (entries.length > 100) {
+                        const sorted = entries.sort((a, b) => b[1] - a[1]);
+                        const limited = Object.fromEntries(sorted.slice(0, 100));
+                        localStorage.setItem(key, JSON.stringify(limited));
+                    } else {
+                        localStorage.setItem(key, JSON.stringify(data));
+                    }
+                }
+            } catch (e) {
+                // If corrupted, just remove it
+                localStorage.removeItem(key);
+            }
+        });
+        
+        // Clean price history - keep only last 90 days
+        try {
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
+            const cutoff = Date.now() - (90 * 24 * 60 * 60 * 1000);
+            let changed = false;
+            
+            Object.keys(history).forEach(element => {
+                if (Array.isArray(history[element])) {
+                    const originalLength = history[element].length;
+                    history[element] = history[element].filter(h => h.timestamp >= cutoff);
+                    if (history[element].length !== originalLength) changed = true;
+                }
+            });
+            
+            if (changed) {
+                localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
+            }
+        } catch (e) {
+            // If corrupted, remove it
+            localStorage.removeItem(STORAGE_KEYS.PRICE_HISTORY);
+        }
+        
+        console.log('✅ Market data cleanup complete');
+        
+    } catch (error) {
+        console.error('Error during market data cleanup:', error);
+    }
 }
 
 // ===== MARKET LISTINGS =====
@@ -543,34 +720,7 @@ export function getBuyRecommendation(elementName) {
     };
 }
 
-// ===== EXPORTS =====
-
-export default {
-    MARKET_CONFIG,
-    initializeMarket,
-    updatePrices,
-    getCurrentPrices,
-    getElementPrice,
-    getBidPrice,
-    getAskPrice,
-    getPriceHistory,
-    getMarketVolume,
-    recordTrade,
-    getVolumeLast24h,
-    getSupplyIndex,
-    getDemandIndex,
-    getAvailableElements,
-    getElementsByRarityWithPrices: getElementsByRarity,
-    canAffordBuy: (elementName, quantity, credits) => credits >= (getAskPrice(elementName) * quantity),
-    hasEnoughToSell: (elementName, quantity, amount) => amount >= quantity,
-    setPriceAlert,
-    checkPriceAlerts,
-    getMarketSummary,
-    getMostActiveElements,
-    getBuyRecommendation
-};
-
-// ===== PRICE ALERTS (moved to end for clarity) =====
+// ===== PRICE ALERTS =====
 
 export function setPriceAlert(playerId, elementName, type, targetPrice) {
     try {
@@ -622,6 +772,34 @@ export function checkPriceAlerts(playerId) {
     }
 }
 
+// ===== EXPORTS =====
+
+export default {
+    MARKET_CONFIG,
+    initializeMarket,
+    updatePrices,
+    getCurrentPrices,
+    getElementPrice,
+    getBidPrice,
+    getAskPrice,
+    getPriceHistory,
+    getMarketVolume,
+    recordTrade,
+    getVolumeLast24h,
+    getSupplyIndex,
+    getDemandIndex,
+    getAvailableElements,
+    getElementsByRarityWithPrices: getElementsByRarity,
+    canAffordBuy: (elementName, quantity, credits) => credits >= (getAskPrice(elementName) * quantity),
+    hasEnoughToSell: (elementName, quantity, amount) => amount >= quantity,
+    setPriceAlert,
+    checkPriceAlerts,
+    getMarketSummary,
+    getMostActiveElements,
+    getBuyRecommendation,
+    cleanupOldMarketData
+};
+
 // Initialize on load
 initializeMarket();
 
@@ -631,5 +809,6 @@ window.getCurrentPrices = getCurrentPrices;
 window.getBidPrice = getBidPrice;
 window.getAskPrice = getAskPrice;
 window.getAvailableElements = getAvailableElements;
+window.cleanupOldMarketData = cleanupOldMarketData;
 
-console.log('✅ market-dynamics.js loaded - Optimized market system ready');
+console.log('✅ market-dynamics.js loaded - Optimized market system ready with storage limits');
