@@ -1,7 +1,7 @@
 // js/market-dynamics.js - Dynamic market pricing and element trading for Voidfarer
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 // OPTIMIZED: Cleaned up code, removed redundancies, improved performance
-// FIXED: Added storage limits and error handling for supply/demand indices
+// FIXED: Added storage limits and error handling for supply/demand indices AND price history
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -12,18 +12,28 @@ const MARKET_CONFIG = {
     EVENT_VOLATILITY: 0.15,
     TREND_STRENGTH: 0.7,
     UPDATE_INTERVAL: 3600000, // 1 hour
-    MAX_PRICE_HISTORY: 90,
     MIN_PRICE_MULTIPLIER: 0.3,
     MAX_PRICE_MULTIPLIER: 3.0,
     DEFAULT_TRANSACTION_FEE: 0.02,
     SUPPLY_DEMAND_FACTOR: 0.1,
     VOLUME_DECAY: 0.95,
     SPREAD_PERCENT: 0.02, // 2% bid-ask spread
-    // NEW: Storage optimization limits
+    
+    // ===== STORAGE OPTIMIZATION SETTINGS =====
+    // Price history - REDUCED to prevent quota issues
+    MAX_PRICE_HISTORY_PER_ELEMENT: 30, // Reduced from 90 to 30
+    MAX_HISTORY_AGE_DAYS: 7, // Only keep last 7 days of history
+    
+    // Supply/demand - limits to prevent growth
     MAX_SUPPLY_DEMAND_VALUE: 10000, // Cap individual values
     MAX_SUPPLY_DEMAND_ENTRIES: 200, // Max number of elements tracked
-    MAX_HISTORY_AGE_DAYS: 30, // Keep only 30 days of history
-    MAX_VOLUME_HISTORY_DAYS: 30 // Keep volume data for 30 days
+    
+    // Volume history
+    MAX_VOLUME_HISTORY_DAYS: 7, // Only keep 7 days of volume data
+    
+    // Cleanup settings
+    ENABLE_AUTO_CLEANUP: true, // Run cleanup on initialization
+    CLEANUP_ON_STARTUP: true // Run cleanup when file loads
 };
 
 const STORAGE_KEYS = {
@@ -108,7 +118,9 @@ export function initializeMarket() {
         console.log('✅ Market initialized with chemical elements only');
     } else {
         // Run cleanup on existing data to prevent future issues
-        cleanupOldMarketData();
+        if (MARKET_CONFIG.CLEANUP_ON_STARTUP) {
+            cleanupOldMarketData();
+        }
     }
 }
 
@@ -230,7 +242,12 @@ export function updatePrices(activeEvents = []) {
             strength: Math.abs(trend.shortTerm) / 10
         };
         
-        addToPriceHistory(elementName, newPrice, priceData.volume24h, now);
+        // Add to price history with error handling
+        try {
+            addToPriceHistory(elementName, newPrice, priceData.volume24h, now);
+        } catch (e) {
+            console.warn(`Failed to add price history for ${elementName}, skipping...`);
+        }
     });
     
     decayVolumeData();
@@ -260,111 +277,207 @@ function calculateEventEffects(events) {
     return effects;
 }
 
+// ===== PRICE HISTORY - OPTIMIZED WITH STORAGE LIMITS =====
+
 /**
- * Add price to history
+ * Add price to history with storage limits and error handling
+ * FIXED: Added capping, size limits, and fallback mechanisms
  */
 function addToPriceHistory(elementName, price, volume, timestamp) {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
-    
-    if (!history[elementName]) {
-        history[elementName] = [];
+    try {
+        // Load history with error handling
+        let history = {};
+        try {
+            const historyStr = localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY);
+            if (historyStr) {
+                history = JSON.parse(historyStr);
+                // Ensure it's an object
+                if (typeof history !== 'object' || history === null) {
+                    history = {};
+                }
+            }
+        } catch (e) {
+            console.warn('Corrupted price history, resetting...');
+            history = {};
+        }
+        
+        // Initialize array for this element if needed
+        if (!history[elementName]) {
+            history[elementName] = [];
+        }
+        
+        // Add new entry
+        history[elementName].push({
+            price: Math.round(price),
+            bid: Math.floor(price * 0.99),
+            ask: Math.ceil(price * 1.01),
+            volume,
+            timestamp,
+            date: new Date(timestamp).toISOString()
+        });
+        
+        // Apply age-based filtering first (keep only last X days)
+        const cutoffTime = Date.now() - (MARKET_CONFIG.MAX_HISTORY_AGE_DAYS * 24 * 60 * 60 * 1000);
+        history[elementName] = history[elementName].filter(h => h.timestamp >= cutoffTime);
+        
+        // Then apply count limit (keep only last N entries)
+        if (history[elementName].length > MARKET_CONFIG.MAX_PRICE_HISTORY_PER_ELEMENT) {
+            // Keep the most recent entries
+            history[elementName] = history[elementName].slice(-MARKET_CONFIG.MAX_PRICE_HISTORY_PER_ELEMENT);
+        }
+        
+        // Optional: Downsample if still too many (keep every other entry)
+        if (history[elementName].length > MARKET_CONFIG.MAX_PRICE_HISTORY_PER_ELEMENT * 0.8) {
+            // Keep only every other entry to reduce size
+            const downsampled = [];
+            for (let i = 0; i < history[elementName].length; i += 2) {
+                downsampled.push(history[elementName][i]);
+            }
+            history[elementName] = downsampled;
+        }
+        
+        // Save with error handling
+        try {
+            localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
+        } catch (e) {
+            // If quota exceeded, try more aggressive cleanup
+            console.warn('Storage quota exceeded for price history, performing emergency cleanup...');
+            
+            // More aggressive: keep only last 10 entries per element
+            Object.keys(history).forEach(key => {
+                if (Array.isArray(history[key])) {
+                    history[key] = history[key].slice(-10);
+                }
+            });
+            
+            try {
+                localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
+            } catch (e2) {
+                // If still failing, clear completely
+                console.warn('Emergency: Clearing price history entirely');
+                localStorage.removeItem(STORAGE_KEYS.PRICE_HISTORY);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error in addToPriceHistory:', error);
+        // Don't let errors propagate - trading should continue
     }
-    
-    history[elementName].push({
-        price: Math.round(price),
-        bid: Math.floor(price * 0.99),
-        ask: Math.ceil(price * 1.01),
-        volume,
-        timestamp,
-        date: new Date(timestamp).toISOString()
-    });
-    
-    // Keep only last MAX_PRICE_HISTORY entries
-    if (history[elementName].length > MARKET_CONFIG.MAX_PRICE_HISTORY) {
-        history[elementName].shift();
-    }
-    
-    localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
 }
 
 /**
  * Get price history for an element
  */
-export function getPriceHistory(elementName, days = 30) {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
-    const elementHistory = history[elementName] || [];
-    const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
-    
-    return elementHistory.filter(h => h.timestamp >= cutoff);
+export function getPriceHistory(elementName, days = 7) {
+    try {
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
+        const elementHistory = history[elementName] || [];
+        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+        
+        return elementHistory.filter(h => h.timestamp >= cutoff);
+    } catch (error) {
+        console.error('Error getting price history:', error);
+        return [];
+    }
 }
 
-// ===== VOLUME TRACKING =====
+// ===== VOLUME TRACKING - OPTIMIZED =====
 
 /**
  * Get market volume data
  */
 export function getMarketVolume() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME) || '{}');
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME) || '{}');
+    } catch (e) {
+        return {};
+    }
 }
 
 /**
  * Record a trade
  */
 export function recordTrade(elementName, quantity, type) {
-    const volume = getMarketVolume();
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (!volume[elementName]) volume[elementName] = {};
-    if (!volume[elementName][today]) {
-        volume[elementName][today] = { buy: 0, sell: 0, total: 0 };
+    try {
+        const volume = getMarketVolume();
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (!volume[elementName]) volume[elementName] = {};
+        if (!volume[elementName][today]) {
+            volume[elementName][today] = { buy: 0, sell: 0, total: 0 };
+        }
+        
+        volume[elementName][today][type] += quantity;
+        volume[elementName][today].total += quantity;
+        
+        localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
+        
+        // Update supply/demand
+        try {
+            updateSupplyDemand(elementName, quantity, type);
+        } catch (e) {
+            console.warn('Failed to update supply/demand:', e);
+        }
+        
+    } catch (error) {
+        console.error('Error recording trade:', error);
     }
-    
-    volume[elementName][today][type] += quantity;
-    volume[elementName][today].total += quantity;
-    
-    localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
-    updateSupplyDemand(elementName, quantity, type);
 }
 
 /**
  * Get volume for last 24 hours
  */
 export function getVolumeLast24h(elementName) {
-    const volume = getMarketVolume();
-    if (!volume[elementName]) return 0;
-    
-    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    let total = 0;
-    
-    Object.entries(volume[elementName]).forEach(([date, data]) => {
-        if (new Date(date).getTime() >= oneDayAgo) {
-            total += data.total || 0;
-        }
-    });
-    
-    return total;
-}
-
-/**
- * Decay old volume data
- */
-function decayVolumeData() {
-    const volume = getMarketVolume();
-    const cutoffDate = Date.now() - (MARKET_CONFIG.MAX_VOLUME_HISTORY_DAYS * 24 * 60 * 60 * 1000);
-    
-    Object.keys(volume).forEach(elementName => {
-        Object.keys(volume[elementName]).forEach(date => {
-            if (new Date(date).getTime() < cutoffDate) {
-                delete volume[elementName][date];
+    try {
+        const volume = getMarketVolume();
+        if (!volume[elementName]) return 0;
+        
+        const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+        let total = 0;
+        
+        Object.entries(volume[elementName]).forEach(([date, data]) => {
+            if (new Date(date).getTime() >= oneDayAgo) {
+                total += data.total || 0;
             }
         });
         
-        if (Object.keys(volume[elementName]).length === 0) {
-            delete volume[elementName];
+        return total;
+    } catch (e) {
+        return 0;
+    }
+}
+
+/**
+ * Decay old volume data - keep only recent data
+ */
+function decayVolumeData() {
+    try {
+        const volume = getMarketVolume();
+        const cutoffDate = Date.now() - (MARKET_CONFIG.MAX_VOLUME_HISTORY_DAYS * 24 * 60 * 60 * 1000);
+        let changed = false;
+        
+        Object.keys(volume).forEach(elementName => {
+            if (volume[elementName] && typeof volume[elementName] === 'object') {
+                Object.keys(volume[elementName]).forEach(date => {
+                    if (new Date(date).getTime() < cutoffDate) {
+                        delete volume[elementName][date];
+                        changed = true;
+                    }
+                });
+                
+                if (Object.keys(volume[elementName]).length === 0) {
+                    delete volume[elementName];
+                    changed = true;
+                }
+            }
+        });
+        
+        if (changed) {
+            localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
         }
-    });
-    
-    localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
+    } catch (error) {
+        console.error('Error decaying volume data:', error);
+    }
 }
 
 // ===== SUPPLY/DEMAND INDICES - OPTIMIZED WITH STORAGE LIMITS =====
@@ -512,24 +625,76 @@ export function getDemandIndex(elementName) {
     }
 }
 
+// ===== COMPREHENSIVE MARKET DATA CLEANUP =====
+
 /**
- * Clean up old market data to prevent storage issues
+ * Clean up all old market data to prevent storage issues
  * Call this periodically or on initialization
  */
 export function cleanupOldMarketData() {
     console.log('🧹 Running market data cleanup...');
+    let cleanupCount = 0;
     
     try {
-        // Clean supply/demand indices
+        // 1. Clean PRICE HISTORY
+        try {
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
+            if (typeof history === 'object' && history !== null) {
+                const cutoffTime = Date.now() - (MARKET_CONFIG.MAX_HISTORY_AGE_DAYS * 24 * 60 * 60 * 1000);
+                let changed = false;
+                
+                Object.keys(history).forEach(element => {
+                    if (Array.isArray(history[element])) {
+                        const originalLength = history[element].length;
+                        
+                        // Filter by age
+                        history[element] = history[element].filter(h => h.timestamp >= cutoffTime);
+                        
+                        // Then limit by count
+                        if (history[element].length > MARKET_CONFIG.MAX_PRICE_HISTORY_PER_ELEMENT) {
+                            history[element] = history[element].slice(-MARKET_CONFIG.MAX_PRICE_HISTORY_PER_ELEMENT);
+                        }
+                        
+                        if (history[element].length !== originalLength) {
+                            changed = true;
+                            cleanupCount += (originalLength - history[element].length);
+                        }
+                        
+                        // Remove empty arrays
+                        if (history[element].length === 0) {
+                            delete history[element];
+                            changed = true;
+                        }
+                    }
+                });
+                
+                if (changed) {
+                    localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
+                    console.log(`🧹 Price history: ${cleanupCount} old records removed`);
+                }
+            }
+        } catch (e) {
+            // If corrupted, remove it
+            console.warn('Corrupted price history, removing...');
+            localStorage.removeItem(STORAGE_KEYS.PRICE_HISTORY);
+        }
+        
+        // 2. Clean SUPPLY/DEMAND indices
         [STORAGE_KEYS.SUPPLY_INDEX, STORAGE_KEYS.DEMAND_INDEX].forEach(key => {
             try {
                 const data = JSON.parse(localStorage.getItem(key) || '{}');
                 if (typeof data === 'object' && data !== null) {
+                    let changed = false;
+                    
                     // Apply strong decay to old data
                     Object.keys(data).forEach(element => {
-                        data[element] = Math.floor(data[element] * 0.5); // 50% decay
+                        const oldValue = data[element];
+                        data[element] = Math.floor(data[element] * 0.8); // 20% decay
                         if (data[element] < 1) {
                             delete data[element];
+                            changed = true;
+                        } else if (data[element] !== oldValue) {
+                            changed = true;
                         }
                     });
                     
@@ -539,7 +704,8 @@ export function cleanupOldMarketData() {
                         const sorted = entries.sort((a, b) => b[1] - a[1]);
                         const limited = Object.fromEntries(sorted.slice(0, 100));
                         localStorage.setItem(key, JSON.stringify(limited));
-                    } else {
+                        changed = true;
+                    } else if (changed) {
                         localStorage.setItem(key, JSON.stringify(data));
                     }
                 }
@@ -549,26 +715,33 @@ export function cleanupOldMarketData() {
             }
         });
         
-        // Clean price history - keep only last 90 days
+        // 3. Clean VOLUME data
         try {
-            const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.PRICE_HISTORY) || '{}');
-            const cutoff = Date.now() - (90 * 24 * 60 * 60 * 1000);
+            const volume = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME) || '{}');
+            const cutoffDate = Date.now() - (MARKET_CONFIG.MAX_VOLUME_HISTORY_DAYS * 24 * 60 * 60 * 1000);
             let changed = false;
             
-            Object.keys(history).forEach(element => {
-                if (Array.isArray(history[element])) {
-                    const originalLength = history[element].length;
-                    history[element] = history[element].filter(h => h.timestamp >= cutoff);
-                    if (history[element].length !== originalLength) changed = true;
+            Object.keys(volume).forEach(element => {
+                if (volume[element] && typeof volume[element] === 'object') {
+                    Object.keys(volume[element]).forEach(date => {
+                        if (new Date(date).getTime() < cutoffDate) {
+                            delete volume[element][date];
+                            changed = true;
+                        }
+                    });
+                    
+                    if (Object.keys(volume[element]).length === 0) {
+                        delete volume[element];
+                        changed = true;
+                    }
                 }
             });
             
             if (changed) {
-                localStorage.setItem(STORAGE_KEYS.PRICE_HISTORY, JSON.stringify(history));
+                localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volume));
             }
         } catch (e) {
-            // If corrupted, remove it
-            localStorage.removeItem(STORAGE_KEYS.PRICE_HISTORY);
+            localStorage.removeItem(STORAGE_KEYS.MARKET_VOLUME);
         }
         
         console.log('✅ Market data cleanup complete');
@@ -674,8 +847,8 @@ export function getMostActiveElements(limit = 5) {
  * Get buy recommendation based on price history
  */
 export function getBuyRecommendation(elementName) {
-    const history = getPriceHistory(elementName, 30);
-    if (history.length < 5) {
+    const history = getPriceHistory(elementName, 7); // Use 7 days instead of 30
+    if (history.length < 3) {
         return { recommendation: 'neutral', reason: 'Insufficient data', confidence: 0 };
     }
     
@@ -693,11 +866,11 @@ export function getBuyRecommendation(elementName) {
     if (position < 0.2) {
         recommendation = 'buy';
         confidence = Math.round((1 - position) * 100);
-        reason = 'Price near 30-day low';
+        reason = 'Price near 7-day low';
     } else if (position > 0.8) {
         recommendation = 'wait';
         confidence = Math.round(position * 100);
-        reason = 'Price near 30-day high';
+        reason = 'Price near 7-day high';
     }
     
     if (trend > 0 && recommendation === 'buy') {
