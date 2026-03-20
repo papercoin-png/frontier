@@ -1283,7 +1283,7 @@
         let sortColumn = 'element';
         let sortDirection = 'asc';
         
-        // ===== FIX: Use the actual player ID from localStorage =====
+        // Use the actual player ID from localStorage
         const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'main';
 
         // ===== HELPER FUNCTIONS =====
@@ -1345,7 +1345,7 @@
             }
         }
 
-        // ===== BALANCE FUNCTION - Uses correct player ID =====
+        // ===== BALANCE FUNCTION =====
         async function updateBalance() {
             try {
                 const credits = await getCredits(PLAYER_ID);
@@ -1673,7 +1673,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER =====
+        // ===== PLACE ORDER WITH DEBUG LOGGING =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1683,6 +1683,9 @@
             
             const total = executionPrice * orderQuantity;
             const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
+            
+            console.log(`📝 PLACING ORDER: ${orderSide} ${orderQuantity}x ${selectedElement.name} at ${executionPrice}⭐ (total: ${total})`);
+            console.log(`💰 Current credits: ${currentCredits}, Player ID: ${PLAYER_ID}`);
             
             if (orderQuantity <= 0) {
                 showToast('Invalid quantity', 'error');
@@ -1715,21 +1718,34 @@
                 const result = await createOrder(orderData);
                 
                 if (result.success && result.trade) {
+                    console.log(`✅ Order successful! Trade result:`, result);
+                    
                     if (orderSide === ORDER_SIDES.BUY) {
+                        console.log(`💰 Attempting to spend ${result.totalCost} credits from player ${PLAYER_ID}`);
                         const success = await spendCredits(result.totalCost, PLAYER_ID);
+                        console.log(`💰 spendCredits result: ${success}`);
+                        
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
-                            console.log(`💰 Credits after buy: ${currentCredits}`);
+                            console.log(`💰 New credits after buy: ${currentCredits}`);
+                        } else {
+                            console.error('❌ spendCredits failed!');
                         }
+                        
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
                             price: result.executionPrice
                         });
+                        console.log(`✅ Added ${orderQuantity}x ${selectedElement.name} to collection`);
+                        
                     } else {
+                        console.log(`💰 Attempting to add ${result.totalCost} credits from player ${PLAYER_ID}`);
                         const newTotal = await addCredits(result.totalCost, PLAYER_ID);
                         currentCredits = newTotal;
-                        console.log(`💰 Credits after sell: ${currentCredits}`);
+                        console.log(`💰 New credits after sell: ${currentCredits}`);
+                        
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
+                        console.log(`✅ Removed ${orderQuantity}x ${selectedElement.name} from collection`);
                     }
                     
                     await updateBalance();
@@ -1739,10 +1755,11 @@
                     showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
                     closeOrderModal();
                 } else {
+                    console.error('❌ Order failed:', result);
                     showToast(result.error || 'Order failed', 'error');
                 }
             } catch (error) {
-                console.error('Order error:', error);
+                console.error('❌ Order error:', error);
                 showToast('Error placing order', 'error');
             }
             
