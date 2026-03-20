@@ -3,6 +3,7 @@
 // FIXED: Market orders now execute against actual order book, not theoretical prices
 // FIXED: Unlimited selling exploit closed
 // FIXED: Proper partial fills and liquidity checks
+// FIXED: Return totalCost consistently for both buy and sell orders
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -479,13 +480,14 @@ async function executeMarketOrder(order) {
             await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
             await reloadOrderCache();
             
+            // FIXED: Return totalCost instead of totalReceived to match HTML expectations
             return { 
                 success: true, 
                 order,
                 trade,
                 executionPrice: lastExecutionPrice,
                 averagePrice: totalReceived / filledQuantity,
-                totalReceived,
+                totalCost: totalReceived,  // <-- FIXED: Use totalCost property name
                 fee,
                 netReceived,
                 filledQuantity,
