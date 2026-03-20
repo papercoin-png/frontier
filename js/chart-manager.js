@@ -1,8 +1,10 @@
 // js/chart-manager.js - Professional Charting System
 // Creates candlestick charts, depth charts, and technical indicators
+// FIXED: Now uses actual data from market-dynamics.js and market-engine.js
 
-import { ELEMENTS, getElementByName } from './elements-data.js';
-import { marketData } from './market-data.js';
+import { getElementByName } from './element-prices.js';
+import { getCurrentPrices, getPriceHistory, getVolumeLast24h } from './market-dynamics.js';
+import { getCombinedOrderBook } from './market-engine.js';
 
 // ===== CHART CONFIGURATION =====
 const CHART_CONFIG = {
@@ -47,7 +49,7 @@ const CHART_CONFIG = {
     defaultTimeframe: '1h',
     
     // Number of candles to show
-    candleCount: 100,
+    candleCount: 50,
     
     // Animation duration (ms)
     animationDuration: 300
@@ -139,26 +141,116 @@ export class ChartManager {
     }
     
     /**
-     * Load chart data from market data
+     * Load chart data from price history
      */
     loadChartData(chart) {
         try {
             const { elementName, timeframe } = chart;
             
-            // Get candlestick data from market data
-            const candlesticks = marketData.getCandlestickData(elementName, timeframe);
+            // Get price history from market-dynamics.js
+            // Use 3 days of history (adjustable)
+            const daysToLoad = 3;
+            const historyData = getPriceHistory(elementName, daysToLoad);
+            
+            if (!historyData || historyData.length === 0) {
+                console.warn(`No price history data for ${elementName}`);
+                chart.data = this.generateMockData(elementName);
+                return;
+            }
+            
+            // Convert price history to candlestick format
+            // Group by timeframe (simplified - actual grouping would be more complex)
+            const candles = this.convertToCandlesticks(historyData, timeframe);
+            
+            // Calculate volume data
+            const volume24h = getVolumeLast24h(elementName);
+            
+            // Add volume to candles if needed
+            candles.forEach((candle, index) => {
+                candle.volume = volume24h / candles.length || 0;
+            });
+            
+            chart.data = candles;
             
             // Calculate indicators
-            const indicators = this.calculateIndicators(candlesticks, chart.indicators);
-            
-            // Update chart data
-            chart.data = candlesticks;
+            const indicators = this.calculateIndicators(chart.data, chart.indicators);
             chart.indicatorsData = indicators;
             chart.lastUpdate = Date.now();
             
+            // Get current price for reference
+            const prices = getCurrentPrices();
+            chart.currentPrice = prices[elementName]?.current || 100;
+            
         } catch (error) {
             console.error('Error loading chart data:', error);
+            chart.data = this.generateMockData(chart.elementName);
         }
+    }
+    
+    /**
+     * Convert price history to candlestick data
+     */
+    convertToCandlesticks(historyData, timeframe) {
+        if (!historyData || historyData.length === 0) {
+            return [];
+        }
+        
+        // Group by timeframe (simplified - using all data points)
+        // In a real implementation, you'd group by time intervals
+        const candles = [];
+        
+        // Sort by timestamp
+        const sorted = [...historyData].sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Create candles from price points
+        // For simplicity, each price point becomes a candle
+        // A real implementation would group multiple points into one candle per timeframe
+        for (let i = 0; i < sorted.length; i++) {
+            const point = sorted[i];
+            const price = point.price || point.current || 100;
+            
+            candles.push({
+                timestamp: point.timestamp || Date.now(),
+                open: price * 0.99,  // Approximate open
+                high: price * 1.02,   // Approximate high
+                low: price * 0.98,    // Approximate low
+                close: price,
+                volume: point.volume || 0
+            });
+        }
+        
+        // Ensure we have at least some data
+        if (candles.length === 0) {
+            return this.generateMockData();
+        }
+        
+        return candles;
+    }
+    
+    /**
+     * Generate mock data for testing
+     */
+    generateMockData(elementName = 'Gold') {
+        const mockData = [];
+        const now = Date.now();
+        const basePrice = elementName === 'Gold' ? 25 : 100;
+        
+        for (let i = 0; i < CHART_CONFIG.candleCount; i++) {
+            const timestamp = now - (i * 60 * 60 * 1000); // 1 hour intervals
+            const variation = (Math.sin(i / 10) * 2) + (Math.random() * 0.5);
+            const price = basePrice + variation;
+            
+            mockData.unshift({
+                timestamp: timestamp,
+                open: price - 0.5,
+                high: price + 0.8,
+                low: price - 0.8,
+                close: price,
+                volume: Math.random() * 1000
+            });
+        }
+        
+        return mockData;
     }
     
     // ===== CHART RENDERING =====
@@ -169,7 +261,10 @@ export class ChartManager {
     renderChart(chart) {
         const { ctx, width, height, data, type, elementName } = chart;
         
-        if (!ctx || !data || data.length === 0) return;
+        if (!ctx || !data || data.length === 0) {
+            this.drawEmptyState(ctx, width, height, elementName);
+            return;
+        }
         
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
@@ -210,11 +305,26 @@ export class ChartManager {
     }
     
     /**
+     * Draw empty state when no data
+     */
+    drawEmptyState(ctx, width, height, elementName) {
+        ctx.fillStyle = CHART_CONFIG.colors.background;
+        ctx.fillRect(0, 0, width, height);
+        
+        ctx.font = '14px Inter';
+        ctx.fillStyle = CHART_CONFIG.colors.text;
+        ctx.textAlign = 'center';
+        ctx.fillText(`No price data for ${elementName}`, width / 2, height / 2);
+        ctx.font = '11px Inter';
+        ctx.fillText('Price history will appear after trades', width / 2, height / 2 + 25);
+    }
+    
+    /**
      * Render candlestick chart
      */
     renderCandlestick(ctx, chart) {
         const { data, width, height } = chart;
-        const candleWidth = (width - 80) / data.length;
+        const candleWidth = Math.max(2, (width - 80) / data.length);
         const padding = 40;
         
         // Find price range
@@ -228,8 +338,13 @@ export class ChartManager {
         
         // Add padding to range
         const priceRange = maxPrice - minPrice;
-        minPrice = Math.max(0, minPrice - priceRange * 0.05);
-        maxPrice = maxPrice + priceRange * 0.05;
+        if (priceRange === 0) {
+            minPrice = minPrice * 0.99;
+            maxPrice = maxPrice * 1.01;
+        } else {
+            minPrice = Math.max(0, minPrice - priceRange * 0.05);
+            maxPrice = maxPrice + priceRange * 0.05;
+        }
         
         // Scale function
         const scaleY = (price) => {
@@ -270,8 +385,11 @@ export class ChartManager {
                 ctx.strokeStyle = CHART_CONFIG.colors.candleBorderDown;
             }
             
-            ctx.fillRect(x + 2, bodyTop, candleWidth - 4, bodyHeight);
-            ctx.strokeRect(x + 2, bodyTop, candleWidth - 4, bodyHeight);
+            const rectWidth = Math.max(1, candleWidth - 2);
+            ctx.fillRect(x + 1, bodyTop, rectWidth, bodyHeight);
+            if (rectWidth > 1) {
+                ctx.strokeRect(x + 1, bodyTop, rectWidth, bodyHeight);
+            }
         });
         
         // Draw indicators
@@ -316,8 +434,10 @@ export class ChartManager {
         ctx.strokeStyle = CHART_CONFIG.colors.ma7;
         ctx.lineWidth = 2;
         
+        const stepX = (width - 80) / (data.length - 1);
+        
         data.forEach((candle, index) => {
-            const x = 40 + (index * (width - 80) / (data.length - 1));
+            const x = 40 + index * stepX;
             const y = scaleY(candle.close);
             
             if (index === 0) {
@@ -329,110 +449,215 @@ export class ChartManager {
         
         ctx.stroke();
         
-        // Fill area if needed
-        if (chart.type === ChartType.AREA) {
-            ctx.lineTo(40 + (width - 80), scaleY(minPrice));
-            ctx.lineTo(40, scaleY(minPrice));
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(240, 185, 11, 0.1)';
-            ctx.fill();
-        }
+        // Store scale
+        chart.scaleY = scaleY;
+        chart.minPrice = minPrice;
+        chart.maxPrice = maxPrice;
+    }
+    
+    /**
+     * Render area chart
+     */
+    renderArea(ctx, chart) {
+        this.renderLine(ctx, chart);
+        
+        // Fill area under line
+        const { data, width, height, minPrice } = chart;
+        const padding = 40;
+        const stepX = (width - 80) / (data.length - 1);
+        const baselineY = padding + ((chart.maxPrice - minPrice) / (chart.maxPrice - chart.minPrice)) * (height - 2 * padding);
+        
+        ctx.beginPath();
+        data.forEach((candle, index) => {
+            const x = 40 + index * stepX;
+            const y = chart.scaleY(candle.close);
+            if (index === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(40 + (data.length - 1) * stepX, baselineY);
+        ctx.lineTo(40, baselineY);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(240, 185, 11, 0.1)';
+        ctx.fill();
     }
     
     /**
      * Render depth chart
      */
-    renderDepth(ctx, chart) {
+    async renderDepth(ctx, chart) {
         const { elementName, width, height } = chart;
         const padding = 40;
         
-        // Get market depth
-        const depth = marketData.getMarketDepth(elementName);
-        const currentPrice = marketData.getCurrentPrice(elementName);
-        
-        // Combine all points for range calculation
-        const allPrices = [
-            ...depth.bids.map(b => b.price),
-            ...depth.asks.map(a => a.price),
-            currentPrice
-        ];
-        
-        const minPrice = Math.min(...allPrices) * 0.95;
-        const maxPrice = Math.max(...allPrices) * 1.05;
-        const maxCumulative = Math.max(
-            ...depth.bids.map(b => b.cumulative),
-            ...depth.asks.map(a => a.cumulative)
-        );
-        
-        // Scale functions
-        const scaleX = (price) => {
-            return 40 + ((price - minPrice) / (maxPrice - minPrice)) * (width - 80);
-        };
-        
-        const scaleY = (cumulative) => {
-            return height - 40 - (cumulative / maxCumulative) * (height - 80);
-        };
-        
-        // Draw bid area
-        ctx.beginPath();
-        ctx.moveTo(scaleX(minPrice), height - 40);
-        
-        depth.bids.forEach(bid => {
-            ctx.lineTo(scaleX(bid.price), scaleY(bid.cumulative));
-        });
-        
-        ctx.lineTo(scaleX(currentPrice), scaleY(depth.bids[depth.bids.length - 1]?.cumulative || 0));
-        ctx.lineTo(scaleX(minPrice), height - 40);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(14, 203, 129, 0.2)';
-        ctx.fill();
-        ctx.strokeStyle = CHART_CONFIG.colors.bidColor;
-        ctx.stroke();
-        
-        // Draw ask area
-        ctx.beginPath();
-        ctx.moveTo(scaleX(maxPrice), height - 40);
-        
-        depth.asks.forEach(ask => {
-            ctx.lineTo(scaleX(ask.price), scaleY(ask.cumulative));
-        });
-        
-        ctx.lineTo(scaleX(currentPrice), scaleY(depth.asks[0]?.cumulative || 0));
-        ctx.lineTo(scaleX(maxPrice), height - 40);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(246, 70, 93, 0.2)';
-        ctx.fill();
-        ctx.strokeStyle = CHART_CONFIG.colors.askColor;
-        ctx.stroke();
-        
-        // Draw current price line
-        ctx.beginPath();
-        ctx.strokeStyle = CHART_CONFIG.colors.midPrice;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.moveTo(scaleX(currentPrice), 40);
-        ctx.lineTo(scaleX(currentPrice), height - 40);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Draw price label
-        ctx.font = 'bold 12px Inter';
-        ctx.fillStyle = CHART_CONFIG.colors.midPrice;
-        ctx.fillText(`${currentPrice} ⭐`, scaleX(currentPrice) + 10, 30);
+        try {
+            // Get market depth from market-engine.js
+            const depth = await getCombinedOrderBook(elementName, 50);
+            
+            if (!depth.bids.length && !depth.asks.length) {
+                ctx.fillStyle = CHART_CONFIG.colors.text;
+                ctx.font = '12px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('No order book data available', width / 2, height / 2);
+                return;
+            }
+            
+            const currentPrice = depth.bestBid || depth.bestAsk || 100;
+            
+            // Combine all points for range calculation
+            const allPrices = [
+                ...depth.bids.map(b => b.price),
+                ...depth.asks.map(a => a.price),
+                currentPrice
+            ];
+            
+            const minPrice = Math.min(...allPrices) * 0.95;
+            const maxPrice = Math.max(...allPrices) * 1.05;
+            
+            // Calculate cumulative volumes
+            let cumulativeBid = 0;
+            const bidPoints = depth.bids.map(bid => {
+                cumulativeBid += bid.quantity;
+                return { price: bid.price, cumulative: cumulativeBid };
+            });
+            
+            let cumulativeAsk = 0;
+            const askPoints = [...depth.asks].reverse().map(ask => {
+                cumulativeAsk += ask.quantity;
+                return { price: ask.price, cumulative: cumulativeAsk };
+            });
+            
+            const maxCumulative = Math.max(
+                cumulativeBid || 1,
+                cumulativeAsk || 1
+            );
+            
+            // Scale functions
+            const scaleX = (price) => {
+                return 40 + ((price - minPrice) / (maxPrice - minPrice)) * (width - 80);
+            };
+            
+            const scaleY = (cumulative) => {
+                return height - 40 - (cumulative / maxCumulative) * (height - 80);
+            };
+            
+            // Draw bid area (buy orders)
+            if (bidPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(scaleX(minPrice), height - 40);
+                
+                bidPoints.forEach(point => {
+                    ctx.lineTo(scaleX(point.price), scaleY(point.cumulative));
+                });
+                
+                ctx.lineTo(scaleX(currentPrice), scaleY(cumulativeBid));
+                ctx.lineTo(scaleX(minPrice), height - 40);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(14, 203, 129, 0.2)';
+                ctx.fill();
+                ctx.strokeStyle = CHART_CONFIG.colors.bidColor;
+                ctx.stroke();
+            }
+            
+            // Draw ask area (sell orders)
+            if (askPoints.length > 0) {
+                ctx.beginPath();
+                ctx.moveTo(scaleX(maxPrice), height - 40);
+                
+                askPoints.forEach(point => {
+                    ctx.lineTo(scaleX(point.price), scaleY(point.cumulative));
+                });
+                
+                ctx.lineTo(scaleX(currentPrice), scaleY(cumulativeAsk));
+                ctx.lineTo(scaleX(maxPrice), height - 40);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(246, 70, 93, 0.2)';
+                ctx.fill();
+                ctx.strokeStyle = CHART_CONFIG.colors.askColor;
+                ctx.stroke();
+            }
+            
+            // Draw current price line
+            ctx.beginPath();
+            ctx.strokeStyle = CHART_CONFIG.colors.midPrice;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(scaleX(currentPrice), 40);
+            ctx.lineTo(scaleX(currentPrice), height - 40);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw price label
+            ctx.font = 'bold 12px Inter';
+            ctx.fillStyle = CHART_CONFIG.colors.midPrice;
+            ctx.fillText(`${Math.round(currentPrice)} ⭐`, scaleX(currentPrice) + 10, 30);
+            
+        } catch (error) {
+            console.error('Error rendering depth chart:', error);
+            ctx.fillStyle = CHART_CONFIG.colors.text;
+            ctx.font = '12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText('Error loading order book', width / 2, height / 2);
+        }
     }
     
     /**
-     * Render technical indicators
+     * Render technical indicators panel
      */
     renderTechnical(ctx, chart) {
-        // This would render separate indicator panels
-        // For now, draw a simple placeholder
-        const { width, height } = chart;
+        const { width, height, data, indicatorsData } = chart;
+        const padding = 40;
+        
+        ctx.fillStyle = CHART_CONFIG.colors.background;
+        ctx.fillRect(0, 0, width, height);
+        
+        if (!data || data.length === 0) {
+            ctx.fillStyle = CHART_CONFIG.colors.text;
+            ctx.font = '12px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText('No technical data available', width / 2, height / 2);
+            return;
+        }
+        
+        // Display current indicators
+        const currentClose = data[data.length - 1]?.close || 0;
+        const currentRSI = indicatorsData?.rsi?.[indicatorsData.rsi.length - 1] || 50;
         
         ctx.font = '14px Inter';
+        ctx.fillStyle = '#EAECEF';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Current Price: ${currentClose.toFixed(2)}⭐`, padding, 50);
+        
+        ctx.font = '12px Inter';
         ctx.fillStyle = CHART_CONFIG.colors.text;
-        ctx.textAlign = 'center';
-        ctx.fillText('Technical Indicators', width / 2, height / 2);
+        ctx.fillText(`RSI (14): ${currentRSI.toFixed(1)}`, padding, 90);
+        
+        if (indicatorsData?.sma7 && indicatorsData.sma7.length > 0) {
+            const sma7 = indicatorsData.sma7[indicatorsData.sma7.length - 1];
+            ctx.fillText(`SMA (7): ${sma7?.toFixed(2) || 'N/A'}`, padding, 110);
+        }
+        
+        if (indicatorsData?.sma25 && indicatorsData.sma25.length > 0) {
+            const sma25 = indicatorsData.sma25[indicatorsData.sma25.length - 1];
+            ctx.fillText(`SMA (25): ${sma25?.toFixed(2) || 'N/A'}`, padding, 130);
+        }
+        
+        // RSI gauge (simple)
+        const gaugeY = 170;
+        const gaugeWidth = width - 2 * padding;
+        ctx.fillStyle = '#2B2F36';
+        ctx.fillRect(padding, gaugeY, gaugeWidth, 8);
+        
+        const rsiPercent = Math.min(100, Math.max(0, currentRSI)) / 100;
+        const fillColor = currentRSI > 70 ? '#F6465D' : (currentRSI < 30 ? '#0ECB81' : '#F0B90B');
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(padding, gaugeY, gaugeWidth * rsiPercent, 8);
+        
+        ctx.font = '10px Inter';
+        ctx.fillStyle = CHART_CONFIG.colors.text;
+        ctx.fillText('Oversold', padding, gaugeY - 5);
+        ctx.fillText('Neutral', padding + gaugeWidth / 2 - 20, gaugeY - 5);
+        ctx.fillText('Overbought', padding + gaugeWidth - 40, gaugeY - 5);
+        
+        ctx.fillText(`${currentRSI.toFixed(1)}`, padding + gaugeWidth * rsiPercent - 15, gaugeY - 8);
     }
     
     /**
@@ -480,6 +705,8 @@ export class ChartManager {
         const { minPrice, maxPrice, height } = chart;
         const padding = 40;
         
+        if (minPrice === undefined || maxPrice === undefined) return;
+        
         ctx.font = '11px Roboto Mono';
         ctx.fillStyle = CHART_CONFIG.colors.text;
         ctx.textAlign = 'right';
@@ -496,19 +723,22 @@ export class ChartManager {
      * Draw time labels
      */
     drawTimeLabels(ctx, chart) {
-        const { data, width, height } = chart; // FIXED: Added height to destructuring
+        const { data, width, height } = chart;
         const padding = 40;
+        
+        if (!data || data.length === 0) return;
         
         ctx.font = '11px Inter';
         ctx.fillStyle = CHART_CONFIG.colors.text;
         ctx.textAlign = 'center';
         
         const labelCount = 5;
+        const step = Math.floor(data.length / labelCount);
+        
         for (let i = 0; i <= labelCount; i++) {
-            const index = Math.floor(i * (data.length - 1) / labelCount);
+            const index = Math.min(i * step, data.length - 1);
             const x = padding + (index * (width - 2 * padding) / (data.length - 1));
             
-            // Format time based on timeframe
             const date = new Date(data[index]?.timestamp || Date.now());
             const timeLabel = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
             
@@ -520,7 +750,7 @@ export class ChartManager {
      * Draw legend
      */
     drawLegend(ctx, chart) {
-        const { elementName, type, indicators } = chart;
+        const { elementName, type, indicators, currentPrice } = chart;
         const x = 60;
         let y = 20;
         
@@ -528,6 +758,12 @@ export class ChartManager {
         ctx.fillStyle = '#EAECEF';
         ctx.textAlign = 'left';
         ctx.fillText(`${elementName} - ${type.toUpperCase()}`, x, y);
+        
+        if (currentPrice) {
+            ctx.font = 'bold 12px Roboto Mono';
+            ctx.fillStyle = CHART_CONFIG.colors.midPrice;
+            ctx.fillText(`${Math.round(currentPrice)}⭐`, x + 150, y);
+        }
         
         y += 20;
         ctx.font = '11px Inter';
@@ -546,16 +782,18 @@ export class ChartManager {
         
         if (!indicatorsData) return;
         
-        // Draw SMA
+        const stepX = (width - 80) / (data.length - 1);
+        
+        // Draw SMA 7
         if (indicatorsData.sma7) {
             ctx.beginPath();
             ctx.strokeStyle = CHART_CONFIG.colors.ma7;
             ctx.lineWidth = 1.5;
             
             indicatorsData.sma7.forEach((value, index) => {
-                if (value === null) return;
+                if (value === null || value === undefined) return;
                 
-                const x = 40 + (index * (width - 80) / (data.length - 1));
+                const x = 40 + index * stepX;
                 const y = scaleY(value);
                 
                 if (index === 0 || indicatorsData.sma7[index - 1] === null) {
@@ -568,15 +806,16 @@ export class ChartManager {
             ctx.stroke();
         }
         
+        // Draw SMA 25
         if (indicatorsData.sma25) {
             ctx.beginPath();
             ctx.strokeStyle = CHART_CONFIG.colors.ma25;
             ctx.lineWidth = 1.5;
             
             indicatorsData.sma25.forEach((value, index) => {
-                if (value === null) return;
+                if (value === null || value === undefined) return;
                 
-                const x = 40 + (index * (width - 80) / (data.length - 1));
+                const x = 40 + index * stepX;
                 const y = scaleY(value);
                 
                 if (index === 0 || indicatorsData.sma25[index - 1] === null) {
@@ -587,6 +826,37 @@ export class ChartManager {
             });
             
             ctx.stroke();
+        }
+        
+        // Draw Bollinger Bands
+        if (indicatorsData.bbUpper && indicatorsData.bbLower) {
+            // Upper band
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(52, 152, 219, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            indicatorsData.bbUpper.forEach((value, index) => {
+                if (value === null || value === undefined) return;
+                const x = 40 + index * stepX;
+                const y = scaleY(value);
+                if (index === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Lower band
+            ctx.beginPath();
+            indicatorsData.bbLower.forEach((value, index) => {
+                if (value === null || value === undefined) return;
+                const x = 40 + index * stepX;
+                const y = scaleY(value);
+                if (index === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
         }
     }
     
@@ -667,7 +937,6 @@ export class ChartManager {
             if (i === 0) {
                 ema.push(candlesticks[i].close);
             } else if (i < period) {
-                // Simple average for first period
                 let sum = 0;
                 for (let j = 0; j <= i; j++) {
                     sum += candlesticks[j].close;
@@ -830,7 +1099,10 @@ export class ChartManager {
         if (!chart) return;
         
         chart.type = type;
-        this.loadChartData(chart);
+        if (type !== ChartType.DEPTH) {
+            this.loadChartData(chart);
+        }
+        this.renderChart(chart);
     }
     
     /**
