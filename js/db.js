@@ -1,9 +1,9 @@
 // js/db.js - IndexedDB wrapper for Voidfarer
 // Provides persistent storage with async/await interface
-// UPDATED: Version 5 - Added NPC trader stores for marketplace NPCs
+// UPDATED: Version 6 - Added market stores for trading system
 
 const DB_NAME = 'voidfarer_db';
-const DB_VERSION = 5; // Increment for schema changes (added NPC trader stores)
+const DB_VERSION = 6; // Increment from 5 to 6 for market stores
 
 // Store names
 const STORES = {
@@ -37,10 +37,19 @@ const STORES = {
     LABOR_HISTORY: 'laborHistory',
     // Certificate holders store
     CERTIFICATE_HOLDERS: 'certificateHolders',
-    // ===== NPC TRADER STORES (NEW) =====
+    // NPC TRADER STORES
     NPC_TRADERS: 'npcTraders',
     NPC_TRADER_ORDERS: 'npcTraderOrders',
-    NPC_TRADER_HISTORY: 'npcTraderHistory'
+    NPC_TRADER_HISTORY: 'npcTraderHistory',
+    // ===== NEW MARKET STORES (Version 6) =====
+    MARKET_PRICES: 'marketPrices',      // Current market prices
+    MARKET_ORDERS: 'marketOrders',       // Buy/sell orders (combined)
+    TRADE_HISTORY: 'tradeHistory',       // Record of all trades
+    ORDER_HISTORY: 'orderHistory',       // User order history
+    PRICE_HISTORY: 'priceHistory',       // Historical price data per element
+    SUPPLY_DEMAND: 'supplyDemand',       // Supply and demand indices
+    MARKET_VOLUME: 'marketVolume',       // Volume tracking per element
+    PRICE_ALERTS: 'priceAlerts'          // User price alerts
 };
 
 // Database connection
@@ -245,9 +254,7 @@ async function initDB() {
                 console.log('Created certificate holders store');
             }
             
-            // ===== NPC TRADER STORES (NEW) =====
-            
-            // NPC Traders master list
+            // NPC TRADER STORES
             if (!db.objectStoreNames.contains(STORES.NPC_TRADERS)) {
                 const npcTradersStore = db.createObjectStore(STORES.NPC_TRADERS, { keyPath: 'id' });
                 npcTradersStore.createIndex('type', 'type', { unique: false });
@@ -258,7 +265,6 @@ async function initDB() {
                 console.log('Created NPC traders store');
             }
             
-            // NPC Trader Orders
             if (!db.objectStoreNames.contains(STORES.NPC_TRADER_ORDERS)) {
                 const npcOrdersStore = db.createObjectStore(STORES.NPC_TRADER_ORDERS, { keyPath: 'id', autoIncrement: true });
                 npcOrdersStore.createIndex('traderId', 'traderId', { unique: false });
@@ -271,7 +277,6 @@ async function initDB() {
                 console.log('Created NPC trader orders store');
             }
             
-            // NPC Trader History
             if (!db.objectStoreNames.contains(STORES.NPC_TRADER_HISTORY)) {
                 const npcHistoryStore = db.createObjectStore(STORES.NPC_TRADER_HISTORY, { keyPath: 'id', autoIncrement: true });
                 npcHistoryStore.createIndex('traderId', 'traderId', { unique: false });
@@ -281,6 +286,76 @@ async function initDB() {
                 npcHistoryStore.createIndex('price', 'price', { unique: false });
                 npcHistoryStore.createIndex('quantity', 'quantity', { unique: false });
                 console.log('Created NPC trader history store');
+            }
+            
+            // ===== NEW MARKET STORES (Version 6) =====
+            
+            // Market Prices store
+            if (!db.objectStoreNames.contains(STORES.MARKET_PRICES)) {
+                const marketPricesStore = db.createObjectStore(STORES.MARKET_PRICES, { keyPath: 'id' });
+                marketPricesStore.createIndex('timestamp', 'timestamp', { unique: false });
+                console.log('Created market prices store');
+            }
+            
+            // Market Orders store (combined buy/sell orders)
+            if (!db.objectStoreNames.contains(STORES.MARKET_ORDERS)) {
+                const marketOrdersStore = db.createObjectStore(STORES.MARKET_ORDERS, { keyPath: 'id' });
+                marketOrdersStore.createIndex('element', 'element', { unique: false });
+                marketOrdersStore.createIndex('side', 'side', { unique: false });
+                marketOrdersStore.createIndex('userId', 'userId', { unique: false });
+                marketOrdersStore.createIndex('status', 'status', { unique: false });
+                marketOrdersStore.createIndex('price', 'price', { unique: false });
+                marketOrdersStore.createIndex('createdAt', 'createdAt', { unique: false });
+                console.log('Created market orders store');
+            }
+            
+            // Trade History store
+            if (!db.objectStoreNames.contains(STORES.TRADE_HISTORY)) {
+                const tradeHistoryStore = db.createObjectStore(STORES.TRADE_HISTORY, { keyPath: 'id', autoIncrement: true });
+                tradeHistoryStore.createIndex('element', 'element', { unique: false });
+                tradeHistoryStore.createIndex('timestamp', 'timestamp', { unique: false });
+                tradeHistoryStore.createIndex('buyerId', 'buyerId', { unique: false });
+                tradeHistoryStore.createIndex('sellerId', 'sellerId', { unique: false });
+                console.log('Created trade history store');
+            }
+            
+            // Order History store
+            if (!db.objectStoreNames.contains(STORES.ORDER_HISTORY)) {
+                const orderHistoryStore = db.createObjectStore(STORES.ORDER_HISTORY, { keyPath: 'id', autoIncrement: true });
+                orderHistoryStore.createIndex('userId', 'userId', { unique: false });
+                orderHistoryStore.createIndex('element', 'element', { unique: false });
+                orderHistoryStore.createIndex('timestamp', 'timestamp', { unique: false });
+                orderHistoryStore.createIndex('action', 'action', { unique: false });
+                console.log('Created order history store');
+            }
+            
+            // Price History store (per element)
+            if (!db.objectStoreNames.contains(STORES.PRICE_HISTORY)) {
+                const priceHistoryStore = db.createObjectStore(STORES.PRICE_HISTORY, { keyPath: 'element' });
+                priceHistoryStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+                console.log('Created price history store');
+            }
+            
+            // Supply/Demand store
+            if (!db.objectStoreNames.contains(STORES.SUPPLY_DEMAND)) {
+                const supplyDemandStore = db.createObjectStore(STORES.SUPPLY_DEMAND, { keyPath: 'id' });
+                console.log('Created supply/demand store');
+            }
+            
+            // Market Volume store
+            if (!db.objectStoreNames.contains(STORES.MARKET_VOLUME)) {
+                const marketVolumeStore = db.createObjectStore(STORES.MARKET_VOLUME, { keyPath: 'element' });
+                marketVolumeStore.createIndex('date', 'date', { unique: false });
+                console.log('Created market volume store');
+            }
+            
+            // Price Alerts store
+            if (!db.objectStoreNames.contains(STORES.PRICE_ALERTS)) {
+                const priceAlertsStore = db.createObjectStore(STORES.PRICE_ALERTS, { keyPath: 'id', autoIncrement: true });
+                priceAlertsStore.createIndex('playerId', 'playerId', { unique: false });
+                priceAlertsStore.createIndex('element', 'element', { unique: false });
+                priceAlertsStore.createIndex('triggered', 'triggered', { unique: false });
+                console.log('Created price alerts store');
             }
         };
     });
@@ -670,21 +745,7 @@ async function dbSaveElementLocation(elementName, planet, locationData) {
  */
 async function dbGetElementLocations(elementName) {
     try {
-        const db = await initDB();
-        const transaction = db.transaction(STORES.ELEMENT_LOCATIONS, 'readonly');
-        const store = transaction.objectStore(STORES.ELEMENT_LOCATIONS);
-        const index = store.index('elementName');
-        
-        return new Promise((resolve, reject) => {
-            const request = index.getAll(elementName);
-            
-            request.onsuccess = () => {
-                resolve(request.result || []);
-            };
-            
-            request.onerror = () => reject(request.error);
-        });
-        
+        return await getByIndex(STORES.ELEMENT_LOCATIONS, 'elementName', elementName);
     } catch (error) {
         console.error('Error in dbGetElementLocations:', error);
         return [];
@@ -1068,21 +1129,7 @@ async function dbUpdateCertificateHolder(certificateId, playerId, playerName, ma
  */
 async function dbGetCertificateHolders(certificateId) {
     try {
-        const db = await initDB();
-        const transaction = db.transaction(STORES.CERTIFICATE_HOLDERS, 'readonly');
-        const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
-        const index = store.index('certificateId');
-        
-        return new Promise((resolve, reject) => {
-            const request = index.getAll(certificateId);
-            
-            request.onsuccess = () => {
-                resolve(request.result || []);
-            };
-            
-            request.onerror = () => reject(request.error);
-        });
-        
+        return await getByIndex(STORES.CERTIFICATE_HOLDERS, 'certificateId', certificateId);
     } catch (error) {
         console.error('Error in dbGetCertificateHolders:', error);
         return [];
@@ -1096,21 +1143,7 @@ async function dbGetCertificateHolders(certificateId) {
  */
 async function dbGetPlayerCertificates(playerId) {
     try {
-        const db = await initDB();
-        const transaction = db.transaction(STORES.CERTIFICATE_HOLDERS, 'readonly');
-        const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
-        const index = store.index('playerId');
-        
-        return new Promise((resolve, reject) => {
-            const request = index.getAll(playerId);
-            
-            request.onsuccess = () => {
-                resolve(request.result || []);
-            };
-            
-            request.onerror = () => reject(request.error);
-        });
-        
+        return await getByIndex(STORES.CERTIFICATE_HOLDERS, 'playerId', playerId);
     } catch (error) {
         console.error('Error in dbGetPlayerCertificates:', error);
         return [];
@@ -1179,7 +1212,7 @@ async function dbGetAllNPCTraders() {
 
 /**
  * Get NPC traders by type
- * @param {string} type - Trader type (small, medium, large, whale, marketMaker)
+ * @param {string} type - Trader type
  * @returns {Promise<Array>} Array of traders
  */
 async function dbGetNPCTradersByType(type) {
@@ -1212,7 +1245,6 @@ async function dbGetNPCTradersByPersonality(personality) {
  */
 async function dbGetActiveNPCTraders(isActive = true) {
     try {
-        // Get all traders and filter in JavaScript to avoid index key type issues
         const allTraders = await getAll(STORES.NPC_TRADERS);
         return allTraders.filter(trader => trader.isActive === isActive);
     } catch (error) {
@@ -1425,7 +1457,6 @@ async function dbRecordNPCTrade(trade) {
 async function dbGetNPCTraderHistory(traderId, limit = 50) {
     try {
         const trades = await getByIndex(STORES.NPC_TRADER_HISTORY, 'traderId', traderId);
-        // Sort by timestamp descending (newest first)
         trades.sort((a, b) => b.timestamp - a.timestamp);
         return trades.slice(0, limit);
     } catch (error) {
@@ -1443,7 +1474,6 @@ async function dbGetNPCTraderHistory(traderId, limit = 50) {
 async function dbGetNPCElementHistory(element, limit = 50) {
     try {
         const trades = await getByIndex(STORES.NPC_TRADER_HISTORY, 'element', element);
-        // Sort by timestamp descending (newest first)
         trades.sort((a, b) => b.timestamp - a.timestamp);
         return trades.slice(0, limit);
     } catch (error) {
@@ -1520,6 +1550,294 @@ async function dbGetNPCElementVolume(element, startTime, endTime) {
     }
 }
 
+// ===== MARKET DATA FUNCTIONS (NEW) =====
+
+/**
+ * Save market prices to IndexedDB
+ * @param {Object} prices - Current market prices
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveMarketPrices(prices) {
+    try {
+        await setItem(STORES.MARKET_PRICES, {
+            id: 'current',
+            data: prices,
+            timestamp: Date.now()
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving market prices:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Load market prices from IndexedDB
+ * @returns {Promise<Object|null>} Market prices or null
+ */
+async function dbLoadMarketPrices() {
+    try {
+        const result = await getItem(STORES.MARKET_PRICES, 'current');
+        return result?.data || null;
+    } catch (error) {
+        console.error('Error loading market prices:', error);
+        return null;
+    }
+}
+
+/**
+ * Save market orders (buy/sell)
+ * @param {Object} orders - Orders object
+ * @param {string} type - 'buy_orders' or 'sell_orders'
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveMarketOrders(orders, type) {
+    try {
+        await setItem(STORES.MARKET_ORDERS, {
+            id: type,
+            data: orders,
+            timestamp: Date.now()
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving market orders:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Load market orders
+ * @param {string} type - 'buy_orders' or 'sell_orders'
+ * @returns {Promise<Object>} Orders object
+ */
+async function dbLoadMarketOrders(type) {
+    try {
+        const result = await getItem(STORES.MARKET_ORDERS, type);
+        return result?.data || {};
+    } catch (error) {
+        console.error('Error loading market orders:', error);
+        return {};
+    }
+}
+
+/**
+ * Add a trade to history
+ * @param {Object} trade - Trade object
+ * @returns {Promise<Object>} Result
+ */
+async function dbAddTrade(trade) {
+    try {
+        const id = await setItem(STORES.TRADE_HISTORY, {
+            ...trade,
+            id: trade.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+        });
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error adding trade:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get recent trades
+ * @param {number} limit - Max number of trades
+ * @returns {Promise<Array>} Array of trades
+ */
+async function dbGetRecentTrades(limit = 500) {
+    try {
+        const trades = await getAll(STORES.TRADE_HISTORY);
+        trades.sort((a, b) => b.timestamp - a.timestamp);
+        return trades.slice(0, limit);
+    } catch (error) {
+        console.error('Error getting recent trades:', error);
+        return [];
+    }
+}
+
+/**
+ * Add order history entry
+ * @param {Object} entry - Order history entry
+ * @returns {Promise<Object>} Result
+ */
+async function dbAddOrderHistory(entry) {
+    try {
+        const id = await setItem(STORES.ORDER_HISTORY, {
+            ...entry,
+            id: entry.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+        });
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error adding order history:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get order history for a user
+ * @param {string} userId - User ID
+ * @param {number} limit - Max number of records
+ * @returns {Promise<Array>} Array of history entries
+ */
+async function dbGetUserOrderHistory(userId, limit = 50) {
+    try {
+        const allHistory = await getAll(STORES.ORDER_HISTORY);
+        const userHistory = allHistory.filter(h => h.userId === userId);
+        userHistory.sort((a, b) => b.timestamp - a.timestamp);
+        return userHistory.slice(0, limit);
+    } catch (error) {
+        console.error('Error getting user order history:', error);
+        return [];
+    }
+}
+
+/**
+ * Save price history for an element
+ * @param {string} element - Element name
+ * @param {Array} history - Price history array
+ * @returns {Promise<Object>} Result
+ */
+async function dbSavePriceHistory(element, history) {
+    try {
+        await setItem(STORES.PRICE_HISTORY, {
+            element: element,
+            data: history,
+            lastUpdated: Date.now()
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving price history:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Load price history for an element
+ * @param {string} element - Element name
+ * @returns {Promise<Array>} Price history array
+ */
+async function dbLoadPriceHistory(element) {
+    try {
+        const result = await getItem(STORES.PRICE_HISTORY, element);
+        return result?.data || [];
+    } catch (error) {
+        console.error('Error loading price history:', error);
+        return [];
+    }
+}
+
+/**
+ * Save supply/demand indices
+ * @param {Object} supply - Supply indices
+ * @param {Object} demand - Demand indices
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveSupplyDemand(supply, demand) {
+    try {
+        await setItem(STORES.SUPPLY_DEMAND, { id: 'supply', data: supply });
+        await setItem(STORES.SUPPLY_DEMAND, { id: 'demand', data: demand });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving supply/demand:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Load supply/demand indices
+ * @returns {Promise<Object>} Supply and demand objects
+ */
+async function dbLoadSupplyDemand() {
+    try {
+        const supply = await getItem(STORES.SUPPLY_DEMAND, 'supply');
+        const demand = await getItem(STORES.SUPPLY_DEMAND, 'demand');
+        return {
+            supply: supply?.data || {},
+            demand: demand?.data || {}
+        };
+    } catch (error) {
+        console.error('Error loading supply/demand:', error);
+        return { supply: {}, demand: {} };
+    }
+}
+
+/**
+ * Save market volume data
+ * @param {Object} volume - Volume data
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveMarketVolume(volume) {
+    try {
+        await setItem(STORES.MARKET_VOLUME, {
+            element: 'all',
+            data: volume,
+            lastUpdated: Date.now()
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving market volume:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Load market volume data
+ * @returns {Promise<Object>} Volume data
+ */
+async function dbLoadMarketVolume() {
+    try {
+        const result = await getItem(STORES.MARKET_VOLUME, 'all');
+        return result?.data || {};
+    } catch (error) {
+        console.error('Error loading market volume:', error);
+        return {};
+    }
+}
+
+// ===== CLEANUP FUNCTIONS =====
+
+/**
+ * Clean up old market data (keep only recent entries)
+ * @returns {Promise<Object>} Cleanup results
+ */
+async function dbCleanupMarketData() {
+    const results = { removed: 0 };
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    try {
+        // Clean trade history (keep last 30 days)
+        const trades = await getAll(STORES.TRADE_HISTORY);
+        const oldTrades = trades.filter(t => t.timestamp < sevenDaysAgo);
+        for (const trade of oldTrades) {
+            await deleteItem(STORES.TRADE_HISTORY, trade.id);
+            results.removed++;
+        }
+        
+        // Clean order history (keep last 7 days)
+        const orderHistory = await getAll(STORES.ORDER_HISTORY);
+        const oldOrders = orderHistory.filter(o => o.timestamp < sevenDaysAgo);
+        for (const order of oldOrders) {
+            await deleteItem(STORES.ORDER_HISTORY, order.id);
+            results.removed++;
+        }
+        
+        // Clean NPC trader history (keep last 7 days)
+        const npcHistory = await getAll(STORES.NPC_TRADER_HISTORY);
+        const oldNPCHistory = npcHistory.filter(h => h.timestamp < sevenDaysAgo);
+        for (const entry of oldNPCHistory) {
+            await deleteItem(STORES.NPC_TRADER_HISTORY, entry.id);
+            results.removed++;
+        }
+        
+        console.log(`🧹 Market data cleanup: removed ${results.removed} old records`);
+        
+    } catch (error) {
+        console.error('Error cleaning market data:', error);
+    }
+    
+    return results;
+}
+
 // ===== RESET FUNCTIONS =====
 
 /**
@@ -1563,7 +1881,7 @@ async function resetNPCData() {
     }
 }
 
-// ===== ES6 EXPORTS (for module imports) =====
+// ===== EXPORTS =====
 export {
     initDB,
     getItem, setItem, deleteItem, getAll, getByIndex, getByIndexRange, clearStore,
@@ -1586,10 +1904,19 @@ export {
     // NPC History Functions
     dbRecordNPCTrade, dbGetNPCTraderHistory, dbGetNPCElementHistory,
     dbGetNPCTradesByTimeRange, dbGetNPCElementVolume,
-    resetNPCData
+    // Market Data Functions (NEW)
+    dbSaveMarketPrices, dbLoadMarketPrices,
+    dbSaveMarketOrders, dbLoadMarketOrders,
+    dbAddTrade, dbGetRecentTrades,
+    dbAddOrderHistory, dbGetUserOrderHistory,
+    dbSavePriceHistory, dbLoadPriceHistory,
+    dbSaveSupplyDemand, dbLoadSupplyDemand,
+    dbSaveMarketVolume, dbLoadMarketVolume,
+    dbCleanupMarketData,
+    resetNPCData, resetAllData
 };
 
-// ===== WINDOW EXPORTS (for global access) =====
+// ===== WINDOW EXPORTS =====
 
 // Core functions
 window.initDB = initDB;
@@ -1634,7 +1961,7 @@ window.dbGetCertificateHolders = dbGetCertificateHolders;
 window.dbGetPlayerCertificates = dbGetPlayerCertificates;
 window.dbGetCertificateHolder = dbGetCertificateHolder;
 
-// ===== NPC TRADER FUNCTIONS (NEW) =====
+// NPC TRADER FUNCTIONS
 window.dbSaveNPCTrader = dbSaveNPCTrader;
 window.dbGetNPCTrader = dbGetNPCTrader;
 window.dbGetAllNPCTraders = dbGetAllNPCTraders;
@@ -1664,7 +1991,24 @@ window.dbGetNPCTradesByTimeRange = dbGetNPCTradesByTimeRange;
 window.dbGetNPCElementVolume = dbGetNPCElementVolume;
 window.resetNPCData = resetNPCData;
 
+// Market Data functions (NEW)
+window.dbSaveMarketPrices = dbSaveMarketPrices;
+window.dbLoadMarketPrices = dbLoadMarketPrices;
+window.dbSaveMarketOrders = dbSaveMarketOrders;
+window.dbLoadMarketOrders = dbLoadMarketOrders;
+window.dbAddTrade = dbAddTrade;
+window.dbGetRecentTrades = dbGetRecentTrades;
+window.dbAddOrderHistory = dbAddOrderHistory;
+window.dbGetUserOrderHistory = dbGetUserOrderHistory;
+window.dbSavePriceHistory = dbSavePriceHistory;
+window.dbLoadPriceHistory = dbLoadPriceHistory;
+window.dbSaveSupplyDemand = dbSaveSupplyDemand;
+window.dbLoadSupplyDemand = dbLoadSupplyDemand;
+window.dbSaveMarketVolume = dbSaveMarketVolume;
+window.dbLoadMarketVolume = dbLoadMarketVolume;
+window.dbCleanupMarketData = dbCleanupMarketData;
+
 // Export STORES for use in other modules
 window.DB_STORES = STORES;
 
-console.log('✅ db.js initialized - Version 5 with NPC trader stores');
+console.log('✅ db.js initialized - Version 6 with market stores and NPC trader stores');
