@@ -1427,11 +1427,11 @@
                         <span class="rarity-badge ${rarityClass}"></span>
                         <span class="element-symbol">${el.symbol}</span>
                         <span class="element-name">${el.name}</span>
-                    </div></td>
-                    <td><span class="bid-price">${el.bidPrice}⭐</span></td>
-                    <td><span class="ask-price">${el.askPrice}⭐</span></td>
-                    <td><span class="element-change ${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span></td>
-                </tr>`;
+                    </div>}
+                     <td><span class="bid-price">${el.bidPrice}⭐</span></td>
+                     <td><span class="ask-price">${el.askPrice}⭐</span></td>
+                     <td><span class="element-change ${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span></td>
+                 </tr>`;
             }).join('');
         }
 
@@ -1673,7 +1673,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER WITH DEBUG LOGGING =====
+        // ===== PLACE ORDER WITH VALIDATION =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1720,9 +1720,20 @@
                 if (result.success && result.trade) {
                     console.log(`✅ Order successful! Trade result:`, result);
                     
+                    // FIXED: Validate result.totalCost is a valid number
+                    const creditAmount = result.totalCost;
+                    if (creditAmount === undefined || creditAmount === null || isNaN(creditAmount) || creditAmount <= 0) {
+                        console.error('❌ Invalid credit amount from order:', creditAmount);
+                        showToast('Order processed but credit calculation error', 'error');
+                        await updateBalance();
+                        closeOrderModal();
+                        showLoading(false);
+                        return;
+                    }
+                    
                     if (orderSide === ORDER_SIDES.BUY) {
-                        console.log(`💰 Attempting to spend ${result.totalCost} credits from player ${PLAYER_ID}`);
-                        const success = await spendCredits(result.totalCost, PLAYER_ID);
+                        console.log(`💰 Attempting to spend ${creditAmount} credits from player ${PLAYER_ID}`);
+                        const success = await spendCredits(creditAmount, PLAYER_ID);
                         console.log(`💰 spendCredits result: ${success}`);
                         
                         if (success) {
@@ -1730,6 +1741,9 @@
                             console.log(`💰 New credits after buy: ${currentCredits}`);
                         } else {
                             console.error('❌ spendCredits failed!');
+                            showToast('Failed to process credits', 'error');
+                            showLoading(false);
+                            return;
                         }
                         
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
@@ -1739,10 +1753,18 @@
                         console.log(`✅ Added ${orderQuantity}x ${selectedElement.name} to collection`);
                         
                     } else {
-                        console.log(`💰 Attempting to add ${result.totalCost} credits from player ${PLAYER_ID}`);
-                        const newTotal = await addCredits(result.totalCost, PLAYER_ID);
-                        currentCredits = newTotal;
-                        console.log(`💰 New credits after sell: ${currentCredits}`);
+                        console.log(`💰 Attempting to add ${creditAmount} credits from player ${PLAYER_ID}`);
+                        const newTotal = await addCredits(creditAmount, PLAYER_ID);
+                        
+                        if (newTotal !== undefined && !isNaN(newTotal) && newTotal > 0) {
+                            currentCredits = newTotal;
+                            console.log(`💰 New credits after sell: ${currentCredits}`);
+                        } else {
+                            console.error('❌ addCredits failed!');
+                            showToast('Failed to process credits', 'error');
+                            showLoading(false);
+                            return;
+                        }
                         
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                         console.log(`✅ Removed ${orderQuantity}x ${selectedElement.name} from collection`);
