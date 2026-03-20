@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        /* ===== YOUR EXISTING CSS - KEPT EXACTLY THE SAME ===== */
+        /* All your existing styles - kept exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -50,6 +50,9 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
+        
+        /* [All your existing CSS styles remain exactly the same - no changes needed] */
+        /* I'm including the essential styles, but keep all your existing styles */
         
         .loading-overlay {
             position: fixed;
@@ -1246,11 +1249,16 @@
             ORDER_TYPES, ORDER_SIDES, getAllRecentTrades
         } from './js/market-engine.js';
         
-        // Import the correct storage.js functions
         import { 
             getCollection, getCredits, addCredits, spendCredits,
             getPlayer, savePlayer
         } from './js/storage.js';
+        
+        import { 
+            dbSaveMarketOrders, dbLoadMarketOrders,
+            dbAddTrade, dbGetRecentTrades,
+            dbCleanupMarketData
+        } from './js/db.js';
         
         import { chartManager, ChartType, createChartToolbar } from './js/chart-manager.js';
         import { initializeNPCTraders, getNPCTraderStats, startNPCTraderUpdates } from './js/npc-traders.js';
@@ -1278,7 +1286,6 @@
         let sortColumn = 'element';
         let sortDirection = 'asc';
         
-        // Use 'main' as the player ID - this matches storage.js default
         const PLAYER_ID = 'main';
 
         // ===== HELPER FUNCTIONS =====
@@ -1293,12 +1300,76 @@
             return value.toString();
         }
 
-        // ===== FIXED BALANCE FUNCTION - USES STORAGE.JS CORRECTLY =====
+        // ===== MIGRATION SCRIPT - ONE TIME ONLY =====
+        async function migrateMarketDataToIndexedDB() {
+            // Check if already migrated
+            if (localStorage.getItem('market_migrated_to_indexeddb') === 'true') {
+                console.log('✅ Market data already migrated to IndexedDB');
+                return true;
+            }
+            
+            console.log('🚀 Starting market data migration to IndexedDB...');
+            
+            try {
+                // Get existing localStorage data
+                const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
+                const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
+                const matchedTrades = JSON.parse(localStorage.getItem('voidfarer_matched_trades') || '[]');
+                const orderHistory = JSON.parse(localStorage.getItem('voidfarer_order_history') || '[]');
+                const currentPrices = JSON.parse(localStorage.getItem('voidfarer_current_prices') || '{}');
+                const priceHistory = JSON.parse(localStorage.getItem('voidfarer_price_history') || '{}');
+                
+                // Store in IndexedDB
+                await dbSaveMarketOrders(buyOrders, 'buy_orders');
+                await dbSaveMarketOrders(sellOrders, 'sell_orders');
+                
+                // Store trades individually
+                for (const trade of matchedTrades) {
+                    await dbAddTrade(trade);
+                }
+                
+                // Store current prices
+                await dbSaveMarketOrders(currentPrices, 'current_prices');
+                
+                // Mark migration as complete
+                localStorage.setItem('market_migrated_to_indexeddb', 'true');
+                
+                // Clear localStorage market data to free up space
+                const keysToClear = [
+                    'voidfarer_market_buy_orders',
+                    'voidfarer_market_sell_orders',
+                    'voidfarer_matched_trades',
+                    'voidfarer_order_history',
+                    'voidfarer_current_prices',
+                    'voidfarer_price_history',
+                    'voidfarer_market_trends',
+                    'voidfarer_market_volume',
+                    'voidfarer_supply_index',
+                    'voidfarer_demand_index'
+                ];
+                
+                let cleared = 0;
+                for (const key of keysToClear) {
+                    if (localStorage.getItem(key)) {
+                        localStorage.removeItem(key);
+                        cleared++;
+                    }
+                }
+                
+                console.log(`✅ Migration complete! Cleared ${cleared} localStorage items.`);
+                return true;
+                
+            } catch (error) {
+                console.error('Migration error:', error);
+                return false;
+            }
+        }
+
+        // ===== BALANCE FUNCTION =====
         async function updateBalance() {
             try {
-                // Use the storage.js getCredits function with 'main' player ID
                 const credits = await getCredits(PLAYER_ID);
-                console.log(`💰 Balance from storage.js: ${credits}`);
+                console.log(`💰 Balance: ${credits}`);
                 currentCredits = credits;
                 
                 const balanceElement = document.getElementById('totalBalance');
@@ -1615,7 +1686,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER USING STORAGE.JS FUNCTIONS =====
+        // ===== PLACE ORDER =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1661,7 +1732,6 @@
                         const success = await spendCredits(result.totalCost, PLAYER_ID);
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
-                            console.log(`💰 New balance after buy: ${currentCredits}`);
                         }
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
@@ -1670,7 +1740,6 @@
                     } else {
                         const newTotal = await addCredits(result.totalCost, PLAYER_ID);
                         currentCredits = newTotal;
-                        console.log(`💰 New balance after sell: ${currentCredits}`);
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                     }
                     
@@ -1819,12 +1888,24 @@
             }, 2000);
         }
 
+        // ===== PERIODIC CLEANUP =====
+        async function startPeriodicCleanup() {
+            // Run cleanup every hour
+            setInterval(async () => {
+                console.log('🧹 Running periodic market data cleanup...');
+                await dbCleanupMarketData();
+            }, 3600000);
+        }
+
         // ===== INITIALIZATION =====
         async function init() {
             showLoading(true);
             
             try {
-                // Ensure player exists with 'main' ID
+                // Run migration first (one time only)
+                await migrateMarketDataToIndexedDB();
+                
+                // Ensure player exists
                 let mainPlayer = await getPlayer(PLAYER_ID);
                 if (!mainPlayer) {
                     const newPlayer = {
@@ -1867,7 +1948,8 @@
                 await renderOrderBook();
                 updateMarketStats();
                 
-                initializeNPCTraders(allElements).catch(console.error);
+                // Initialize NPC traders
+                await initializeNPCTraders(allElements);
                 startNPCTraderUpdates(100, 60000);
                 
                 setTimeout(() => {
@@ -1878,6 +1960,7 @@
                 
                 setupTimeframeButtons();
                 startRealTimeUpdates();
+                startPeriodicCleanup();
                 
                 setInterval(async () => await updateBalance(), 2000);
                 
