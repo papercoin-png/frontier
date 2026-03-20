@@ -403,6 +403,106 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Reset Confirmation Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            pointer-events: auto;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: rgba(20, 20, 35, 0.95);
+            backdrop-filter: blur(15px);
+            border: 2px solid #8a6aff;
+            border-radius: 32px;
+            padding: 28px 24px;
+            width: 300px;
+            max-width: 85%;
+            text-align: center;
+            color: white;
+            box-shadow: 0 0 40px rgba(138, 106, 255, 0.3);
+        }
+        
+        .modal-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #ff6b6b;
+        }
+        
+        .modal-message {
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .modal-warning {
+            background: rgba(255, 107, 107, 0.15);
+            border: 1px solid #ff6b6b;
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 24px;
+            font-size: 12px;
+            color: #ff6b6b;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-btn.confirm {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .modal-btn.confirm:active {
+            background: #ff5252;
+            transform: scale(0.96);
+        }
+        
+        .modal-btn.cancel {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .modal-btn.cancel:active {
+            background: rgba(255,255,255,0.2);
+            transform: scale(0.96);
+        }
     </style>
 </head>
 <body>
@@ -520,6 +620,27 @@
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">ENTERING THE VOID...</div>
         </div>
+        
+        <!-- Reset Confirmation Modal -->
+        <div class="modal-overlay" id="resetModal">
+            <div class="modal-content">
+                <div class="modal-icon">⚠️</div>
+                <div class="modal-title">DATA PURGE</div>
+                <div class="modal-message">
+                    This will permanently erase all Voidfarer data.<br><br>
+                    Your journey will be forgotten. Your discoveries will vanish.<br>
+                    Your credits. Your ship. Your progress.<br><br>
+                    <strong>This cannot be undone.</strong>
+                </div>
+                <div class="modal-warning">
+                    ⚠️ All player data will be permanently deleted ⚠️
+                </div>
+                <div class="modal-buttons">
+                    <button class="modal-btn cancel" onclick="closeResetModal()">CANCEL</button>
+                    <button class="modal-btn confirm" onclick="confirmReset()">RESET</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Global audio element for background music -->
@@ -623,19 +744,116 @@
         setInterval(cycleLore, 4000);
 
         // ===== STATS =====
-        document.getElementById('planetCount').textContent = '3';
-        document.getElementById('resourceCount').textContent = '12';
-        document.getElementById('distanceTraveled').textContent = '8.4';
+        function updateStats() {
+            try {
+                // Try to get real stats from localStorage
+                const collection = JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+                let totalElements = 0;
+                let uniqueElements = 0;
+                
+                for (const [name, data] of Object.entries(collection)) {
+                    const count = typeof data === 'object' ? data.count : data;
+                    totalElements += count;
+                    uniqueElements++;
+                }
+                
+                document.getElementById('planetCount').textContent = uniqueElements.toString();
+                document.getElementById('resourceCount').textContent = totalElements.toString();
+                
+                // Distance traveled (simulated)
+                const distance = parseFloat(localStorage.getItem('voidfarer_total_distance')) || 0;
+                document.getElementById('distanceTraveled').textContent = distance.toFixed(1);
+            } catch (e) {
+                document.getElementById('planetCount').textContent = '0';
+                document.getElementById('resourceCount').textContent = '0';
+                document.getElementById('distanceTraveled').textContent = '0';
+            }
+        }
+        
+        // Update stats on load and when storage changes
+        updateStats();
+        window.addEventListener('storage', updateStats);
 
-        // ===== CHECK FOR EXISTING PLAYER =====
-        function checkExistingPlayer() {
-            const playerId = localStorage.getItem('voidfarer_player_id');
-            const playerName = localStorage.getItem('voidfarer_player_name');
-            const playerPath = localStorage.getItem('voidfarer_player_path');
+        // ===== RESET CONFIRMATION MODAL =====
+        function openResetModal() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+            document.getElementById('resetModal').classList.add('active');
+        }
+        
+        function closeResetModal() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            document.getElementById('resetModal').classList.remove('active');
+        }
+        
+        // ===== CONFIRM RESET =====
+        async function confirmReset() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
             
-            if (playerId && playerName && playerPath) {
-                console.log('Existing player found:', playerName, 'Path:', playerPath);
-                // Could update UI to show "Continue as [name]" if desired
+            // Show loading
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            loadingText.textContent = 'PURGING DATA...';
+            loadingOverlay.classList.add('active');
+            
+            // Close modal
+            closeResetModal();
+            
+            try {
+                // Clear ALL Voidfarer data from localStorage
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.includes('voidfarer')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                // Clear IndexedDB if possible
+                if (typeof window.resetAllData === 'function') {
+                    await window.resetAllData();
+                }
+                
+                // Reset stats display
+                updateStats();
+                
+                // Wait a moment for effect
+                setTimeout(() => {
+                    loadingOverlay.classList.remove('active');
+                    
+                    // Show success message
+                    const toast = document.createElement('div');
+                    toast.textContent = '✓ Data purged. Begin anew.';
+                    toast.style.cssText = `
+                        position: fixed;
+                        bottom: 100px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: rgba(138, 106, 255, 0.9);
+                        color: white;
+                        padding: 12px 24px;
+                        border-radius: 30px;
+                        font-size: 14px;
+                        z-index: 4000;
+                        animation: fadeOut 2s forwards;
+                    `;
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => toast.remove(), 2000);
+                    
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred?.('success');
+                    }
+                    
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Reset error:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to reset data. Please try again.');
             }
         }
 
@@ -645,6 +863,7 @@
             
             // Show loading
             document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingText').textContent = 'ENTERING THE VOID...';
             
             // Check if player has COMPLETED path selection
             const playerId = localStorage.getItem('voidfarer_player_id');
@@ -668,16 +887,51 @@
 
         window.openSettings = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Settings - Reset progress?');
+            openResetModal();
         };
 
         window.openCredits = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            alert('Voidfarer - Created by SpellForge Studios');
+            
+            // Show credits in a styled alert
+            const modalHtml = `
+                <div class="modal-overlay active" id="creditsModal" style="z-index: 3000;">
+                    <div class="modal-content" style="border-color: #ffaa4a;">
+                        <div class="modal-icon">📡</div>
+                        <div class="modal-title" style="color: #ffaa4a;">VOIDFARER</div>
+                        <div class="modal-message" style="text-align: center;">
+                            <strong>Created by SpellForge Studios</strong><br><br>
+                            ✦ A game of exploration, economy, and survival ✦<br><br>
+                            118 elements. Infinite stars. One journey.<br><br>
+                            <span style="font-size: 11px; color: #8a6aff;">Cognatus watches over you.</span>
+                        </div>
+                        <div class="modal-buttons">
+                            <button class="modal-btn confirm" onclick="closeCreditsModal()" style="background: #ffaa4a;">ACKNOWLEDGE</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        };
+        
+        window.closeCreditsModal = function() {
+            const modal = document.getElementById('creditsModal');
+            if (modal) modal.remove();
         };
 
+        // ===== CHECK FOR EXISTING PLAYER =====
+        function checkExistingPlayer() {
+            const playerId = localStorage.getItem('voidfarer_player_id');
+            const playerName = localStorage.getItem('voidfarer_player_name');
+            const playerPath = localStorage.getItem('voidfarer_player_path');
+            
+            if (playerId && playerName && playerPath) {
+                console.log('Existing player found:', playerName, 'Path:', playerPath);
+            }
+        }
+
         // ===== INIT =====
-        // Check for existing player on load
         checkExistingPlayer();
     </script>
 </body>
