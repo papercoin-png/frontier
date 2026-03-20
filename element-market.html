@@ -1283,7 +1283,8 @@
         let sortColumn = 'element';
         let sortDirection = 'asc';
         
-        const PLAYER_ID = 'main';
+        // ===== FIX: Use the actual player ID from localStorage =====
+        const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'main';
 
         // ===== HELPER FUNCTIONS =====
         function calculateMaxBuy(credits, price) {
@@ -1344,11 +1345,11 @@
             }
         }
 
-        // ===== BALANCE FUNCTION =====
+        // ===== BALANCE FUNCTION - Uses correct player ID =====
         async function updateBalance() {
             try {
                 const credits = await getCredits(PLAYER_ID);
-                console.log(`💰 Balance: ${credits}`);
+                console.log(`💰 Balance for player ${PLAYER_ID}: ${credits}`);
                 currentCredits = credits;
                 
                 const balanceElement = document.getElementById('totalBalance');
@@ -1465,7 +1466,7 @@
             spreadDisplay.innerHTML = `▼ SPREAD ${book.spreadPercent?.toFixed(2) || 0}% ▼`;
         }
 
-        // ===== FIXED: async updateMarketStats =====
+        // ===== async updateMarketStats =====
         async function updateMarketStats() {
             const prices = getCurrentPrices();
             let marketCap = 0;
@@ -1718,6 +1719,7 @@
                         const success = await spendCredits(result.totalCost, PLAYER_ID);
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
+                            console.log(`💰 Credits after buy: ${currentCredits}`);
                         }
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
@@ -1726,6 +1728,7 @@
                     } else {
                         const newTotal = await addCredits(result.totalCost, PLAYER_ID);
                         currentCredits = newTotal;
+                        console.log(`💰 Credits after sell: ${currentCredits}`);
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                     }
                     
@@ -1864,7 +1867,6 @@
             else overlay.classList.remove('active');
         }
 
-        // ===== FIXED: startRealTimeUpdates with await =====
         function startRealTimeUpdates() {
             updateInterval = setInterval(async () => {
                 renderMarketTicker();
@@ -1875,7 +1877,6 @@
             }, 2000);
         }
 
-        // ===== PERIODIC CLEANUP =====
         async function startPeriodicCleanup() {
             setInterval(async () => {
                 console.log('🧹 Running periodic market data cleanup...');
@@ -1888,7 +1889,8 @@
             showLoading(true);
             
             try {
-                // Run migration first
+                console.log(`🎮 Initializing with player ID: ${PLAYER_ID}`);
+                
                 await migrateMarketDataToIndexedDB();
                 
                 // Ensure player exists
@@ -1902,9 +1904,9 @@
                         created: new Date().toISOString()
                     };
                     await savePlayer(newPlayer, PLAYER_ID);
-                    console.log('✅ Created main player with 5000 credits');
+                    console.log(`✅ Created player with ID: ${PLAYER_ID} and 5000 credits`);
                 } else {
-                    console.log('✅ Main player exists with credits:', mainPlayer.credits);
+                    console.log(`✅ Player exists with credits: ${mainPlayer.credits}`);
                 }
                 
                 initializeMarket();
@@ -1934,7 +1936,6 @@
                 await renderOrderBook();
                 await updateMarketStats();
                 
-                // Initialize NPC traders
                 await initializeNPCTraders(allElements);
                 startNPCTraderUpdates(100, 60000);
                 
