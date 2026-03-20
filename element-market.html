@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
+        /* ===== YOUR EXISTING CSS - KEPT EXACTLY THE SAME ===== */
         * {
             margin: 0;
             padding: 0;
@@ -1245,6 +1246,7 @@
             ORDER_TYPES, ORDER_SIDES, getAllRecentTrades
         } from './js/market-engine.js';
         
+        // Import the correct storage.js functions
         import { 
             getCollection, getCredits, addCredits, spendCredits,
             getPlayer, savePlayer
@@ -1276,6 +1278,7 @@
         let sortColumn = 'element';
         let sortDirection = 'asc';
         
+        // Use 'main' as the player ID - this matches storage.js default
         const PLAYER_ID = 'main';
 
         // ===== HELPER FUNCTIONS =====
@@ -1290,50 +1293,10 @@
             return value.toString();
         }
 
-        // ===== STORAGE CLEANUP FUNCTION =====
-        window.clearOldStorageData = function() {
-            console.log('🧹 Cleaning up old storage data...');
-            
-            const keysToKeep = [
-                'voidfarer_player_main',
-                'voidfarer_player_id',
-                'voidfarer_collection',
-                'voidfarer_credits',
-                'voidfarer_market_prices'
-            ];
-            
-            let removedCount = 0;
-            
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                let shouldKeep = false;
-                
-                for (const keepKey of keysToKeep) {
-                    if (key === keepKey || key.startsWith(keepKey)) {
-                        shouldKeep = true;
-                        break;
-                    }
-                }
-                
-                if (!shouldKeep && key.includes('voidfarer')) {
-                    console.log(`🗑️ Removing: ${key}`);
-                    localStorage.removeItem(key);
-                    removedCount++;
-                    i--;
-                }
-            }
-            
-            console.log(`✅ Removed ${removedCount} old storage items`);
-            showToast(`Cleaned up ${removedCount} old data items`, 'success');
-            
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
-        };
-
-        // ===== FIXED BALANCE FUNCTION =====
+        // ===== FIXED BALANCE FUNCTION - USES STORAGE.JS CORRECTLY =====
         async function updateBalance() {
             try {
+                // Use the storage.js getCredits function with 'main' player ID
                 const credits = await getCredits(PLAYER_ID);
                 console.log(`💰 Balance from storage.js: ${credits}`);
                 currentCredits = credits;
@@ -1652,7 +1615,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER =====
+        // ===== PLACE ORDER USING STORAGE.JS FUNCTIONS =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1698,6 +1661,7 @@
                         const success = await spendCredits(result.totalCost, PLAYER_ID);
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
+                            console.log(`💰 New balance after buy: ${currentCredits}`);
                         }
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
@@ -1706,6 +1670,7 @@
                     } else {
                         const newTotal = await addCredits(result.totalCost, PLAYER_ID);
                         currentCredits = newTotal;
+                        console.log(`💰 New balance after sell: ${currentCredits}`);
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                     }
                     
@@ -1859,20 +1824,7 @@
             showLoading(true);
             
             try {
-                // Check if storage is near quota and offer cleanup
-                let totalSize = 0;
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    const value = localStorage.getItem(key);
-                    totalSize += (key.length + (value?.length || 0)) * 2;
-                }
-                
-                if (totalSize > 4 * 1024 * 1024) {
-                    console.warn('⚠️ localStorage is near quota limit');
-                    showToast('Storage nearly full. Consider clearing old data.', 'error');
-                }
-                
-                // Ensure player exists
+                // Ensure player exists with 'main' ID
                 let mainPlayer = await getPlayer(PLAYER_ID);
                 if (!mainPlayer) {
                     const newPlayer = {
@@ -1915,16 +1867,8 @@
                 await renderOrderBook();
                 updateMarketStats();
                 
-                // Initialize NPC traders with error handling
-                try {
-                    await initializeNPCTraders(allElements);
-                    startNPCTraderUpdates(100, 60000);
-                } catch (e) {
-                    console.warn('NPC initialization warning:', e);
-                    if (e.name === 'QuotaExceededError') {
-                        showToast('Storage full. Run cleanup from console: clearOldStorageData()', 'error');
-                    }
-                }
+                initializeNPCTraders(allElements).catch(console.error);
+                startNPCTraderUpdates(100, 60000);
                 
                 setTimeout(() => {
                     const goldElement = allElements.find(e => e.name === 'Gold');
