@@ -4,6 +4,7 @@
 // UPDATED: Added market data persistence for trading system
 // UPDATED: Added certificate holder tracking for labor pool distribution
 // UPDATED: Added NPC trader persistence for marketplace NPCs
+// UPDATED: Added market data cleanup functions to prevent localStorage quota issues
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -150,11 +151,15 @@ const STORAGE_KEYS = {
     // Field mastery levels
     FIELD_MASTERY: 'voidfarer_field_mastery',
     
-    // ===== NPC TRADER KEYS (NEW) =====
+    // ===== NPC TRADER KEYS =====
     NPC_TRADERS: 'voidfarer_npc_traders',
     NPC_TRADER_ORDERS: 'voidfarer_npc_trader_orders',
     NPC_TRADER_STATS: 'voidfarer_npc_trader_stats',
-    LAST_NPC_UPDATE: 'voidfarer_last_npc_update'
+    LAST_NPC_UPDATE: 'voidfarer_last_npc_update',
+    
+    // ===== MARKET DATA CLEANUP KEYS (NEW) =====
+    LAST_CLEANUP: 'voidfarer_last_cleanup',
+    CLEANUP_INTERVAL_DAYS: 7 // Run cleanup weekly
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE =====
@@ -1248,7 +1253,7 @@ export async function initializeStorage(playerId = 'main') {
         localStorage.setItem(certKey, '{}');
     }
     
-    // Initialize NPC trader storage (NEW)
+    // Initialize NPC trader storage
     const npcTradersKey = STORAGE_KEYS.NPC_TRADERS;
     if (!localStorage.getItem(npcTradersKey)) {
         localStorage.setItem(npcTradersKey, '{}');
@@ -1275,12 +1280,345 @@ export async function initializeStorage(playerId = 'main') {
         localStorage.setItem(lastUpdateKey, Date.now().toString());
     }
     
+    // Initialize last cleanup timestamp
+    const lastCleanupKey = STORAGE_KEYS.LAST_CLEANUP;
+    if (!localStorage.getItem(lastCleanupKey)) {
+        localStorage.setItem(lastCleanupKey, Date.now().toString());
+    }
+    
     // Initialize location if not set
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) {
         setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     }
     
     console.log('Storage initialized for player:', playerId);
+    
+    // Check if cleanup is needed
+    await checkAndRunCleanup();
+}
+
+// ============================================================================
+// STORAGE CLEANUP FUNCTIONS (NEW)
+// ============================================================================
+
+/**
+ * Check if cleanup is needed based on last cleanup timestamp
+ * @returns {Promise<boolean>} True if cleanup was performed
+ */
+export async function checkAndRunCleanup() {
+    try {
+        const lastCleanup = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_CLEANUP)) || 0;
+        const now = Date.now();
+        const daysSinceCleanup = (now - lastCleanup) / (24 * 60 * 60 * 1000);
+        
+        if (daysSinceCleanup >= STORAGE_KEYS.CLEANUP_INTERVAL_DAYS) {
+            console.log(`🧹 ${daysSinceCleanup.toFixed(1)} days since last cleanup, running storage cleanup...`);
+            await runFullStorageCleanup();
+            localStorage.setItem(STORAGE_KEYS.LAST_CLEANUP, now.toString());
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Error checking cleanup:', error);
+        return false;
+    }
+}
+
+/**
+ * Run full storage cleanup to prevent quota issues
+ * @returns {Promise<Object>} Cleanup results
+ */
+export async function runFullStorageCleanup() {
+    console.log('🧹 Running full storage cleanup...');
+    
+    const results = {
+        marketData: 0,
+        npcData: 0,
+        historyData: 0,
+        totalFreed: 0
+    };
+    
+    try {
+        // 1. Clean market data (prices, volume, history)
+        const marketCleanup = await cleanupMarketData();
+        results.marketData = marketCleanup.itemsRemoved;
+        results.totalFreed += marketCleanup.bytesFreed;
+        
+        // 2. Clean NPC trader data (old orders, inactive traders)
+        const npcCleanup = await cleanupNPCData();
+        results.npcData = npcCleanup.itemsRemoved;
+        results.totalFreed += npcCleanup.bytesFreed;
+        
+        // 3. Clean old history data (scan history, recent locations)
+        const historyCleanup = await cleanupHistoryData();
+        results.historyData = historyCleanup.itemsRemoved;
+        results.totalFreed += historyCleanup.bytesFreed;
+        
+        // 4. Remove any orphaned keys
+        const orphanedCleanup = await cleanupOrphanedKeys();
+        results.orphanedRemoved = orphanedCleanup;
+        
+        console.log('✅ Storage cleanup complete:', results);
+        
+        return results;
+        
+    } catch (error) {
+        console.error('Error during storage cleanup:', error);
+        return results;
+    }
+}
+
+/**
+ * Clean up market data (prices, volume, orders)
+ * @returns {Promise<Object>} Cleanup results
+ */
+export async function cleanupMarketData() {
+    const itemsRemoved = 0;
+    const bytesFreed = 0;
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    
+    try {
+        // Clean MARKET_HISTORY
+        const history = localStorage.getItem(STORAGE_KEYS.MARKET_HISTORY);
+        if (history) {
+            try {
+                const historyData = JSON.parse(history);
+                if (Array.isArray(historyData)) {
+                    const originalSize = history.length;
+                    const filtered = historyData.filter(item => 
+                        item.timestamp >= thirtyDaysAgo
+                    );
+                    if (filtered.length < historyData.length) {
+                        localStorage.setItem(STORAGE_KEYS.MARKET_HISTORY, JSON.stringify(filtered));
+                        console.log(`🧹 Market history: ${historyData.length - filtered.length} old records removed`);
+                    }
+                }
+            } catch (e) {
+                // If corrupted, remove it
+                localStorage.removeItem(STORAGE_KEYS.MARKET_HISTORY);
+                console.log('🧹 Removed corrupted market history');
+            }
+        }
+        
+        // Clean MARKET_VOLUME
+        const volume = localStorage.getItem(STORAGE_KEYS.MARKET_VOLUME);
+        if (volume) {
+            try {
+                const volumeData = JSON.parse(volume);
+                let changed = false;
+                
+                Object.keys(volumeData).forEach(element => {
+                    if (volumeData[element] && typeof volumeData[element] === 'object') {
+                        Object.keys(volumeData[element]).forEach(date => {
+                            if (new Date(date).getTime() < thirtyDaysAgo) {
+                                delete volumeData[element][date];
+                                changed = true;
+                            }
+                        });
+                        
+                        if (Object.keys(volumeData[element]).length === 0) {
+                            delete volumeData[element];
+                            changed = true;
+                        }
+                    }
+                });
+                
+                if (changed) {
+                    localStorage.setItem(STORAGE_KEYS.MARKET_VOLUME, JSON.stringify(volumeData));
+                }
+            } catch (e) {
+                // If corrupted, remove it
+                localStorage.removeItem(STORAGE_KEYS.MARKET_VOLUME);
+            }
+        }
+        
+        // Clean MARKET_ORDERS (keep only active orders)
+        const orders = localStorage.getItem(STORAGE_KEYS.MARKET_ORDERS);
+        if (orders) {
+            try {
+                const ordersData = JSON.parse(orders);
+                if (typeof ordersData === 'object') {
+                    let changed = false;
+                    
+                    Object.keys(ordersData).forEach(element => {
+                        if (Array.isArray(ordersData[element])) {
+                            const activeOrders = ordersData[element].filter(o => 
+                                o.status === 'active' || o.status === 'partial'
+                            );
+                            if (activeOrders.length < ordersData[element].length) {
+                                ordersData[element] = activeOrders;
+                                changed = true;
+                            }
+                        }
+                    });
+                    
+                    if (changed) {
+                        localStorage.setItem(STORAGE_KEYS.MARKET_ORDERS, JSON.stringify(ordersData));
+                    }
+                }
+            } catch (e) {
+                // If corrupted, remove it
+                localStorage.removeItem(STORAGE_KEYS.MARKET_ORDERS);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error cleaning market data:', error);
+    }
+    
+    return { itemsRemoved, bytesFreed };
+}
+
+/**
+ * Clean up NPC trader data
+ * @returns {Promise<Object>} Cleanup results
+ */
+export async function cleanupNPCData() {
+    const itemsRemoved = 0;
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    
+    try {
+        // Clean NPC_TRADER_ORDERS - remove filled/cancelled orders older than 7 days
+        const orders = localStorage.getItem(STORAGE_KEYS.NPC_TRADER_ORDERS);
+        if (orders) {
+            try {
+                const ordersData = JSON.parse(orders);
+                let changed = false;
+                
+                if (typeof ordersData === 'object') {
+                    Object.keys(ordersData).forEach(element => {
+                        if (Array.isArray(ordersData[element])) {
+                            const recentOrders = ordersData[element].filter(o => 
+                                o.status === 'active' || 
+                                o.status === 'partial' ||
+                                (o.status !== 'active' && o.status !== 'partial' && o.createdAt >= sevenDaysAgo)
+                            );
+                            if (recentOrders.length < ordersData[element].length) {
+                                ordersData[element] = recentOrders;
+                                changed = true;
+                            }
+                        }
+                    });
+                    
+                    if (changed) {
+                        localStorage.setItem(STORAGE_KEYS.NPC_TRADER_ORDERS, JSON.stringify(ordersData));
+                    }
+                }
+            } catch (e) {
+                // If corrupted, remove it
+                localStorage.removeItem(STORAGE_KEYS.NPC_TRADER_ORDERS);
+            }
+        }
+        
+        // Clean NPC_TRADER_STATS - just keep latest
+        // No cleanup needed, it's a single object
+        
+    } catch (error) {
+        console.error('Error cleaning NPC data:', error);
+    }
+    
+    return { itemsRemoved, bytesFreed: 0 };
+}
+
+/**
+ * Clean up history data (scan history, recent locations)
+ * @returns {Promise<Object>} Cleanup results
+ */
+export async function cleanupHistoryData() {
+    const itemsRemoved = 0;
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    
+    try {
+        // Clean SCAN_HISTORY
+        const scanHistory = localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
+        if (scanHistory) {
+            try {
+                const scans = JSON.parse(scanHistory);
+                if (Array.isArray(scans)) {
+                    const recentScans = scans.filter(scan => 
+                        scan.timestamp >= thirtyDaysAgo
+                    );
+                    if (recentScans.length < scans.length) {
+                        localStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify(recentScans));
+                        console.log(`🧹 Scan history: ${scans.length - recentScans.length} old records removed`);
+                    }
+                }
+            } catch (e) {
+                // If corrupted, remove it
+                localStorage.removeItem(STORAGE_KEYS.SCAN_HISTORY);
+            }
+        }
+        
+        // Clean RECENT_LOCATIONS
+        const recentLocs = localStorage.getItem(STORAGE_KEYS.RECENT_LOCATIONS);
+        if (recentLocs) {
+            try {
+                const locations = JSON.parse(recentLocs);
+                if (Array.isArray(locations)) {
+                    const recent = locations.filter(loc => 
+                        loc.timestamp >= thirtyDaysAgo
+                    );
+                    if (recent.length < locations.length) {
+                        localStorage.setItem(STORAGE_KEYS.RECENT_LOCATIONS, JSON.stringify(recent));
+                    }
+                }
+            } catch (e) {
+                localStorage.removeItem(STORAGE_KEYS.RECENT_LOCATIONS);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error cleaning history data:', error);
+    }
+    
+    return { itemsRemoved, bytesFreed: 0 };
+}
+
+/**
+ * Clean up orphaned keys (player-specific keys without player data)
+ * @returns {Promise<number>} Number of orphaned keys removed
+ */
+export async function cleanupOrphanedKeys() {
+    let removed = 0;
+    const playerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID) || 'player_default';
+    
+    try {
+        const allKeys = Object.keys(localStorage);
+        const playerKeys = allKeys.filter(key => 
+            key.includes(playerId) && 
+            !key.includes(STORAGE_KEYS.PLAYER) // Don't remove player data itself
+        );
+        
+        // Check if player exists
+        const playerKey = `${STORAGE_KEYS.PLAYER}_${playerId}`;
+        const playerExists = localStorage.getItem(playerKey);
+        
+        if (!playerExists) {
+            // No player data, remove all player-specific keys
+            playerKeys.forEach(key => {
+                localStorage.removeItem(key);
+                removed++;
+            });
+            console.log(`🧹 Removed ${removed} orphaned keys (no player data)`);
+        }
+        
+    } catch (error) {
+        console.error('Error cleaning orphaned keys:', error);
+    }
+    
+    return removed;
+}
+
+/**
+ * Manual cleanup trigger for external use
+ * @returns {Promise<Object>} Cleanup results
+ */
+export async function triggerManualCleanup() {
+    console.log('🧹 Manual storage cleanup triggered');
+    const results = await runFullStorageCleanup();
+    localStorage.setItem(STORAGE_KEYS.LAST_CLEANUP, Date.now().toString());
+    return results;
 }
 
 // ============================================================================
@@ -1553,7 +1891,7 @@ export async function loadTradeHistory(playerId = null) {
 }
 
 // ============================================================================
-// NPC TRADER FUNCTIONS (NEW)
+// NPC TRADER FUNCTIONS
 // ============================================================================
 
 /**
@@ -2046,7 +2384,7 @@ export default {
     getPlayerLaborEarnings,
     claimPlayerLaborEarnings,
     
-    // NPC Trader Functions (NEW)
+    // NPC Trader Functions
     saveNPCTraders,
     loadNPCTraders,
     saveNPCTrader,
@@ -2108,7 +2446,15 @@ export default {
     // System
     initializeStorage,
     resetGame,
-    saveTimestamp
+    saveTimestamp,
+    
+    // NEW: Cleanup functions
+    checkAndRunCleanup,
+    runFullStorageCleanup,
+    triggerManualCleanup,
+    cleanupMarketData,
+    cleanupNPCData,
+    cleanupHistoryData
 };
 
 // ============================================================================
@@ -2160,7 +2506,7 @@ window.addPlayerLaborEarnings = addPlayerLaborEarnings;
 window.getPlayerLaborEarnings = getPlayerLaborEarnings;
 window.claimPlayerLaborEarnings = claimPlayerLaborEarnings;
 
-// NPC Trader Functions (NEW)
+// NPC Trader Functions
 window.saveNPCTraders = saveNPCTraders;
 window.loadNPCTraders = loadNPCTraders;
 window.saveNPCTrader = saveNPCTrader;
@@ -2186,4 +2532,8 @@ window.loadTradeHistory = loadTradeHistory;
 // Element locations function
 window.getElementLocations = getElementLocations;
 
-console.log('✅ storage.js fully loaded with NPC trader support');
+// NEW: Cleanup functions
+window.triggerManualCleanup = triggerManualCleanup;
+window.runFullStorageCleanup = runFullStorageCleanup;
+
+console.log('✅ storage.js fully loaded with NPC trader support and storage cleanup functions');
