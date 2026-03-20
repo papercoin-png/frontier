@@ -1039,7 +1039,7 @@
             box-shadow: 0 4px 12px rgba(246, 70, 93, 0.3);
         }
         
-        /* Order Sub-type Toggle - FIXED */
+        /* Order Sub-type Toggle */
         .order-type-selector {
             display: flex;
             gap: 8px;
@@ -1068,7 +1068,7 @@
             font-weight: 700;
         }
         
-        /* Execution Info - NEW */
+        /* Execution Info */
         .execution-info {
             background: rgba(240, 185, 11, 0.1);
             border-radius: 16px;
@@ -1810,7 +1810,7 @@
                 </div>
             </div>
             
-            <!-- Order Modal (for placing orders) - REDESIGNED with fixed toggles -->
+            <!-- Order Modal (for placing orders) -->
             <div class="order-modal-overlay" id="orderModal">
                 <div class="order-modal-content" id="orderModalContent">
                     <!-- Dynamically filled by JavaScript -->
@@ -2214,8 +2214,17 @@
             }
         }
 
-        // ===== BALANCE =====
+        // ===== BALANCE - FIXED SYNC =====
         function updateBalance() {
+            // Make sure currentCredits is up to date with storage
+            const storedCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+            
+            // If there's a discrepancy, log it and sync
+            if (currentCredits !== storedCredits) {
+                console.log(`Balance sync: ${currentCredits} (memory) → ${storedCredits} (storage)`);
+                currentCredits = storedCredits;
+            }
+            
             const balanceElement = document.getElementById('totalBalance');
             if (balanceElement) {
                 balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
@@ -2350,10 +2359,10 @@
             document.getElementById('depthSpread').textContent = `${spreadPercent.toFixed(2)}% spread`;
         }
 
-        // ===== UPDATED MARKET STATS WITH ABBREVIATED MARKET CAP =====
+        // ===== MARKET STATS =====
         function updateMarketStats() {
             try {
-                console.log('📊 Forcing market stats update...');
+                console.log('📊 Updating market stats...');
                 
                 // Get DOM elements
                 const volumeEl = document.getElementById('volume24h');
@@ -2363,8 +2372,6 @@
                 const topGainerEl = document.getElementById('topGainer');
                 const gainerChangeEl = document.getElementById('gainerChange');
                 const volumeChangeEl = document.getElementById('volumeChange');
-                const npcActiveEl = document.getElementById('npcActiveCount');
-                const npcOrderEl = document.getElementById('npcOrderCount');
                 
                 // Get fresh data
                 const prices = getCurrentPrices();
@@ -2410,15 +2417,7 @@
                     volumeChangeEl.innerText = `+${volChange}%`;
                 }
                 
-                // Update NPC stats
-                if (npcActiveEl) npcActiveEl.innerText = '1000';
-                if (npcOrderEl) npcOrderEl.innerText = '200 orders';
-                
-                console.log('✅ Stats updated with market cap:', formatMarketCap(marketCap));
-                
-                // Also update ticker and table
-                renderMarketTicker();
-                renderMarketTable();
+                console.log('✅ Stats updated');
                 
             } catch (error) {
                 console.error('❌ Error updating market stats:', error);
@@ -2517,7 +2516,7 @@
             openOrderModal(selectedElement.name, 'sell', selectedElement.bidPrice);
         };
 
-        // ===== OPEN ORDER MODAL - REDESIGNED with fixed toggles =====
+        // ===== OPEN ORDER MODAL =====
         openOrderModal = function(elementName, side, price) {
             const element = allElements.find(e => e.name === elementName);
             if (!element) return;
@@ -2731,10 +2730,16 @@
             }
         }
 
+        // ===== FIXED PLACE ORDER MODAL =====
         placeOrderModal = async function() {
             if (!selectedElement) return;
             
-            const total = orderPrice * orderQuantity;
+            // For market orders, use current market price for validation
+            const executionPrice = orderType === ORDER_TYPES.MARKET ? 
+                (orderSide === ORDER_SIDES.BUY ? getAskPrice(selectedElement.name) : getBidPrice(selectedElement.name)) : 
+                orderPrice;
+            
+            const total = executionPrice * orderQuantity;
             const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
             
             // Validation
@@ -2774,22 +2779,44 @@
                     
                     // Update balances for market orders (immediate execution)
                     if (orderType === ORDER_TYPES.MARKET && result.trade) {
+                        // Log the trade details for debugging
+                        console.log('Trade executed:', result.trade);
+                        
                         if (orderSide === ORDER_SIDES.BUY) {
-                            currentCredits -= result.totalCost;
+                            // Calculate new balance
+                            currentCredits = currentCredits - result.totalCost;
+                            
+                            // Save to localStorage
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
                             
+                            // Add to collection
                             await window.addElementToCollection(selectedElement.name, orderQuantity, {
                                 source: 'market',
                                 price: result.executionPrice
                             });
+                            
                         } else {
-                            await window.removeElementFromCollection(selectedElement.name, orderQuantity);
-                            currentCredits += result.totalCost;
+                            // Calculate new balance
+                            currentCredits = currentCredits + result.totalCost;
+                            
+                            // Save to localStorage
                             localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
+                            // Remove from collection
+                            await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                         }
                         
+                        // Refresh collection data
                         currentCollection = await getCollection();
+                        
+                        // Force balance update in UI
                         updateBalance();
+                        
+                        // Show success message with price
+                        showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
+                    } else {
+                        // Limit order placed successfully
+                        showToast('Limit order placed', 'success');
                     }
                     
                     await renderOrderBook(); // Refresh order book
