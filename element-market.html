@@ -1634,10 +1634,10 @@
                 <button class="portfolio-btn" onclick="window.openPortfolioModal()">PORTFOLIO</button>
             </div>
             
-            <!-- My Orders Link - FIXED VISIBILITY -->
+            <!-- My Orders Link - FIXED: Both emoji and text are now in spans -->
             <div class="my-orders-link">
                 <div class="my-orders-btn" onclick="window.goToMyOrders()">
-                    <span>📋</span> MY ORDERS
+                    <span>📋</span> <span>MY ORDERS</span>
                 </div>
             </div>
             
@@ -1894,7 +1894,7 @@
             getTraderDisplayName,
             isNPCOrder
         } from './js/market-engine.js';
-        import { getCollection } from './js/storage.js';
+        import { getCollection, getPlayer, savePlayer } from './js/storage.js';
         import { chartManager, ChartType, createChartToolbar } from './js/chart-manager.js';
         import { 
             initializeNPCTraders, 
@@ -1968,7 +1968,6 @@
 
         // ===== SORT TABLE FUNCTION =====
         sortTable = function(column) {
-            // Toggle direction if same column, otherwise set to asc
             if (sortColumn === column) {
                 sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
             } else {
@@ -1976,10 +1975,8 @@
                 sortDirection = 'asc';
             }
             
-            // Update sort indicators
             updateSortIndicators();
             
-            // Sort the elements
             filteredElements.sort((a, b) => {
                 let valA, valB;
                 
@@ -2004,7 +2001,6 @@
                         return 0;
                 }
                 
-                // Compare based on type
                 if (typeof valA === 'string') {
                     return sortDirection === 'asc' 
                         ? valA.localeCompare(valB)
@@ -2016,10 +2012,8 @@
                 }
             });
             
-            // Re-render the table
             renderMarketTable();
             
-            // Optional haptic feedback
             if (tg?.HapticFeedback) {
                 tg.HapticFeedback.impactOccurred('light');
             }
@@ -2027,12 +2021,10 @@
 
         // ===== UPDATE SORT INDICATORS =====
         function updateSortIndicators() {
-            // Clear all indicators
             document.querySelectorAll('.sort-indicator').forEach(el => {
                 el.textContent = '';
             });
             
-            // Set current indicator
             const indicator = document.getElementById(`sort-${sortColumn}`);
             if (indicator) {
                 indicator.textContent = sortDirection === 'asc' ? '▼' : '▲';
@@ -2088,7 +2080,6 @@
                     
                     await initializeNPCTraders(allElements);
                     
-                    // Start staggered updates (100 traders per minute)
                     startNPCTraderUpdates(100, 60000);
                     
                     npcInitialized = true;
@@ -2097,11 +2088,9 @@
                     console.log(`NPC traders already exist: ${stats.totalTraders}`);
                     npcInitialized = true;
                     
-                    // Start updates if not already running
                     startNPCTraderUpdates(100, 60000);
                 }
                 
-                // Update NPC stats display
                 await updateNPCStats();
                 
             } catch (error) {
@@ -2127,30 +2116,97 @@
             }
         };
 
+        // ===== FIXED BALANCE FUNCTION - READS FROM PLAYER OBJECT FIRST =====
+        async function updateBalance() {
+            try {
+                let storedCredits = null;
+                const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId || 'player_default';
+                
+                // Source 1: Player object (PRIMARY SOURCE)
+                try {
+                    const playerData = await getPlayer(actualPlayerId);
+                    if (playerData && typeof playerData.credits === 'number' && playerData.credits >= 0) {
+                        storedCredits = playerData.credits;
+                        console.log(`💰 Balance from player object: ${storedCredits}`);
+                    }
+                } catch (e) {
+                    console.warn('Could not read player object');
+                }
+                
+                // Source 2: Direct credits key (fallback)
+                if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
+                    try {
+                        const directCredits = localStorage.getItem('voidfarer_credits');
+                        if (directCredits !== null) {
+                            storedCredits = parseInt(directCredits);
+                            console.log(`💰 Balance from direct key: ${storedCredits}`);
+                        }
+                    } catch (e) {
+                        console.warn('Could not read direct credits');
+                    }
+                }
+                
+                // Fallback to default
+                if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
+                    storedCredits = 5000;
+                    console.log(`💰 Balance using default: ${storedCredits}`);
+                    
+                    // Initialize player with default credits if needed
+                    try {
+                        const playerData = await getPlayer(actualPlayerId);
+                        if (!playerData) {
+                            // Player doesn't exist, will be created by storage.js
+                            console.log('No player found, will be created with 5000 credits');
+                        }
+                    } catch (e) {}
+                }
+                
+                // Sync both storage locations
+                if (currentCredits !== storedCredits) {
+                    console.log(`💰 Balance sync: ${currentCredits} → ${storedCredits}`);
+                    currentCredits = storedCredits;
+                }
+                
+                // Update direct key for compatibility
+                localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                
+                // Update UI
+                const balanceElement = document.getElementById('totalBalance');
+                if (balanceElement) {
+                    balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+                }
+                
+                document.querySelectorAll('.balance-value').forEach(el => {
+                    if (el.id !== 'totalBalance') {
+                        el.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+                    }
+                });
+                
+                return currentCredits;
+                
+            } catch (error) {
+                console.error('Error updating balance:', error);
+                return currentCredits;
+            }
+        }
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
             
             try {
-                // Get player info
                 playerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
-                // Ensure default prices exist
                 ensureDefaultPrices();
-                
-                // Initialize market if needed
                 initializeMarket();
                 
-                // Load all elements with proper price data
                 console.log('Loading available elements...');
                 const rawElements = getAvailableElements();
                 console.log('Raw elements from getAvailableElements:', rawElements.length);
                 
-                // Get current prices to merge
                 const prices = getCurrentPrices();
                 console.log('Current prices available:', Object.keys(prices).length);
                 
-                // Merge price data into elements
                 allElements = rawElements.map(el => {
                     const priceData = prices[el.name] || {};
                     return {
@@ -2166,24 +2222,18 @@
                 console.log('Sample element with price:', allElements[0]);
                 filteredElements = [...allElements];
                 
-                // Load player data
-                currentCredits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                // Load player data - use the FIXED balance function
                 currentCollection = await getCollection();
+                await updateBalance(); // This will now read from player object
                 
-                // Update displays
-                updateBalance();
                 renderMarketTicker();
                 renderMarketTable();
                 await renderOrderBook();
                 updateMarketStats();
                 
-                // Save initial prices
                 saveMarketPrices();
-                
-                // Initialize NPC traders
                 initializeNPCs().catch(console.error);
                 
-                // Setup chart for default element
                 setTimeout(() => {
                     const goldElement = allElements.find(e => e.name === 'Gold');
                     if (goldElement) {
@@ -2193,22 +2243,18 @@
                     }
                 }, 100);
                 
-                // Setup timeframe buttons
                 setupTimeframeButtons();
-                
-                // Start real-time updates
                 startRealTimeUpdates();
                 
-                // ===== FIX: Add aggressive balance refresh =====
-                setInterval(() => {
-                    updateBalance();
+                // Aggressive balance refresh
+                setInterval(async () => {
+                    await updateBalance();
                 }, 2000);
 
-                // Also refresh after any storage event (other tabs/windows)
-                window.addEventListener('storage', (e) => {
+                window.addEventListener('storage', async (e) => {
                     if (e.key === 'voidfarer_credits' || (e.key && e.key.includes('voidfarer_player'))) {
                         console.log('Storage changed, refreshing balance');
-                        updateBalance();
+                        await updateBalance();
                     }
                 });
                 
@@ -2229,64 +2275,6 @@
             } else {
                 overlay.classList.remove('active');
             }
-        }
-
-        // ===== BALANCE - ENHANCED SYNC WITH MULTIPLE STORAGE LOCATIONS =====
-        function updateBalance() {
-            // Try multiple sources to get the correct balance
-            let storedCredits = null;
-            
-            // Source 1: Direct credits key
-            try {
-                const directCredits = localStorage.getItem('voidfarer_credits');
-                if (directCredits !== null) {
-                    storedCredits = parseInt(directCredits);
-                }
-            } catch (e) {
-                console.warn('Could not read direct credits');
-            }
-            
-            // Source 2: Player object
-            if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
-                try {
-                    const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                    const playerKey = `voidfarer_player_${playerId}`;
-                    const playerData = JSON.parse(localStorage.getItem(playerKey));
-                    if (playerData && playerData.credits !== undefined) {
-                        storedCredits = playerData.credits;
-                        // Sync to direct key
-                        localStorage.setItem('voidfarer_credits', storedCredits.toString());
-                    }
-                } catch (e) {
-                    console.warn('Could not read player object');
-                }
-            }
-            
-            // Fallback to currentCredits or default
-            if (storedCredits === null || isNaN(storedCredits) || storedCredits < 0) {
-                storedCredits = currentCredits || 5000;
-                localStorage.setItem('voidfarer_credits', storedCredits.toString());
-            }
-            
-            // Update memory and UI
-            if (currentCredits !== storedCredits) {
-                console.log(`💰 Balance sync: ${currentCredits} → ${storedCredits}`);
-                currentCredits = storedCredits;
-            }
-            
-            const balanceElement = document.getElementById('totalBalance');
-            if (balanceElement) {
-                balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
-            }
-            
-            // Also update any other balance displays
-            document.querySelectorAll('.balance-value').forEach(el => {
-                if (el.id !== 'totalBalance') {
-                    el.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
-                }
-            });
-            
-            return currentCredits;
         }
 
         // ===== MARKET TICKER =====
@@ -2347,14 +2335,12 @@
                 return;
             }
             
-            // Get combined order book with NPC orders
             const book = await getCombinedOrderBook(selectedElement.name, 8);
             
             const bids = document.getElementById('orderBookBids');
             const asks = document.getElementById('orderBookAsks');
             const spreadDisplay = document.getElementById('spreadDisplay');
             
-            // Update counts
             document.getElementById('npcBidCount').textContent = `${book.bids.filter(b => b.isNPC).length} NPC`;
             document.getElementById('npcAskCount').textContent = `${book.asks.filter(a => a.isNPC).length} NPC`;
             document.getElementById('playerOrderCount').textContent = book.playerCount || 0;
@@ -2364,7 +2350,6 @@
             let bidHtml = '';
             let askHtml = '';
             
-            // Render bids (buy orders)
             if (book.bids && book.bids.length > 0) {
                 book.bids.forEach(level => {
                     const npcClass = level.isNPC ? 'npc-order' : '';
@@ -2385,7 +2370,6 @@
                 bidHtml = '<div class="order-row">No bids</div>';
             }
             
-            // Render asks (sell orders)
             if (book.asks && book.asks.length > 0) {
                 book.asks.forEach(level => {
                     const npcClass = level.isNPC ? 'npc-order' : '';
@@ -2412,7 +2396,6 @@
             const spreadPercent = book.spreadPercent || 0;
             spreadDisplay.innerHTML = `▼ SPREAD ${spreadPercent.toFixed(2)}% ▼`;
             
-            // Also update market depth stat
             document.getElementById('marketDepth').textContent = book.bids.length + book.asks.length;
             document.getElementById('depthSpread').textContent = `${spreadPercent.toFixed(2)}% spread`;
         }
@@ -2422,7 +2405,6 @@
             try {
                 console.log('📊 Updating market stats...');
                 
-                // Get DOM elements
                 const volumeEl = document.getElementById('volume24h');
                 const marketCapEl = document.getElementById('marketCap');
                 const tradesEl = document.getElementById('trades24h');
@@ -2431,23 +2413,19 @@
                 const gainerChangeEl = document.getElementById('gainerChange');
                 const volumeChangeEl = document.getElementById('volumeChange');
                 
-                // Get fresh data
                 const prices = getCurrentPrices();
                 const recentTrades = getAllRecentTrades(500);
                 
-                // Calculate 24h stats
                 const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
                 const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
                 const volume24h = last24hTrades.reduce((sum, t) => sum + (t.quantity || 0), 0);
                 const npcTrades = last24hTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
                 
-                // Calculate market cap
                 let marketCap = 0;
                 Object.values(prices).forEach(priceData => {
                     marketCap += (priceData.current || 100) * 1000000;
                 });
                 
-                // Find top gainer
                 let topGainer = { name: '---', change: 0 };
                 let topGainerValue = -Infinity;
                 
@@ -2459,7 +2437,6 @@
                     }
                 });
                 
-                // UPDATE DOM with formatted values
                 if (volumeEl) volumeEl.innerText = volume24h.toString();
                 if (marketCapEl) marketCapEl.innerText = formatMarketCap(marketCap);
                 if (tradesEl) tradesEl.innerText = last24hTrades.length.toString();
@@ -2580,7 +2557,7 @@
             if (!element) return;
             
             orderSide = side === 'buy' ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
-            orderType = orderType || ORDER_TYPES.LIMIT; // Preserve current type
+            orderType = orderType || ORDER_TYPES.LIMIT;
             orderPrice = price;
             orderQuantity = 1;
             
@@ -2589,7 +2566,6 @@
             const bestBid = getBidPrice(elementName);
             const bestAsk = getAskPrice(elementName);
             
-            // Determine execution info based on order type
             let executionInfo = '';
             if (orderType === ORDER_TYPES.MARKET) {
                 executionInfo = `
@@ -2788,11 +2764,10 @@
             }
         }
 
-        // ===== FIXED PLACE ORDER MODAL - WITH ENHANCED BALANCE UPDATE =====
+        // ===== PLACE ORDER MODAL - WITH BALANCE UPDATE =====
         placeOrderModal = async function() {
             if (!selectedElement) return;
             
-            // For market orders, use current market price for validation
             const executionPrice = orderType === ORDER_TYPES.MARKET ? 
                 (orderSide === ORDER_SIDES.BUY ? getAskPrice(selectedElement.name) : getBidPrice(selectedElement.name)) : 
                 orderPrice;
@@ -2800,7 +2775,6 @@
             const total = executionPrice * orderQuantity;
             const ownedQuantity = currentCollection[selectedElement.name]?.count || 0;
             
-            // Validation
             if (orderQuantity <= 0) {
                 showToast('Invalid quantity', 'error');
                 return;
@@ -2835,77 +2809,64 @@
                 if (result.success) {
                     showToast('Order placed successfully', 'success');
                     
-                    // Update balances for market orders (immediate execution)
                     if (orderType === ORDER_TYPES.MARKET && result.trade) {
-                        // Log the trade details for debugging
                         console.log('Trade executed:', result.trade);
                         
                         if (orderSide === ORDER_SIDES.BUY) {
-                            // Calculate new balance
                             currentCredits = currentCredits - result.totalCost;
                             
-                            // Save to localStorage in MULTIPLE places for redundancy
-                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
-                            
-                            // Also update in player object
-                            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                            const playerKey = `voidfarer_player_${playerId}`;
+                            // Update player object (PRIMARY)
                             try {
-                                const playerData = JSON.parse(localStorage.getItem(playerKey));
+                                const playerData = await getPlayer(playerId);
                                 if (playerData) {
                                     playerData.credits = currentCredits;
-                                    localStorage.setItem(playerKey, JSON.stringify(playerData));
+                                    await savePlayer(playerData, playerId);
                                 }
                             } catch (e) {
                                 console.warn('Could not update player object');
                             }
                             
-                            // Add to collection
+                            // Update direct key for compatibility
+                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
                             await window.addElementToCollection(selectedElement.name, orderQuantity, {
                                 source: 'market',
                                 price: result.executionPrice
                             });
                             
                         } else {
-                            // Calculate new balance
                             currentCredits = currentCredits + result.totalCost;
                             
-                            // Save to localStorage in MULTIPLE places
-                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
-                            
-                            // Also update in player object
-                            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                            const playerKey = `voidfarer_player_${playerId}`;
+                            // Update player object (PRIMARY)
                             try {
-                                const playerData = JSON.parse(localStorage.getItem(playerKey));
+                                const playerData = await getPlayer(playerId);
                                 if (playerData) {
                                     playerData.credits = currentCredits;
-                                    localStorage.setItem(playerKey, JSON.stringify(playerData));
+                                    await savePlayer(playerData, playerId);
                                 }
                             } catch (e) {
                                 console.warn('Could not update player object');
                             }
                             
-                            // Remove from collection
+                            // Update direct key for compatibility
+                            localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                            
                             await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                         }
                         
-                        // Refresh collection data
                         currentCollection = await getCollection();
                         
-                        // Force balance update in UI (MULTIPLE TIMES for safety)
-                        updateBalance();
-                        setTimeout(() => updateBalance(), 100);
-                        setTimeout(() => updateBalance(), 500);
+                        // Force balance update
+                        await updateBalance();
+                        setTimeout(async () => await updateBalance(), 100);
+                        setTimeout(async () => await updateBalance(), 500);
                         
-                        // Show success message with price
                         showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
                     } else {
-                        // Limit order placed successfully
                         showToast('Limit order placed', 'success');
                     }
                     
-                    await renderOrderBook(); // Refresh order book
+                    await renderOrderBook();
                     closeOrderModal();
                     
                     if (tg?.HapticFeedback) {
@@ -2952,9 +2913,8 @@
         };
 
         // ===== PORTFOLIO MODAL FUNCTIONS =====
-        openPortfolioModal = function() {
-            // Force balance refresh before opening
-            updateBalance();
+        openPortfolioModal = async function() {
+            await updateBalance();
             updatePortfolioModal();
             document.getElementById('portfolioModal').classList.add('active');
         };
@@ -2991,7 +2951,6 @@
                 }
             }
             
-            // Show total value with 2 decimal places
             document.getElementById('modalTotalValue').textContent = totalValue.toFixed(2) + '⭐';
             
             const listElement = document.getElementById('portfolioItemList');
@@ -3062,12 +3021,9 @@
                 return true;
             });
             
-            // Reset sort to default (A-Z by element)
             sortColumn = 'element';
             sortDirection = 'asc';
             updateSortIndicators();
-            
-            // Apply current sort
             sortTable('element');
         }
 
@@ -3080,27 +3036,25 @@
         function startRealTimeUpdates() {
             console.log('Starting real-time updates...');
             
-            // Update display every 1 second
             updateInterval = setInterval(async () => {
                 renderMarketTicker();
                 renderMarketTable();
                 await renderOrderBook();
                 updateMarketStats();
                 await updateNPCStats();
+                await updateBalance();
             }, 1000);
             
-            // Also update on window focus
-            window.addEventListener('focus', () => {
+            window.addEventListener('focus', async () => {
                 console.log('Window focused, refreshing...');
                 renderMarketTicker();
                 renderMarketTable();
                 renderOrderBook();
                 updateMarketStats();
                 updateNPCStats();
-                updateBalance(); // Added balance refresh on focus
+                await updateBalance();
             });
             
-            // Auto-save prices every minute
             priceUpdateInterval = setInterval(() => {
                 saveMarketPrices();
             }, 60000);
@@ -3148,7 +3102,6 @@
         window.sortTable = sortTable;
         window.formatMarketCap = formatMarketCap;
         
-        // Modal functions
         window.openElementModal = openElementModal;
         window.closeElementModal = closeElementModal;
         window.buyFromModal = buyFromModal;
@@ -3165,20 +3118,17 @@
         window.setMaxQuantityModal = setMaxQuantityModal;
         window.placeOrderModal = placeOrderModal;
         
-        // Portfolio functions
         window.openPortfolioModal = openPortfolioModal;
         window.closePortfolioModal = closePortfolioModal;
         window.updatePortfolioModal = updatePortfolioModal;
         window.buyFromPortfolio = buyFromPortfolio;
         window.sellFromPortfolio = sellFromPortfolio;
         
-        // NPC functions
         window.initializeNPCs = initializeNPCs;
         window.updateNPCStats = updateNPCStats;
 
         console.log('✅ Window functions attached with NPC support');
 
-        // ===== START =====
         init();
     </script>
 </body>
