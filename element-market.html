@@ -352,23 +352,6 @@
             border-top: 1px solid #2B2F36;
         }
         
-        .chart-type-btn, .indicator-btn {
-            background: #2B2F36;
-            border: none;
-            color: #848E9C;
-            padding: 6px 12px;
-            border-radius: 30px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        
-        .chart-type-btn.active, .indicator-btn.active {
-            background: #F0B90B;
-            color: #0B0E14;
-        }
-        
         .market-stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1261,7 +1244,13 @@
             createOrder, getCombinedOrderBook,
             ORDER_TYPES, ORDER_SIDES, getAllRecentTrades
         } from './js/market-engine.js';
-        import { getCollection, getPlayer, savePlayer } from './js/storage.js';
+        
+        // Import storage.js functions
+        import { 
+            getCollection, getPlayer, savePlayer, 
+            getCredits, saveCredits, addCredits, spendCredits 
+        } from './js/storage.js';
+        
         import { chartManager, ChartType, createChartToolbar } from './js/chart-manager.js';
         import { initializeNPCTraders, getNPCTraderStats, startNPCTraderUpdates } from './js/npc-traders.js';
 
@@ -1284,7 +1273,6 @@
         let currentCredits = 5000;
         let currentCollection = {};
         let currentTimeframe = '1h';
-        let playerId = null;
         let updateInterval = null;
         let sortColumn = 'element';
         let sortDirection = 'asc';
@@ -1301,57 +1289,14 @@
             return value.toString();
         }
 
-        // ===== CRITICAL: FIXED BALANCE FUNCTION =====
+        // ===== FIXED BALANCE FUNCTION - USES STORAGE.JS =====
         async function updateBalance() {
             try {
-                const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId || 'player_default';
-                let storedCredits = null;
+                // Use 'main' as the player ID for credits (storage.js default)
+                const credits = await getCredits('main');
+                console.log(`💰 Balance from storage.js: ${credits}`);
                 
-                // Primary source: Player object from storage.js
-                try {
-                    const playerData = await getPlayer(actualPlayerId);
-                    if (playerData && typeof playerData.credits === 'number') {
-                        storedCredits = playerData.credits;
-                        console.log(`💰 Balance from player object: ${storedCredits}`);
-                    }
-                } catch (e) {
-                    console.warn('Could not read player object');
-                }
-                
-                // Secondary source: Direct credits key
-                if (storedCredits === null) {
-                    const directCredits = localStorage.getItem('voidfarer_credits');
-                    if (directCredits !== null) {
-                        storedCredits = parseInt(directCredits);
-                        console.log(`💰 Balance from direct key: ${storedCredits}`);
-                    }
-                }
-                
-                // Default if nothing found
-                if (storedCredits === null || isNaN(storedCredits)) {
-                    storedCredits = 5000;
-                    console.log(`💰 Using default balance: ${storedCredits}`);
-                    
-                    // Initialize player with default
-                    try {
-                        let playerData = await getPlayer(actualPlayerId);
-                        if (!playerData) {
-                            playerData = { credits: 5000, inventory: {} };
-                            await savePlayer(playerData, actualPlayerId);
-                        } else if (playerData.credits === undefined) {
-                            playerData.credits = 5000;
-                            await savePlayer(playerData, actualPlayerId);
-                        }
-                    } catch (e) {}
-                }
-                
-                // Update local variable
-                if (currentCredits !== storedCredits) {
-                    currentCredits = storedCredits;
-                }
-                
-                // Ensure direct key is synced
-                localStorage.setItem('voidfarer_credits', currentCredits.toString());
+                currentCredits = credits;
                 
                 // Update UI
                 const balanceElement = document.getElementById('totalBalance');
@@ -1366,42 +1311,12 @@
             }
         }
 
-        // ===== FORCE CREDIT SYNC =====
-        window.syncCredits = async function() {
-            const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId || 'player_default';
-            
-            try {
-                const playerData = await getPlayer(actualPlayerId);
-                let creditsFromPlayer = playerData?.credits;
-                let creditsFromDirect = localStorage.getItem('voidfarer_credits');
-                if (creditsFromDirect) creditsFromDirect = parseInt(creditsFromDirect);
-                
-                let correctCredits = creditsFromPlayer;
-                if (correctCredits === undefined || correctCredits === null || isNaN(correctCredits)) {
-                    correctCredits = creditsFromDirect;
-                }
-                if (correctCredits === undefined || correctCredits === null || isNaN(correctCredits)) {
-                    correctCredits = 5000;
-                }
-                
-                if (playerData) {
-                    playerData.credits = correctCredits;
-                    await savePlayer(playerData, actualPlayerId);
-                }
-                localStorage.setItem('voidfarer_credits', correctCredits.toString());
-                currentCredits = correctCredits;
-                
-                const balanceElement = document.getElementById('totalBalance');
-                if (balanceElement) {
-                    balanceElement.innerHTML = `${correctCredits.toLocaleString()} <span>⭐</span>`;
-                }
-                
-                console.log('✅ Credits synced to:', correctCredits);
-                return correctCredits;
-            } catch (error) {
-                console.error('Error syncing credits:', error);
-                return currentCredits;
-            }
+        // ===== DEBUG FUNCTION =====
+        window.checkBalance = async function() {
+            const credits = await getCredits('main');
+            console.log('Current credits in storage:', credits);
+            console.log('Displayed balance:', document.getElementById('totalBalance')?.innerText);
+            return credits;
         };
 
         // ===== SORT FUNCTIONS =====
@@ -1700,7 +1615,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER WITH PROPER BALANCE UPDATE =====
+        // ===== PLACE ORDER WITH STORAGE.JS FUNCTIONS =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1729,10 +1644,8 @@
             showLoading(true);
             
             try {
-                const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId;
-                
                 const orderData = {
-                    userId: actualPlayerId,
+                    userId: 'main', // Use 'main' for consistency with storage.js
                     playerName: 'Voidfarer',
                     element: selectedElement.name,
                     side: orderSide,
@@ -1744,41 +1657,22 @@
                 const result = await createOrder(orderData);
                 
                 if (result.success && result.trade) {
-                    let newCredits = currentCredits;
-                    
                     if (orderSide === ORDER_SIDES.BUY) {
-                        newCredits = currentCredits - result.totalCost;
-                    } else {
-                        newCredits = currentCredits + result.totalCost;
-                    }
-                    
-                    currentCredits = newCredits;
-                    
-                    // Update player object
-                    try {
-                        const playerData = await getPlayer(actualPlayerId);
-                        if (playerData) {
-                            playerData.credits = newCredits;
-                            await savePlayer(playerData, actualPlayerId);
-                            console.log('✅ Updated player credits to:', newCredits);
-                        } else {
-                            const newPlayer = { credits: newCredits, inventory: {} };
-                            await savePlayer(newPlayer, actualPlayerId);
+                        // Use storage.js spendCredits function
+                        const success = await spendCredits(result.totalCost, 'main');
+                        if (success) {
+                            currentCredits = await getCredits('main');
+                            console.log(`💰 New balance after buy: ${currentCredits}`);
                         }
-                    } catch (e) {
-                        console.error('Error updating player:', e);
-                    }
-                    
-                    // Update direct key
-                    localStorage.setItem('voidfarer_credits', newCredits.toString());
-                    
-                    // Update collection
-                    if (orderSide === ORDER_SIDES.BUY) {
                         await window.addElementToCollection(selectedElement.name, orderQuantity, {
                             source: 'market',
                             price: result.executionPrice
                         });
                     } else {
+                        // Use storage.js addCredits function
+                        const newTotal = await addCredits(result.totalCost, 'main');
+                        currentCredits = newTotal;
+                        console.log(`💰 New balance after sell: ${currentCredits}`);
                         await window.removeElementFromCollection(selectedElement.name, orderQuantity);
                     }
                     
@@ -1933,33 +1827,23 @@
             showLoading(true);
             
             try {
-                // Get or create player ID
-                playerId = localStorage.getItem('voidfarer_player_id');
-                if (!playerId) {
-                    playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('voidfarer_player_id', playerId);
-                    console.log('Created new player ID:', playerId);
+                // Ensure player exists in storage.js with 'main' ID
+                let mainPlayer = await getPlayer('main');
+                if (!mainPlayer) {
+                    const newPlayer = {
+                        id: 'main',
+                        name: 'Voidfarer',
+                        credits: 5000,
+                        inventory: {},
+                        created: new Date().toISOString()
+                    };
+                    await savePlayer(newPlayer, 'main');
+                    console.log('✅ Created main player with 5000 credits');
                 } else {
-                    console.log('Loaded player ID:', playerId);
+                    console.log('✅ Main player exists with credits:', mainPlayer.credits);
                 }
                 
-                // Initialize player data
-                try {
-                    let playerData = await getPlayer(playerId);
-                    if (!playerData) {
-                        playerData = { credits: 5000, inventory: {} };
-                        await savePlayer(playerData, playerId);
-                        localStorage.setItem('voidfarer_credits', '5000');
-                        console.log('Created new player with 5000 credits');
-                    } else if (playerData.credits !== undefined) {
-                        localStorage.setItem('voidfarer_credits', playerData.credits.toString());
-                        currentCredits = playerData.credits;
-                        console.log('Loaded player credits:', currentCredits);
-                    }
-                } catch (e) {
-                    console.warn('Player init warning:', e);
-                }
-                
+                // Initialize market
                 initializeMarket();
                 
                 const rawElements = getAvailableElements();
@@ -1980,8 +1864,7 @@
                 filteredElements = [...allElements];
                 currentCollection = await getCollection();
                 
-                // Force initial balance sync
-                await window.syncCredits();
+                // Load balance from storage.js
                 await updateBalance();
                 
                 renderMarketTicker();
@@ -2003,12 +1886,6 @@
                 
                 setInterval(async () => await updateBalance(), 2000);
                 
-                window.addEventListener('storage', async (e) => {
-                    if (e.key === 'voidfarer_credits' || (e.key && e.key.includes('voidfarer_player'))) {
-                        await updateBalance();
-                    }
-                });
-                
                 showLoading(false);
                 
             } catch (error) {
@@ -2021,11 +1898,6 @@
         // Attach functions to window
         window.selectElement = selectElement;
         window.formatMarketCap = formatMarketCap;
-        window.debugStorage = function() {
-            console.log('Player ID:', playerId);
-            console.log('Current credits:', currentCredits);
-            console.log('Storage credits:', localStorage.getItem('voidfarer_credits'));
-        };
 
         init();
     </script>
