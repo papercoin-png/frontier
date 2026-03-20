@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        /* All your existing styles - kept exactly the same */
+        /* ===== ALL YOUR EXISTING CSS STYLES - KEPT EXACTLY THE SAME ===== */
         * {
             margin: 0;
             padding: 0;
@@ -50,9 +50,6 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
-        
-        /* [All your existing CSS styles remain exactly the same - no changes needed] */
-        /* I'm including the essential styles, but keep all your existing styles */
         
         .loading-overlay {
             position: fixed;
@@ -1300,9 +1297,8 @@
             return value.toString();
         }
 
-        // ===== MIGRATION SCRIPT - ONE TIME ONLY =====
+        // ===== MIGRATION SCRIPT =====
         async function migrateMarketDataToIndexedDB() {
-            // Check if already migrated
             if (localStorage.getItem('market_migrated_to_indexeddb') === 'true') {
                 console.log('✅ Market data already migrated to IndexedDB');
                 return true;
@@ -1311,52 +1307,35 @@
             console.log('🚀 Starting market data migration to IndexedDB...');
             
             try {
-                // Get existing localStorage data
                 const buyOrders = JSON.parse(localStorage.getItem('voidfarer_market_buy_orders') || '{}');
                 const sellOrders = JSON.parse(localStorage.getItem('voidfarer_market_sell_orders') || '{}');
                 const matchedTrades = JSON.parse(localStorage.getItem('voidfarer_matched_trades') || '[]');
-                const orderHistory = JSON.parse(localStorage.getItem('voidfarer_order_history') || '[]');
-                const currentPrices = JSON.parse(localStorage.getItem('voidfarer_current_prices') || '{}');
-                const priceHistory = JSON.parse(localStorage.getItem('voidfarer_price_history') || '{}');
                 
-                // Store in IndexedDB
                 await dbSaveMarketOrders(buyOrders, 'buy_orders');
                 await dbSaveMarketOrders(sellOrders, 'sell_orders');
                 
-                // Store trades individually
                 for (const trade of matchedTrades) {
                     await dbAddTrade(trade);
                 }
                 
-                // Store current prices
-                await dbSaveMarketOrders(currentPrices, 'current_prices');
-                
-                // Mark migration as complete
                 localStorage.setItem('market_migrated_to_indexeddb', 'true');
                 
-                // Clear localStorage market data to free up space
                 const keysToClear = [
                     'voidfarer_market_buy_orders',
                     'voidfarer_market_sell_orders',
                     'voidfarer_matched_trades',
                     'voidfarer_order_history',
                     'voidfarer_current_prices',
-                    'voidfarer_price_history',
-                    'voidfarer_market_trends',
-                    'voidfarer_market_volume',
-                    'voidfarer_supply_index',
-                    'voidfarer_demand_index'
+                    'voidfarer_price_history'
                 ];
                 
-                let cleared = 0;
                 for (const key of keysToClear) {
                     if (localStorage.getItem(key)) {
                         localStorage.removeItem(key);
-                        cleared++;
                     }
                 }
                 
-                console.log(`✅ Migration complete! Cleared ${cleared} localStorage items.`);
+                console.log('✅ Migration complete!');
                 return true;
                 
             } catch (error) {
@@ -1486,17 +1465,24 @@
             spreadDisplay.innerHTML = `▼ SPREAD ${book.spreadPercent?.toFixed(2) || 0}% ▼`;
         }
 
-        function updateMarketStats() {
+        // ===== FIXED: async updateMarketStats =====
+        async function updateMarketStats() {
             const prices = getCurrentPrices();
             let marketCap = 0;
             Object.values(prices).forEach(p => marketCap += (p.current || 100) * 1000000);
             document.getElementById('marketCap').innerHTML = formatMarketCap(marketCap);
             
-            const recentTrades = getAllRecentTrades(500);
-            const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-            const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
-            document.getElementById('trades24h').innerText = last24hTrades.length;
-            document.getElementById('volume24h').innerText = last24hTrades.reduce((sum, t) => sum + (t.quantity || 0), 0);
+            try {
+                const recentTrades = await getAllRecentTrades(500);
+                const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+                const last24hTrades = recentTrades.filter(t => t.timestamp >= oneDayAgo);
+                document.getElementById('trades24h').innerText = last24hTrades.length;
+                document.getElementById('volume24h').innerText = last24hTrades.reduce((sum, t) => sum + (t.quantity || 0), 0);
+            } catch (error) {
+                console.error('Error getting recent trades:', error);
+                document.getElementById('trades24h').innerText = '0';
+                document.getElementById('volume24h').innerText = '0';
+            }
         }
 
         function setupChart(elementName) {
@@ -1878,19 +1864,19 @@
             else overlay.classList.remove('active');
         }
 
+        // ===== FIXED: startRealTimeUpdates with await =====
         function startRealTimeUpdates() {
             updateInterval = setInterval(async () => {
                 renderMarketTicker();
                 renderMarketTable();
                 await renderOrderBook();
-                updateMarketStats();
+                await updateMarketStats();
                 await updateBalance();
             }, 2000);
         }
 
         // ===== PERIODIC CLEANUP =====
         async function startPeriodicCleanup() {
-            // Run cleanup every hour
             setInterval(async () => {
                 console.log('🧹 Running periodic market data cleanup...');
                 await dbCleanupMarketData();
@@ -1902,7 +1888,7 @@
             showLoading(true);
             
             try {
-                // Run migration first (one time only)
+                // Run migration first
                 await migrateMarketDataToIndexedDB();
                 
                 // Ensure player exists
@@ -1946,7 +1932,7 @@
                 renderMarketTicker();
                 renderMarketTable();
                 await renderOrderBook();
-                updateMarketStats();
+                await updateMarketStats();
                 
                 // Initialize NPC traders
                 await initializeNPCTraders(allElements);
