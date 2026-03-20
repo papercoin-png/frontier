@@ -211,7 +211,7 @@
             transform: scale(0.96);
         }
         
-        /* My Orders Link - FIXED COLOR */
+        /* My Orders Link */
         .my-orders-link {
             margin-bottom: 16px;
         }
@@ -1039,11 +1039,11 @@
             box-shadow: 0 4px 12px rgba(246, 70, 93, 0.3);
         }
         
-        /* Order Sub-type Toggle */
+        /* Order Sub-type Toggle - FIXED */
         .order-type-selector {
             display: flex;
             gap: 8px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             background: #252A33;
             padding: 4px;
             border-radius: 60px;
@@ -1051,7 +1051,7 @@
         
         .order-subtype-btn {
             flex: 1;
-            padding: 10px;
+            padding: 12px;
             border-radius: 60px;
             font-weight: 600;
             font-size: 14px;
@@ -1065,11 +1065,39 @@
         .order-subtype-btn.active {
             background: #F0B90B;
             color: #0B0E14;
+            font-weight: 700;
+        }
+        
+        /* Execution Info - NEW */
+        .execution-info {
+            background: rgba(240, 185, 11, 0.1);
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-left: 3px solid #F0B90B;
+        }
+        
+        .execution-title {
+            color: #F0B90B;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .execution-desc {
+            color: #EAECEF;
+            font-size: 13px;
+        }
+        
+        .execution-price {
+            color: #F0B90B;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
         }
         
         /* Price Input */
         .price-input-group {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         
         .price-input-label {
@@ -1130,7 +1158,7 @@
         
         /* Amount Field */
         .amount-field {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         
         .amount-header {
@@ -1210,22 +1238,22 @@
         .order-summary {
             background: #252A33;
             border-radius: 24px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 16px;
+            margin-bottom: 16px;
             border: 1px solid #333A45;
         }
         
         .summary-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             color: #848E9C;
             font-size: 14px;
         }
         
         .summary-row:last-child {
             margin-bottom: 0;
-            padding-top: 12px;
+            padding-top: 8px;
             border-top: 1px solid #3A4250;
         }
         
@@ -1244,7 +1272,7 @@
             text-align: center;
             color: #848E9C;
             font-size: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             padding: 8px;
             background: rgba(240, 185, 11, 0.05);
             border-radius: 30px;
@@ -1253,7 +1281,7 @@
         /* Execute Button */
         .execute-btn {
             width: 100%;
-            padding: 18px;
+            padding: 16px;
             border-radius: 60px;
             font-weight: 700;
             font-size: 18px;
@@ -1278,6 +1306,11 @@
         
         .execute-btn:active {
             transform: scale(0.97);
+        }
+        
+        .execute-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         /* Portfolio Modal - More Space */
@@ -1597,7 +1630,7 @@
                 <button class="portfolio-btn" onclick="window.openPortfolioModal()">PORTFOLIO</button>
             </div>
             
-            <!-- My Orders Link - FIXED COLOR -->
+            <!-- My Orders Link -->
             <div class="my-orders-link">
                 <div class="my-orders-btn" onclick="window.goToMyOrders()">
                     <span>📋</span> MY ORDERS
@@ -1777,7 +1810,7 @@
                 </div>
             </div>
             
-            <!-- Order Modal (for placing orders) - REDESIGNED -->
+            <!-- Order Modal (for placing orders) - REDESIGNED with fixed toggles -->
             <div class="order-modal-overlay" id="orderModal">
                 <div class="order-modal-content" id="orderModalContent">
                     <!-- Dynamically filled by JavaScript -->
@@ -1920,7 +1953,7 @@
             return collection[elementName]?.count || 0;
         }
 
-        // ===== FORMAT MARKET CAP - FIXED (assigned to declared variable) =====
+        // ===== FORMAT MARKET CAP =====
         formatMarketCap = function(value) {
             if (value >= 1e12) return (value / 1e12).toFixed(2) + 'T';
             if (value >= 1e9) return (value / 1e9).toFixed(2) + 'B';
@@ -2484,18 +2517,44 @@
             openOrderModal(selectedElement.name, 'sell', selectedElement.bidPrice);
         };
 
-        // ===== OPEN ORDER MODAL - REDESIGNED =====
+        // ===== OPEN ORDER MODAL - REDESIGNED with fixed toggles =====
         openOrderModal = function(elementName, side, price) {
             const element = allElements.find(e => e.name === elementName);
             if (!element) return;
             
             orderSide = side === 'buy' ? ORDER_SIDES.BUY : ORDER_SIDES.SELL;
-            orderType = ORDER_TYPES.LIMIT;
+            orderType = orderType || ORDER_TYPES.LIMIT; // Preserve current type
             orderPrice = price;
             orderQuantity = 1;
             
             const ownedQuantity = currentCollection[elementName]?.count || 0;
             const maxBuy = calculateMaxBuy(currentCredits, orderPrice);
+            const bestBid = getBidPrice(elementName);
+            const bestAsk = getAskPrice(elementName);
+            
+            // Determine execution info based on order type
+            let executionInfo = '';
+            if (orderType === ORDER_TYPES.MARKET) {
+                executionInfo = `
+                    <div class="execution-info">
+                        <div class="execution-title">⚡ INSTANT EXECUTION</div>
+                        <div class="execution-desc">Your order will fill immediately at the best available price:
+                            ${orderSide === ORDER_SIDES.BUY ? 
+                                `<span class="execution-price">${bestAsk}⭐ (ASK)</span>` : 
+                                `<span class="execution-price">${bestBid}⭐ (BID)</span>`}
+                        </div>
+                    </div>
+                `;
+            } else {
+                executionInfo = `
+                    <div class="execution-info">
+                        <div class="execution-title">⏳ LIMIT ORDER</div>
+                        <div class="execution-desc">Your order will wait at your price until someone matches it.
+                            Current market: BID ${bestBid}⭐ | ASK ${bestAsk}⭐
+                        </div>
+                    </div>
+                `;
+            }
             
             const modalHtml = `
                 <div class="order-modal-header">
@@ -2520,6 +2579,8 @@
                     <button class="order-subtype-btn ${orderType === ORDER_TYPES.LIMIT ? 'active' : ''}" onclick="window.setOrderTypeModal('limit')">LIMIT</button>
                     <button class="order-subtype-btn ${orderType === ORDER_TYPES.MARKET ? 'active' : ''}" onclick="window.setOrderTypeModal('market')">MARKET</button>
                 </div>
+                
+                ${executionInfo}
                 
                 ${orderType !== ORDER_TYPES.MARKET ? `
                     <div class="price-input-group">
@@ -2551,7 +2612,9 @@
                 <div class="order-summary">
                     <div class="summary-row">
                         <span>Price per unit</span>
-                        <span class="summary-value" id="modalSummaryPrice">${orderPrice}⭐</span>
+                        <span class="summary-value" id="modalSummaryPrice">${orderType === ORDER_TYPES.MARKET ? 
+                            (orderSide === ORDER_SIDES.BUY ? bestAsk : bestBid) + '⭐' : 
+                            orderPrice + '⭐'}</span>
                     </div>
                     <div class="summary-row">
                         <span>Quantity</span>
@@ -2559,14 +2622,18 @@
                     </div>
                     <div class="summary-row">
                         <span>Total</span>
-                        <span class="summary-value summary-total" id="modalSummaryTotal">${(orderPrice * orderQuantity).toLocaleString()}⭐</span>
+                        <span class="summary-value summary-total" id="modalSummaryTotal">${(orderType === ORDER_TYPES.MARKET ? 
+                            (orderSide === ORDER_SIDES.BUY ? bestAsk : bestBid) * orderQuantity : 
+                            orderPrice * orderQuantity).toLocaleString()}⭐</span>
                     </div>
                 </div>
                 
-                <div class="fee-info" id="modalFeeDisplay">Fee: 1% (${Math.floor(orderPrice * orderQuantity * 0.01)}⭐)</div>
+                <div class="fee-info" id="modalFeeDisplay">Fee: 1% (${Math.floor((orderType === ORDER_TYPES.MARKET ? 
+                    (orderSide === ORDER_SIDES.BUY ? bestAsk : bestBid) * orderQuantity : 
+                    orderPrice * orderQuantity) * 0.01)}⭐)</div>
                 
                 <button class="execute-btn ${orderSide === ORDER_SIDES.BUY ? 'buy' : 'sell'}" id="modalExecuteBtn" onclick="window.placeOrderModal()">
-                    ${orderSide === ORDER_SIDES.BUY ? 'BUY' : 'SELL'} ${element.symbol}
+                    ${orderSide === ORDER_SIDES.BUY ? 'BUY' : 'SELL'} ${element.symbol} ${orderType === ORDER_TYPES.MARKET ? 'NOW' : ''}
                 </button>
             `;
             
@@ -2593,7 +2660,7 @@
         };
 
         setOrderTypeModal = function(type) {
-            orderType = type;
+            orderType = type === 'limit' ? ORDER_TYPES.LIMIT : ORDER_TYPES.MARKET;
             openOrderModal(selectedElement.name, orderSide === ORDER_SIDES.BUY ? 'buy' : 'sell', orderPrice);
         };
 
