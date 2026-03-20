@@ -2,6 +2,7 @@
 // Handles order matching, price discovery, and market operations
 // UPDATED: Added NPC trader integration for 1000 simulated traders
 // UPDATED: Fixed imports for market-dynamics.js (default export)
+// UPDATED: Added aggressive storage limits to prevent quota issues
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -40,7 +41,13 @@ const ENGINE_CONFIG = {
     MAX_SPREAD_MULTIPLIER: 5, // Maximum spread relative to market price
     INCLUDE_NPC_ORDERS: true,         // Whether to include NPC orders
     SHOW_NPC_NAMES: true,              // Show NPC names in order book
-    NPC_ORDER_PREFIX: 'npc_'           // Prefix for NPC order IDs
+    NPC_ORDER_PREFIX: 'npc_',           // Prefix for NPC order IDs
+    
+    // ===== AGGRESSIVE STORAGE LIMITS =====
+    MAX_MATCHED_TRADES: 200,           // Reduced from 10000 to 200
+    MAX_ORDER_HISTORY: 500,            // Reduced from 10000 to 500
+    MAX_ORDERS_PER_ELEMENT: 50,        // Max orders per side per element
+    CLEANUP_ON_LOAD: true              // Run cleanup on initialization
 };
 
 // ===== STORAGE KEYS =====
@@ -110,10 +117,76 @@ export function initializeMarketEngine() {
         }));
     }
     
+    // Run cleanup on initialization
+    if (ENGINE_CONFIG.CLEANUP_ON_LOAD) {
+        cleanupOldMarketData();
+    }
+    
     console.log('Market engine initialized with NPC support');
     
     // Start matching engine
     startMatchingEngine();
+}
+
+// ===== STORAGE CLEANUP =====
+
+/**
+ * Clean up old market data to prevent quota issues
+ */
+function cleanupOldMarketData() {
+    console.log('🧹 Cleaning market engine data...');
+    
+    try {
+        // Clean MATCHED_TRADES
+        const trades = JSON.parse(localStorage.getItem(STORAGE_KEYS.MATCHED_TRADES) || '[]');
+        if (trades.length > ENGINE_CONFIG.MAX_MATCHED_TRADES) {
+            const trimmed = trades.slice(-ENGINE_CONFIG.MAX_MATCHED_TRADES);
+            localStorage.setItem(STORAGE_KEYS.MATCHED_TRADES, JSON.stringify(trimmed));
+            console.log(`🧹 Trimmed matched trades from ${trades.length} to ${trimmed.length}`);
+        }
+        
+        // Clean ORDER_HISTORY
+        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.ORDER_HISTORY) || '[]');
+        if (history.length > ENGINE_CONFIG.MAX_ORDER_HISTORY) {
+            const trimmed = history.slice(-ENGINE_CONFIG.MAX_ORDER_HISTORY);
+            localStorage.setItem(STORAGE_KEYS.ORDER_HISTORY, JSON.stringify(trimmed));
+            console.log(`🧹 Trimmed order history from ${history.length} to ${trimmed.length}`);
+        }
+        
+        // Clean order books per element
+        const buyOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.BUY_ORDERS) || '{}');
+        const sellOrders = JSON.parse(localStorage.getItem(STORAGE_KEYS.SELL_ORDERS) || '{}');
+        let changed = false;
+        
+        Object.keys(buyOrders).forEach(element => {
+            if (buyOrders[element] && buyOrders[element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
+                // Keep only highest priced buy orders
+                buyOrders[element] = buyOrders[element]
+                    .sort((a, b) => b.price - a.price)
+                    .slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+                changed = true;
+            }
+        });
+        
+        Object.keys(sellOrders).forEach(element => {
+            if (sellOrders[element] && sellOrders[element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
+                // Keep only lowest priced sell orders
+                sellOrders[element] = sellOrders[element]
+                    .sort((a, b) => a.price - b.price)
+                    .slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+                changed = true;
+            }
+        });
+        
+        if (changed) {
+            localStorage.setItem(STORAGE_KEYS.BUY_ORDERS, JSON.stringify(buyOrders));
+            localStorage.setItem(STORAGE_KEYS.SELL_ORDERS, JSON.stringify(sellOrders));
+            console.log('🧹 Trimmed oversized order books');
+        }
+        
+    } catch (error) {
+        console.error('Error cleaning market data:', error);
+    }
 }
 
 // ===== ORDER MANAGEMENT =====
@@ -318,7 +391,7 @@ function executeMarketOrder(order) {
 }
 
 /**
- * Add limit order to order book
+ * Add limit order to order book with size limits
  * @param {Object} order - Limit order
  */
 function addToOrderBook(order) {
@@ -333,10 +406,20 @@ function addToOrderBook(order) {
         buyOrders[order.element].push(order);
         // Sort buy orders: highest price first
         buyOrders[order.element].sort((a, b) => b.price - a.price);
+        
+        // Limit number of orders per element
+        if (buyOrders[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
+            buyOrders[order.element] = buyOrders[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+        }
     } else {
         sellOrders[order.element].push(order);
         // Sort sell orders: lowest price first
         sellOrders[order.element].sort((a, b) => a.price - b.price);
+        
+        // Limit number of orders per element
+        if (sellOrders[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
+            sellOrders[order.element] = sellOrders[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+        }
     }
     
     localStorage.setItem(STORAGE_KEYS.BUY_ORDERS, JSON.stringify(buyOrders));
@@ -856,7 +939,7 @@ export async function cancelOrder(userId, orderId) {
 // ===== ORDER HISTORY =====
 
 /**
- * Record order history
+ * Record order history with limit
  * @param {Object} order - Order object
  * @param {string} action - Action performed
  */
@@ -877,9 +960,9 @@ function recordOrderHistory(order, action) {
         isNPC: order.isNPC || false
     });
     
-    // Keep last 10000 records
-    if (history.length > 10000) {
-        history.shift();
+    // Keep last 500 records (reduced from 10000)
+    if (history.length > ENGINE_CONFIG.MAX_ORDER_HISTORY) {
+        history.splice(0, history.length - ENGINE_CONFIG.MAX_ORDER_HISTORY);
     }
     
     localStorage.setItem(STORAGE_KEYS.ORDER_HISTORY, JSON.stringify(history));
@@ -903,7 +986,7 @@ export function getUserOrderHistory(userId, limit = 50) {
 // ===== MATCHED TRADES =====
 
 /**
- * Add trade to matched trades list
+ * Add trade to matched trades list with limit
  * @param {Object} trade - Trade object
  */
 function addToMatchedTrades(trade) {
@@ -911,9 +994,9 @@ function addToMatchedTrades(trade) {
     
     trades.push(trade);
     
-    // Keep last 10000 trades
-    if (trades.length > 10000) {
-        trades.shift();
+    // Keep last 200 trades (reduced from 10000)
+    if (trades.length > ENGINE_CONFIG.MAX_MATCHED_TRADES) {
+        trades.splice(0, trades.length - ENGINE_CONFIG.MAX_MATCHED_TRADES);
     }
     
     localStorage.setItem(STORAGE_KEYS.MATCHED_TRADES, JSON.stringify(trades));
@@ -1223,7 +1306,8 @@ export default {
     isNPCOrder,
     getTraderDisplayName,
     startMatchingEngine,
-    stopMatchingEngine
+    stopMatchingEngine,
+    cleanupOldMarketData
 };
 
 // Initialize on load
@@ -1250,5 +1334,6 @@ window.getMarketStats = getMarketStats;
 window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
+window.cleanupOldMarketData = cleanupOldMarketData;
 
-console.log('✅ market-engine.js loaded - NPC-integrated trading engine ready');
+console.log('✅ market-engine.js loaded - NPC-integrated trading engine ready with aggressive storage limits');
