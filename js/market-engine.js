@@ -1,8 +1,7 @@
 // js/market-engine.js - Core Trading Engine for Element Marketplace
 // Handles order matching, price discovery, and market operations
-// UPDATED: Converted to use IndexedDB instead of localStorage for permanent storage
-// UPDATED: Fixed NaN issue in totalCost calculation for market orders
-// UPDATED: Added proper number validation for all calculations
+// FIXED: Quantity validation in executeMarketOrder to prevent NaN errors
+// FIXED: Proper number handling for all calculations
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -90,14 +89,10 @@ export const ORDER_STATUS = {
 let buyOrdersCache = {};
 let sellOrdersCache = {};
 let userOrdersCache = {};
-let matchedTradesCache = [];
 let marketStatsCache = {};
 
 // ===== HELPER FUNCTIONS =====
 
-/**
- * Reload cache from IndexedDB - Call this after any order change
- */
 async function reloadOrderCache() {
     try {
         const buyOrders = await dbLoadMarketOrders('buy_orders');
@@ -123,14 +118,10 @@ async function reloadOrderCache() {
 
 // ===== INITIALIZATION =====
 
-/**
- * Initialize market engine - loads data from IndexedDB
- */
 export async function initializeMarketEngine() {
     console.log('🔄 Initializing market engine with IndexedDB...');
     
     try {
-        // Load buy orders from IndexedDB
         const buyOrders = await dbLoadMarketOrders('buy_orders');
         if (buyOrders && Object.keys(buyOrders).length > 0) {
             buyOrdersCache = buyOrders;
@@ -139,7 +130,6 @@ export async function initializeMarketEngine() {
             await dbSaveMarketOrders({}, 'buy_orders');
         }
         
-        // Load sell orders from IndexedDB
         const sellOrders = await dbLoadMarketOrders('sell_orders');
         if (sellOrders && Object.keys(sellOrders).length > 0) {
             sellOrdersCache = sellOrders;
@@ -148,7 +138,6 @@ export async function initializeMarketEngine() {
             await dbSaveMarketOrders({}, 'sell_orders');
         }
         
-        // Load user orders from IndexedDB
         const userOrders = await dbLoadMarketOrders('user_orders');
         if (userOrders && Object.keys(userOrders).length > 0) {
             userOrdersCache = userOrders;
@@ -157,7 +146,6 @@ export async function initializeMarketEngine() {
             await dbSaveMarketOrders({}, 'user_orders');
         }
         
-        // Load market stats
         const stats = await dbLoadMarketOrders('market_stats');
         if (stats) {
             marketStatsCache = stats;
@@ -167,8 +155,6 @@ export async function initializeMarketEngine() {
         }
         
         console.log('✅ Market engine initialized with IndexedDB');
-        
-        // Start matching engine
         startMatchingEngine();
         
     } catch (error) {
@@ -178,28 +164,21 @@ export async function initializeMarketEngine() {
 
 // ===== ORDER MANAGEMENT =====
 
-/**
- * Create a new order
- * @param {Object} orderData - Order data
- * @returns {Promise<Object>} Created order
- */
 export async function createOrder(orderData) {
     try {
-        // Validate required fields
         if (!orderData.userId) throw new Error('User ID required');
         if (!orderData.element) throw new Error('Element required');
         if (!orderData.side) throw new Error('Order side required');
         if (!orderData.type) throw new Error('Order type required');
-        if (!orderData.quantity || orderData.quantity <= 0) throw new Error('Valid quantity required');
         
-        // Validate element exists
+        const quantity = Number(orderData.quantity);
+        if (isNaN(quantity) || quantity <= 0) throw new Error('Valid quantity required');
+        
         const element = getElementByName(orderData.element);
         if (!element) throw new Error('Element not found');
         
-        // Check if this is an NPC order
         const isNPC = orderData.userId.startsWith('npc_') || orderData.isNPC === true;
         
-        // Check order limits based on user type
         if (!isNPC) {
             const userOrders = await getUserOrders(orderData.userId);
             if (userOrders.length >= ENGINE_CONFIG.MAX_ORDERS_PER_USER) {
@@ -207,20 +186,17 @@ export async function createOrder(orderData) {
             }
         }
         
-        // Validate quantity
-        if (orderData.quantity < ENGINE_CONFIG.MIN_ORDER_QUANTITY) {
+        if (quantity < ENGINE_CONFIG.MIN_ORDER_QUANTITY) {
             throw new Error(`Minimum order quantity is ${ENGINE_CONFIG.MIN_ORDER_QUANTITY}`);
         }
-        if (orderData.quantity > ENGINE_CONFIG.MAX_ORDER_QUANTITY) {
+        if (quantity > ENGINE_CONFIG.MAX_ORDER_QUANTITY) {
             throw new Error(`Maximum order quantity is ${ENGINE_CONFIG.MAX_ORDER_QUANTITY}`);
         }
         
-        // Validate price for limit orders
         if (orderData.type === ORDER_TYPES.LIMIT && (!orderData.price || orderData.price <= 0)) {
             throw new Error('Valid price required for limit orders');
         }
         
-        // Create order object
         const order = {
             id: generateOrderId(),
             userId: orderData.userId,
@@ -230,8 +206,8 @@ export async function createOrder(orderData) {
             type: orderData.type,
             price: orderData.price || null,
             stopPrice: orderData.stopPrice || null,
-            originalQuantity: orderData.quantity,
-            remainingQuantity: orderData.quantity,
+            originalQuantity: quantity,
+            remainingQuantity: quantity,
             filledQuantity: 0,
             status: ORDER_STATUS.ACTIVE,
             createdAt: Date.now(),
@@ -241,27 +217,22 @@ export async function createOrder(orderData) {
             traderName: orderData.traderName || (isNPC ? 'NPC Trader' : null)
         };
         
-        // For market orders, attempt immediate execution
         if (order.type === ORDER_TYPES.MARKET) {
             return await executeMarketOrder(order);
         }
         
-        // For limit orders, add to order book
         if (order.type === ORDER_TYPES.LIMIT) {
             await addToOrderBook(order);
         }
         
-        // For stop orders, add to stop order list
         if (order.type === ORDER_TYPES.STOP || order.type === ORDER_TYPES.STOP_LIMIT) {
             await addStopOrder(order);
         }
         
-        // Save order to user's list (only for players)
         if (!isNPC) {
             await saveUserOrder(order);
         }
         
-        // Record order creation
         await recordOrderHistory(order, 'created');
         
         return { success: true, order };
@@ -274,8 +245,6 @@ export async function createOrder(orderData) {
 
 /**
  * Execute a market order immediately
- * @param {Object} order - Market order
- * @returns {Promise<Object>} Execution result
  */
 async function executeMarketOrder(order) {
     try {
@@ -286,20 +255,21 @@ async function executeMarketOrder(order) {
             throw new Error('Price data not available');
         }
         
-        // Determine execution price based on side with proper number validation
+        // FIX: Get quantity from originalQuantity (set in createOrder)
+        let quantity = order.originalQuantity || order.remainingQuantity || order.quantity;
+        quantity = Number(quantity);
+        
+        if (isNaN(quantity) || quantity <= 0) {
+            console.error('Invalid quantity in executeMarketOrder:', { order });
+            throw new Error('Invalid quantity');
+        }
+        
         let executionPrice;
         let totalCost;
         let fee;
         
-        // Ensure quantity is a valid number
-        const quantity = Number(order.quantity);
-        if (isNaN(quantity) || quantity <= 0) {
-            throw new Error('Invalid quantity');
-        }
-        
         if (order.side === ORDER_SIDES.BUY) {
             executionPrice = elementPrice.ask || elementPrice.current * 1.01;
-            // Ensure executionPrice is a valid number
             executionPrice = Number(executionPrice);
             if (isNaN(executionPrice) || executionPrice <= 0) {
                 executionPrice = elementPrice.current || 100;
@@ -316,21 +286,17 @@ async function executeMarketOrder(order) {
             fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
         }
         
-        // Validate totalCost is a valid number
         if (isNaN(totalCost) || totalCost <= 0) {
-            console.error('Invalid totalCost calculation:', { quantity, executionPrice, order });
-            totalCost = quantity * 100; // Fallback
+            totalCost = quantity * (executionPrice || 100);
         }
         
-        // Update order status
         order.status = ORDER_STATUS.FILLED;
-        order.filledQuantity = order.quantity;
+        order.filledQuantity = quantity;
         order.remainingQuantity = 0;
         order.executionPrice = executionPrice;
         order.fee = fee;
         order.executedAt = Date.now();
         
-        // Record trade
         const trade = {
             id: generateTradeId(),
             orderId: order.id,
@@ -350,15 +316,12 @@ async function executeMarketOrder(order) {
         await addToMatchedTrades(trade);
         await recordOrderHistory(order, 'filled');
         
-        // Save user order if player
         if (!order.isNPC) {
             await saveUserOrder(order);
         }
         
-        // Update market stats
         await updateMarketStats(quantity, totalCost);
         
-        // Calculate price impact for large orders
         const volume24h = getVolumeLast24h(order.element);
         if (quantity > volume24h * 0.01) {
             await applyPriceImpact(order.element, quantity, order.side);
@@ -379,50 +342,32 @@ async function executeMarketOrder(order) {
     }
 }
 
-/**
- * Add limit order to order book
- * @param {Object} order - Limit order
- */
 async function addToOrderBook(order) {
-    // Group orders by element
     if (!buyOrdersCache[order.element]) buyOrdersCache[order.element] = [];
     if (!sellOrdersCache[order.element]) sellOrdersCache[order.element] = [];
     
     if (order.side === ORDER_SIDES.BUY) {
         buyOrdersCache[order.element].push(order);
-        // Sort buy orders: highest price first
         buyOrdersCache[order.element].sort((a, b) => b.price - a.price);
         
-        // Limit number of orders per element
         if (buyOrdersCache[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
             buyOrdersCache[order.element] = buyOrdersCache[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
         }
     } else {
         sellOrdersCache[order.element].push(order);
-        // Sort sell orders: lowest price first
         sellOrdersCache[order.element].sort((a, b) => a.price - b.price);
         
-        // Limit number of orders per element
         if (sellOrdersCache[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
             sellOrdersCache[order.element] = sellOrdersCache[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
         }
     }
     
-    // Save to IndexedDB
     await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
     await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
-    
-    // Reload cache after saving
     await reloadOrderCache();
-    
-    // Attempt to match orders
     await matchOrders(order.element);
 }
 
-/**
- * Add stop order to watch list
- * @param {Object} order - Stop order
- */
 async function addStopOrder(order) {
     let stopOrders = await dbLoadMarketOrders('stop_orders');
     if (!stopOrders) stopOrders = {};
@@ -432,16 +377,11 @@ async function addStopOrder(order) {
     }
     
     stopOrders[order.element].push(order);
-    
     await dbSaveMarketOrders(stopOrders, 'stop_orders');
 }
 
 // ===== ORDER MATCHING =====
 
-/**
- * Match buy and sell orders for an element
- * @param {string} element - Element name
- */
 async function matchOrders(element) {
     const buys = buyOrdersCache[element] || [];
     const sells = sellOrdersCache[element] || [];
@@ -455,12 +395,10 @@ async function matchOrders(element) {
         const buy = buys[i];
         const sell = sells[j];
         
-        // Check if prices cross (buy price >= sell price)
         if (buy.price >= sell.price) {
             const matchPrice = sell.price;
             const matchQuantity = Math.min(buy.remainingQuantity, sell.remainingQuantity);
             
-            // Create matched trade
             const trade = {
                 id: generateTradeId(),
                 buyOrderId: buy.id,
@@ -476,13 +414,11 @@ async function matchOrders(element) {
                 sellerName: sell.playerName || (sell.isNPC ? sell.traderName : 'Player')
             };
             
-            // Update orders
             buy.filledQuantity += matchQuantity;
             buy.remainingQuantity -= matchQuantity;
             sell.filledQuantity += matchQuantity;
             sell.remainingQuantity -= matchQuantity;
             
-            // Update statuses
             if (buy.remainingQuantity === 0) {
                 buy.status = ORDER_STATUS.FILLED;
                 i++;
@@ -497,7 +433,6 @@ async function matchOrders(element) {
                 sell.status = ORDER_STATUS.PARTIAL;
             }
             
-            // Record trade
             buy.trades = buy.trades || [];
             sell.trades = sell.trades || [];
             buy.trades.push(trade);
@@ -508,11 +443,9 @@ async function matchOrders(element) {
             await recordOrderHistory(buy, 'matched');
             await recordOrderHistory(sell, 'matched');
             
-            // Update user orders (players only)
             if (!buy.isNPC) await saveUserOrder(buy);
             if (!sell.isNPC) await saveUserOrder(sell);
             
-            // Update NPC traders if involved
             if (buy.isNPC) {
                 updateNPCTraderAfterTrade(buy.userId, {
                     element,
@@ -533,33 +466,23 @@ async function matchOrders(element) {
                 }).catch(err => console.error('Error updating NPC seller:', err));
             }
             
-            // Update market stats
             await updateMarketStats(matchQuantity, trade.total);
-            
             matched = true;
         } else {
             break;
         }
     }
     
-    // Remove filled orders and update order books
     if (matched) {
         buyOrdersCache[element] = buys.filter(o => o.status !== ORDER_STATUS.FILLED);
         sellOrdersCache[element] = sells.filter(o => o.status !== ORDER_STATUS.FILLED);
         
         await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
         await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
-        
-        // Reload cache after match
         await reloadOrderCache();
     }
 }
 
-/**
- * Check and trigger stop orders
- * @param {string} element - Element name
- * @param {number} currentPrice - Current market price
- */
 async function checkStopOrders(element, currentPrice) {
     const stopOrders = await dbLoadMarketOrders('stop_orders');
     const elementStops = stopOrders?.[element] || [];
@@ -599,7 +522,6 @@ async function checkStopOrders(element, currentPrice) {
         }
     }
     
-    // Update stop orders
     if (stopOrders) {
         stopOrders[element] = remaining;
         await dbSaveMarketOrders(stopOrders, 'stop_orders');
@@ -610,21 +532,13 @@ async function checkStopOrders(element, currentPrice) {
 
 // ===== ORDER BOOK QUERIES =====
 
-/**
- * Get combined order book with both player and NPC orders
- * @param {string} element - Element name
- * @param {number} depth - Number of orders to return
- * @returns {Promise<Object>} Order book with bids and asks
- */
 export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
-    // Read directly from cache (which should be fresh)
     const playerBuys = (buyOrdersCache[element] || [])
         .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL);
     
     const playerSells = (sellOrdersCache[element] || [])
         .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL);
     
-    // Get NPC orders
     let npcBuys = [];
     let npcSells = [];
     
@@ -638,11 +552,9 @@ export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_
         }
     }
     
-    // Combine and sort
     const allBuys = [...playerBuys, ...npcBuys].sort((a, b) => b.price - a.price);
     const allSells = [...playerSells, ...npcSells].sort((a, b) => a.price - b.price);
     
-    // Format for display
     const bids = allBuys.slice(0, depth).map(o => ({
         price: o.price,
         quantity: o.remainingQuantity,
@@ -663,7 +575,6 @@ export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_
         userId: o.userId
     }));
     
-    // Calculate spread
     const bestBid = bids.length > 0 ? bids[0].price : null;
     const bestAsk = asks.length > 0 ? asks[0].price : null;
     const spread = bestBid && bestAsk ? bestAsk - bestBid : null;
@@ -683,12 +594,6 @@ export async function getCombinedOrderBook(element, depth = ENGINE_CONFIG.ORDER_
     };
 }
 
-/**
- * Get order book for an element (legacy - returns only player orders)
- * @param {string} element - Element name
- * @param {number} depth - Number of orders to return
- * @returns {Object} Order book with bids and asks
- */
 export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
     const buys = (buyOrdersCache[element] || [])
         .filter(o => o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL)
@@ -731,11 +636,6 @@ export function getOrderBook(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
     };
 }
 
-/**
- * Get market depth (cumulative quantities at each price level)
- * @param {string} element - Element name
- * @returns {Promise<Object>} Market depth
- */
 export async function getMarketDepth(element) {
     const orderBook = await getCombinedOrderBook(element, 100);
     
@@ -743,16 +643,12 @@ export async function getMarketDepth(element) {
     const askLevels = {};
     
     orderBook.bids.forEach(bid => {
-        if (!bidLevels[bid.price]) {
-            bidLevels[bid.price] = 0;
-        }
+        if (!bidLevels[bid.price]) bidLevels[bid.price] = 0;
         bidLevels[bid.price] += bid.quantity;
     });
     
     orderBook.asks.forEach(ask => {
-        if (!askLevels[ask.price]) {
-            askLevels[ask.price] = 0;
-        }
+        if (!askLevels[ask.price]) askLevels[ask.price] = 0;
         askLevels[ask.price] += ask.quantity;
     });
     
@@ -772,40 +668,19 @@ export async function getMarketDepth(element) {
 
 // ===== USER ORDER MANAGEMENT =====
 
-/**
- * Get orders for a user
- * @param {string} userId - User ID
- * @param {Object} filters - Optional filters
- * @returns {Promise<Array>} User orders
- */
 export async function getUserOrders(userId, filters = {}) {
     let orders = userOrdersCache[userId] || [];
-    
-    // Filter out NPC orders
     orders = orders.filter(o => !o.isNPC);
     
-    if (filters.element) {
-        orders = orders.filter(o => o.element === filters.element);
-    }
-    if (filters.side) {
-        orders = orders.filter(o => o.side === filters.side);
-    }
-    if (filters.status) {
-        orders = orders.filter(o => o.status === filters.status);
-    }
-    if (filters.type) {
-        orders = orders.filter(o => o.type === filters.type);
-    }
+    if (filters.element) orders = orders.filter(o => o.element === filters.element);
+    if (filters.side) orders = orders.filter(o => o.side === filters.side);
+    if (filters.status) orders = orders.filter(o => o.status === filters.status);
+    if (filters.type) orders = orders.filter(o => o.type === filters.type);
     
     orders.sort((a, b) => b.createdAt - a.createdAt);
-    
     return orders;
 }
 
-/**
- * Save user order
- * @param {Object} order - Order object
- */
 async function saveUserOrder(order) {
     if (order.isNPC) return;
     
@@ -823,15 +698,8 @@ async function saveUserOrder(order) {
     await dbSaveMarketOrders(userOrdersCache, 'user_orders');
 }
 
-/**
- * Cancel an order
- * @param {string} userId - User ID
- * @param {string} orderId - Order ID
- * @returns {Promise<Object>} Result
- */
 export async function cancelOrder(userId, orderId) {
     try {
-        // Check if this is an NPC order
         if (orderId.startsWith('npc_')) {
             const result = await cancelTraderOrder(orderId, { id: userId });
             return result;
@@ -840,7 +708,6 @@ export async function cancelOrder(userId, orderId) {
         let cancelled = false;
         let order = null;
         
-        // Search in buy orders
         for (const element of Object.keys(buyOrdersCache)) {
             const index = buyOrdersCache[element].findIndex(o => o.id === orderId && o.userId === userId);
             if (index >= 0) {
@@ -853,7 +720,6 @@ export async function cancelOrder(userId, orderId) {
             }
         }
         
-        // Search in sell orders if not found
         if (!cancelled) {
             for (const element of Object.keys(sellOrdersCache)) {
                 const index = sellOrdersCache[element].findIndex(o => o.id === orderId && o.userId === userId);
@@ -868,7 +734,6 @@ export async function cancelOrder(userId, orderId) {
             }
         }
         
-        // Search in stop orders if not found
         if (!cancelled) {
             const stopOrders = await dbLoadMarketOrders('stop_orders');
             if (stopOrders) {
@@ -903,11 +768,6 @@ export async function cancelOrder(userId, orderId) {
 
 // ===== ORDER HISTORY =====
 
-/**
- * Record order history
- * @param {Object} order - Order object
- * @param {string} action - Action performed
- */
 async function recordOrderHistory(order, action) {
     const entry = {
         orderId: order.id,
@@ -926,59 +786,26 @@ async function recordOrderHistory(order, action) {
     await dbAddOrderHistory(entry);
 }
 
-/**
- * Get order history for a user
- * @param {string} userId - User ID
- * @param {number} limit - Number of records
- * @returns {Promise<Array>} Order history
- */
 export async function getUserOrderHistory(userId, limit = 50) {
     return await dbGetUserOrderHistory(userId, limit);
 }
 
 // ===== MATCHED TRADES =====
 
-/**
- * Add trade to matched trades list
- * @param {Object} trade - Trade object
- */
 async function addToMatchedTrades(trade) {
     await dbAddTrade(trade);
 }
 
-/**
- * Get recent trades for an element
- * @param {string} element - Element name
- * @param {number} limit - Number of trades
- * @returns {Promise<Array>} Recent trades
- */
 export async function getRecentTrades(element, limit = 20) {
     const trades = await dbGetRecentTrades(500);
-    return trades
-        .filter(t => t.element === element)
-        .slice(-limit)
-        .reverse();
+    return trades.filter(t => t.element === element).slice(-limit).reverse();
 }
 
-/**
- * Get trade history for a user
- * @param {string} userId - User ID
- * @param {number} limit - Number of trades
- * @returns {Promise<Array>} User trades
- */
 export async function getUserTrades(userId, limit = 50) {
     const trades = await dbGetRecentTrades(500);
-    return trades
-        .filter(t => t.buyOrderId?.includes(userId) || t.sellOrderId?.includes(userId))
-        .slice(-limit)
-        .reverse();
+    return trades.filter(t => t.buyOrderId?.includes(userId) || t.sellOrderId?.includes(userId)).slice(-limit).reverse();
 }
 
-/**
- * Get all recent trades (including NPC trades)
- * @param {number} limit - Number of trades
- * @returns {Promise<Array>} Recent trades
- */
 export async function getAllRecentTrades(limit = 50) {
     const trades = await dbGetRecentTrades(500);
     return trades.slice(-limit).reverse();
@@ -986,36 +813,21 @@ export async function getAllRecentTrades(limit = 50) {
 
 // ===== MARKET STATISTICS =====
 
-/**
- * Update market statistics
- * @param {number} volume - Trade volume
- * @param {number} value - Trade value
- */
 async function updateMarketStats(volume, value) {
     marketStatsCache.totalVolume = (marketStatsCache.totalVolume || 0) + volume;
     marketStatsCache.totalValue = (marketStatsCache.totalValue || 0) + value;
     marketStatsCache.totalTrades = (marketStatsCache.totalTrades || 0) + 1;
     marketStatsCache.lastUpdate = Date.now();
-    
     await dbSaveMarketOrders(marketStatsCache, 'market_stats');
 }
 
-/**
- * Get market statistics
- * @returns {Promise<Object>} Market statistics
- */
 export async function getMarketStats() {
     return marketStatsCache;
 }
 
-/**
- * Get 24-hour market summary
- * @returns {Promise<Object>} 24-hour summary
- */
 export async function get24HourSummary() {
     const trades = await dbGetRecentTrades(500);
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    
     const recentTrades = trades.filter(t => t.timestamp >= oneDayAgo);
     
     const volume = recentTrades.reduce((sum, t) => sum + t.quantity, 0);
@@ -1026,37 +838,17 @@ export async function get24HourSummary() {
     const last = recentTrades.length > 0 ? recentTrades[recentTrades.length - 1].price : 0;
     const change = last - first;
     const changePercent = first > 0 ? (change / first) * 100 : 0;
-    
     const npcTrades = recentTrades.filter(t => t.buyIsNPC || t.sellIsNPC).length;
     const playerTrades = recentTrades.length - npcTrades;
     
-    return {
-        volume,
-        value,
-        trades: recentTrades.length,
-        npcTrades,
-        playerTrades,
-        high,
-        low,
-        open: first,
-        close: last,
-        change,
-        changePercent
-    };
+    return { volume, value, trades: recentTrades.length, npcTrades, playerTrades, high, low, open: first, close: last, change, changePercent };
 }
 
 // ===== PRICE IMPACT =====
 
-/**
- * Apply price impact from large trades
- * @param {string} element - Element name
- * @param {number} quantity - Trade quantity
- * @param {string} side - Trade side
- */
 async function applyPriceImpact(element, quantity, side) {
     const prices = getCurrentPrices();
     const elementPrice = prices[element];
-    
     if (!elementPrice) return;
     
     const volume24h = getVolumeLast24h(element);
@@ -1085,28 +877,22 @@ function generateTradeId() {
     return 'trade_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-/**
- * Clean expired orders
- */
 async function cleanExpiredOrders() {
     const now = Date.now();
     let expired = 0;
     
-    // Clean buy orders
     for (const element of Object.keys(buyOrdersCache)) {
         const before = buyOrdersCache[element].length;
         buyOrdersCache[element] = buyOrdersCache[element].filter(o => o.expiresAt > now);
         expired += before - buyOrdersCache[element].length;
     }
     
-    // Clean sell orders
     for (const element of Object.keys(sellOrdersCache)) {
         const before = sellOrdersCache[element].length;
         sellOrdersCache[element] = sellOrdersCache[element].filter(o => o.expiresAt > now);
         expired += before - sellOrdersCache[element].length;
     }
     
-    // Clean stop orders
     const stopOrders = await dbLoadMarketOrders('stop_orders');
     if (stopOrders) {
         for (const element of Object.keys(stopOrders)) {
@@ -1117,45 +903,31 @@ async function cleanExpiredOrders() {
         await dbSaveMarketOrders(stopOrders, 'stop_orders');
     }
     
-    // Save updated order books
     await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
     await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
     
-    if (expired > 0) {
-        console.log(`Cleaned ${expired} expired orders`);
-    }
+    if (expired > 0) console.log(`Cleaned ${expired} expired orders`);
 }
 
 // ===== MATCHING ENGINE =====
 
 let matchingInterval = null;
 
-/**
- * Start the matching engine
- */
 export function startMatchingEngine() {
     if (matchingInterval) return;
     
     matchingInterval = setInterval(async () => {
         try {
-            // Get all elements with orders
-            const elements = new Set([
-                ...Object.keys(buyOrdersCache),
-                ...Object.keys(sellOrdersCache)
-            ]);
+            const elements = new Set([...Object.keys(buyOrdersCache), ...Object.keys(sellOrdersCache)]);
             
-            // Match orders for each element
             for (const element of elements) {
                 await matchOrders(element);
-                
-                // Check stop orders
                 const prices = getCurrentPrices();
                 if (prices[element]) {
                     await checkStopOrders(element, prices[element].current);
                 }
             }
             
-            // Clean expired orders
             await cleanExpiredOrders();
             
         } catch (error) {
@@ -1164,9 +936,6 @@ export function startMatchingEngine() {
     }, ENGINE_CONFIG.MATCHING_INTERVAL);
 }
 
-/**
- * Stop the matching engine
- */
 export function stopMatchingEngine() {
     if (matchingInterval) {
         clearInterval(matchingInterval);
@@ -1176,34 +945,16 @@ export function stopMatchingEngine() {
 
 // ===== NPC INTEGRATION HELPERS =====
 
-/**
- * Get order book with NPC orders (async version for UI)
- * @param {string} element - Element name
- * @param {number} depth - Order depth
- * @returns {Promise<Object>} Combined order book
- */
 export async function getOrderBookWithNPC(element, depth = ENGINE_CONFIG.ORDER_BOOK_DEPTH) {
     return await getCombinedOrderBook(element, depth);
 }
 
-/**
- * Check if an order is from an NPC
- * @param {Object} order - Order object
- * @returns {boolean} True if NPC order
- */
 export function isNPCOrder(order) {
     return order.isNPC === true || order.userId?.startsWith('npc_') || order.id?.startsWith('npc_');
 }
 
-/**
- * Get trader name for display
- * @param {Object} order - Order object
- * @returns {string} Display name
- */
 export function getTraderDisplayName(order) {
-    if (order.isNPC) {
-        return order.traderName || 'NPC Trader';
-    }
+    if (order.isNPC) return order.traderName || 'NPC Trader';
     return order.playerName || 'Player';
 }
 
@@ -1234,10 +985,8 @@ export default {
     stopMatchingEngine
 };
 
-// Initialize on load
 initializeMarketEngine();
 
-// Attach to window for global access
 window.ORDER_TYPES = ORDER_TYPES;
 window.ORDER_SIDES = ORDER_SIDES;
 window.ORDER_STATUS = ORDER_STATUS;
