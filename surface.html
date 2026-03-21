@@ -69,6 +69,12 @@
             pointer-events: none;
         }
         
+        /* Landscape orientation for gas giants */
+        .planet-canvas.landscape {
+            object-fit: contain;
+            background: #000;
+        }
+        
         .star-overlay {
             position: fixed;
             top: 0;
@@ -689,7 +695,7 @@
 <body>
     <div class="phone-frame">
         <div class="surface-view" id="surfaceView">
-            <img src="assets/images/earth-view.jpg" class="planet-canvas" id="planetImage" alt="Planet surface" onerror="this.src='https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg'">
+            <img src="assets/images/fallback/default-surface.jpg" class="planet-canvas" id="planetImage" alt="Planet surface">
             <div class="star-overlay"></div>
             
             <div class="content">
@@ -756,6 +762,7 @@
 
     <script type="module">
         import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
+        import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -833,6 +840,38 @@
         let cachedCargoMass = 0;
         let lastMassUpdate = 0;
         const MASS_UPDATE_INTERVAL = 2000;
+
+        // ===== PLANET IMAGE LOADING =====
+        async function loadPlanetSurfaceImage(planetName, planetType) {
+            try {
+                loadingText.textContent = 'loading surface view...';
+                
+                const result = await getAndLoadPlanetImage(planetName, planetType);
+                
+                if (result.success) {
+                    planetImage.src = result.url;
+                    
+                    // Apply landscape class for gas giants
+                    if (result.pathInfo.isGasGiant) {
+                        planetImage.classList.add('landscape');
+                    } else {
+                        planetImage.classList.remove('landscape');
+                    }
+                    
+                    return true;
+                } else {
+                    // Use external fallback
+                    planetImage.src = EXTERNAL_FALLBACK_URL;
+                    planetImage.classList.remove('landscape');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Failed to load planet image:', error);
+                planetImage.src = EXTERNAL_FALLBACK_URL;
+                planetImage.classList.remove('landscape');
+                return false;
+            }
+        }
 
         // ===== PERSIST EXPLORED STATE =====
         function loadExploredState() {
@@ -1147,30 +1186,6 @@
                     planetResources = planetResources.slice(0, 4);
                 }
                 
-                let imageFile = 'earth-view.jpg';
-                if (planetTypeStr.includes('scorched') || planetTypeStr.includes('volcanic')) {
-                    imageFile = 'pyros-surface.jpg';
-                } else if (planetTypeStr.includes('frozen') || planetTypeStr.includes('ice')) {
-                    imageFile = 'glacier-surface.jpg';
-                } else if (planetTypeStr.includes('lush')) {
-                    imageFile = 'verdant-surface.jpg';
-                } else if (planetTypeStr.includes('barren')) {
-                    imageFile = 'barren-surface.jpg';
-                } else if (planetTypeStr.includes('gas')) {
-                    imageFile = 'gas-surface.jpg';
-                } else if (planetTypeStr.includes('oceanic')) {
-                    imageFile = 'oceanic-surface.jpg';
-                } else if (planetTypeStr.includes('toxic')) {
-                    imageFile = 'toxic-surface.jpg';
-                } else if (planetTypeStr.includes('asteroid')) {
-                    imageFile = 'asteroid-field.jpg';
-                }
-                
-                planetImage.src = 'assets/images/' + imageFile;
-                planetImage.onerror = function() {
-                    this.src = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
-                };
-                
                 currentPlanet = {
                     name: planetNameStr,
                     type: planetTypeStr,
@@ -1180,6 +1195,9 @@
                 
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
+                
+                // Load the planet image using the new image system
+                await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
@@ -1198,6 +1216,7 @@
                 return true;
                 
             } catch (error) {
+                console.error('Error loading planet data:', error);
                 return false;
             }
         }
