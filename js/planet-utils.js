@@ -418,12 +418,132 @@ export function validatePlanetResources(resources) {
     return true;
 }
 
+// ===== PLANET IMAGE SYSTEM =====
+// Maximum number of images per biome
+export const MAX_IMAGES_PER_BIOME = 50;
+
+// External fallback URL for when local images fail
+export const EXTERNAL_FALLBACK_URL = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
+
+// Biome to folder mapping
+export function getBiomeFolder(planetType) {
+    const type = planetType?.toLowerCase() || '';
+    
+    if (type.includes('scorched') || type.includes('volcanic')) return 'scorched';
+    if (type.includes('barren')) return 'barren';
+    if (type.includes('lush')) return 'lush';
+    if (type.includes('frozen') || type.includes('ice')) return 'frozen';
+    if (type.includes('oceanic')) return 'oceanic';
+    if (type.includes('toxic')) return 'toxic';
+    if (type.includes('asteroid')) return 'asteroid';
+    if (type.includes('gas')) return 'gasgiant';
+    
+    return 'fallback';
+}
+
+// Deterministic image index based on planet name (1-50)
+export function getImageIndexForPlanet(planetName, maxImages = MAX_IMAGES_PER_BIOME) {
+    if (!planetName || planetName === '') return 1;
+    
+    let hash = 0;
+    for (let i = 0; i < planetName.length; i++) {
+        hash = ((hash << 5) - hash) + planetName.charCodeAt(i);
+        hash |= 0; // Convert to 32-bit integer
+    }
+    // Return a number between 1 and maxImages (inclusive)
+    return ((Math.abs(hash) % maxImages) + 1);
+}
+
+// Get image path for a planet
+export function getPlanetImagePath(planetName, planetType) {
+    const folder = getBiomeFolder(planetType);
+    const isGasGiant = folder === 'gasgiant';
+    
+    if (isGasGiant) {
+        const index = getImageIndexForPlanet(planetName, MAX_IMAGES_PER_BIOME);
+        const imageNumber = String(index).padStart(2, '0');
+        return {
+            src: `assets/images/gasgiant/gasgiant_${imageNumber}.jpg`,
+            isGasGiant: true,
+            fallback: 'assets/images/fallback/default-gasgiant.jpg',
+            orientation: 'landscape',
+            index: index
+        };
+    }
+    
+    // Surface planets
+    const index = getImageIndexForPlanet(planetName, MAX_IMAGES_PER_BIOME);
+    const imageNumber = String(index).padStart(2, '0');
+    
+    return {
+        src: `assets/images/${folder}/${folder}_surface_${imageNumber}.jpg`,
+        isGasGiant: false,
+        fallback: 'assets/images/fallback/default-surface.jpg',
+        orientation: 'portrait',
+        index: index
+    };
+}
+
+// Load image with fallback chain
+export function loadPlanetImage(imagePath, fallbackPath, externalFallback = EXTERNAL_FALLBACK_URL) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        
+        const handleSuccess = () => {
+            resolve(img.src);
+        };
+        
+        const handleError = () => {
+            // Try fallback image
+            if (fallbackPath && img.src !== fallbackPath) {
+                img.src = fallbackPath;
+            } else if (externalFallback && img.src !== externalFallback) {
+                // Try external fallback
+                img.src = externalFallback;
+            } else {
+                // All fallbacks failed
+                reject(new Error('All image sources failed to load'));
+            }
+        };
+        
+        img.onload = handleSuccess;
+        img.onerror = handleError;
+        
+        // Start loading
+        img.src = imagePath;
+    });
+}
+
+// Get and load planet image in one call
+export async function getAndLoadPlanetImage(planetName, planetType) {
+    const pathInfo = getPlanetImagePath(planetName, planetType);
+    
+    try {
+        const loadedUrl = await loadPlanetImage(pathInfo.src, pathInfo.fallback);
+        return {
+            success: true,
+            url: loadedUrl,
+            pathInfo: pathInfo
+        };
+    } catch (error) {
+        console.error('Failed to load planet image:', error);
+        return {
+            success: false,
+            url: EXTERNAL_FALLBACK_URL,
+            pathInfo: pathInfo,
+            error: error
+        };
+    }
+}
+
 // ===== EXPORT ALL =====
 export default {
     PLANET_TYPES,
     PLANET_TYPE_DATA,
     RESOURCE_POOLS,
     RARITY_WEIGHTS,
+    MAX_IMAGES_PER_BIOME,
+    EXTERNAL_FALLBACK_URL,
     seededRandom,
     seededRandomRange,
     hashString,
@@ -436,5 +556,10 @@ export default {
     clearSystemData,
     savePlanetResources,
     loadPlanetResources,
-    validatePlanetResources
+    validatePlanetResources,
+    getBiomeFolder,
+    getImageIndexForPlanet,
+    getPlanetImagePath,
+    loadPlanetImage,
+    getAndLoadPlanetImage
 };
