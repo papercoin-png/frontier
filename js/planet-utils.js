@@ -484,37 +484,62 @@ export function getPlanetImagePath(planetName, planetType) {
     };
 }
 
-// Load image with fallback chain
+// Load image with fallback chain - ALWAYS resolves with a URL
 export function loadPlanetImage(imagePath, fallbackPath, externalFallback = EXTERNAL_FALLBACK_URL) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const img = new Image();
         
-        const handleSuccess = () => {
-            resolve(img.src);
-        };
+        let currentSrc = imagePath;
+        let attempts = 0;
+        let timeoutId = null;
         
-        const handleError = () => {
-            // Try fallback image
-            if (fallbackPath && img.src !== fallbackPath) {
-                img.src = fallbackPath;
-            } else if (externalFallback && img.src !== externalFallback) {
-                // Try external fallback
-                img.src = externalFallback;
-            } else {
-                // All fallbacks failed
-                reject(new Error('All image sources failed to load'));
+        const cleanup = () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
             }
         };
         
-        img.onload = handleSuccess;
-        img.onerror = handleError;
+        const tryNext = () => {
+            attempts++;
+            if (attempts === 1 && fallbackPath) {
+                currentSrc = fallbackPath;
+                img.src = currentSrc;
+            } else if (attempts === 2) {
+                currentSrc = externalFallback;
+                img.src = currentSrc;
+            } else {
+                // All attempts failed, resolve with external fallback anyway
+                cleanup();
+                console.warn('All image sources failed, using external fallback');
+                resolve(externalFallback);
+            }
+        };
+        
+        img.onload = () => {
+            cleanup();
+            resolve(img.src);
+        };
+        
+        img.onerror = (e) => {
+            console.warn(`Failed to load: ${currentSrc}`);
+            tryNext();
+        };
         
         // Start loading
         img.src = imagePath;
+        
+        // Timeout fallback (in case onload/onerror never fire)
+        timeoutId = setTimeout(() => {
+            if (!img.complete) {
+                console.warn(`Timeout loading: ${imagePath}`);
+                tryNext();
+            }
+        }, 5000);
     });
 }
 
-// Get and load planet image in one call
+// Get and load planet image - ALWAYS returns a URL
 export async function getAndLoadPlanetImage(planetName, planetType) {
     const pathInfo = getPlanetImagePath(planetName, planetType);
     
