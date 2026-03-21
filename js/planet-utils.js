@@ -108,8 +108,6 @@ export const PLANET_TYPE_DATA = {
 };
 
 // ===== RESOURCE POOLS BY PLANET TYPE =====
-// Each planet type has a pool of possible resources
-// Maximum 4 resources per planet, selected from these pools
 export const RESOURCE_POOLS = {
     [PLANET_TYPES.SCORCHED]: [
         'Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury',
@@ -145,31 +143,24 @@ export const RESOURCE_POOLS = {
     ]
 };
 
-// ===== RARITY WEIGHTS (for resource selection) =====
+// ===== RARITY WEIGHTS =====
 export const RARITY_WEIGHTS = {
-    // Common elements (found in many pools)
     'Hydrogen': 100, 'Helium': 90, 'Oxygen': 100, 'Carbon': 100, 'Nitrogen': 80,
     'Iron': 100, 'Silicon': 100, 'Aluminum': 90, 'Magnesium': 85, 'Calcium': 80,
     'Sodium': 75, 'Potassium': 75, 'Sulfur': 70, 'Phosphorus': 65, 'Chlorine': 60,
-    
-    // Uncommon elements
     'Titanium': 50, 'Nickel': 55, 'Copper': 50, 'Zinc': 45, 'Manganese': 40,
     'Chromium': 40, 'Vanadium': 35, 'Cobalt': 35, 'Lead': 40, 'Tin': 35,
     'Argon': 40, 'Neon': 35, 'Krypton': 30, 'Xenon': 25, 'Radon': 10,
-    
-    // Rare elements
     'Gold': 20, 'Silver': 25, 'Platinum': 15, 'Palladium': 12, 'Rhodium': 10,
     'Iridium': 8, 'Ruthenium': 8, 'Osmium': 7, 'Rhenium': 6, 'Tungsten': 15,
     'Uranium': 12, 'Thorium': 10, 'Gallium': 15, 'Germanium': 12, 'Arsenic': 10,
     'Selenium': 12, 'Bromine': 15, 'Rubidium': 10, 'Strontium': 12, 'Yttrium': 8,
-    'Zirconium': 10, 'Niobium': 8, 'Molybdenum': 15, 'Technetium': 1, 'Ruthenium': 5,
+    'Zirconium': 10, 'Niobium': 8, 'Molybdenum': 15, 'Technetium': 1,
     'Cadmium': 10, 'Indium': 8, 'Antimony': 8, 'Tellurium': 7, 'Iodine': 10,
     'Cesium': 6, 'Barium': 8, 'Lanthanum': 5, 'Cerium': 5, 'Praseodymium': 4,
     'Neodymium': 5, 'Promethium': 1, 'Samarium': 4, 'Europium': 3, 'Gadolinium': 4,
     'Terbium': 3, 'Dysprosium': 4, 'Holmium': 3, 'Erbium': 4, 'Thulium': 3,
     'Ytterbium': 4, 'Lutetium': 3, 'Hafnium': 4, 'Tantalum': 4, 'Bismuth': 6,
-    
-    // Legendary elements
     'Polonium': 2, 'Astatine': 1, 'Francium': 1, 'Radium': 2, 'Actinium': 2,
     'Protactinium': 2, 'Neptunium': 1, 'Plutonium': 1, 'Americium': 1, 'Curium': 1,
     'Berkelium': 1, 'Californium': 1, 'Einsteinium': 1, 'Fermium': 1, 'Mendelevium': 1,
@@ -202,8 +193,6 @@ export function seededRandomRange(seed, index, min, max) {
 export function getRandomPlanetType(seed, index = 0) {
     const rand = seededRandom(seed, index);
     let cumulative = 0;
-    
-    // Get all active planet types (all are active now)
     const types = Object.values(PLANET_TYPES);
     
     for (const type of types) {
@@ -212,27 +201,20 @@ export function getRandomPlanetType(seed, index = 0) {
             return type;
         }
     }
-    
-    return PLANET_TYPES.BARREN; // Default fallback
+    return PLANET_TYPES.BARREN;
 }
 
-// ===== RESOURCE GENERATION (4 MAXIMUM) =====
+// ===== RESOURCE GENERATION =====
 export function generatePlanetResources(seed, planetType, maxResources = 4) {
     const pool = RESOURCE_POOLS[planetType] || RESOURCE_POOLS[PLANET_TYPES.BARREN];
     const resources = [];
-    
-    // Create a copy of the pool with weights
     const weightedPool = pool.map(resource => ({
         name: resource,
         weight: RARITY_WEIGHTS[resource] || 10
     }));
     
-    // Select up to maxResources unique resources
     while (resources.length < maxResources && weightedPool.length > 0) {
-        // Calculate total weight
         const totalWeight = weightedPool.reduce((sum, item) => sum + item.weight, 0);
-        
-        // Weighted random selection
         let rand = seededRandom(seed, resources.length + 100) * totalWeight;
         let selectedIndex = 0;
         let cumulative = 0;
@@ -245,11 +227,8 @@ export function generatePlanetResources(seed, planetType, maxResources = 4) {
             }
         }
         
-        // Add selected resource
         const selected = weightedPool[selectedIndex];
         resources.push(selected.name);
-        
-        // Remove selected resource from pool (no duplicates)
         weightedPool.splice(selectedIndex, 1);
     }
     
@@ -261,17 +240,13 @@ export function generatePlanet(seed, index, starType, sectorId) {
     const planetSeed = seed + index * 1000;
     const planetType = getRandomPlanetType(planetSeed, 0);
     const planetData = PLANET_TYPE_DATA[planetType];
-    
-    // Generate resources (max 4)
     const resources = generatePlanetResources(planetSeed, planetType);
-    
-    // Calculate orbit parameters
     const orbitRadius = 70 + index * 40;
     const orbitSpeed = 0.002 - (index * 0.0002);
     
     return {
         index: index,
-        name: '', // Will be filled by planet-names.js
+        name: '',
         type: planetType,
         typeName: planetData.name,
         icon: planetData.icon,
@@ -285,8 +260,8 @@ export function generatePlanet(seed, index, starType, sectorId) {
         seed: planetSeed,
         orbitRadius: orbitRadius,
         orbitSpeed: orbitSpeed,
-        angle: seededRandom(planetSeed, 100) * Math.PI * 2, // Random starting angle
-        distanceFromStar: 0.5 + (index * 0.8) // Approximate distance in LY
+        angle: seededRandom(planetSeed, 100) * Math.PI * 2,
+        distanceFromStar: 0.5 + (index * 0.8)
     };
 }
 
@@ -294,7 +269,6 @@ export function generatePlanet(seed, index, starType, sectorId) {
 export function generateStar(seed, index, clusterName) {
     const starSeed = seed + index * 1000;
     
-    // Star types with probabilities
     const starTypes = [
         { type: 'main', name: 'Main Sequence', prob: 0.60, color: '#ffd700', minPlanets: 3, maxPlanets: 8, icon: '🟡' },
         { type: 'red', name: 'Red Dwarf', prob: 0.25, color: '#ff6b6b', minPlanets: 2, maxPlanets: 5, icon: '🔴' },
@@ -303,7 +277,6 @@ export function generateStar(seed, index, clusterName) {
         { type: 'blackhole', name: 'Black Hole', prob: 0.02, color: '#000000', minPlanets: 0, maxPlanets: 0, icon: '⚫' }
     ];
     
-    // Select star type
     const rand = seededRandom(starSeed, 0);
     let cumulative = 0;
     let starType = starTypes[0];
@@ -316,13 +289,11 @@ export function generateStar(seed, index, clusterName) {
         }
     }
     
-    // Determine planet count
     let planetCount = 0;
     if (starType.maxPlanets > 0) {
         planetCount = Math.floor(seededRandom(starSeed, 1) * (starType.maxPlanets - starType.minPlanets + 1)) + starType.minPlanets;
     }
     
-    // Generate planets
     const planets = [];
     for (let i = 0; i < planetCount; i++) {
         planets.push(generatePlanet(starSeed, i, starType.type, clusterName));
@@ -330,7 +301,7 @@ export function generateStar(seed, index, clusterName) {
     
     return {
         index: index,
-        name: '', // Will be filled by planet-names.js
+        name: '',
         type: starType.type,
         typeName: starType.name,
         color: starType.color,
@@ -357,15 +328,10 @@ export function saveSystemData(star, planets, clusterName) {
             index: star.index,
             seed: star.seed
         },
-        planets: planets.map(p => ({
-            ...p,
-            // Ensure resources are included
-            resources: p.resources || []
-        })),
+        planets: planets.map(p => ({ ...p, resources: p.resources || [] })),
         clusterName: clusterName,
         timestamp: Date.now()
     };
-    
     localStorage.setItem('voidfarer_system_data', JSON.stringify(systemData));
     return systemData;
 }
@@ -386,15 +352,12 @@ export function clearSystemData() {
     localStorage.removeItem('voidfarer_system_data');
 }
 
-// ===== PLANET RESOURCE MANAGEMENT =====
 export function savePlanetResources(planetName, resources) {
-    const key = `voidfarer_planet_resources_${planetName}`;
-    localStorage.setItem(key, JSON.stringify(resources));
+    localStorage.setItem(`voidfarer_planet_resources_${planetName}`, JSON.stringify(resources));
 }
 
 export function loadPlanetResources(planetName) {
-    const key = `voidfarer_planet_resources_${planetName}`;
-    const saved = localStorage.getItem(key);
+    const saved = localStorage.getItem(`voidfarer_planet_resources_${planetName}`);
     if (saved) {
         try {
             return JSON.parse(saved);
@@ -405,27 +368,19 @@ export function loadPlanetResources(planetName) {
     return null;
 }
 
-// ===== VALIDATION =====
 export function validatePlanetResources(resources) {
     if (!Array.isArray(resources)) return false;
-    if (resources.length > 4) return false; // Max 4 resources
-    if (resources.length === 0) return false; // At least 1 resource
-    
-    // Check for duplicates
+    if (resources.length > 4) return false;
+    if (resources.length === 0) return false;
     const unique = new Set(resources);
     if (unique.size !== resources.length) return false;
-    
     return true;
 }
 
 // ===== PLANET IMAGE SYSTEM =====
-// Maximum number of images per biome
 export const MAX_IMAGES_PER_BIOME = 50;
+export const EXTERNAL_FALLBACK_URL = 'https://i.postimg.cc/kGb4GdB4/Ungb-A0PI.jpg';
 
-// External fallback URL for when local images fail
-export const EXTERNAL_FALLBACK_URL = 'https://i.postimg.cc/tTj6V9HV/grok-image-1773016193832.jpg';
-
-// Biome to folder mapping
 export function getBiomeFolder(planetType) {
     const type = planetType?.toLowerCase() || '';
     
@@ -441,105 +396,65 @@ export function getBiomeFolder(planetType) {
     return 'fallback';
 }
 
-// Deterministic image index based on planet name (1-50)
 export function getImageIndexForPlanet(planetName, maxImages = MAX_IMAGES_PER_BIOME) {
     if (!planetName || planetName === '') return 1;
     
     let hash = 0;
     for (let i = 0; i < planetName.length; i++) {
         hash = ((hash << 5) - hash) + planetName.charCodeAt(i);
-        hash |= 0; // Convert to 32-bit integer
+        hash |= 0;
     }
-    // Return a number between 1 and maxImages (inclusive)
     return ((Math.abs(hash) % maxImages) + 1);
 }
 
-// Get image path for a planet
 export function getPlanetImagePath(planetName, planetType) {
     const folder = getBiomeFolder(planetType);
     const isGasGiant = folder === 'gasgiant';
+    const index = getImageIndexForPlanet(planetName, MAX_IMAGES_PER_BIOME);
+    const imageNumber = String(index).padStart(2, '0');
     
     if (isGasGiant) {
-        const index = getImageIndexForPlanet(planetName, MAX_IMAGES_PER_BIOME);
-        const imageNumber = String(index).padStart(2, '0');
         return {
             src: `assets/images/gasgiant/gasgiant_${imageNumber}.jpg`,
             isGasGiant: true,
-            fallback: 'assets/images/fallback/default-gasgiant.jpg',
+            fallback: EXTERNAL_FALLBACK_URL,
             orientation: 'landscape',
             index: index
         };
     }
     
-    // Surface planets
-    const index = getImageIndexForPlanet(planetName, MAX_IMAGES_PER_BIOME);
-    const imageNumber = String(index).padStart(2, '0');
-    
     return {
         src: `assets/images/${folder}/${folder}_surface_${imageNumber}.jpg`,
         isGasGiant: false,
-        fallback: 'assets/images/fallback/default-surface.jpg',
+        fallback: EXTERNAL_FALLBACK_URL,
         orientation: 'portrait',
         index: index
     };
 }
 
-// Load image with fallback chain - ALWAYS resolves with a URL
 export function loadPlanetImage(imagePath, fallbackPath, externalFallback = EXTERNAL_FALLBACK_URL) {
     return new Promise((resolve) => {
         const img = new Image();
         
-        let currentSrc = imagePath;
-        let attempts = 0;
-        let timeoutId = null;
-        
-        const cleanup = () => {
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
+        img.onload = () => {
+            resolve(img.src);
         };
         
-        const tryNext = () => {
-            attempts++;
-            if (attempts === 1 && fallbackPath) {
-                currentSrc = fallbackPath;
-                img.src = currentSrc;
-            } else if (attempts === 2) {
-                currentSrc = externalFallback;
-                img.src = currentSrc;
+        img.onerror = () => {
+            if (fallbackPath) {
+                const fallbackImg = new Image();
+                fallbackImg.onload = () => resolve(fallbackImg.src);
+                fallbackImg.onerror = () => resolve(externalFallback);
+                fallbackImg.src = fallbackPath;
             } else {
-                // All attempts failed, resolve with external fallback anyway
-                cleanup();
-                console.warn('All image sources failed, using external fallback');
                 resolve(externalFallback);
             }
         };
         
-        img.onload = () => {
-            cleanup();
-            resolve(img.src);
-        };
-        
-        img.onerror = (e) => {
-            console.warn(`Failed to load: ${currentSrc}`);
-            tryNext();
-        };
-        
-        // Start loading
         img.src = imagePath;
-        
-        // Timeout fallback (in case onload/onerror never fire)
-        timeoutId = setTimeout(() => {
-            if (!img.complete) {
-                console.warn(`Timeout loading: ${imagePath}`);
-                tryNext();
-            }
-        }, 5000);
     });
 }
 
-// Get and load planet image - ALWAYS returns a URL
 export async function getAndLoadPlanetImage(planetName, planetType) {
     const pathInfo = getPlanetImagePath(planetName, planetType);
     
@@ -551,7 +466,6 @@ export async function getAndLoadPlanetImage(planetName, planetType) {
             pathInfo: pathInfo
         };
     } catch (error) {
-        console.error('Failed to load planet image:', error);
         return {
             success: false,
             url: EXTERNAL_FALLBACK_URL,
