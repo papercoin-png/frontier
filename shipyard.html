@@ -6,6 +6,8 @@
     <title>VOIDFARER - SHIPYARD</title>
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         * {
@@ -685,7 +687,7 @@
                     <span>✦ SHIPYARD</span>
                     <span>✦ MINING FLEET</span>
                 </div>
-                <div class="top-bar-right">v4.0.0</div>
+                <div class="top-bar-right">v5.0.0</div>
             </div>
             
             <div class="shipyard-title">
@@ -706,7 +708,7 @@
                 </div>
                 <div class="credits-row">
                     <span>Available Credits</span>
-                    <span class="credits-value" id="credits">5,000 ⭐</span>
+                    <span class="credits-value" id="credits">Loading...</span>
                 </div>
                 <div class="fuel-row">
                     <span>⚡ Fuel Cells</span>
@@ -735,41 +737,38 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
 
-        // ===== CREDIT FUNCTIONS (FIXED NaN ISSUE) =====
+        // ===== GET PLAYER ID =====
+        function getPlayerId() {
+            return localStorage.getItem('voidfarer_player_id') || 'main';
+        }
+
+        // ===== CREDIT FUNCTIONS USING STORAGE.JS =====
+        let currentCredits = 0;
         
-        function getPlayerCredits() {
-            let credits = localStorage.getItem('voidfarer_credits');
-            if (credits === null || credits === undefined || credits === 'NaN') {
-                credits = '5000';
-                localStorage.setItem('voidfarer_credits', credits);
-            }
-            const parsed = parseInt(credits);
-            if (isNaN(parsed)) {
-                localStorage.setItem('voidfarer_credits', '5000');
+        async function updateCreditsDisplay() {
+            try {
+                const playerId = getPlayerId();
+                currentCredits = await getCredits(playerId);
+                const creditsElement = document.getElementById('credits');
+                if (creditsElement) {
+                    creditsElement.textContent = currentCredits.toLocaleString() + ' ⭐';
+                }
+                return currentCredits;
+            } catch (error) {
+                console.error('Error loading credits:', error);
                 return 5000;
             }
-            return parsed;
         }
-        
-        function setPlayerCredits(amount) {
-            localStorage.setItem('voidfarer_credits', amount.toString());
-        }
-        
-        function updateCreditsDisplay() {
-            const creditsElement = document.getElementById('credits');
-            if (creditsElement) {
-                const credits = getPlayerCredits();
-                creditsElement.textContent = credits.toLocaleString() + ' ⭐';
-            }
-        }
-        
+
         // ===== MARKET PRICE FUNCTIONS =====
         
         function getMarketPrice(element) {
@@ -796,34 +795,14 @@
             return 100;
         }
         
-        function getPlayerCollection() {
+        async function getPlayerCollection() {
             try {
-                const collection = localStorage.getItem('voidfarer_collection');
-                if (!collection) return {};
-                return JSON.parse(collection);
+                return await getCollection();
             } catch (e) {
                 return {};
             }
         }
         
-        function addToCollection(element, quantity) {
-            const collection = getPlayerCollection();
-            if (!collection[element]) collection[element] = { count: 0 };
-            collection[element].count = (collection[element].count || 0) + quantity;
-            localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-        }
-        
-        function removeFromCollection(element, quantity) {
-            const collection = getPlayerCollection();
-            if (collection[element] && collection[element].count >= quantity) {
-                collection[element].count -= quantity;
-                if (collection[element].count <= 0) delete collection[element];
-                localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
-                return true;
-            }
-            return false;
-        }
-
         // ===== SHIP DATA =====
         
         const CARGO_CAPACITY = {
@@ -950,7 +929,7 @@
             return total;
         }
         
-        // ===== AUTO-BUY FUNCTION =====
+        // ===== AUTO-BUY FUNCTION USING STORAGE.JS =====
         window.autoBuyElement = async function(element, missingAmount) {
             event.stopPropagation();
             
@@ -962,7 +941,8 @@
             try {
                 const price = getMarketPrice(element);
                 const totalCost = missingAmount * price;
-                const currentCredits = getPlayerCredits();
+                const playerId = getPlayerId();
+                const currentCredits = await getCredits(playerId);
                 
                 if (currentCredits < totalCost) {
                     alert(`Insufficient credits! Need ${totalCost.toLocaleString()}⭐`);
@@ -970,18 +950,27 @@
                     return;
                 }
                 
-                // Deduct credits
-                setPlayerCredits(currentCredits - totalCost);
-                updateCreditsDisplay();
+                // Spend credits using storage.js
+                const spent = await spendCredits(totalCost, playerId, `Purchased ${missingAmount} ${element}`);
+                if (!spent) {
+                    alert('Failed to spend credits');
+                    loadingOverlay.classList.remove('active');
+                    return;
+                }
                 
-                // Add elements to inventory
-                addToCollection(element, missingAmount);
+                // Add elements to collection using storage.js
+                await addElementToCollection(element, missingAmount, {
+                    source: 'shipyard_auto_buy',
+                    timestamp: Date.now(),
+                    price: price
+                });
                 
                 if (tg?.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred?.('success');
                 }
                 
-                // Refresh the ship cards to update counts
+                // Update display and refresh
+                await updateCreditsDisplay();
                 await refreshShipCards();
                 
                 loadingOverlay.classList.remove('active');
@@ -993,7 +982,7 @@
             }
         };
         
-        // ===== BUILD SHIP FUNCTION =====
+        // ===== BUILD SHIP FUNCTION USING STORAGE.JS =====
         window.buildShip = async function(shipName, tier) {
             const ship = MINING_SHIPS.find(s => s.tier === tier);
             if (!ship) return;
@@ -1004,7 +993,7 @@
             loadingText.textContent = `CONSTRUCTING ${shipName.toUpperCase()}...`;
             
             try {
-                const collection = getPlayerCollection();
+                const collection = await getPlayerCollection();
                 let allMet = true;
                 for (const [element, needed] of Object.entries(ship.elements)) {
                     const have = collection[element]?.count || 0;
@@ -1019,7 +1008,8 @@
                 
                 const materialCost = calculateMaterialCost(ship.elements);
                 const totalCost = materialCost * 2;
-                const currentCredits = getPlayerCredits();
+                const playerId = getPlayerId();
+                const currentCredits = await getCredits(playerId);
                 
                 if (currentCredits < totalCost) {
                     alert(`Insufficient credits! Need ${totalCost.toLocaleString()}⭐`);
@@ -1027,14 +1017,18 @@
                     return;
                 }
                 
-                // Remove materials
+                // Remove materials using storage.js
                 for (const [element, amount] of Object.entries(ship.elements)) {
-                    removeFromCollection(element, amount);
+                    await removeElementFromCollection(element, amount);
                 }
                 
-                // Deduct credits
-                setPlayerCredits(currentCredits - totalCost);
-                updateCreditsDisplay();
+                // Spend credits
+                const spent = await spendCredits(totalCost, playerId, `Built ${shipName}`);
+                if (!spent) {
+                    alert('Failed to spend credits');
+                    loadingOverlay.classList.remove('active');
+                    return;
+                }
                 
                 // Add to fleet
                 const playerShips = JSON.parse(localStorage.getItem('voidfarer_ships') || '[]');
@@ -1058,6 +1052,7 @@
                 message += `Total: ${totalCost.toLocaleString()}⭐`;
                 alert(message);
                 
+                await updateCreditsDisplay();
                 await refreshShipCards();
                 
             } catch (error) {
@@ -1075,15 +1070,19 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         };
         
-        window.buyFuel = function() {
-            const credits = getPlayerCredits();
+        window.buyFuel = async function() {
+            const credits = await getCredits(getPlayerId());
             const fuelCells = parseInt(localStorage.getItem('voidfarer_fuel_cells') || '0');
             if (credits >= 10) {
-                setPlayerCredits(credits - 10);
-                localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
-                updateCreditsDisplay();
-                document.getElementById('fuelCells').textContent = fuelCells + 1;
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                const spent = await spendCredits(10, getPlayerId(), 'Fuel purchase');
+                if (spent) {
+                    localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
+                    await updateCreditsDisplay();
+                    document.getElementById('fuelCells').textContent = fuelCells + 1;
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Failed to purchase fuel');
+                }
             } else {
                 alert('Insufficient credits! Need 10⭐ for 1 fuel cell.');
             }
@@ -1105,9 +1104,9 @@
             
             const materialCost = calculateMaterialCost(ship.elements);
             const totalCost = materialCost * 2;
-            const playerCredits = getPlayerCredits();
+            const playerCredits = await getCredits(getPlayerId());
             const canAfford = playerCredits >= totalCost;
-            const collection = getPlayerCollection();
+            const collection = await getPlayerCollection();
             
             let requirementsHtml = '';
             let allMet = true;
@@ -1222,18 +1221,14 @@
             const savedVariants = localStorage.getItem('voidfarer_selected_variants');
             if (savedVariants) selectedVariants = JSON.parse(savedVariants);
             
-            // Ensure credits is valid
-            let credits = localStorage.getItem('voidfarer_credits');
-            if (credits === null || credits === undefined || credits === 'NaN' || isNaN(parseInt(credits))) {
-                localStorage.setItem('voidfarer_credits', '5000');
-            }
-            updateCreditsDisplay();
+            await updateCreditsDisplay();
             
             const fuelCells = localStorage.getItem('voidfarer_fuel_cells') || '0';
             document.getElementById('fuelCells').textContent = fuelCells;
             
-            const playerId = localStorage.getItem('voidfarer_player_id') || '1234';
-            document.getElementById('playerName').textContent = `VOIDFARER #${playerId.slice(-4)}`;
+            const playerId = getPlayerId();
+            const player = await getPlayer(playerId);
+            document.getElementById('playerName').textContent = player?.name || `VOIDFARER #${playerId.slice(-4)}`;
             
             await refreshShipCards();
         }
