@@ -1,10 +1,10 @@
 // js/npc-traders.js - NPC Trader System for Voidfarer Marketplace
 // Creates and manages 1000 simulated traders with personalities
+// UPDATED: Reduced debug logging, staggered updates, improved inventory pruning
 // UPDATED: Added market orders and liquidity taking for real trading behavior
 // UPDATED: Fixed price validation to prevent "Price data not available" errors
 // UPDATED: Fixed element filtering to use current price instead of bid/ask
 // UPDATED: Added updatePrices() call to ensure fresh price data each cycle
-// UPDATED: Added enhanced debug logging to diagnose zero actions issue
 // UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
 // UPDATED: Added inventory pruning to prevent excessive storage growth
 // UPDATED: FIXED - Now writes orders to IndexedDB instead of localStorage
@@ -31,6 +31,9 @@ import marketDynamics from './market-dynamics.js';
 const { getCurrentPrices, getBidPrice, getAskPrice, updatePrices } = marketDynamics;
 
 import { ORDER_TYPES, ORDER_SIDES, ORDER_STATUS, createOrder } from './market-engine.js';
+
+// ===== DEBUG FLAG - SET TO FALSE TO REDUCE CONSOLE SPAM =====
+const DEBUG_NPC = false;
 
 // ===== TRADER TYPE DEFINITIONS =====
 
@@ -303,15 +306,14 @@ function generateStrategyParams(personality) {
     }
 }
 
-// ===== INVENTORY PRUNING =====
-
+// ===== INVENTORY PRUNING - UPDATED to prune by value, not count =====
 /**
  * Prune trader inventory to keep only top N elements by value
  * @param {Object} trader - Trader object
  * @param {Object} marketData - Current market data
- * @param {number} maxItems - Maximum inventory items to keep (default 10)
+ * @param {number} maxItems - Maximum inventory items to keep (default 15, increased from 10)
  */
-function pruneInventory(trader, marketData, maxItems = 10) {
+function pruneInventory(trader, marketData, maxItems = 15) {
     if (!trader.inventory || Object.keys(trader.inventory).length <= maxItems) {
         return;
     }
@@ -326,10 +328,10 @@ function pruneInventory(trader, marketData, maxItems = 10) {
         };
     });
     
-    // Sort by value (highest first)
+    // Sort by value (highest first) - KEEP VALUABLE ITEMS
     items.sort((a, b) => b.value - a.value);
     
-    // Keep only top N items
+    // Keep only top N items by value
     const keptItems = items.slice(0, maxItems);
     
     // Rebuild inventory
@@ -339,7 +341,7 @@ function pruneInventory(trader, marketData, maxItems = 10) {
     });
     
     const removed = Object.keys(trader.inventory).length - keptItems.length;
-    if (removed > 0) {
+    if (removed > 0 && DEBUG_NPC) {
         console.log(`✂️ Pruned ${removed} low-value items from ${trader.name}'s inventory`);
     }
     
@@ -778,30 +780,32 @@ export async function updateTrader(trader, marketData) {
         if (Math.random() < 0.15) {
             trader.isActive = true;
             trader.personality = TRADER_PERSONALITIES.RANDOM;
-            console.log(`💤 ${trader.name} woke up and is now active!`);
+            if (DEBUG_NPC) console.log(`💤 ${trader.name} woke up and is now active!`);
         } else {
             return { traderId: trader.id, actions: [] };
         }
     }
     
-    // Prune inventory before trading (keep only top 10 items)
-    pruneInventory(trader, marketData, 10);
+    // Prune inventory before trading (keep only top 15 items by value)
+    pruneInventory(trader, marketData, 15);
     
     const actions = [];
     const prices = marketData.prices || {};
     
-    // ===== ENHANCED DEBUG LOGGING =====
-    console.log(`\n🔍 TRADER: ${trader.name} (${trader.personality})`);
-    console.log(`   Credits: ${trader.credits}`);
-    console.log(`   Inventory size: ${Object.keys(trader.inventory).length} items`);
-    console.log(`   Favorite elements:`, trader.favoriteElements);
+    // ===== ENHANCED DEBUG LOGGING - ONLY WHEN DEBUG_NPC = true =====
+    if (DEBUG_NPC) {
+        console.log(`\n🔍 TRADER: ${trader.name} (${trader.personality})`);
+        console.log(`   Credits: ${trader.credits}`);
+        console.log(`   Inventory size: ${Object.keys(trader.inventory).length} items`);
+        console.log(`   Favorite elements:`, trader.favoriteElements);
+    }
     
     const priceKeys = Object.keys(prices);
-    console.log(`   Total price keys: ${priceKeys.length}`);
     
-    if (priceKeys.length > 0) {
+    if (DEBUG_NPC && priceKeys.length > 0) {
+        console.log(`   Total price keys: ${priceKeys.length}`);
         console.log(`   Sample price data for ${priceKeys[0]}:`, prices[priceKeys[0]]);
-    } else {
+    } else if (DEBUG_NPC && priceKeys.length === 0) {
         console.log(`   ⚠️ NO PRICE DATA FOUND!`);
     }
     
@@ -809,29 +813,29 @@ export async function updateTrader(trader, marketData) {
         prices[el] && prices[el].current > 0
     );
     
-    console.log(`   Tradable elements found: ${allTradableElements.length}`);
+    if (DEBUG_NPC) console.log(`   Tradable elements found: ${allTradableElements.length}`);
     
     let elements = [];
     if (trader.favoriteElements && trader.favoriteElements.length > 0) {
         elements = trader.favoriteElements.filter(el => 
             prices[el] && prices[el].current > 0
         );
-        console.log(`   Favorite elements tradable: ${elements.length} of ${trader.favoriteElements.length}`);
-    } else {
+        if (DEBUG_NPC) console.log(`   Favorite elements tradable: ${elements.length} of ${trader.favoriteElements.length}`);
+    } else if (DEBUG_NPC) {
         console.log(`   No favorite elements defined`);
     }
     
     if (elements.length === 0) {
         elements = allTradableElements.slice(0, 5);
-        console.log(`   Using fallback elements: ${elements.length}`);
+        if (DEBUG_NPC) console.log(`   Using fallback elements: ${elements.length}`);
     }
     
     if (elements.length === 0) {
-        console.log(`   ❌ No tradable elements for ${trader.name}`);
+        if (DEBUG_NPC) console.log(`   ❌ No tradable elements for ${trader.name}`);
         return { traderId: trader.id, actions: [] };
     }
     
-    console.log(`   ⚡ Updating with elements:`, elements);
+    if (DEBUG_NPC) console.log(`   ⚡ Updating with elements:`, elements);
     
     switch (trader.personality) {
         case TRADER_PERSONALITIES.SCALPER:
@@ -850,13 +854,15 @@ export async function updateTrader(trader, marketData) {
             await updateMarketMaker(trader, marketData, elements, actions);
             break;
         default:
-            console.log(`   ❓ Unknown personality: ${trader.personality}`);
+            if (DEBUG_NPC) console.log(`   ❓ Unknown personality: ${trader.personality}`);
             break;
     }
     
-    console.log(`   📝 Took ${actions.length} actions`);
-    if (actions.length > 0) {
-        console.log(`   Actions:`, actions);
+    if (DEBUG_NPC) {
+        console.log(`   📝 Took ${actions.length} actions`);
+        if (actions.length > 0) {
+            console.log(`   Actions:`, actions);
+        }
     }
     
     await cleanupExpiredOrders(trader);
@@ -1236,29 +1242,97 @@ async function cleanupExpiredOrders(trader) {
         }
     }
     
-    if (ordersToRemove.length > 0) {
+    if (ordersToRemove.length > 0 && DEBUG_NPC) {
         console.log(`Cleaned up ${ordersToRemove.length} expired orders for ${trader.name}`);
     }
 }
 
-// ===== UPDATE CYCLE =====
+// ===== UPDATE CYCLE - UPDATED with staggered updates =====
 
 let updateInterval = null;
 let isUpdating = false;
+let currentBatchIndex = 0;
+const BATCH_SIZE = 20; // Update 20 traders per cycle instead of 100
 
-export function startNPCTraderUpdates(tradersPerBatch = 100, intervalMs = 60000) {
+export function startNPCTraderUpdates(tradersPerBatch = BATCH_SIZE, intervalMs = 60000) {
     if (updateInterval) {
         clearInterval(updateInterval);
     }
     
-    console.log(`Starting NPC trader updates: ${tradersPerBatch} traders every ${intervalMs/1000}s`);
+    console.log(`Starting NPC trader updates: ${BATCH_SIZE} traders every ${intervalMs/1000}s (staggered)`);
     
     updateInterval = setInterval(async () => {
         if (isUpdating) return;
         isUpdating = true;
         
         try {
-            await processNPCTradingCycle(tradersPerBatch);
+            const traders = await loadNPCTraders();
+            const traderList = Object.values(traders);
+            
+            if (traderList.length === 0) {
+                isUpdating = false;
+                return;
+            }
+            
+            // Get current batch
+            const start = currentBatchIndex * BATCH_SIZE;
+            const end = Math.min(start + BATCH_SIZE, traderList.length);
+            const batch = traderList.slice(start, end);
+            
+            if (DEBUG_NPC) {
+                console.log(`🔄 Processing NPC batch ${currentBatchIndex + 1}/${Math.ceil(traderList.length / BATCH_SIZE)} (${batch.length} traders)...`);
+            } else {
+                // Only show occasional summary
+                if (currentBatchIndex === 0) {
+                    console.log(`🔄 Processing NPC trading cycle (batch 1/${Math.ceil(traderList.length / BATCH_SIZE)})...`);
+                }
+            }
+            
+            // Ensure prices are updated before trading
+            const updatedPrices = updatePrices();
+            
+            const marketData = {
+                prices: getCurrentPrices(),
+                timestamp: Date.now()
+            };
+            
+            let actions = [];
+            let updatedCount = 0;
+            let marketOrders = 0;
+            let limitOrders = 0;
+            
+            for (const trader of batch) {
+                try {
+                    const result = await updateTrader(trader, marketData);
+                    actions = actions.concat(result.actions);
+                    updatedCount++;
+                    
+                    result.actions.forEach(a => {
+                        if (a.type.includes('market')) marketOrders++;
+                        else limitOrders++;
+                    });
+                    
+                } catch (error) {
+                    console.error(`Error updating trader ${trader.id}:`, error);
+                }
+            }
+            
+            // Move to next batch
+            currentBatchIndex = (currentBatchIndex + 1) % Math.ceil(traderList.length / BATCH_SIZE);
+            
+            // Update stats periodically
+            if (currentBatchIndex === 0) {
+                const stats = await loadNPCStats();
+                stats.activeTraders = (await dbGetActiveNPCTraders(true)).length;
+                stats.lastUpdated = Date.now();
+                await saveNPCStats(stats);
+                await setLastNPCUpdate();
+                
+                console.log(`✅ NPC cycle complete: ${updatedCount} traders, ${actions.length} actions (${marketOrders} market, ${limitOrders} limit)`);
+            } else if (DEBUG_NPC) {
+                console.log(`✅ Batch complete: ${updatedCount} traders, ${actions.length} actions`);
+            }
+            
         } catch (error) {
             console.error('Error in NPC trading cycle:', error);
         } finally {
@@ -1277,7 +1351,7 @@ export function stopNPCTraderUpdates() {
     }
 }
 
-export async function processNPCTradingCycle(batchSize = 100) {
+export async function processNPCTradingCycle(batchSize = BATCH_SIZE) {
     console.log(`\n🔄 Processing NPC trading cycle (${batchSize} traders)...`);
     
     // Ensure prices are updated before trading
