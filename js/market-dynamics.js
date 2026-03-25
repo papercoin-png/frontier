@@ -2,6 +2,7 @@
 // Handles price fluctuations, supply/demand, and market history for all 118 elements
 // OPTIMIZED: Cleaned up code, removed redundancies, improved performance
 // FIXED: Added storage limits and error handling for supply/demand indices AND price history
+// FIXED: Exposed recordTrade and supply/demand functions to window for shipyard integration
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -947,5 +948,9 @@ window.getBidPrice = getBidPrice;
 window.getAskPrice = getAskPrice;
 window.getAvailableElements = getAvailableElements;
 window.cleanupOldMarketData = cleanupOldMarketData;
+window.recordTrade = recordTrade;
+window.getSupplyIndex = getSupplyIndex;
+window.getDemandIndex = getDemandIndex;
+window.updateSupplyDemand = updateSupplyDemand;
 
 console.log('✅ market-dynamics.js loaded - Optimized market system ready with aggressive storage limits');
