@@ -895,53 +895,9 @@
             localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
         }
 
-        // ===== PLAYER LOCATIONS SYSTEM =====
-        async function saveDiscoveryToLocation(elementName, quantity, rarity) {
-            try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                const locationsKey = `voidfarer_locations_${playerId}`;
-                
-                let locations = [];
-                const saved = localStorage.getItem(locationsKey);
-                if (saved) {
-                    locations = JSON.parse(saved);
-                }
-                
-                locations.push({
-                    planet: currentPlanet.name,
-                    planetType: currentPlanet.type,
-                    elementName: elementName,
-                    elementRarity: rarity,
-                    quantity: quantity,
-                    discoveredAt: Date.now()
-                });
-                
-                if (locations.length > 1000) {
-                    locations = locations.slice(-1000);
-                }
-                
-                localStorage.setItem(locationsKey, JSON.stringify(locations));
-                
-                window.getPlayerLocations = async function() {
-                    const saved = localStorage.getItem(locationsKey);
-                    return saved ? JSON.parse(saved) : [];
-                };
-                
-                return true;
-            } catch (error) {
-                console.error('Error saving discovery:', error);
-                return false;
-            }
-        }
-
-        if (!window.getPlayerLocations) {
-            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-            const locationsKey = `voidfarer_locations_${playerId}`;
-            window.getPlayerLocations = async function() {
-                const saved = localStorage.getItem(locationsKey);
-                return saved ? JSON.parse(saved) : [];
-            };
-        }
+        // ===== PLAYER LOCATIONS SYSTEM - REMOVED duplicate save function =====
+        // Locations are now saved exclusively through addElementToCollection → dbSaveElementLocation
+        // No separate saveDiscoveryToLocation function needed
 
         // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
@@ -1370,19 +1326,21 @@
                     const totalMass = massPerUnit * quantity;
                     
                     if (currentMass + totalMass <= cargoLimit) {
+                        // Create location data with all required fields
                         const locationData = {
                             planet: currentPlanet.name,
                             planetType: currentPlanet.type,
                             quantity: quantity,
                             rarity: rarity,
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            discoveredDate: new Date().toISOString(),
+                            value: 100
                         };
                         
+                        // Save to collection - this automatically saves location to IndexedDB
                         const result = await window.addElementToCollection(resource, quantity, locationData);
                         
                         if (result && result.success) {
-                            await saveDiscoveryToLocation(resource, quantity, rarity);
-                            
                             // Update cargo display by adding to current value
                             const currentDisplay = cargoMass.innerHTML;
                             const match = currentDisplay.match(/<span>(\d+)<\/span>/);
