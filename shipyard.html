@@ -744,33 +744,21 @@
 
         // ===== MARKET PRICE FUNCTIONS (Reads directly from VoidEx localStorage) =====
         
-        /**
-         * Get current market price for an element from VoidEx market data
-         * @param {string} element - Element name
-         * @returns {number} Current market price (ask price or current price)
-         */
         function getMarketPrice(element) {
             try {
-                // Read from VoidEx market data
                 const pricesData = localStorage.getItem('voidfarer_current_prices');
                 if (pricesData) {
                     const prices = JSON.parse(pricesData);
                     if (prices[element]) {
-                        // Use ask price (what you pay to buy) or fallback to current price
                         return prices[element].ask || prices[element].current || 100;
                     }
                 }
             } catch (e) {
                 console.warn('Error reading market prices:', e);
             }
-            
-            // Fallback based on element rarity (using VoidEx base prices)
             return getFallbackPrice(element);
         }
         
-        /**
-         * Get fallback price based on element rarity
-         */
         function getFallbackPrice(element) {
             const rareElements = ['Titanium', 'Chromium', 'Nickel', 'Gold', 'Silver', 'Platinum', 'Copper', 'Zinc', 'Tin', 'Cobalt', 'Lead', 'Iridium', 'Manganese', 'Uranium', 'Thorium', 'Neodymium', 'Plutonium', 'Rhodium', 'Palladium', 'Osmium', 'Ruthenium', 'Technetium', 'Rhenium', 'Hafnium', 'Promethium'];
             const veryRareElements = ['Uranium', 'Thorium', 'Plutonium', 'Technetium', 'Promethium', 'Polonium', 'Radium', 'Actinium'];
@@ -783,26 +771,17 @@
             const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Silicon', 'Aluminum', 'Sulfur', 'Chlorine', 'Argon'];
             if (uncommonElements.includes(element)) return 250;
             
-            return 100; // Common
+            return 100;
         }
         
-        /**
-         * Get current player credits
-         */
         function getPlayerCredits() {
             return parseInt(localStorage.getItem('voidfarer_credits') || '5000');
         }
         
-        /**
-         * Update player credits display
-         */
         function updateCreditsDisplay() {
             document.getElementById('credits').textContent = getPlayerCredits().toLocaleString() + ' ⭐';
         }
         
-        /**
-         * Get player's inventory collection
-         */
         function getPlayerCollection() {
             try {
                 return JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
@@ -811,16 +790,12 @@
             }
         }
         
-        /**
-         * Add elements to player collection
-         */
         async function addToCollection(element, quantity) {
             const collection = getPlayerCollection();
             if (!collection[element]) collection[element] = { count: 0 };
             collection[element].count = (collection[element].count || 0) + quantity;
             localStorage.setItem('voidfarer_collection', JSON.stringify(collection));
             
-            // Also record to IndexedDB if available
             if (window.addElementToCollection) {
                 await window.addElementToCollection(element, quantity, {
                     planet: 'Earth Hub',
@@ -830,9 +805,6 @@
             }
         }
         
-        /**
-         * Remove elements from player collection
-         */
         async function removeFromCollection(element, quantity) {
             const collection = getPlayerCollection();
             if (collection[element] && collection[element].count >= quantity) {
@@ -850,12 +822,8 @@
 
         // ===== SHIP DATA =====
         
-        // Cargo capacities
         const CARGO_CAPACITY = {
-            1: 3700,
-            2: 4200,
-            3: 4800,
-            4: 5500,
+            1: 3700, 2: 4200, 3: 4800, 4: 5500,
             5: { drill: 6300, hauler: 12600, tank: 6300 },
             6: { drill: 7200, hauler: 14400, tank: 7200 },
             7: { drill: 8200, hauler: 16400, tank: 8200 },
@@ -864,12 +832,8 @@
             10: { drill: 11800, hauler: 23600, tank: 11800 }
         };
         
-        // Mining bonuses (%)
         const MINING_BONUS = {
-            1: 0,
-            2: 20,
-            3: 40,
-            4: 60,
+            1: 0, 2: 20, 3: 40, 4: 60,
             5: { drill: 80, hauler: 40, tank: 80 },
             6: { drill: 100, hauler: 50, tank: 100 },
             7: { drill: 120, hauler: 60, tank: 120 },
@@ -878,12 +842,8 @@
             10: { drill: 180, hauler: 90, tank: 180 }
         };
         
-        // Hull values
         const HULL = {
-            1: 100,
-            2: 110,
-            3: 120,
-            4: 130,
+            1: 100, 2: 110, 3: 120, 4: 130,
             5: { drill: 140, hauler: 140, tank: 196 },
             6: { drill: 150, hauler: 150, tank: 240 },
             7: { drill: 160, hauler: 160, tank: 288 },
@@ -892,12 +852,8 @@
             10: { drill: 200, hauler: 200, tank: 500 }
         };
         
-        // Fuel efficiency
         const FUEL_EFFICIENCY = {
-            1: 1.0,
-            2: 0.97,
-            3: 0.94,
-            4: 0.91,
+            1: 1.0, 2: 0.97, 3: 0.94, 4: 0.91,
             5: { drill: 0.88, hauler: 1.05, tank: 0.82 },
             6: { drill: 0.85, hauler: 1.02, tank: 0.79 },
             7: { drill: 0.82, hauler: 0.99, tank: 0.76 },
@@ -908,33 +864,21 @@
         
         const BASE_WARP_SPEED = 25;
         
-        // Tier costs (total credits)
         const TIER_COSTS = {
-            1: 5000,
-            2: 15000,
-            3: 50000,
-            4: 150000,
-            5: 400000,
-            6: 1000000,
-            7: 2500000,
-            8: 6000000,
-            9: 15000000,
-            10: 40000000
+            1: 5000, 2: 15000, 3: 50000, 4: 150000,
+            5: 400000, 6: 1000000, 7: 2500000, 8: 6000000,
+            9: 15000000, 10: 40000000
         };
         
         const MINING_SHIPS = [
             { tier: 1, name: 'Prospector', totalCost: TIER_COSTS[1], miningBonus: MINING_BONUS[1], cargo: CARGO_CAPACITY[1], hull: HULL[1], speed: '1.0x', fuelEfficiency: FUEL_EFFICIENCY[1], starter: true,
               elements: { 'Iron': 400, 'Copper': 200, 'Titanium': 50, 'Carbon': 100, 'Aluminum': 40, 'Silicon': 20 } },
-              
             { tier: 2, name: 'Deep Miner', totalCost: TIER_COSTS[2], miningBonus: MINING_BONUS[2], cargo: CARGO_CAPACITY[2], hull: HULL[2], speed: '0.97x', fuelEfficiency: FUEL_EFFICIENCY[2],
               elements: { 'Iron': 800, 'Copper': 400, 'Titanium': 200, 'Nickel': 250, 'Chromium': 180, 'Steel': 150 } },
-              
             { tier: 3, name: 'Excavator', totalCost: TIER_COSTS[3], miningBonus: MINING_BONUS[3], cargo: CARGO_CAPACITY[3], hull: HULL[3], speed: '0.94x', fuelEfficiency: FUEL_EFFICIENCY[3],
               elements: { 'Titanium': 350, 'Steel': 450, 'Nickel': 350, 'Chromium': 280, 'Zinc': 250, 'Silver': 150, 'Cobalt': 140 } },
-              
             { tier: 4, name: 'Borealis', totalCost: TIER_COSTS[4], miningBonus: MINING_BONUS[4], cargo: CARGO_CAPACITY[4], hull: HULL[4], speed: '0.91x', fuelEfficiency: FUEL_EFFICIENCY[4],
               elements: { 'Steel': 800, 'Titanium': 600, 'Nickel': 550, 'Silver': 350, 'Iridium': 220, 'Manganese': 350, 'Lead': 300 } },
-              
             { tier: 5, name: 'Core Digger', totalCost: TIER_COSTS[5], miningBonus: MINING_BONUS[5].drill, cargo: CARGO_CAPACITY[5].drill, hull: HULL[5].drill, speed: '0.88x',
               variants: [
                   { id: 'pulse_drill', name: '⚡ Pulse Drill', miningBonus: MINING_BONUS[5].drill, cargo: CARGO_CAPACITY[5].drill, hull: HULL[5].drill, fuelEfficiency: FUEL_EFFICIENCY[5].drill, desc: '+80% mining speed • Standard cargo • Standard fuel' },
@@ -942,7 +886,6 @@
                   { id: 'deep_core', name: '🛡️ Deep Core', miningBonus: MINING_BONUS[5].tank, cargo: CARGO_CAPACITY[5].tank, hull: HULL[5].tank, fuelEfficiency: FUEL_EFFICIENCY[5].tank, desc: '+80% mining speed • +40% hull • -12% fuel' }
               ],
               elements: { 'Steel': 1200, 'Titanium': 1000, 'Iridium': 400, 'Uranium': 200, 'Thorium': 150, 'Neodymium': 120 } },
-              
             { tier: 6, name: 'Abyss Miner', totalCost: TIER_COSTS[6], miningBonus: MINING_BONUS[6].drill, cargo: CARGO_CAPACITY[6].drill, hull: HULL[6].drill, speed: '0.85x',
               variants: [
                   { id: 'razor_drill', name: '⚡ Razor Drill', miningBonus: MINING_BONUS[6].drill, cargo: CARGO_CAPACITY[6].drill, hull: HULL[6].drill, fuelEfficiency: FUEL_EFFICIENCY[6].drill, desc: '+100% mining speed • Standard cargo • -15% fuel' },
@@ -950,7 +893,6 @@
                   { id: 'abyss_walker', name: '🛡️ Abyss Walker', miningBonus: MINING_BONUS[6].tank, cargo: CARGO_CAPACITY[6].tank, hull: HULL[6].tank, fuelEfficiency: FUEL_EFFICIENCY[6].tank, desc: '+100% mining speed • +60% hull • -21% fuel' }
               ],
               elements: { 'Uranium': 400, 'Thorium': 300, 'Plutonium': 200, 'Rhodium': 160, 'Palladium': 120, 'Neodymium': 200 } },
-              
             { tier: 7, name: 'Void Excavator', totalCost: TIER_COSTS[7], miningBonus: MINING_BONUS[7].drill, cargo: CARGO_CAPACITY[7].drill, hull: HULL[7].drill, speed: '0.82x',
               variants: [
                   { id: 'quantum_drill', name: '⚡ Quantum Drill', miningBonus: MINING_BONUS[7].drill, cargo: CARGO_CAPACITY[7].drill, hull: HULL[7].drill, fuelEfficiency: FUEL_EFFICIENCY[7].drill, desc: '+120% mining speed • Standard cargo • -18% fuel' },
@@ -958,7 +900,6 @@
                   { id: 'umbral_core', name: '🛡️ Umbral Core', miningBonus: MINING_BONUS[7].tank, cargo: CARGO_CAPACITY[7].tank, hull: HULL[7].tank, fuelEfficiency: FUEL_EFFICIENCY[7].tank, desc: '+120% mining speed • +80% hull • -24% fuel' }
               ],
               elements: { 'Plutonium': 400, 'Rhodium': 300, 'Osmium': 240, 'Ruthenium': 200, 'Technetium': 160, 'Palladium': 240 } },
-              
             { tier: 8, name: 'Singularity Miner', totalCost: TIER_COSTS[8], miningBonus: MINING_BONUS[8].drill, cargo: CARGO_CAPACITY[8].drill, hull: HULL[8].drill, speed: '0.79x',
               variants: [
                   { id: 'singularity_drill', name: '⚡ Singularity Drill', miningBonus: MINING_BONUS[8].drill, cargo: CARGO_CAPACITY[8].drill, hull: HULL[8].drill, fuelEfficiency: FUEL_EFFICIENCY[8].drill, desc: '+140% mining speed • Standard cargo • -21% fuel' },
@@ -966,7 +907,6 @@
                   { id: 'event_shield', name: '🛡️ Event Shield', miningBonus: MINING_BONUS[8].tank, cargo: CARGO_CAPACITY[8].tank, hull: HULL[8].tank, fuelEfficiency: FUEL_EFFICIENCY[8].tank, desc: '+140% mining speed • +100% hull • -27% fuel' }
               ],
               elements: { 'Osmium': 400, 'Ruthenium': 360, 'Rhenium': 240, 'Hafnium': 200, 'Promethium': 160, 'Technetium': 200 } },
-              
             { tier: 9, name: 'Quasar Drill', totalCost: TIER_COSTS[9], miningBonus: MINING_BONUS[9].drill, cargo: CARGO_CAPACITY[9].drill, hull: HULL[9].drill, speed: '0.76x',
               variants: [
                   { id: 'quasar_beam', name: '⚡ Quasar Beam', miningBonus: MINING_BONUS[9].drill, cargo: CARGO_CAPACITY[9].drill, hull: HULL[9].drill, fuelEfficiency: FUEL_EFFICIENCY[9].drill, desc: '+160% mining speed • Standard cargo • -24% fuel' },
@@ -974,7 +914,6 @@
                   { id: 'quasar_armor', name: '🛡️ Quasar Armor', miningBonus: MINING_BONUS[9].tank, cargo: CARGO_CAPACITY[9].tank, hull: HULL[9].tank, fuelEfficiency: FUEL_EFFICIENCY[9].tank, desc: '+160% mining speed • +120% hull • -30% fuel' }
               ],
               elements: { 'Rhenium': 500, 'Hafnium': 400, 'Californium': 200, 'Einsteinium': 160, 'Fermium': 120, 'Promethium': 240 } },
-              
             { tier: 10, name: 'Event Horizon', totalCost: TIER_COSTS[10], miningBonus: MINING_BONUS[10].drill, cargo: CARGO_CAPACITY[10].drill, hull: HULL[10].drill, speed: '0.73x',
               variants: [
                   { id: 'horizon_drill', name: '⚡ Horizon Drill', miningBonus: MINING_BONUS[10].drill, cargo: CARGO_CAPACITY[10].drill, hull: HULL[10].drill, fuelEfficiency: FUEL_EFFICIENCY[10].drill, desc: '+180% mining speed • Standard cargo • -27% fuel' },
@@ -985,8 +924,6 @@
         ];
         
         let selectedVariants = {};
-        
-        // ===== HELPER FUNCTIONS =====
         
         function getElementIcon(element) {
             const icons = { 
@@ -1010,15 +947,12 @@
         function calculateMaterialCost(elements) {
             let total = 0;
             for (const [element, amount] of Object.entries(elements)) {
-                const price = getMarketPrice(element);
-                total += amount * price;
+                total += amount * getMarketPrice(element);
             }
             return total;
         }
         
-        // ===== AUTO-BUY FUNCTION =====
-        
-        window.autoBuyElement = async function(element, quantity, shipId, missingAmount) {
+        window.autoBuyElement = async function(element, missingAmount) {
             event.stopPropagation();
             
             document.getElementById('loadingOverlay').classList.add('active');
@@ -1035,20 +969,12 @@
                     return;
                 }
                 
-                // Deduct credits
                 localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
                 updateCreditsDisplay();
-                
-                // Add elements to inventory
                 await addToCollection(element, missingAmount);
                 
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred?.('success');
-                }
-                
-                // Refresh ship cards
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred?.('success');
                 await refreshShipCards();
-                
                 document.getElementById('loadingOverlay').classList.remove('active');
                 
             } catch (error) {
@@ -1058,8 +984,6 @@
             }
         };
         
-        // ===== BUILD SHIP FUNCTION =====
-        
         window.buildShip = async function(shipName, tier) {
             const ship = MINING_SHIPS.find(s => s.tier === tier);
             if (!ship) return;
@@ -1068,15 +992,11 @@
             document.getElementById('loadingText').textContent = `CONSTRUCTING ${shipName.toUpperCase()}...`;
             
             try {
-                // Check if player has all required materials
                 const collection = getPlayerCollection();
                 let allMet = true;
                 for (const [element, needed] of Object.entries(ship.elements)) {
                     const have = collection[element]?.count || 0;
-                    if (have < needed) {
-                        allMet = false;
-                        break;
-                    }
+                    if (have < needed) { allMet = false; break; }
                 }
                 
                 if (!allMet) {
@@ -1085,10 +1005,8 @@
                     return;
                 }
                 
-                // Calculate total cost
                 const materialCost = calculateMaterialCost(ship.elements);
-                const laborCost = materialCost;
-                const totalCost = ship.totalCost;
+                const totalCost = materialCost * 2;
                 const currentCredits = getPlayerCredits();
                 
                 if (currentCredits < totalCost) {
@@ -1097,42 +1015,26 @@
                     return;
                 }
                 
-                // Remove materials from inventory
                 for (const [element, amount] of Object.entries(ship.elements)) {
                     await removeFromCollection(element, amount);
                 }
                 
-                // Deduct total cost
                 localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
                 updateCreditsDisplay();
                 
-                // Add ship to player's fleet
                 const playerShips = JSON.parse(localStorage.getItem('voidfarer_ships') || '[]');
                 playerShips.push({
                     id: ship.tier,
                     name: ship.name,
                     variant: getCurrentVariant(ship)?.id || null,
-                    builtAt: Date.now(),
-                    builtDate: new Date().toISOString()
+                    builtAt: Date.now()
                 });
                 localStorage.setItem('voidfarer_ships', JSON.stringify(playerShips));
                 
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred?.('success');
-                }
-                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred?.('success');
                 document.getElementById('loadingOverlay').classList.remove('active');
                 
-                let message = `✅ ${shipName} successfully constructed!\n\n`;
-                message += `Ship added to your fleet.\n\n`;
-                if (tier === 5) {
-                    message += `⚡ MILESTONE REACHED! You've unlocked the VARIANT SYSTEM. Now choose between Speed, Cargo, or Durability builds.`;
-                } else if (tier === 10) {
-                    message += `🏆 LEGENDARY ACHIEVEMENT! You now command the most powerful mining vessel in the galaxy. The Event Horizon is yours.`;
-                } else {
-                    message += `Proceed to the galaxy map to begin mining operations with your new vessel.`;
-                }
-                
+                let message = `✅ ${shipName} successfully constructed!\n\nMaterials: ${materialCost.toLocaleString()}⭐\nLabor: ${materialCost.toLocaleString()}⭐\nTotal: ${totalCost.toLocaleString()}⭐`;
                 alert(message);
                 await refreshShipCards();
                 
@@ -1143,31 +1045,44 @@
             }
         };
         
-        // ===== GENERATE SHIP CARD =====
+        window.selectVariant = async function(tier, variantId) {
+            selectedVariants[tier] = variantId;
+            localStorage.setItem('voidfarer_selected_variants', JSON.stringify(selectedVariants));
+            await refreshShipCards();
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+        
+        window.buyFuel = function() {
+            const credits = getPlayerCredits();
+            const fuelCells = parseInt(localStorage.getItem('voidfarer_fuel_cells') || '0');
+            if (credits >= 10) {
+                localStorage.setItem('voidfarer_credits', (credits - 10).toString());
+                localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
+                updateCreditsDisplay();
+                document.getElementById('fuelCells').textContent = fuelCells + 1;
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            } else {
+                alert('Insufficient credits! Need 10⭐ for 1 fuel cell.');
+            }
+        };
+        
+        window.returnToEarthHub = function() {
+            document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingText').textContent = 'RETURNING TO HUB...';
+            setTimeout(() => { window.location.href = 'earth-hub.html'; }, 500);
+        };
         
         async function generateShipCard(ship) {
             const variant = getCurrentVariant(ship);
-            
-            let miningBonus, cargo, hull, fuelEfficiency, variantDesc;
-            if (variant) {
-                miningBonus = variant.miningBonus;
-                cargo = variant.cargo;
-                hull = variant.hull;
-                fuelEfficiency = variant.fuelEfficiency;
-                variantDesc = variant.desc;
-            } else {
-                miningBonus = ship.miningBonus;
-                cargo = ship.cargo;
-                hull = ship.hull;
-                fuelEfficiency = ship.fuelEfficiency;
-                variantDesc = null;
-            }
+            let miningBonus = variant ? variant.miningBonus : ship.miningBonus;
+            let cargo = variant ? variant.cargo : ship.cargo;
+            let hull = variant ? variant.hull : ship.hull;
+            let fuelEfficiency = variant ? variant.fuelEfficiency : ship.fuelEfficiency;
             
             const materialCost = calculateMaterialCost(ship.elements);
-            const totalCost = ship.totalCost;
+            const totalCost = materialCost * 2;
             const playerCredits = getPlayerCredits();
             const canAfford = playerCredits >= totalCost;
-            
             const collection = getPlayerCollection();
             
             let requirementsHtml = '';
@@ -1200,14 +1115,12 @@
                 
                 if (!met) {
                     requirementsHtml += `
-                        <div class="auto-buy-row" onclick="event.stopPropagation()">
+                        <div class="auto-buy-row">
                             <div class="auto-buy-info">
                                 <span class="auto-buy-text">Missing ${missing.toLocaleString()} ${element}</span>
                                 <span class="auto-buy-cost">${buyCost.toLocaleString()}⭐</span>
                             </div>
-                            <button class="auto-buy-btn" onclick="autoBuyElement('${element}', ${needed}, ${ship.tier}, ${missing})">
-                                AUTO-BUY
-                            </button>
+                            <button class="auto-buy-btn" onclick="autoBuyElement('${element}', ${missing})">AUTO-BUY</button>
                         </div>
                     `;
                 }
@@ -1215,7 +1128,6 @@
             
             let variantHtml = '';
             let variantDescHtml = '';
-            
             if (ship.variants) {
                 variantHtml = `
                     <div class="variant-selector">
@@ -1225,15 +1137,11 @@
                         `).join('')}
                     </div>
                 `;
-                if (variantDesc) {
-                    variantDescHtml = `<div class="variant-desc">✨ ${variantDesc}</div>`;
-                }
+                if (variant) variantDescHtml = `<div class="variant-desc">✨ ${variant.desc}</div>`;
             }
             
             const canBuild = allMet && canAfford;
             const starterBadge = ship.starter ? '<span class="tier-badge starter-badge">⭐ STARTER SHIP • NO BONUSES</span>' : `<span class="tier-badge">TIER ${ship.tier} MINING VESSEL</span>`;
-            const bonusDisplay = ship.tier === 1 ? '+0% (Starter Ship)' : `+${miningBonus}% Mining Yield`;
-            
             const warpSpeed = Math.round(BASE_WARP_SPEED / fuelEfficiency);
             const fuelCostPer100LY = Math.round(10 * fuelEfficiency);
             
@@ -1244,7 +1152,7 @@
                         <div class="ship-icon">${ship.tier === 1 ? '🛸' : ship.tier === 2 ? '⛏️' : ship.tier === 3 ? '⚙️' : ship.tier === 4 ? '🔷' : ship.tier === 5 ? '💎' : ship.tier === 6 ? '🌑' : ship.tier === 7 ? '🌀' : ship.tier === 8 ? '⚫' : ship.tier === 9 ? '💫' : '🌌'}</div>
                         <div class="ship-title">
                             <div class="ship-name">${ship.name}</div>
-                            <div class="ship-tier">${bonusDisplay}</div>
+                            <div class="ship-tier">+${miningBonus}% Mining Yield</div>
                         </div>
                     </div>
                     ${variantHtml}
@@ -1253,14 +1161,14 @@
                         <div class="stat-row"><span class="stat-label">MINING BONUS</span><span class="stat-value">+${miningBonus}%</span></div>
                         <div class="stat-row"><span class="stat-label">CARGO (AMU)</span><span class="stat-value">${cargo.toLocaleString()}</span></div>
                         <div class="stat-row"><span class="stat-label">HULL</span><span class="stat-value">${hull}</span></div>
-                        <div class="stat-row"><span class="stat-label">WARP SPEED</span><span class="stat-value">${warpSpeed} LY/min <span class="warp-speed-badge">${fuelEfficiency < 0.85 ? '⚡ EFFICIENT' : fuelEfficiency > 0.95 ? '⚠️ THIRSTY' : 'STANDARD'}</span></span></div>
+                        <div class="stat-row"><span class="stat-label">WARP SPEED</span><span class="stat-value">${warpSpeed} LY/min</span></div>
                     </div>
                     <div class="cost-summary">
                         <div class="cost-row"><span class="cost-label">Materials Cost:</span><span class="cost-value">${materialCost.toLocaleString()} ⭐</span></div>
                         <div class="cost-row"><span class="cost-label">Labor Cost:</span><span class="cost-value">${materialCost.toLocaleString()} ⭐</span></div>
                         <div class="cost-row total-row"><span class="cost-label">TOTAL COST:</span><span class="cost-total">${totalCost.toLocaleString()} ⭐</span></div>
-                        <div class="labor-note">👷 Labor fees distributed to Excavator certificate holders</div>
-                        <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY • Warp: ${warpSpeed} LY/min</div>
+                        <div class="labor-note">👷 Labor fees distributed to certificate holders</div>
+                        <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY</div>
                         <div class="price-note">📊 Prices update dynamically from VoidEx market</div>
                     </div>
                     <div class="requirements-section">
@@ -1270,48 +1178,15 @@
                     <div class="build-btn ${!canBuild ? 'disabled' : ''}" onclick="${canBuild ? `buildShip('${ship.name}', ${ship.tier})` : ''}">
                         ${canBuild ? '🚀 CONSTRUCT SHIP' : (allMet ? '⚠️ INSUFFICIENT CREDITS' : '⚠️ MISSING MATERIALS')}
                     </div>
-                    ${ship.tier === 10 ? '<div class="achievement-badge">🏆 ENDGAME VESSEL • LEGENDARY STATUS</div>' : ''}
-                    ${ship.tier === 5 ? '<div class="achievement-badge">⚡ MILESTONE • VARIANT SYSTEM UNLOCKED</div>' : ''}
+                    ${ship.tier === 10 ? '<div class="achievement-badge">🏆 ENDGAME VESSEL</div>' : ''}
+                    ${ship.tier === 5 ? '<div class="achievement-badge">⚡ VARIANT SYSTEM UNLOCKED</div>' : ''}
                 </div>
             `;
         }
         
-        // ===== REFRESH FUNCTIONS =====
-        
-        window.selectVariant = async function(tier, variantId) {
-            selectedVariants[tier] = variantId;
-            localStorage.setItem('voidfarer_selected_variants', JSON.stringify(selectedVariants));
-            await refreshShipCards();
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        };
-        
-        window.buyFuel = function() {
-            const credits = getPlayerCredits();
-            const fuelCells = parseInt(localStorage.getItem('voidfarer_fuel_cells') || '0');
-            
-            if (credits >= 10) {
-                localStorage.setItem('voidfarer_credits', (credits - 10).toString());
-                localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
-                updateCreditsDisplay();
-                document.getElementById('fuelCells').textContent = fuelCells + 1;
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            } else {
-                alert('Insufficient credits! Need 10⭐ for 1 fuel cell.');
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-            }
-        };
-        
-        window.returnToEarthHub = function() {
-            document.getElementById('loadingOverlay').classList.add('active');
-            document.getElementById('loadingText').textContent = 'RETURNING TO HUB...';
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            setTimeout(() => { window.location.href = 'earth-hub.html'; }, 500);
-        };
-        
         async function refreshShipCards() {
             const container = document.getElementById('shipsContainer');
-            container.innerHTML = '<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.5);">Loading shipyard data...</div>';
-            
+            container.innerHTML = '<div style="text-align: center; padding: 40px;">Loading shipyard...</div>';
             let html = '';
             for (const ship of MINING_SHIPS) {
                 html += await generateShipCard(ship);
@@ -1322,21 +1197,13 @@
         async function loadShips() {
             const savedVariants = localStorage.getItem('voidfarer_selected_variants');
             if (savedVariants) selectedVariants = JSON.parse(savedVariants);
-            
             updateCreditsDisplay();
-            
-            const fuelCells = localStorage.getItem('voidfarer_fuel_cells') || '0';
-            document.getElementById('fuelCells').textContent = fuelCells;
-            
-            const playerId = localStorage.getItem('voidfarer_player_id') || '1234';
-            document.getElementById('playerName').textContent = `VOIDFARER #${playerId.slice(-4)}`;
-            
+            document.getElementById('fuelCells').textContent = localStorage.getItem('voidfarer_fuel_cells') || '0';
+            document.getElementById('playerName').textContent = `VOIDFARER #${(localStorage.getItem('voidfarer_player_id') || '1234').slice(-4)}`;
             await refreshShipCards();
         }
         
-        document.addEventListener('DOMContentLoaded', () => {
-            loadShips();
-        });
+        document.addEventListener('DOMContentLoaded', () => loadShips());
     </script>
 </body>
 </html>
