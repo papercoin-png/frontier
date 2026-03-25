@@ -4,6 +4,10 @@
 // FIXED: Unlimited selling exploit closed
 // FIXED: Proper partial fills and liquidity checks
 // FIXED: Return totalCost consistently for both buy and sell orders
+// UPDATED: Removed arbitrary player order limits
+// UPDATED: Added market maker liquidity on startup
+// UPDATED: Throttled error logging to reduce console spam
+// UPDATED: Added order pruning for non-competitive orders
 
 import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
 
@@ -40,7 +44,8 @@ import {
 // ===== MARKET ENGINE CONFIGURATION =====
 
 const ENGINE_CONFIG = {
-    MAX_ORDERS_PER_USER: 50,
+    // Player orders: NO LIMIT - players can place unlimited orders
+    MAX_ORDERS_PER_USER: Infinity,
     MAX_ORDERS_PER_NPC: 10,
     ORDER_EXPIRY_HOURS: 72,
     MIN_ORDER_QUANTITY: 1,
@@ -48,16 +53,26 @@ const ENGINE_CONFIG = {
     FEE_PERCENT: 0.01,
     MATCHING_INTERVAL: 5000,
     PRICE_IMPACT_FACTOR: 0.1,
-    ORDER_BOOK_DEPTH: 20,
+    ORDER_BOOK_DEPTH: 50,  // Increased from 20 to show more orders
     MAX_SPREAD_MULTIPLIER: 5,
     INCLUDE_NPC_ORDERS: true,
     SHOW_NPC_NAMES: true,
     NPC_ORDER_PREFIX: 'npc_',
     MAX_MATCHED_TRADES: 200,
     MAX_ORDER_HISTORY: 500,
-    MAX_ORDERS_PER_ELEMENT: 50,
-    CLEANUP_ON_LOAD: true
+    MAX_ORDERS_PER_ELEMENT: Infinity,  // No per-element limit for players
+    CLEANUP_ON_LOAD: true,
+    
+    // Market maker configuration
+    MARKET_MAKER_SPREAD: 0.20,  // 20% spread for liquidity
+    MARKET_MAKER_QUANTITY: 1000,  // Default quantity per order
+    PRUNE_NON_COMPETITIVE: true,  // Remove orders that won't execute
+    PRUNE_AGE_HOURS: 24  // Remove stale orders after 24 hours
 };
+
+// Throttling for error logging
+let lastErrorLog = {};
+const ERROR_LOG_INTERVAL = 60000; // 1 minute
 
 // ===== ORDER TYPES =====
 
@@ -118,6 +133,154 @@ async function reloadOrderCache() {
     }
 }
 
+// ===== MARKET MAKER LIQUIDITY =====
+
+/**
+ * Ensure market has liquidity by creating market maker orders if none exist
+ */
+async function ensureMarketLiquidity() {
+    console.log('🔧 Checking market liquidity...');
+    
+    // Check if market already has orders
+    let hasOrders = false;
+    for (const element of Object.keys(ELEMENT_DATABASE)) {
+        const sells = sellOrdersCache[element] || [];
+        const buys = buyOrdersCache[element] || [];
+        if (sells.length > 0 || buys.length > 0) {
+            hasOrders = true;
+            break;
+        }
+    }
+    
+    if (hasOrders) {
+        console.log('✅ Market already has liquidity');
+        return;
+    }
+    
+    console.log('🔄 Adding market maker orders for liquidity...');
+    
+    let ordersAdded = 0;
+    
+    for (const [elementName, elementData] of Object.entries(ELEMENT_DATABASE)) {
+        const basePrice = elementData.basePrice || elementData.value || 100;
+        
+        // Add buy orders (bids) at 20% below market
+        const buyPrice = Math.floor(basePrice * (1 - ENGINE_CONFIG.MARKET_MAKER_SPREAD / 2));
+        const buyOrder = {
+            id: `mm_buy_${elementName}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            userId: 'market_maker',
+            playerName: 'Market Maker',
+            element: elementName,
+            side: ORDER_SIDES.BUY,
+            type: ORDER_TYPES.LIMIT,
+            price: buyPrice,
+            originalQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
+            remainingQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
+            filledQuantity: 0,
+            status: ORDER_STATUS.ACTIVE,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + (ENGINE_CONFIG.ORDER_EXPIRY_HOURS * 60 * 60 * 1000),
+            trades: [],
+            isNPC: true,
+            traderName: 'Market Maker'
+        };
+        
+        // Add sell orders (asks) at 20% above market
+        const sellPrice = Math.ceil(basePrice * (1 + ENGINE_CONFIG.MARKET_MAKER_SPREAD / 2));
+        const sellOrder = {
+            id: `mm_sell_${elementName}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            userId: 'market_maker',
+            playerName: 'Market Maker',
+            element: elementName,
+            side: ORDER_SIDES.SELL,
+            type: ORDER_TYPES.LIMIT,
+            price: sellPrice,
+            originalQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
+            remainingQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
+            filledQuantity: 0,
+            status: ORDER_STATUS.ACTIVE,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + (ENGINE_CONFIG.ORDER_EXPIRY_HOURS * 60 * 60 * 1000),
+            trades: [],
+            isNPC: true,
+            traderName: 'Market Maker'
+        };
+        
+        // Initialize arrays if needed
+        if (!buyOrdersCache[elementName]) buyOrdersCache[elementName] = [];
+        if (!sellOrdersCache[elementName]) sellOrdersCache[elementName] = [];
+        
+        buyOrdersCache[elementName].push(buyOrder);
+        sellOrdersCache[elementName].push(sellOrder);
+        
+        // Sort orders
+        buyOrdersCache[elementName].sort((a, b) => b.price - a.price);
+        sellOrdersCache[elementName].sort((a, b) => a.price - b.price);
+        
+        ordersAdded += 2;
+    }
+    
+    // Save market maker orders
+    await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
+    await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+    
+    console.log(`✅ Added ${ordersAdded} market maker orders (2 per element)`);
+}
+
+/**
+ * Prune non-competitive orders that will never execute
+ */
+async function pruneNonCompetitiveOrders() {
+    if (!ENGINE_CONFIG.PRUNE_NON_COMPETITIVE) return;
+    
+    let prunedCount = 0;
+    const cutoffTime = Date.now() - (ENGINE_CONFIG.PRUNE_AGE_HOURS * 60 * 60 * 1000);
+    
+    for (const element of Object.keys(buyOrdersCache)) {
+        const sells = sellOrdersCache[element] || [];
+        const bestAsk = sells.length > 0 ? Math.min(...sells.map(s => s.price)) : Infinity;
+        
+        // Remove buy orders that are below best ask by a significant margin
+        const originalLength = buyOrdersCache[element].length;
+        buyOrdersCache[element] = buyOrdersCache[element].filter(order => {
+            // Keep market maker orders
+            if (order.userId === 'market_maker') return true;
+            // Keep recent orders
+            if (order.createdAt > cutoffTime) return true;
+            // Keep orders that could potentially execute
+            if (bestAsk !== Infinity && order.price >= bestAsk * 0.95) return true;
+            // Remove stale orders
+            return false;
+        });
+        prunedCount += originalLength - buyOrdersCache[element].length;
+    }
+    
+    for (const element of Object.keys(sellOrdersCache)) {
+        const buys = buyOrdersCache[element] || [];
+        const bestBid = buys.length > 0 ? Math.max(...buys.map(b => b.price)) : 0;
+        
+        // Remove sell orders that are above best bid by a significant margin
+        const originalLength = sellOrdersCache[element].length;
+        sellOrdersCache[element] = sellOrdersCache[element].filter(order => {
+            // Keep market maker orders
+            if (order.userId === 'market_maker') return true;
+            // Keep recent orders
+            if (order.createdAt > cutoffTime) return true;
+            // Keep orders that could potentially execute
+            if (bestBid > 0 && order.price <= bestBid * 1.05) return true;
+            // Remove stale orders
+            return false;
+        });
+        prunedCount += originalLength - sellOrdersCache[element].length;
+    }
+    
+    if (prunedCount > 0) {
+        console.log(`🧹 Pruned ${prunedCount} non-competitive orders`);
+        await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
+        await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+    }
+}
+
 // ===== INITIALIZATION =====
 
 export async function initializeMarketEngine() {
@@ -156,6 +319,12 @@ export async function initializeMarketEngine() {
             await dbSaveMarketOrders(marketStatsCache, 'market_stats');
         }
         
+        // Ensure market has liquidity
+        await ensureMarketLiquidity();
+        
+        // Prune non-competitive orders
+        await pruneNonCompetitiveOrders();
+        
         console.log('✅ Market engine initialized with IndexedDB');
         startMatchingEngine();
         
@@ -181,10 +350,13 @@ export async function createOrder(orderData) {
         
         const isNPC = orderData.userId.startsWith('npc_') || orderData.isNPC === true;
         
-        if (!isNPC) {
-            const userOrders = await getUserOrders(orderData.userId);
-            if (userOrders.length >= ENGINE_CONFIG.MAX_ORDERS_PER_USER) {
-                throw new Error(`Maximum orders (${ENGINE_CONFIG.MAX_ORDERS_PER_USER}) reached`);
+        // NO PLAYER ORDER LIMIT - removed the check for players
+        // Only enforce limits for NPCs
+        if (isNPC) {
+            const npcOrders = await getNPCOrders();
+            const npcOrderCount = npcOrders.filter(o => o.traderId === orderData.userId).length;
+            if (npcOrderCount >= ENGINE_CONFIG.MAX_ORDERS_PER_NPC) {
+                throw new Error(`Maximum NPC orders (${ENGINE_CONFIG.MAX_ORDERS_PER_NPC}) reached`);
             }
         }
         
@@ -248,6 +420,7 @@ export async function createOrder(orderData) {
 /**
  * Execute a market order against actual order book
  * FIXED: Now uses real orders, not theoretical prices
+ * UPDATED: Throttled error logging
  */
 async function executeMarketOrder(order) {
     try {
@@ -497,7 +670,15 @@ async function executeMarketOrder(order) {
         }
         
     } catch (error) {
-        console.error('Error executing market order:', error);
+        // Throttled error logging - only log once per minute per element
+        const errorKey = `${order.element}_${order.side}`;
+        const now = Date.now();
+        
+        if (!lastErrorLog[errorKey] || (now - lastErrorLog[errorKey]) > ERROR_LOG_INTERVAL) {
+            console.error('Error executing market order:', error);
+            lastErrorLog[errorKey] = now;
+        }
+        
         return { success: false, error: error.message };
     }
 }
@@ -510,15 +691,18 @@ async function addToOrderBook(order) {
         buyOrdersCache[order.element].push(order);
         buyOrdersCache[order.element].sort((a, b) => b.price - a.price);
         
-        if (buyOrdersCache[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
-            buyOrdersCache[order.element] = buyOrdersCache[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+        // No per-element limit for players - removed the slice
+        // Only enforce limit for NPCs
+        if (order.isNPC && buyOrdersCache[order.element].length > 100) {
+            buyOrdersCache[order.element] = buyOrdersCache[order.element].slice(0, 100);
         }
     } else {
         sellOrdersCache[order.element].push(order);
         sellOrdersCache[order.element].sort((a, b) => a.price - b.price);
         
-        if (sellOrdersCache[order.element].length > ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT) {
-            sellOrdersCache[order.element] = sellOrdersCache[order.element].slice(0, ENGINE_CONFIG.MAX_ORDERS_PER_ELEMENT);
+        // No per-element limit for players - removed the slice
+        if (order.isNPC && sellOrdersCache[order.element].length > 100) {
+            sellOrdersCache[order.element] = sellOrdersCache[order.element].slice(0, 100);
         }
     }
     
@@ -1018,7 +1202,7 @@ async function applyPriceImpact(element, quantity, side) {
     if (!elementPrice) return;
     
     const volume24h = getVolumeLast24h(element);
-    const impact = (quantity / volume24h) * ENGINE_CONFIG.PRICE_IMPACT_FACTOR;
+    const impact = (quantity / Math.max(volume24h, 1)) * ENGINE_CONFIG.PRICE_IMPACT_FACTOR;
     
     if (side === ORDER_SIDES.BUY) {
         elementPrice.current *= (1 + impact);
@@ -1095,6 +1279,7 @@ export function startMatchingEngine() {
             }
             
             await cleanExpiredOrders();
+            await pruneNonCompetitiveOrders();
             
         } catch (error) {
             console.error('Matching engine error:', error);
@@ -1174,4 +1359,4 @@ window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix');
+console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, and market maker liquidity');
