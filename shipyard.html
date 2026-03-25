@@ -742,6 +742,34 @@
             tg.expand();
         }
 
+        // ===== CREDIT FUNCTIONS (FIXED NaN ISSUE) =====
+        
+        function getPlayerCredits() {
+            let credits = localStorage.getItem('voidfarer_credits');
+            if (credits === null || credits === undefined || credits === 'NaN') {
+                credits = '5000';
+                localStorage.setItem('voidfarer_credits', credits);
+            }
+            const parsed = parseInt(credits);
+            if (isNaN(parsed)) {
+                localStorage.setItem('voidfarer_credits', '5000');
+                return 5000;
+            }
+            return parsed;
+        }
+        
+        function setPlayerCredits(amount) {
+            localStorage.setItem('voidfarer_credits', amount.toString());
+        }
+        
+        function updateCreditsDisplay() {
+            const creditsElement = document.getElementById('credits');
+            if (creditsElement) {
+                const credits = getPlayerCredits();
+                creditsElement.textContent = credits.toLocaleString() + ' ⭐';
+            }
+        }
+        
         // ===== MARKET PRICE FUNCTIONS =====
         
         function getMarketPrice(element) {
@@ -768,17 +796,11 @@
             return 100;
         }
         
-        function getPlayerCredits() {
-            return parseInt(localStorage.getItem('voidfarer_credits') || '5000');
-        }
-        
-        function updateCreditsDisplay() {
-            document.getElementById('credits').textContent = getPlayerCredits().toLocaleString() + ' ⭐';
-        }
-        
         function getPlayerCollection() {
             try {
-                return JSON.parse(localStorage.getItem('voidfarer_collection') || '{}');
+                const collection = localStorage.getItem('voidfarer_collection');
+                if (!collection) return {};
+                return JSON.parse(collection);
             } catch (e) {
                 return {};
             }
@@ -928,7 +950,7 @@
             return total;
         }
         
-        // ===== AUTO-BUY FUNCTION (FIXED) =====
+        // ===== AUTO-BUY FUNCTION =====
         window.autoBuyElement = async function(element, missingAmount) {
             event.stopPropagation();
             
@@ -949,7 +971,7 @@
                 }
                 
                 // Deduct credits
-                localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
+                setPlayerCredits(currentCredits - totalCost);
                 updateCreditsDisplay();
                 
                 // Add elements to inventory
@@ -1011,7 +1033,7 @@
                 }
                 
                 // Deduct credits
-                localStorage.setItem('voidfarer_credits', (currentCredits - totalCost).toString());
+                setPlayerCredits(currentCredits - totalCost);
                 updateCreditsDisplay();
                 
                 // Add to fleet
@@ -1057,7 +1079,7 @@
             const credits = getPlayerCredits();
             const fuelCells = parseInt(localStorage.getItem('voidfarer_fuel_cells') || '0');
             if (credits >= 10) {
-                localStorage.setItem('voidfarer_credits', (credits - 10).toString());
+                setPlayerCredits(credits - 10);
                 localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
                 updateCreditsDisplay();
                 document.getElementById('fuelCells').textContent = fuelCells + 1;
@@ -1199,10 +1221,20 @@
         async function loadShips() {
             const savedVariants = localStorage.getItem('voidfarer_selected_variants');
             if (savedVariants) selectedVariants = JSON.parse(savedVariants);
+            
+            // Ensure credits is valid
+            let credits = localStorage.getItem('voidfarer_credits');
+            if (credits === null || credits === undefined || credits === 'NaN' || isNaN(parseInt(credits))) {
+                localStorage.setItem('voidfarer_credits', '5000');
+            }
             updateCreditsDisplay();
-            document.getElementById('fuelCells').textContent = localStorage.getItem('voidfarer_fuel_cells') || '0';
+            
+            const fuelCells = localStorage.getItem('voidfarer_fuel_cells') || '0';
+            document.getElementById('fuelCells').textContent = fuelCells;
+            
             const playerId = localStorage.getItem('voidfarer_player_id') || '1234';
             document.getElementById('playerName').textContent = `VOIDFARER #${playerId.slice(-4)}`;
+            
             await refreshShipCards();
         }
         
