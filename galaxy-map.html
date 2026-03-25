@@ -2,1154 +2,457 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Voidfarer - Galaxy Map</title>
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Add idb library for IndexedDB -->
-    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Voidfarer - Galaxy Map (Condensed Clusters)</title>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: #03030f; font-family: 'Exo 2', sans-serif; overflow: hidden; height: 100vh; width: 100vw; position: fixed; }
+        .galaxy-container { width: 100%; height: 100%; position: relative; background: #03030f; }
+        .map-scroll { position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+        .galaxy-map { position: relative; width: 7000px; height: 7000px; background: radial-gradient(ellipse at 50% 50%, #0a0a2a 0%, #020208 100%); margin: 0 auto; }
+
+        .ring-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none; }
         
-        body {
-            background: #0a0a1a;
-            overflow: hidden;
-            font-family: 'Libre Baskerville', serif;
-            position: fixed;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .galaxy-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #0a0a1a;
-        }
-        
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            touch-action: none;
-        }
-        
-        .ui-header {
-            position: absolute;
-            top: max(15px, env(safe-area-inset-top));
-            left: 50%;
-            transform: translateX(-50%);
-            color: #e0f0ff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            text-shadow: 0 0 20px #8a6aff;
-            background: rgba(10,10,26,0.7);
-            backdrop-filter: blur(8px);
-            padding: 8px 25px;
-            border-radius: 60px 20px 60px 20px;
-            border: 2px solid #a0b0c0;
-            z-index: 30;
-            white-space: nowrap;
-            letter-spacing: 1px;
-            pointer-events: none;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .current-location {
-            position: absolute;
-            top: max(80px, env(safe-area-inset-top) + 50px);
-            left: 20px;
-            background: rgba(10,10,26,0.7);
-            backdrop-filter: blur(8px);
-            border: 1px solid #4affaa;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 12px;
-            z-index: 30;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .current-dot {
-            width: 10px;
-            height: 10px;
-            background: #4affaa;
-            border-radius: 50%;
-            box-shadow: 0 0 15px #4affaa;
-        }
-        
-        .back-btn {
-            position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom));
-            left: max(15px, env(safe-area-inset-left));
-            background: rgba(10,10,26,0.7);
-            backdrop-filter: blur(8px);
-            border: 2px solid #a0b0c0;
-            color: #d0e0f0;
-            padding: 12px 24px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.1s;
-            z-index: 30;
-            min-width: 100px;
-            text-align: center;
-        }
-        
-        .back-btn:active {
-            background: rgba(160, 176, 192, 0.3);
-            transform: scale(0.96);
-        }
-        
-        /* Region Info Panel - with CLAIM STATUS */
-        .region-panel {
-            position: absolute;
-            bottom: max(100px, env(safe-area-inset-bottom) + 70px);
-            right: max(15px, env(safe-area-inset-right));
-            background: rgba(10,10,26,0.9);
-            backdrop-filter: blur(10px);
-            border: 2px solid #a0b0c0;
-            color: white;
-            padding: 20px;
-            border-radius: 40px 15px 40px 15px;
-            z-index: 40;
-            min-width: 260px;
-            display: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        
-        .region-panel.visible {
-            display: block;
-        }
-        
-        .region-name {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 22px;
-            color: #ffffff;
-            margin-bottom: 15px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding-bottom: 8px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .region-name .claimed-crown {
-            color: gold;
-            font-size: 20px;
-            filter: drop-shadow(0 0 10px gold);
-        }
-        
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-            font-size: 14px;
-        }
-        
-        .info-label {
-            color: #a0c0ff;
-        }
-        
-        .info-value {
-            color: #ffd966;
-            font-weight: bold;
-        }
-        
-        /* Claim info row - special styling */
-        .claim-row {
-            background: rgba(255, 215, 0, 0.1);
-            border-radius: 30px 5px 30px 5px;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid gold;
-        }
-        
-        .claim-row .info-label {
-            color: gold;
-        }
-        
-        .claim-row .info-value {
-            color: #4affaa;
-        }
-        
-        .claim-detail {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-size: 13px;
-        }
-        
-        .claim-detail-label {
-            color: #a0c0ff;
-        }
-        
-        .claim-detail-value {
-            color: #ffd966;
-            font-weight: 600;
-        }
-        
-        .exploration-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: bold;
-            margin-left: 8px;
-        }
-        
-        .exploration-low {
-            background: rgba(255, 255, 255, 0.2);
-            color: #cccccc;
-        }
-        
-        .exploration-medium {
-            background: rgba(74, 255, 170, 0.2);
-            color: #4affaa;
-        }
-        
-        .exploration-high {
-            background: rgba(255, 215, 0, 0.2);
-            color: #ffd700;
-        }
-        
-        .distance-value {
-            color: #4affaa;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        
-        .warp-info {
-            background: rgba(74, 138, 192, 0.2);
-            border-radius: 30px 8px 30px 8px;
-            padding: 10px;
-            margin: 15px 0;
-            border: 1px solid #4a8ac0;
-        }
-        
-        .warp-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-size: 13px;
-        }
-        
-        .warp-label {
-            color: #a0c0ff;
-        }
-        
-        .warp-value {
-            color: #ffaa4a;
-            font-weight: 600;
-        }
-        
-        .travel-btn {
-            width: 100%;
-            background: #4a8ac0;
-            border: none;
-            color: white;
-            padding: 15px;
-            border-radius: 40px 10px 40px 10px;
-            font-size: 18px;
-            font-family: 'Exo 2', sans-serif;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: all 0.1s;
-            font-weight: 600;
-        }
-        
-        .travel-btn:active {
-            background: #6aa0e0;
-            transform: scale(0.98);
-        }
-        
-        .travel-btn.primary {
-            background: #ffaa4a;
-            color: #0a0a1a;
-        }
-        
-        .travel-btn.primary:active {
-            background: #ffcc6a;
-        }
-        
-        .travel-btn:disabled {
-            background: #2a4a6a;
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        /* Region boxes - UPDATED with claim indicator */
-        .region-box {
-            position: absolute;
-            border: 2px solid rgba(160, 176, 192, 0.4);
-            border-radius: 30% 15% 30% 15%;
-            box-shadow: 0 0 20px rgba(160, 176, 192, 0.2);
-            backdrop-filter: blur(2px);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            z-index: 20;
-            pointer-events: auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .region-box:hover {
-            border-color: rgba(255, 255, 255, 0.6);
-            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
-        }
-        
-        .region-box.selected {
-            border-color: #ffaa4a;
-            box-shadow: 0 0 30px #ffaa4a;
-        }
-        
-        .region-box.explored {
-            border-color: #4affaa;
-            box-shadow: 0 0 20px rgba(74, 255, 170, 0.3);
-        }
-        
-        .region-box.fully-explored {
-            border-color: #ffd700;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
-        }
-        
-        .region-box.has-claims {
-            border-color: gold;
-            border-width: 3px;
-            box-shadow: 0 0 30px gold;
-            animation: claim-pulse 3s infinite alternate;
-        }
-        
-        @keyframes claim-pulse {
-            from { box-shadow: 0 0 20px gold; }
-            to { box-shadow: 0 0 40px gold; }
-        }
-        
-        .region-label {
-            color: white;
-            font-family: 'Exo 2', sans-serif;
-            font-size: clamp(14px, 4vw, 18px);
-            text-shadow: 0 0 15px #ffffff;
-            background: rgba(10,10,26,0.3);
-            backdrop-filter: blur(2px);
-            padding: 5px 12px;
-            border-radius: 40px 10px 40px 10px;
-            border: 1px solid rgba(255,255,255,0.3);
-            white-space: nowrap;
-            pointer-events: none;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .region-label .crown-icon {
-            color: gold;
-            font-size: 14px;
-            filter: drop-shadow(0 0 5px gold);
-        }
-        
-        .region-count {
-            position: absolute;
-            bottom: -5px;
-            right: -5px;
-            background: #8a6aff;
-            color: white;
-            font-size: 10px;
-            font-weight: bold;
-            padding: 3px 6px;
-            border-radius: 50%;
-            min-width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white;
-        }
-        
-        .exploration-indicator {
-            position: absolute;
-            top: -5px;
-            left: -5px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #4affaa;
-            box-shadow: 0 0 10px #4affaa;
-        }
-        
-        .exploration-indicator.full {
-            background: #ffd700;
-            box-shadow: 0 0 10px #ffd700;
-        }
-        
-        .claim-indicator {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: gold;
-            color: #0a0a1a;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white;
-            box-shadow: 0 0 15px gold;
-            animation: bounce 2s infinite;
-            z-index: 25;
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
-        }
-        
-        /* Loading overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-            opacity: 1;
-        }
-        
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #8a6aff;
-            border-top: 4px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        .loading-text {
-            color: white;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            text-shadow: 0 0 20px #8a6aff;
-            font-weight: 500;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @supports (padding: max(0px)) {
-            .ui-header { top: max(15px, env(safe-area-inset-top)); }
-            .current-location { top: max(80px, env(safe-area-inset-top) + 50px); left: max(20px, env(safe-area-inset-left)); }
-            .back-btn { bottom: max(20px, env(safe-area-inset-bottom)); left: max(15px, env(safe-area-inset-left)); }
-            .region-panel { bottom: max(100px, env(safe-area-inset-bottom) + 70px); right: max(15px, env(safe-area-inset-right)); }
-        }
-        
-        /* Migration status (debug) */
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
-            display: none;
-        }
+        .sector-card { position: absolute; width: 22px; height: 22px; cursor: pointer; z-index: 10; transform: translate(-50%, -50%); transition: 0.1s; }
+        .sector-card:hover { transform: translate(-50%, -50%) scale(1.2); z-index: 20; }
+        .sector-dot { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; box-shadow: 0 0 4px currentColor; }
+        .sector-name-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; font-size: 8px; padding: 2px 5px; border-radius: 8px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; font-family: monospace; margin-bottom: 3px; border: 1px solid #ffaa4a; z-index: 30; }
+        .sector-card:hover .sector-name-tooltip { opacity: 1; }
+
+        .ship-status { position: fixed; top: 15px; left: 15px; background: rgba(10,20,35,0.95); backdrop-filter: blur(12px); border: 1px solid #4affaa; border-radius: 40px 12px 40px 12px; padding: 8px 12px; z-index: 100; min-width: 180px; }
+        .ship-name { font-size: 12px; color: #4affaa; font-weight: 600; }
+        .ship-tier { font-size: 9px; color: #a0c0ff; }
+        .damage-bar { background: #2a2a3a; border-radius: 20px; height: 3px; margin: 4px 0; overflow: hidden; }
+        .damage-fill { height: 100%; background: #ff4444; width: 0%; }
+
+        .info-panel { position: fixed; bottom: 20px; right: 20px; background: rgba(10,20,35,0.96); backdrop-filter: blur(12px); border: 2px solid #ffaa4a; border-radius: 40px 15px 40px 15px; padding: 12px; width: 260px; z-index: 100; }
+        .info-panel.hidden { display: none; }
+        .info-title { font-size: 12px; color: #ffaa4a; margin-bottom: 6px; text-align: center; }
+        .info-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 10px; }
+        .info-label { color: #a0c0ff; }
+        .info-value { color: #ffd966; font-weight: bold; }
+        .risk-meter { background: #2a2a3a; border-radius: 20px; height: 4px; margin: 5px 0; overflow: hidden; }
+        .risk-fill { height: 100%; background: linear-gradient(90deg, #4affaa, #ffaa44, #ff4444); width: 0%; }
+        .travel-btn { width: 100%; background: #ffaa4a; border: none; color: #0a0a1a; padding: 6px; border-radius: 40px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+        .travel-btn.disabled { background: #4a4a6a; color: #aaa; cursor: not-allowed; }
+
+        .zoom-controls { position: fixed; bottom: 20px; left: 20px; display: flex; gap: 8px; z-index: 100; }
+        .zoom-btn { width: 40px; height: 40px; background: rgba(10,20,35,0.9); backdrop-filter: blur(8px); border: 2px solid #4affaa; border-radius: 50%; color: #4affaa; font-size: 20px; cursor: pointer; }
+
+        .legend { position: fixed; top: 15px; right: 15px; background: rgba(10,20,35,0.9); backdrop-filter: blur(8px); border-radius: 30px 10px 30px 10px; padding: 8px 12px; z-index: 100; border: 1px solid #4affaa; max-width: 170px; }
+        .legend-title { font-size: 10px; color: #4affaa; margin-bottom: 5px; font-weight: 600; text-align: center; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 8px; margin: 2px 0; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        .warp-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.96); backdrop-filter: blur(15px); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .warp-modal.hidden { display: none; }
+        .warp-content { background: rgba(10,20,40,0.98); border: 3px solid #4affaa; border-radius: 60px 20px 60px 20px; padding: 15px; text-align: center; width: 260px; }
+        .warp-distance { font-size: 24px; color: #ffaa4a; font-weight: bold; margin: 5px 0; }
+        .warp-progress { background: #2a2a3a; border-radius: 30px; height: 8px; margin: 8px 0; overflow: hidden; }
+        .warp-progress-fill { height: 100%; background: linear-gradient(90deg, #4affaa, #ffaa4a); width: 0%; }
+        .abort-btn { background: #ff4444; border: none; color: white; padding: 4px 10px; border-radius: 40px; font-size: 10px; cursor: pointer; margin-top: 8px; }
+
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #03030f; display: flex; justify-content: center; align-items: center; z-index: 1000; flex-direction: column; gap: 20px; }
+        .loading-overlay.hidden { display: none; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid #8a6aff; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="galaxy-container">
-        <div class="ui-header">✦ MILKY WAY ✦</div>
-        <div class="current-location" id="currentLocation">
-            <span class="current-dot"></span>
-            <span id="currentLocationText">Loading location...</span>
+        <div class="ship-status">
+            <div class="ship-name" id="shipName">Prospector</div>
+            <div class="ship-tier" id="shipTier">Tier 1 • Range: 100 LY</div>
+            <div class="damage-bar"><div class="damage-fill" id="damageFill"></div></div>
+            <div id="damageText" style="font-size: 8px;">Hull: 100%</div>
         </div>
-        <button class="back-btn" onclick="window.returnToShip()">← SHIP</button>
-        
-        <!-- Region boxes will be dynamically created -->
-        <div id="regionBoxes"></div>
-        
-        <!-- Region Info Panel - with CLAIM STATUS -->
-        <div class="region-panel" id="regionPanel">
-            <div class="region-name" id="selectedRegionName">
-                Loading...
-                <span class="claimed-crown" id="regionCrown" style="display: none;">👑</span>
-            </div>
-            
-            <!-- Basic sector info -->
-            <div class="info-row">
-                <span class="info-label">Sector:</span>
-                <span class="info-value" id="sectorId">---</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Star Sectors:</span>
-                <span class="info-value" id="nebulaeCount">6</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Stars:</span>
-                <span class="info-value" id="starsCount">300</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Explored:</span>
-                <span class="info-value" id="explorationPercent">0%</span>
-                <span class="exploration-badge" id="explorationBadge">Unknown</span>
-            </div>
-            
-            <!-- CLAIM INFO SECTION - appears if sector has claimed planets -->
-            <div class="claim-row" id="claimInfoRow" style="display: none;">
-                <div class="info-row">
-                    <span class="info-label">Claimed Planets:</span>
-                    <span class="info-value" id="claimedCount">0</span>
-                </div>
-                <div class="claim-detail">
-                    <span class="claim-detail-label">Highest Value:</span>
-                    <span class="claim-detail-value" id="highestValue">---</span>
-                </div>
-                <div class="claim-detail">
-                    <span class="claim-detail-label">Total Fees Earned:</span>
-                    <span class="claim-detail-value" id="totalFees">0⭐</span>
-                </div>
-            </div>
-            
-            <!-- Warp Information -->
-            <div class="warp-info">
-                <div class="warp-row">
-                    <span class="warp-label">Distance:</span>
-                    <span class="warp-value" id="sectorDistance">0.0 LY</span>
-                </div>
-                <div class="warp-row">
-                    <span class="warp-label">Warp cycles:</span>
-                    <span class="warp-value" id="warpCycles">0</span>
-                </div>
-                <div class="warp-row">
-                    <span class="warp-label">Fuel cost:</span>
-                    <span class="warp-value" id="fuelCost">0⭐</span>
-                </div>
-            </div>
-            
-            <!-- PLOT COURSE BUTTON -->
-            <button class="travel-btn primary" id="plotBtn" onclick="window.plotCourseToSector()">🚀 PLOT COURSE TO SECTOR</button>
+
+        <div class="legend">
+            <div class="legend-title">✦ SHIP TIERS ✦</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#4affaa;"></div><span>T1: 100 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#88ff88;"></div><span>T2: 250 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ccff88;"></div><span>T3: 500 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ffcc66;"></div><span>T4: 1000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ffaa44;"></div><span>T5: 2000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff8844;"></div><span>T6: 4000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff6644;"></div><span>T7: 8000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff4444;"></div><span>T8: 15000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff2222;"></div><span>T9: 25000 LY</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ff0000;"></div><span>T10: 50000 LY</span></div>
         </div>
-        
-        <canvas id="galaxyCanvas"></canvas>
-        
-        <div class="loading-overlay" id="loadingOverlay">
+
+        <div class="map-scroll" id="mapScroll">
+            <div class="galaxy-map" id="galaxyMap">
+                <svg class="ring-svg" id="ringSvg" viewBox="0 0 7000 7000"></svg>
+            </div>
+        </div>
+
+        <div class="info-panel hidden" id="infoPanel">
+            <div class="info-title" id="infoTitle">Select a sector</div>
+            <div class="info-row"><span class="info-label">Distance:</span><span class="info-value" id="infoDist">0 LY</span></div>
+            <div class="info-row"><span class="info-label">Risk:</span><span class="info-value" id="infoRisk">0%</span></div>
+            <div class="risk-meter"><div class="risk-fill" id="riskFill"></div></div>
+            <div class="info-row"><span class="info-label">Extraction:</span><span class="info-value" id="infoExtract">100%</span></div>
+            <div class="info-row"><span class="info-label">Rare Chance:</span><span class="info-value" id="infoRare">0%</span></div>
+            <div class="info-row"><span class="info-label">Ship Required:</span><span class="info-value" id="infoTier">Tier 1</span></div>
+            <div style="background:rgba(74,138,192,0.2);border-radius:20px;padding:4px;margin:4px 0;">
+                <div class="info-row"><span class="info-label">Warp Time:</span><span class="info-value" id="infoWarpTime">0 min</span></div>
+                <div class="info-row"><span class="info-label">Fuel Cost:</span><span class="info-value" id="infoFuel">0⭐</span></div>
+                <div class="info-row"><span class="info-label">Arrival Damage:</span><span class="info-value" id="infoDamage">0%</span></div>
+            </div>
+            <button class="travel-btn" id="travelBtn" onclick="startTravel()">🚀 TRAVEL</button>
+        </div>
+
+        <div class="zoom-controls">
+            <button class="zoom-btn" id="zoomIn">+</button>
+            <button class="zoom-btn" id="zoomOut">−</button>
+        </div>
+
+        <div class="warp-modal hidden" id="warpModal">
+            <div class="warp-content">
+                <div style="font-size:14px;">🚀 WARP TRAVEL</div>
+                <div id="warpDest">Destination</div>
+                <div class="warp-distance" id="warpDist">0 LY</div>
+                <div class="warp-progress"><div class="warp-progress-fill" id="warpFill"></div></div>
+                <div id="warpRemaining" style="font-size:10px;">Time remaining: --</div>
+                <button class="abort-btn" onclick="abortWarp()">⚠️ ABORT</button>
+            </div>
+        </div>
+
+        <div class="loading-overlay hidden" id="loadingOverlay">
             <div class="loading-spinner"></div>
-            <div class="loading-text" id="loadingText">loading galaxy...</div>
+            <div class="loading-text">Generating condensed galaxy...</div>
         </div>
-        
-        <!-- Migration status (debug) -->
-        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- CRITICAL: All scripts loaded as modules -->
-    <script type="module" src="js/storage.js"></script>
-    <script type="module" src="js/navigation.js"></script>
-    <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/migration.js"></script>
-    <script type="module" src="js/planet-status.js"></script>
-    <script type="module" src="js/claim-system.js"></script>
+    <script>
+        // Center Earth with balanced padding: max radius is 3400px, add 400px padding = 3800px from center to edge
+        // So map size = 3800 * 2 = 7600, but we'll use 7000 for tighter fit
+        const EARTH_X = 3500;
+        const EARTH_Y = 3500;
+        const MIN_DISTANCE = 18;
 
-    <script type="module">
-        import { getPlanetStatus, getClaimedPlanets, getPlayerClaimStats } from './js/planet-status.js';
+        const SHIP_TIERS = {
+            1: { name: 'Prospector', range: 100, speed: 25, fuelMult: 1.0, color: '#4affaa' },
+            2: { name: 'Explorer', range: 250, speed: 45, fuelMult: 0.9, color: '#88ff88' },
+            3: { name: 'Voyager', range: 500, speed: 70, fuelMult: 0.8, color: '#ccff88' },
+            4: { name: 'Pioneer', range: 1000, speed: 110, fuelMult: 0.7, color: '#ffcc66' },
+            5: { name: 'Stellaris', range: 2000, speed: 160, fuelMult: 0.6, color: '#ffaa44' },
+            6: { name: 'Voidwalker', range: 4000, speed: 230, fuelMult: 0.5, color: '#ff8844' },
+            7: { name: 'Galaxy', range: 8000, speed: 320, fuelMult: 0.45, color: '#ff6644' },
+            8: { name: 'Cosmos', range: 15000, speed: 430, fuelMult: 0.4, color: '#ff4444' },
+            9: { name: 'Universe', range: 25000, speed: 560, fuelMult: 0.35, color: '#ff2222' },
+            10: { name: 'Eternity', range: 50000, speed: 750, fuelMult: 0.3, color: '#ff0000' }
+        };
 
-        // ===== TELEGRAM INITIALIZATION =====
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-        }
+        // Condensed rings with max radius 3400px from Earth
+        const RING_ZONES = [
+            { tier: 1, minDist: 0, maxDist: 100, minRadius: 70, maxRadius: 210, color: '#4affaa', density: 225 },
+            { tier: 2, minDist: 100, maxDist: 250, minRadius: 220, maxRadius: 370, color: '#88ff88', density: 325 },
+            { tier: 3, minDist: 250, maxDist: 500, minRadius: 380, maxRadius: 550, color: '#ccff88', density: 425 },
+            { tier: 4, minDist: 500, maxDist: 1000, minRadius: 560, maxRadius: 770, color: '#ffcc66', density: 550 },
+            { tier: 5, minDist: 1000, maxDist: 2000, minRadius: 780, maxRadius: 1030, color: '#ffaa44', density: 700 },
+            { tier: 6, minDist: 2000, maxDist: 4000, minRadius: 1040, maxRadius: 1350, color: '#ff8844', density: 875 },
+            { tier: 7, minDist: 4000, maxDist: 8000, minRadius: 1360, maxRadius: 1730, color: '#ff6644', density: 1075 },
+            { tier: 8, minDist: 8000, maxDist: 15000, minRadius: 1740, maxRadius: 2190, color: '#ff4444', density: 1300 },
+            { tier: 9, minDist: 15000, maxDist: 25000, minRadius: 2200, maxRadius: 2730, color: '#ff2222', density: 1550 },
+            { tier: 10, minDist: 25000, maxDist: 50000, minRadius: 2740, maxRadius: 3390, color: '#ff0000', density: 1850 }
+        ];
 
-        // ===== DOM ELEMENTS =====
-        const canvas = document.getElementById('galaxyCanvas');
-        const ctx = canvas.getContext('2d');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        const migrationStatus = document.getElementById('migrationStatus');
-        const regionPanel = document.getElementById('regionPanel');
-        const regionBoxes = document.getElementById('regionBoxes');
-        
-        // Claim-related elements
-        const regionCrown = document.getElementById('regionCrown');
-        const claimInfoRow = document.getElementById('claimInfoRow');
-        const claimedCount = document.getElementById('claimedCount');
-        const highestValue = document.getElementById('highestValue');
-        const totalFees = document.getElementById('totalFees');
-
-        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        window.returnToShip = returnToShip;
-        window.plotCourseToSector = plotCourseToSector;
-
-        // ===== STATE =====
-        let currentSector = 'B2';
-        let currentRegion = 'Orion Arm';
-        let selectedRegion = null;
+        let currentShipTier = 1;
+        let currentDamage = 0;
         let selectedSector = null;
-        
-        // Exploration data cache
-        let sectorExplorationData = {};
-        let playerLocations = [];
-        
-        // Claim data cache
-        let allClaimedPlanets = [];
-        let sectorClaimData = {};
+        let zoom = 1;
+        let isWarping = false;
+        let allSectors = [];
 
-        // ===== SECTOR COORDINATES =====
-        const sectorCoordinates = {
-            'A1': { x: 0, y: 0, name: 'Cygnus', displayName: 'Cygnus Arm', color: '#ff6a9a', nebulae: 6, stars: 300 },
-            'B1': { x: 1, y: 0, name: 'Perseus', displayName: 'Perseus Arm', color: '#4affaa', nebulae: 6, stars: 300 },
-            'C1': { x: 2, y: 0, name: 'Core', displayName: 'Galactic Core', color: '#8a8aaa', nebulae: 6, stars: 300 },
-            'A2': { x: 0, y: 1, name: 'Outer', displayName: 'Outer Arm', color: '#ffaa4a', nebulae: 6, stars: 300 },
-            'B2': { x: 1, y: 1, name: 'Orion', displayName: 'Orion Arm', color: '#8a6aff', nebulae: 6, stars: 300 },
-            'C2': { x: 2, y: 1, name: 'Sagittarius', displayName: 'Sagittarius Arm', color: '#c06aff', nebulae: 6, stars: 300 },
-            'A3': { x: 0, y: 2, name: 'Carina', displayName: 'Carina Arm', color: '#6a8aff', nebulae: 6, stars: 300 },
-            'B3': { x: 1, y: 2, name: 'Norma', displayName: 'Norma Arm', color: '#ff8a6a', nebulae: 6, stars: 300 },
-            'C3': { x: 2, y: 2, name: 'Scutum', displayName: 'Scutum Arm', color: '#6aff8a', nebulae: 6, stars: 300 },
-            'A4': { x: 0, y: 3, name: 'Far', displayName: 'Far Arm', color: '#ff6aff', nebulae: 6, stars: 300 },
-            'B4': { x: 1, y: 3, name: 'Reach', displayName: 'Outer Reach', color: '#8aff6a', nebulae: 6, stars: 300 },
-            'C4': { x: 2, y: 3, name: 'Fringe', displayName: 'The Fringe', color: '#ff8a8a', nebulae: 6, stars: 300 }
-        };
-
-        // ===== SECTOR NAMES MAPPING =====
-        const sectorNames = {
-            'A1': 'Cygnus Arm', 'B1': 'Perseus Arm', 'C1': 'Galactic Core',
-            'A2': 'Outer Arm', 'B2': 'Orion Arm', 'C2': 'Sagittarius Arm',
-            'A3': 'Carina Arm', 'B3': 'Norma Arm', 'C3': 'Scutum Arm',
-            'A4': 'Far Arm', 'B4': 'Outer Reach', 'C4': 'The Fringe'
-        };
-
-        // ===== REGION BOX POSITIONS =====
-        const regionPositions = {
-            'Cygnus': { left: '60%', top: '30%', width: '120px', height: '80px' },
-            'Perseus': { left: '65%', top: '55%', width: '130px', height: '90px' },
-            'Core': { left: '50%', top: '50%', width: '180px', height: '120px' },
-            'Outer': { left: '70%', top: '70%', width: '120px', height: '80px' },
-            'Orion': { left: '35%', top: '40%', width: '130px', height: '90px' },
-            'Sagittarius': { left: '45%', top: '60%', width: '140px', height: '100px' },
-            'Carina': { left: '30%', top: '65%', width: '110px', height: '80px' },
-            'Norma': { left: '20%', top: '55%', width: '120px', height: '80px' },
-            'Scutum': { left: '25%', top: '45%', width: '120px', height: '80px' },
-            'Far': { left: '15%', top: '70%', width: '110px', height: '80px' },
-            'Reach': { left: '10%', top: '30%', width: '120px', height: '80px' },
-            'Fringe': { left: '75%', top: '20%', width: '120px', height: '80px' }
-        };
-
-        // ===== LOAD CLAIM DATA =====
-        async function loadClaimData() {
-            try {
-                // Get all claimed planets
-                allClaimedPlanets = await getClaimedPlanets();
-                console.log('Loaded claimed planets:', allClaimedPlanets.length);
-                
-                // Group claims by sector
-                sectorClaimData = {};
-                
-                allClaimedPlanets.forEach(claim => {
-                    // Determine which sector this planet belongs to
-                    // For now, we'll use a simple mapping based on planet name or coordinates
-                    // In a real implementation, you'd have sector info in the claim data
-                    
-                    // Since we don't have direct sector mapping in claims yet,
-                    // we'll use a simplified approach: check if the planet name matches known patterns
-                    // or use the sector coordinates from the claim if available
-                    
-                    let sectorId = null;
-                    
-                    if (claim.sectorX !== undefined && claim.sectorY !== undefined) {
-                        // Find sector by coordinates
-                        for (const [id, coords] of Object.entries(sectorCoordinates)) {
-                            if (coords.x === claim.sectorX && coords.y === claim.sectorY) {
-                                sectorId = id;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // Fallback: try to infer from planet name (simplified for demo)
-                    if (!sectorId) {
-                        // This is a simplified mapping - in production, you'd have proper sector data
-                        if (claim.planetName.includes('Earth') || claim.planetName.includes('Mars') || claim.planetName.includes('Venus')) {
-                            sectorId = 'B2'; // Sol system is in Orion Arm
-                        } else if (claim.planetName.includes('Pyros')) {
-                            sectorId = 'C4'; // Pyros in The Fringe
-                        } else {
-                            sectorId = 'B2'; // Default to Orion Arm for demo
-                        }
-                    }
-                    
-                    if (sectorId) {
-                        if (!sectorClaimData[sectorId]) {
-                            sectorClaimData[sectorId] = [];
-                        }
-                        sectorClaimData[sectorId].push(claim);
-                    }
-                });
-                
-                console.log('Sector claim data:', sectorClaimData);
-                
-            } catch (error) {
-                console.error('Error loading claim data:', error);
-            }
+        function drawRingBoundaries() {
+            const svg = document.getElementById('ringSvg');
+            svg.innerHTML = '';
         }
 
-        // ===== LOAD EXPLORATION DATA =====
-        async function loadExplorationData() {
-            try {
-                // Get all player locations
-                if (typeof window.getPlayerLocations === 'function') {
-                    playerLocations = await window.getPlayerLocations() || [];
-                }
+        function isTooClose(x, y, sectors, minDist) {
+            for (let s of sectors) {
+                const dx = s.x - x;
+                const dy = s.y - y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < minDist) return true;
+            }
+            return false;
+        }
+
+        function generateGalaxy() {
+            const sectors = [];
+            let sectorId = 0;
+            
+            for (let z = 0; z < RING_ZONES.length; z++) {
+                const zone = RING_ZONES[z];
+                const sectorCount = zone.density;
                 
-                // Initialize exploration data for each sector
-                for (const [sectorId, data] of Object.entries(sectorCoordinates)) {
-                    // Count unique planets in this sector
-                    const uniquePlanets = new Set();
-                    playerLocations.forEach(loc => {
-                        if (loc.planet) uniquePlanets.add(loc.planet);
+                for (let i = 0; i < sectorCount; i++) {
+                    const radius = zone.minRadius + (Math.random() * (zone.maxRadius - zone.minRadius));
+                    const angle = Math.random() * Math.PI * 2;
+                    
+                    let x = EARTH_X + Math.cos(angle) * radius;
+                    let y = EARTH_Y + Math.sin(angle) * radius;
+                    
+                    let attempts = 0;
+                    while (isTooClose(x, y, sectors, MIN_DISTANCE) && attempts < 25) {
+                        const newRadius = zone.minRadius + (Math.random() * (zone.maxRadius - zone.minRadius));
+                        const newAngle = angle + (Math.random() - 0.5) * 0.5;
+                        x = EARTH_X + Math.cos(newAngle) * newRadius;
+                        y = EARTH_Y + Math.sin(newAngle) * newRadius;
+                        attempts++;
+                    }
+                    
+                    const pixelDist = Math.sqrt((x - EARTH_X)**2 + (y - EARTH_Y)**2);
+                    const distanceLY = Math.floor(zone.minDist + (pixelDist - zone.minRadius) / (zone.maxRadius - zone.minRadius) * (zone.maxDist - zone.minDist));
+                    
+                    const risk = Math.min(99, Math.floor((distanceLY / 500) * 100));
+                    const extractRate = Math.max(10, 100 - Math.floor(risk * 0.85));
+                    const rareChance = Math.min(45, Math.floor(risk * 0.5));
+                    
+                    const armNames = ['Perseus', 'Orion', 'Sagittarius', 'Scutum', 'Norma', 'Cygnus', 'Carina', 'Outer', 'Far', 'Void'];
+                    const armIdx = Math.floor(angle / (Math.PI * 2 / armNames.length)) % armNames.length;
+                    const name = `${armNames[armIdx]} ${zone.tier}${Math.floor(distanceLY / 50) + 1}`;
+                    
+                    sectors.push({
+                        id: sectorId++,
+                        name: name,
+                        x: x,
+                        y: y,
+                        distance: Math.max(1, distanceLY),
+                        risk: risk,
+                        requiredTier: zone.tier,
+                        extractRate: extractRate,
+                        rareChance: rareChance,
+                        tier: zone.tier,
+                        color: zone.color
                     });
-                    
-                    // Calculate exploration percentage (simplified)
-                    const totalPlanetsInSector = 300; // Approximate
-                    const exploredCount = uniquePlanets.size;
-                    const percentage = Math.min(100, Math.floor((exploredCount / totalPlanetsInSector) * 100));
-                    
-                    // Check if any planets in this sector are claimed
-                    const claimedInSector = sectorClaimData[sectorId]?.length || 0;
-                    
-                    sectorExplorationData[sectorId] = {
-                        exploredCount,
-                        totalEstimate: totalPlanetsInSector,
-                        percentage,
-                        hasExplored: exploredCount > 0,
-                        hasClaimed: claimedInSector > 0,
-                        claimedCount: claimedInSector
-                    };
                 }
-                
-                console.log('Exploration data loaded:', sectorExplorationData);
-                
-            } catch (error) {
-                console.error('Error loading exploration data:', error);
-            }
-        }
-
-        // ===== GET SECTOR CLAIM STATS =====
-        function getSectorClaimStats(sectorId) {
-            const claims = sectorClaimData[sectorId] || [];
-            
-            if (claims.length === 0) {
-                return {
-                    count: 0,
-                    highestValue: null,
-                    totalFees: 0
-                };
             }
             
-            // Calculate highest value element found
-            const rarityValues = {
-                'legendary': 5,
-                'very-rare': 4,
-                'rare': 3,
-                'uncommon': 2,
-                'common': 1
-            };
-            
-            let highestRarity = 'common';
-            let totalFees = 0;
-            
-            claims.forEach(claim => {
-                if (claim.rarity && rarityValues[claim.rarity] > (rarityValues[highestRarity] || 0)) {
-                    highestRarity = claim.rarity;
-                }
-                totalFees += claim.totalEarned || 0;
-            });
-            
-            return {
-                count: claims.length,
-                highestValue: highestRarity.charAt(0).toUpperCase() + highestRarity.slice(1),
-                totalFees: totalFees
-            };
-        }
-
-        // ===== WARP CALCULATION FUNCTIONS =====
-        function getWarpCyclesFromDistance(distance) {
-            if (distance <= 1.0) return 1;
-            if (distance <= 2.5) return 2;
-            if (distance <= 4.5) return 3;
-            if (distance <= 7.0) return 4;
-            return 5;
-        }
-
-        function getFuelCostFromDistance(distance) {
-            return Math.floor(distance * 4) + 5;
-        }
-
-        function getSectorDistance(sector1, sector2) {
-            const s1 = sectorCoordinates[sector1] || { x: 1, y: 1 };
-            const s2 = sectorCoordinates[sector2] || { x: 1, y: 1 };
-            
-            const dx = Math.abs(s1.x - s2.x);
-            const dy = Math.abs(s1.y - s2.y);
-            const gridDistance = dx + dy;
-            
-            return gridDistance * 2.3;
-        }
-
-        // ===== LOAD CURRENT LOCATION =====
-        async function loadCurrentLocation() {
-            try {
-                if (typeof window.getCurrentSector === 'function') {
-                    currentSector = await window.getCurrentSector() || 'B2';
-                } else {
-                    currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
-                }
-                
-                if (typeof window.getCurrentRegion === 'function') {
-                    currentRegion = await window.getCurrentRegion() || 'Orion Arm';
-                } else {
-                    currentRegion = localStorage.getItem('voidfarer_current_region') || 'Orion Arm';
-                }
-                
-                document.getElementById('currentLocationText').textContent = currentRegion;
-                
-            } catch (error) {
-                console.error('Error loading location:', error);
-                currentSector = 'B2';
-                currentRegion = 'Orion Arm';
-                document.getElementById('currentLocationText').textContent = 'Orion Arm';
-            }
-        }
-
-        // ===== CREATE REGION BOXES =====
-        function createRegionBoxes() {
-            regionBoxes.innerHTML = '';
-            
-            Object.entries(sectorCoordinates).forEach(([sectorId, data]) => {
-                const pos = regionPositions[data.name];
-                if (!pos) return;
-                
-                const box = document.createElement('div');
-                box.className = 'region-box';
-                box.id = `region-${data.name}`;
-                box.style.left = pos.left;
-                box.style.top = pos.top;
-                box.style.width = pos.width;
-                box.style.height = pos.height;
-                
-                // Add exploration class based on data
-                const expData = sectorExplorationData[sectorId];
-                if (expData) {
-                    if (expData.hasClaimed) {
-                        box.classList.add('has-claims');
-                    } else if (expData.hasExplored) {
-                        box.classList.add('explored');
+            // Final cleanup to ensure no overlaps
+            for (let i = 0; i < sectors.length; i++) {
+                for (let j = i + 1; j < sectors.length; j++) {
+                    const dx = sectors[i].x - sectors[j].x;
+                    const dy = sectors[i].y - sectors[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < MIN_DISTANCE) {
+                        const angle = Math.atan2(dy, dx);
+                        const push = MIN_DISTANCE - dist + 1;
+                        sectors[j].x += Math.cos(angle) * push;
+                        sectors[j].y += Math.sin(angle) * push;
+                        sectors[j].x = Math.min(6980, Math.max(20, sectors[j].x));
+                        sectors[j].y = Math.min(6980, Math.max(20, sectors[j].y));
                     }
                 }
-                
-                box.onclick = function() { selectRegion(data.displayName, sectorId); };
-                
-                if (sectorId === currentSector) {
-                    box.style.borderColor = '#4affaa';
-                    box.style.boxShadow = '0 0 30px #4affaa';
-                    box.style.borderWidth = '3px';
-                }
-                
-                // Add claim indicator if sector has claimed planets
-                let indicatorHtml = '';
-                if (expData && expData.hasClaimed) {
-                    indicatorHtml = `<div class="claim-indicator" title="${expData.claimedCount} claimed planet${expData.claimedCount !== 1 ? 's' : ''}">👑</div>`;
-                } else if (expData && expData.hasExplored) {
-                    const indicatorClass = expData.hasClaimed ? 'exploration-indicator full' : 'exploration-indicator';
-                    indicatorHtml = `<div class="${indicatorClass}"></div>`;
-                }
-                
-                // Add crown icon to label if sector has claims
-                const crownInLabel = expData && expData.hasClaimed ? '<span class="crown-icon">👑</span>' : '';
-                
-                box.innerHTML = `
-                    <span class="region-label">
-                        ${crownInLabel}
-                        <span>${data.displayName}</span>
-                    </span>
-                    <span class="region-count">${data.nebulae}</span>
-                    ${indicatorHtml}
-                `;
-                
-                regionBoxes.appendChild(box);
-            });
-        }
-
-        // ===== SELECT REGION =====
-        function selectRegion(displayName, sector) {
-            document.querySelectorAll('.region-box').forEach(box => {
-                box.classList.remove('selected');
-            });
-            
-            const regionName = sectorCoordinates[sector]?.name;
-            const box = document.getElementById('region-' + regionName);
-            if (box) {
-                box.classList.add('selected');
             }
             
-            selectedRegion = displayName;
+            // Earth
+            sectors.unshift({
+                id: 'earth',
+                name: 'Earth',
+                x: EARTH_X,
+                y: EARTH_Y,
+                distance: 0,
+                risk: 0,
+                requiredTier: 1,
+                extractRate: 100,
+                rareChance: 0,
+                tier: 0,
+                color: '#ffffff'
+            });
+            
+            const totalClusters = sectors.length - 1;
+            console.log(`Generated ${totalClusters} clusters, Earth at ${EARTH_X},${EARTH_Y}`);
+            return sectors;
+        }
+
+        function renderGalaxy(sectors) {
+            const container = document.getElementById('galaxyMap');
+            const existingSvg = container.querySelector('.ring-svg');
+            container.innerHTML = '';
+            if (existingSvg) container.appendChild(existingSvg);
+            else container.appendChild(document.getElementById('ringSvg'));
+            
+            sectors.forEach(sector => {
+                const card = document.createElement('div');
+                card.className = 'sector-card';
+                card.style.left = `${sector.x}px`;
+                card.style.top = `${sector.y}px`;
+                card.onclick = (function(s) { return function() { selectSector(s); }; })(sector);
+                
+                const isEarth = sector.distance === 0;
+                const size = isEarth ? 26 : 12;
+                
+                card.innerHTML = `
+                    <div class="sector-dot" style="background: radial-gradient(circle at 30% 30%, ${sector.color}, ${sector.color}); width: ${size}px; height: ${size}px; margin: ${(22-size)/2}px; border: ${isEarth ? '2px solid white' : 'none'};">
+                        ${isEarth ? '🌍' : ''}
+                    </div>
+                    <div class="sector-name-tooltip">
+                        ${sector.name}<br>${sector.distance} LY • Risk: ${sector.risk}%<br>Extract: ${sector.extractRate}% • Rare: ${sector.rareChance}%<br>Requires: Tier ${sector.requiredTier}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            document.getElementById('shipName').innerHTML = SHIP_TIERS[currentShipTier].name;
+            document.getElementById('shipTier').innerHTML = `Tier ${currentShipTier} • Range: ${SHIP_TIERS[currentShipTier].range} LY`;
+        }
+
+        function selectSector(sector) {
+            if (isWarping) return;
             selectedSector = sector;
             
-            // CRITICAL: Save selected sector for star sectors screen
-            localStorage.setItem('voidfarer_selected_sector', sector);
-            localStorage.setItem('voidfarer_selected_region', displayName);
+            const ship = SHIP_TIERS[currentShipTier];
+            const warpTime = Math.max(1, Math.ceil(sector.distance / ship.speed));
+            const fuelCost = Math.floor(sector.distance * 0.35 * ship.fuelMult);
+            const arrivalDamage = Math.min(100, Math.floor(sector.risk * 0.4));
             
-            const sectorData = sectorCoordinates[sector];
-            const expData = sectorExplorationData[sector] || { percentage: 0, hasExplored: false, claimedCount: 0 };
+            document.getElementById('infoTitle').innerHTML = sector.name;
+            document.getElementById('infoDist').innerHTML = `${sector.distance} LY`;
+            document.getElementById('infoRisk').innerHTML = `${sector.risk}%`;
+            document.getElementById('riskFill').style.width = `${sector.risk}%`;
+            document.getElementById('infoExtract').innerHTML = `${sector.extractRate}%`;
+            document.getElementById('infoRare').innerHTML = `${sector.rareChance}%`;
+            document.getElementById('infoTier').innerHTML = `Tier ${sector.requiredTier}`;
+            document.getElementById('infoWarpTime').innerHTML = `${warpTime} min`;
+            document.getElementById('infoFuel').innerHTML = `${fuelCost}⭐`;
+            document.getElementById('infoDamage').innerHTML = `+${arrivalDamage}%`;
             
-            const distance = getSectorDistance(currentSector, sector);
-            const cycles = getWarpCyclesFromDistance(distance);
-            const fuel = getFuelCostFromDistance(distance);
-            
-            document.getElementById('selectedRegionName').innerHTML = `
-                ${displayName}
-                ${expData.hasClaimed ? '<span class="claimed-crown">👑</span>' : ''}
-            `;
-            document.getElementById('sectorId').textContent = sector;
-            document.getElementById('nebulaeCount').textContent = sectorData.nebulae;
-            document.getElementById('starsCount').textContent = sectorData.stars;
-            document.getElementById('explorationPercent').textContent = expData.percentage + '%';
-            
-            const badge = document.getElementById('explorationBadge');
-            if (expData.hasClaimed) {
-                badge.textContent = 'Has Claims';
-                badge.className = 'exploration-badge exploration-high';
-            } else if (expData.hasExplored) {
-                badge.textContent = 'Partially Explored';
-                badge.className = 'exploration-badge exploration-medium';
+            const btn = document.getElementById('travelBtn');
+            if (sector.requiredTier > currentShipTier) {
+                btn.classList.add('disabled'); btn.disabled = true;
+                btn.innerHTML = '❌ NEED TIER ' + sector.requiredTier;
+            } else if (currentDamage + arrivalDamage >= 100) {
+                btn.classList.add('disabled'); btn.disabled = true;
+                btn.innerHTML = '⚠️ REPAIR SHIP';
             } else {
-                badge.textContent = 'Unexplored';
-                badge.className = 'exploration-badge exploration-low';
+                btn.classList.remove('disabled'); btn.disabled = false;
+                btn.innerHTML = `🚀 TRAVEL (${warpTime} min)`;
             }
             
-            // Update claim info section
-            if (expData.hasClaimed) {
-                const claimStats = getSectorClaimStats(sector);
-                claimedCount.textContent = claimStats.count;
-                highestValue.textContent = claimStats.highestValue || 'None';
-                totalFees.textContent = claimStats.totalFees.toLocaleString() + '⭐';
-                claimInfoRow.style.display = 'block';
-                regionCrown.style.display = 'inline-block';
-            } else {
-                claimInfoRow.style.display = 'none';
-                regionCrown.style.display = 'none';
-            }
-            
-            document.getElementById('sectorDistance').textContent = distance.toFixed(1) + ' LY';
-            document.getElementById('warpCycles').textContent = cycles;
-            document.getElementById('fuelCost').textContent = fuel + '⭐';
-            
-            regionPanel.classList.add('visible');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            document.getElementById('infoPanel').classList.remove('hidden');
         }
 
-        // ===== PLOT COURSE TO SECTOR =====
-        async function plotCourseToSector() {
-            if (!selectedSector || !selectedRegion) {
-                alert('Please select a destination sector first');
+        let warpInterval = null, warpStartTime = 0, warpDuration = 0;
+        
+        function startTravel() {
+            if (!selectedSector) return;
+            if (selectedSector.requiredTier > currentShipTier) {
+                alert(`Requires Tier ${selectedSector.requiredTier} ship. You have Tier ${currentShipTier}.`);
                 return;
             }
             
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'plotting course...';
+            const ship = SHIP_TIERS[currentShipTier];
+            const warpTime = Math.max(1, Math.ceil(selectedSector.distance / ship.speed));
+            const arrivalDamage = Math.min(100, Math.floor(selectedSector.risk * 0.4));
             
-            try {
-                const distance = getSectorDistance(currentSector, selectedSector);
-                
-                console.log('Plotting course to sector:', {
-                    from: currentSector,
-                    to: selectedSector,
-                    region: selectedRegion,
-                    distance: distance
-                });
-                
-                // Clear any old plot data
-                const plotKeys = [
-                    'voidfarer_plot_sector',
-                    'voidfarer_plot_region',
-                    'voidfarer_plot_from_sector',
-                    'voidfarer_plot_from_region',
-                    'voidfarer_plot_sector_distance',
-                    'voidfarer_plot_cumulative_distance',
-                    'voidfarer_plot_nebula',
-                    'voidfarer_plot_nebula_type',
-                    'voidfarer_plot_nebula_distance',
-                    'voidfarer_plot_nebula_stars',
-                    'voidfarer_plot_star',
-                    'voidfarer_plot_star_distance',
-                    'voidfarer_plot_planet'
-                ];
-                
-                plotKeys.forEach(key => localStorage.removeItem(key));
-                
-                // Save plot data
-                localStorage.setItem('voidfarer_plot_sector', selectedSector);
-                localStorage.setItem('voidfarer_plot_region', selectedRegion);
-                localStorage.setItem('voidfarer_plot_from_sector', currentSector);
-                localStorage.setItem('voidfarer_plot_from_region', currentRegion);
-                localStorage.setItem('voidfarer_plot_sector_distance', distance.toString());
-                
-                // CRITICAL: Save the target sector for star sectors screen
-                localStorage.setItem('voidfarer_target_sector', selectedSector);
-                localStorage.setItem('voidfarer_target_region', selectedRegion);
-                
-                // Set cumulative distance to sector distance (first leg)
-                localStorage.setItem('voidfarer_plot_cumulative_distance', distance.toString());
-                
-                console.log('Plot data saved, navigating to star sectors');
-                
-                // Navigate to star sectors
+            if (currentDamage + arrivalDamage >= 100) {
+                alert(`Ship would be destroyed!`);
+                return;
+            }
+            
+            localStorage.setItem('voidfarer_plot_sector', selectedSector.id);
+            localStorage.setItem('voidfarer_plot_region', selectedSector.name);
+            localStorage.setItem('voidfarer_plot_sector_distance', selectedSector.distance.toString());
+            localStorage.setItem('voidfarer_plot_cumulative_distance', selectedSector.distance.toString());
+            localStorage.setItem('voidfarer_target_sector', selectedSector.id);
+            localStorage.setItem('voidfarer_target_region', selectedSector.name);
+            
+            document.getElementById('warpDest').innerHTML = `Destination: ${selectedSector.name}`;
+            document.getElementById('warpDist').innerHTML = `${selectedSector.distance} LY`;
+            document.getElementById('warpFill').style.width = '0%';
+            document.getElementById('warpRemaining').innerHTML = `Time remaining: ${warpTime} min`;
+            document.getElementById('warpModal').classList.remove('hidden');
+            
+            isWarping = true;
+            warpStartTime = Date.now();
+            warpDuration = warpTime * 60 * 1000;
+            
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = setInterval(updateWarp, 100);
+        }
+        
+        function updateWarp() {
+            const elapsed = Date.now() - warpStartTime;
+            const progress = Math.min(100, (elapsed / warpDuration) * 100);
+            document.getElementById('warpFill').style.width = `${progress}%`;
+            
+            const remaining = Math.max(0, warpDuration - elapsed);
+            const remainingMin = Math.ceil(remaining / 60000);
+            document.getElementById('warpRemaining').innerHTML = `Time remaining: ${remainingMin} min`;
+            
+            if (progress >= 100) completeWarp();
+        }
+        
+        function completeWarp() {
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = null;
+            
+            const arrivalDamage = Math.min(100, Math.floor(selectedSector.risk * 0.4));
+            currentDamage = Math.min(100, currentDamage + arrivalDamage);
+            
+            document.getElementById('damageFill').style.width = `${currentDamage}%`;
+            document.getElementById('damageText').innerHTML = `Hull: ${100 - currentDamage}%`;
+            
+            document.getElementById('warpModal').classList.add('hidden');
+            isWarping = false;
+            
+            if (currentDamage >= 100) {
+                alert(`💀 SHIP DESTROYED!\n\nYou have respawned at Earth with a repaired ship.`);
+                currentDamage = 0;
+                document.getElementById('damageFill').style.width = '0%';
+                document.getElementById('damageText').innerHTML = 'Hull: 100%';
+            } else {
+                alert(`✅ Arrived at ${selectedSector.name}!\n\nShip damage: ${currentDamage}%\n\nThis sector contains multiple star systems with planets to explore.`);
                 setTimeout(() => {
                     window.location.href = 'star-sectors.html?mode=plot';
                 }, 500);
-                
-            } catch (error) {
-                console.error('Error plotting course:', error);
-                loadingOverlay.classList.remove('active');
-                alert('Failed to plot course. Please try again.');
-            }
-        }
-
-        // ===== RETURN TO SHIP =====
-        function returnToShip() {
-            window.location.href = 'ship-bridge.html';
-        }
-
-        // ===== DRAW GALAXY BACKGROUND =====
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            drawGalaxy();
-        }
-
-        function drawGalaxy() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            
-            // Draw stars
-            for (let i = 0; i < 1000; i++) {
-                const x = Math.random() * canvas.width;
-                const y = Math.random() * canvas.height;
-                const size = Math.random() * 2;
-                const opacity = Math.random() * 0.15 + 0.05;
-                
-                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-                ctx.beginPath();
-                ctx.arc(x, y, size, 0, Math.PI * 2);
-                ctx.fill();
             }
             
-            // Draw galactic core glow
-            const gradient = ctx.createRadialGradient(
-                centerX, centerY, 0,
-                centerX, centerY, canvas.width * 0.3
-            );
-            gradient.addColorStop(0, 'rgba(255, 220, 180, 0.15)');
-            gradient.addColorStop(0.5, 'rgba(160, 140, 200, 0.08)');
-            gradient.addColorStop(1, 'transparent');
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw spiral arm hints
-            ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)';
-            ctx.lineWidth = 2;
-            
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2;
-                ctx.beginPath();
-                for (let r = 0.1; r < 0.9; r += 0.1) {
-                    const spiralAngle = angle + r * 10;
-                    const x = centerX + Math.cos(spiralAngle) * r * canvas.width * 0.4;
-                    const y = centerY + Math.sin(spiralAngle) * r * canvas.height * 0.4;
-                    
-                    if (r === 0.1) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                }
-                ctx.stroke();
-            }
+            selectedSector = null;
+            document.getElementById('infoPanel').classList.add('hidden');
         }
-
-        // ===== INITIALIZE =====
-        async function init() {
-            try {
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'loading galaxy map...';
+        
+        function abortWarp() {
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = null;
+            document.getElementById('warpModal').classList.add('hidden');
+            isWarping = false;
+            alert('Warp aborted.');
+        }
+        
+        function setZoom(newZoom) {
+            zoom = Math.min(2, Math.max(0.5, newZoom));
+            document.getElementById('galaxyMap').style.transform = `scale(${zoom})`;
+            document.getElementById('galaxyMap').style.transformOrigin = '0 0';
+        }
+        
+        document.getElementById('zoomIn').onclick = () => setZoom(zoom + 0.1);
+        document.getElementById('zoomOut').onclick = () => setZoom(zoom - 0.1);
+        
+        function init() {
+            const loading = document.getElementById('loadingOverlay');
+            loading.classList.remove('hidden');
+            
+            drawRingBoundaries();
+            
+            setTimeout(() => {
+                allSectors = generateGalaxy();
+                renderGalaxy(allSectors);
+                loading.classList.add('hidden');
                 
-                const credits = typeof window.getCredits === 'function' ? await window.getCredits() : 5000;
-                if (!credits) {
-                    window.location.href = 'index.html';
-                    return;
-                }
-                
-                // Load claim data first
-                await loadClaimData();
-                
-                await loadCurrentLocation();
-                await loadExplorationData();
-                
-                resizeCanvas();
-                window.addEventListener('resize', resizeCanvas);
-                
-                createRegionBoxes();
-                
+                const scroll = document.getElementById('mapScroll');
                 setTimeout(() => {
-                    loadingOverlay.classList.remove('active');
-                }, 500);
-                
-            } catch (error) {
-                console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            }
+                    scroll.scrollLeft = EARTH_X - scroll.clientWidth / 2;
+                    scroll.scrollTop = EARTH_Y - scroll.clientHeight / 2;
+                }, 50);
+            }, 50);
         }
-
+        
         init();
     </script>
 </body>
