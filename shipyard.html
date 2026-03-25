@@ -739,6 +739,7 @@
 
     <script type="module">
         import { getCredits, getPlayer, getCollection, addCredits, spendCredits, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+        import { recordTrade } from './js/market-dynamics.js';
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -965,6 +966,14 @@
                     price: price
                 });
                 
+                // ===== RECORD TRADE FOR MARKET DYNAMICS =====
+                if (typeof recordTrade === 'function') {
+                    recordTrade(element, missingAmount, 'buy');
+                    console.log(`📈 Recorded trade: bought ${missingAmount}x ${element} for market dynamics`);
+                } else {
+                    console.warn('⚠️ recordTrade not available - market dynamics not updated');
+                }
+                
                 if (tg?.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred?.('success');
                 }
@@ -1020,6 +1029,14 @@
                 // Remove materials using storage.js
                 for (const [element, amount] of Object.entries(ship.elements)) {
                     await removeElementFromCollection(element, amount);
+                }
+                
+                // ===== RECORD MATERIALS USED FOR MARKET DYNAMICS (SELL) =====
+                if (typeof recordTrade === 'function') {
+                    for (const [element, amount] of Object.entries(ship.elements)) {
+                        recordTrade(element, amount, 'sell');
+                    }
+                    console.log(`📈 Recorded trade: sold materials for ${shipName}`);
                 }
                 
                 // Spend credits
