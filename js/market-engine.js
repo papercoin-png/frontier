@@ -6,6 +6,7 @@
 // FIXED: Return totalCost consistently for both buy and sell orders
 // UPDATED: Removed arbitrary player order limits
 // UPDATED: Added market maker liquidity on startup
+// UPDATED: Added emergency liquidity fallback when orders are missing
 // UPDATED: Throttled error logging to reduce console spam
 // UPDATED: Added order pruning for non-competitive orders
 
@@ -66,6 +67,7 @@ const ENGINE_CONFIG = {
     // Market maker configuration
     MARKET_MAKER_SPREAD: 0.20,  // 20% spread for liquidity
     MARKET_MAKER_QUANTITY: 1000,  // Default quantity per order
+    EMERGENCY_QUANTITY: 500,  // Emergency liquidity quantity
     PRUNE_NON_COMPETITIVE: true,  // Remove orders that won't execute
     PRUNE_AGE_HOURS: 24  // Remove stale orders after 24 hours
 };
@@ -133,6 +135,107 @@ async function reloadOrderCache() {
     }
 }
 
+// ===== EMERGENCY LIQUIDITY FALLBACK =====
+
+/**
+ * Add emergency liquidity for a specific element when no orders exist
+ * @param {string} element - Element name
+ * @param {string} side - 'buy' or 'sell' (what the trader is trying to do)
+ * @returns {Promise<boolean>} True if liquidity was added
+ */
+async function ensureElementLiquidity(element, side) {
+    const currentBuys = buyOrdersCache[element] || [];
+    const currentSells = sellOrdersCache[element] || [];
+    
+    // Check if we actually need liquidity
+    const needsLiquidity = (side === ORDER_SIDES.BUY && currentSells.length === 0) ||
+                           (side === ORDER_SIDES.SELL && currentBuys.length === 0);
+    
+    if (!needsLiquidity) {
+        return false;
+    }
+    
+    // Throttle emergency liquidity logs to avoid spam
+    const logKey = `emergency_${element}_${side}`;
+    const now = Date.now();
+    if (!lastErrorLog[logKey] || (now - lastErrorLog[logKey]) > ERROR_LOG_INTERVAL) {
+        console.log(`🔧 Adding emergency liquidity for ${element} (${side})`);
+        lastErrorLog[logKey] = now;
+    }
+    
+    const elementData = ELEMENT_DATABASE[element];
+    if (!elementData) return false;
+    
+    const basePrice = elementData.basePrice || elementData.value || 100;
+    let ordersAdded = false;
+    
+    // If trying to SELL, need BUY orders (bids) in the market
+    if (side === ORDER_SIDES.SELL && currentBuys.length === 0) {
+        const buyPrice = Math.floor(basePrice * (1 - ENGINE_CONFIG.MARKET_MAKER_SPREAD));
+        const buyOrder = {
+            id: `emergency_buy_${element}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            userId: 'market_maker',
+            playerName: 'Market Maker',
+            element: element,
+            side: ORDER_SIDES.BUY,
+            type: ORDER_TYPES.LIMIT,
+            price: Math.max(1, buyPrice),
+            originalQuantity: ENGINE_CONFIG.EMERGENCY_QUANTITY,
+            remainingQuantity: ENGINE_CONFIG.EMERGENCY_QUANTITY,
+            filledQuantity: 0,
+            status: ORDER_STATUS.ACTIVE,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + (12 * 60 * 60 * 1000), // 12 hours for emergency orders
+            trades: [],
+            isNPC: true,
+            traderName: 'Market Maker'
+        };
+        
+        if (!buyOrdersCache[element]) buyOrdersCache[element] = [];
+        buyOrdersCache[element].push(buyOrder);
+        buyOrdersCache[element].sort((a, b) => b.price - a.price);
+        ordersAdded = true;
+    }
+    
+    // If trying to BUY, need SELL orders (asks) in the market
+    if (side === ORDER_SIDES.BUY && currentSells.length === 0) {
+        const sellPrice = Math.ceil(basePrice * (1 + ENGINE_CONFIG.MARKET_MAKER_SPREAD));
+        const sellOrder = {
+            id: `emergency_sell_${element}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            userId: 'market_maker',
+            playerName: 'Market Maker',
+            element: element,
+            side: ORDER_SIDES.SELL,
+            type: ORDER_TYPES.LIMIT,
+            price: sellPrice,
+            originalQuantity: ENGINE_CONFIG.EMERGENCY_QUANTITY,
+            remainingQuantity: ENGINE_CONFIG.EMERGENCY_QUANTITY,
+            filledQuantity: 0,
+            status: ORDER_STATUS.ACTIVE,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + (12 * 60 * 60 * 1000), // 12 hours for emergency orders
+            trades: [],
+            isNPC: true,
+            traderName: 'Market Maker'
+        };
+        
+        if (!sellOrdersCache[element]) sellOrdersCache[element] = [];
+        sellOrdersCache[element].push(sellOrder);
+        sellOrdersCache[element].sort((a, b) => a.price - b.price);
+        ordersAdded = true;
+    }
+    
+    if (ordersAdded) {
+        // Save the emergency orders
+        await dbSaveMarketOrders(buyOrdersCache, 'buy_orders');
+        await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
+        
+        console.log(`✅ Added emergency liquidity for ${element} (${side})`);
+    }
+    
+    return ordersAdded;
+}
+
 // ===== MARKET MAKER LIQUIDITY =====
 
 /**
@@ -173,7 +276,7 @@ async function ensureMarketLiquidity() {
             element: elementName,
             side: ORDER_SIDES.BUY,
             type: ORDER_TYPES.LIMIT,
-            price: buyPrice,
+            price: Math.max(1, buyPrice),
             originalQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
             remainingQuantity: ENGINE_CONFIG.MARKET_MAKER_QUANTITY,
             filledQuantity: 0,
@@ -420,6 +523,7 @@ export async function createOrder(orderData) {
 /**
  * Execute a market order against actual order book
  * FIXED: Now uses real orders, not theoretical prices
+ * UPDATED: Added emergency liquidity fallback
  * UPDATED: Throttled error logging
  */
 async function executeMarketOrder(order) {
@@ -434,10 +538,23 @@ async function executeMarketOrder(order) {
         // ===== BUY MARKET ORDER =====
         // Finds the best ASK orders (sell orders) and fills against them
         if (order.side === ORDER_SIDES.BUY) {
-            const sellOrders = sellOrdersCache[order.element] || [];
-            const activeSells = sellOrders.filter(o => 
+            let sellOrders = sellOrdersCache[order.element] || [];
+            let activeSells = sellOrders.filter(o => 
                 o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
             ).sort((a, b) => a.price - b.price); // Sort by price ascending (cheapest first)
+            
+            // If no sell orders, try to add emergency liquidity
+            if (activeSells.length === 0) {
+                const added = await ensureElementLiquidity(order.element, ORDER_SIDES.BUY);
+                if (added) {
+                    // Reload cache and try again
+                    await reloadOrderCache();
+                    sellOrders = sellOrdersCache[order.element] || [];
+                    activeSells = sellOrders.filter(o => 
+                        o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
+                    ).sort((a, b) => a.price - b.price);
+                }
+            }
             
             if (activeSells.length === 0) {
                 throw new Error('No sellers available at this time');
@@ -550,10 +667,23 @@ async function executeMarketOrder(order) {
         // ===== SELL MARKET ORDER =====
         // Finds the best BID orders (buy orders) and fills against them
         } else {
-            const buyOrders = buyOrdersCache[order.element] || [];
-            const activeBuys = buyOrders.filter(o => 
+            let buyOrders = buyOrdersCache[order.element] || [];
+            let activeBuys = buyOrders.filter(o => 
                 o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
             ).sort((a, b) => b.price - a.price); // Sort by price descending (highest bid first)
+            
+            // If no buy orders, try to add emergency liquidity
+            if (activeBuys.length === 0) {
+                const added = await ensureElementLiquidity(order.element, ORDER_SIDES.SELL);
+                if (added) {
+                    // Reload cache and try again
+                    await reloadOrderCache();
+                    buyOrders = buyOrdersCache[order.element] || [];
+                    activeBuys = buyOrders.filter(o => 
+                        o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
+                    ).sort((a, b) => b.price - a.price);
+                }
+            }
             
             if (activeBuys.length === 0) {
                 throw new Error('No buyers available at this time');
@@ -670,7 +800,7 @@ async function executeMarketOrder(order) {
         }
         
     } catch (error) {
-        // Throttled error logging - only log once per minute per element
+        // Throttled error logging - only log once per minute per element/side
         const errorKey = `${order.element}_${order.side}`;
         const now = Date.now();
         
@@ -1359,4 +1489,4 @@ window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, and market maker liquidity');
+console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, market maker liquidity, and emergency fallback');
