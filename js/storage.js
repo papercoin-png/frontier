@@ -6,6 +6,7 @@
 // UPDATED: Added NPC trader persistence for marketplace NPCs
 // UPDATED: Added market data cleanup functions to prevent localStorage quota issues
 // UPDATED: Added location saving to IndexedDB when collecting elements
+// FIXED: Added recordTrade call to update market dynamics when elements are added
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -619,7 +620,7 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
-// COLLECTION FUNCTIONS (Ship Cargo) - FIXED WITH LOCATION SAVING
+// COLLECTION FUNCTIONS (Ship Cargo) - FIXED WITH LOCATION SAVING AND MARKET RECORD
 // ============================================================================
 
 /**
@@ -712,6 +713,15 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
             console.log(`⚠️ No location data provided for ${elementName}, location not saved`);
         }
         
+        // ===== RECORD TRADE FOR MARKET DYNAMICS =====
+        // This updates supply/demand indices and affects real market prices
+        if (window.recordTrade) {
+            window.recordTrade(elementName, quantity, 'buy');
+            console.log(`📈 Recorded trade: bought ${quantity}x ${elementName} for market dynamics`);
+        } else {
+            console.warn('⚠️ window.recordTrade not available - market dynamics not updated');
+        }
+        
         return {
             success: true,
             element: elementName,
@@ -773,6 +783,12 @@ export async function removeElementFromCollection(elementName, quantity = 1) {
         }
         
         localStorage.setItem(key, JSON.stringify(collection));
+        
+        // ===== RECORD SELL TRADE FOR MARKET DYNAMICS =====
+        if (window.recordTrade) {
+            window.recordTrade(elementName, quantity, 'sell');
+            console.log(`📈 Recorded trade: sold ${quantity}x ${elementName} for market dynamics`);
+        }
         
         return {
             success: true,
