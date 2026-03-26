@@ -8,6 +8,7 @@
 // UPDATED: Added location saving to IndexedDB when collecting elements
 // FIXED: Added recordTrade call to update market dynamics when elements are added
 // FIXED: Added dbSaveElementLocation function for journal tracking
+// UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -68,6 +69,7 @@ const STORAGE_KEYS = {
     CURRENT_PLANET_TYPE: 'voidfarer_current_planet_type',
     CURRENT_PLANET_RESOURCES: 'voidfarer_current_planet_resources',
     CURRENT_PLANET_IMAGE: 'voidfarer_current_planet_image',
+    CURRENT_PLANET_TIER: 'voidfarer_current_planet_tier',
     
     // Warp data
     WARP_DESTINATION: 'voidfarer_warp_destination',
@@ -162,7 +164,14 @@ const STORAGE_KEYS = {
     
     // ===== MARKET DATA CLEANUP KEYS (NEW) =====
     LAST_CLEANUP: 'voidfarer_last_cleanup',
-    CLEANUP_INTERVAL_DAYS: 7 // Run cleanup weekly
+    CLEANUP_INTERVAL_DAYS: 7, // Run cleanup weekly
+    
+    // ===== DISCOVERY LOCK KEYS (NEW) =====
+    DISCOVERY_HISTORY: 'voidfarer_discovery_history',      // Chain of discoverers per planet
+    HIDDEN_PLANETS: 'voidfarer_hidden_planets',            // Planets currently unmapped
+    SCANNED_SECTORS: 'voidfarer_scanned_sectors',          // Galactic sectors player has scanned
+    SCANNED_STAR_SECTORS: 'voidfarer_scanned_star_sectors', // Star sectors player has scanned
+    SCANNED_STARS: 'voidfarer_scanned_stars'               // Stars player has scanned
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE =====
@@ -977,6 +986,15 @@ export function getCurrentPlanetResources() {
 }
 
 /**
+ * Get current planet tier
+ * @returns {number} Planet tier (1-10)
+ */
+export function getCurrentPlanetTier() {
+    const tier = localStorage.getItem(STORAGE_KEYS.CURRENT_PLANET_TIER);
+    return tier ? parseInt(tier) : 1;
+}
+
+/**
  * Get current sector
  * @returns {string} Sector ID
  */
@@ -1021,11 +1039,13 @@ export function setCurrentLocation(region, sector, starSector, starSectorType, s
  * @param {string} name - Planet name
  * @param {string} type - Planet type
  * @param {Array} resources - Planet resources
+ * @param {number} tier - Planet tier (1-10)
  */
-export function setCurrentPlanet(name, type, resources) {
+export function setCurrentPlanet(name, type, resources, tier = 1) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET, name);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TYPE, type);
     localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_RESOURCES, JSON.stringify(resources));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_PLANET_TIER, tier.toString());
     
     let image = 'earth-view.jpg';
     if (type.includes('scorched') || type.includes('volcanic')) image = 'pyros-surface.jpg';
@@ -2465,6 +2485,262 @@ export async function claimPlayerLaborEarnings(playerId) {
 }
 
 // ============================================================================
+// DISCOVERY LOCK FUNCTIONS (NEW)
+// ============================================================================
+
+/**
+ * Get discovery history for a planet
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<Array>} Array of discovery records
+ */
+export async function getDiscoveryHistory(planetName) {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const historyKey = `${STORAGE_KEYS.DISCOVERY_HISTORY}_${planetName}`;
+        const saved = localStorage.getItem(historyKey);
+        
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error getting discovery history:', error);
+        return [];
+    }
+}
+
+/**
+ * Save discovery history for a planet
+ * @param {string} planetName - Name of the planet
+ * @param {Array} history - Array of discovery records
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveDiscoveryHistory(planetName, history) {
+    try {
+        const historyKey = `${STORAGE_KEYS.DISCOVERY_HISTORY}_${planetName}`;
+        localStorage.setItem(historyKey, JSON.stringify(history));
+        return true;
+    } catch (error) {
+        console.error('Error saving discovery history:', error);
+        return false;
+    }
+}
+
+/**
+ * Add a discovery record to a planet's history
+ * @param {string} planetName - Name of the planet
+ * @param {string} playerId - Player ID who discovered/rediscovered
+ * @param {string} playerName - Player name
+ * @param {number} planetTier - Planet tier (1-10)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addToDiscoveryHistory(planetName, playerId, playerName, planetTier) {
+    try {
+        const history = await getDiscoveryHistory(planetName);
+        
+        const record = {
+            playerId: playerId,
+            playerName: playerName,
+            timestamp: Date.now(),
+            date: new Date().toISOString(),
+            planetTier: planetTier,
+            isFirstDiscovery: history.length === 0
+        };
+        
+        history.push(record);
+        
+        return await saveDiscoveryHistory(planetName, history);
+    } catch (error) {
+        console.error('Error adding to discovery history:', error);
+        return false;
+    }
+}
+
+/**
+ * Get all hidden planets (rights expired, need rediscovery)
+ * @returns {Promise<Array>} Array of hidden planet names
+ */
+export async function getHiddenPlanets() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.HIDDEN_PLANETS);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting hidden planets:', error);
+        return [];
+    }
+}
+
+/**
+ * Hide a planet (rights expired)
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<boolean>} Success status
+ */
+export async function hidePlanet(planetName) {
+    try {
+        const hidden = await getHiddenPlanets();
+        if (!hidden.includes(planetName)) {
+            hidden.push(planetName);
+            localStorage.setItem(STORAGE_KEYS.HIDDEN_PLANETS, JSON.stringify(hidden));
+        }
+        return true;
+    } catch (error) {
+        console.error('Error hiding planet:', error);
+        return false;
+    }
+}
+
+/**
+ * Reveal a planet (rediscovered)
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<boolean>} Success status
+ */
+export async function revealPlanet(planetName) {
+    try {
+        let hidden = await getHiddenPlanets();
+        hidden = hidden.filter(name => name !== planetName);
+        localStorage.setItem(STORAGE_KEYS.HIDDEN_PLANETS, JSON.stringify(hidden));
+        return true;
+    } catch (error) {
+        console.error('Error revealing planet:', error);
+        return false;
+    }
+}
+
+/**
+ * Get scanned galactic sectors for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Array of scanned sector IDs
+ */
+export async function getScannedSectors(playerId) {
+    try {
+        const key = `${STORAGE_KEYS.SCANNED_SECTORS}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned sectors:', error);
+        return [];
+    }
+}
+
+/**
+ * Mark a galactic sector as scanned
+ * @param {string} sectorId - Sector ID (e.g., 'B2')
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markSectorScanned(sectorId, playerId) {
+    try {
+        const scanned = await getScannedSectors(playerId);
+        if (!scanned.includes(sectorId)) {
+            scanned.push(sectorId);
+            const key = `${STORAGE_KEYS.SCANNED_SECTORS}_${playerId}`;
+            localStorage.setItem(key, JSON.stringify(scanned));
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking sector scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Get scanned star sectors for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Array of scanned star sector names
+ */
+export async function getScannedStarSectors(playerId) {
+    try {
+        const key = `${STORAGE_KEYS.SCANNED_STAR_SECTORS}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned star sectors:', error);
+        return [];
+    }
+}
+
+/**
+ * Mark a star sector as scanned
+ * @param {string} starSectorName - Name of the star sector
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markStarSectorScanned(starSectorName, playerId) {
+    try {
+        const scanned = await getScannedStarSectors(playerId);
+        if (!scanned.includes(starSectorName)) {
+            scanned.push(starSectorName);
+            const key = `${STORAGE_KEYS.SCANNED_STAR_SECTORS}_${playerId}`;
+            localStorage.setItem(key, JSON.stringify(scanned));
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking star sector scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Get scanned stars for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Array of scanned star names
+ */
+export async function getScannedStars(playerId) {
+    try {
+        const key = `${STORAGE_KEYS.SCANNED_STARS}_${playerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned stars:', error);
+        return [];
+    }
+}
+
+/**
+ * Mark a star as scanned
+ * @param {string} starName - Name of the star
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markStarScanned(starName, playerId) {
+    try {
+        const scanned = await getScannedStars(playerId);
+        if (!scanned.includes(starName)) {
+            scanned.push(starName);
+            const key = `${STORAGE_KEYS.SCANNED_STARS}_${playerId}`;
+            localStorage.setItem(key, JSON.stringify(scanned));
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking star scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Check if a planet should be visible to a player
+ * @param {string} planetName - Name of the planet
+ * @param {string} playerId - Player ID
+ * @param {number} planetTier - Planet tier (1-10)
+ * @returns {Promise<boolean>} True if visible
+ */
+export async function isPlanetVisibleToPlayer(planetName, playerId, planetTier) {
+    // Tiers 1-4 are always visible (public mining)
+    if (planetTier <= 4) {
+        return true;
+    }
+    
+    // Check if planet is hidden (rights expired)
+    const hidden = await getHiddenPlanets();
+    if (hidden.includes(planetName)) {
+        return false;
+    }
+    
+    return true;
+}
+
+// ============================================================================
 // RESET
 // ============================================================================
 
@@ -2527,6 +2803,7 @@ export async function resetGame(playerId = 'main') {
         STORAGE_KEYS.CURRENT_PLANET_TYPE,
         STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
         STORAGE_KEYS.CURRENT_PLANET_IMAGE,
+        STORAGE_KEYS.CURRENT_PLANET_TIER,
         STORAGE_KEYS.COLONIES,
         STORAGE_KEYS.DISCOVERED_LOCATIONS,
         STORAGE_KEYS.SCAN_HISTORY,
@@ -2673,17 +2950,33 @@ export default {
     setLastNPCUpdate,
     updateNPCTraderAfterTrade,
     
-    // Journal Functions (NEW)
+    // Journal Functions
     getJournal,
     getElementLocations,
     getRecentJournalEntries,
     clearJournal,
+    
+    // Discovery Lock Functions (NEW)
+    getDiscoveryHistory,
+    saveDiscoveryHistory,
+    addToDiscoveryHistory,
+    getHiddenPlanets,
+    hidePlanet,
+    revealPlanet,
+    getScannedSectors,
+    markSectorScanned,
+    getScannedStarSectors,
+    markStarSectorScanned,
+    getScannedStars,
+    markStarScanned,
+    isPlanetVisibleToPlayer,
     
     // Location
     isAtEarth,
     getCurrentPlanetName,
     getCurrentPlanetType,
     getCurrentPlanetResources,
+    getCurrentPlanetTier,
     getCurrentSector,
     getCurrentRegion,
     setCurrentLocation,
@@ -2727,7 +3020,7 @@ export default {
     resetGame,
     saveTimestamp,
     
-    // NEW: Cleanup functions
+    // Cleanup functions
     checkAndRunCleanup,
     runFullStorageCleanup,
     triggerManualCleanup,
@@ -2773,6 +3066,7 @@ window.saveShipPower = saveShipPower;
 window.getCurrentPlanetName = getCurrentPlanetName;
 window.getCurrentPlanetType = getCurrentPlanetType;
 window.getCurrentPlanetResources = getCurrentPlanetResources;
+window.getCurrentPlanetTier = getCurrentPlanetTier;
 window.getCurrentSector = getCurrentSector;
 window.getCurrentRegion = getCurrentRegion;
 window.setCurrentLocation = setCurrentLocation;
@@ -2798,12 +3092,26 @@ window.getLastNPCUpdate = getLastNPCUpdate;
 window.setLastNPCUpdate = setLastNPCUpdate;
 window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
-// Journal Functions (NEW)
+// Journal Functions
 window.getJournal = getJournal;
 window.getElementLocations = getElementLocations;
 window.getRecentJournalEntries = getRecentJournalEntries;
 window.clearJournal = clearJournal;
-window.dbSaveElementLocation = dbSaveElementLocation; // Expose for HTML calls
+window.dbSaveElementLocation = dbSaveElementLocation;
+
+// Discovery Lock Functions (NEW)
+window.getDiscoveryHistory = getDiscoveryHistory;
+window.addToDiscoveryHistory = addToDiscoveryHistory;
+window.getHiddenPlanets = getHiddenPlanets;
+window.hidePlanet = hidePlanet;
+window.revealPlanet = revealPlanet;
+window.getScannedSectors = getScannedSectors;
+window.markSectorScanned = markSectorScanned;
+window.getScannedStarSectors = getScannedStarSectors;
+window.markStarSectorScanned = markStarSectorScanned;
+window.getScannedStars = getScannedStars;
+window.markStarScanned = markStarScanned;
+window.isPlanetVisibleToPlayer = isPlanetVisibleToPlayer;
 
 // Market data functions
 window.saveMarketData = saveMarketData;
@@ -2815,8 +3123,8 @@ window.loadPortfolio = loadPortfolio;
 window.saveTradeHistory = saveTradeHistory;
 window.loadTradeHistory = loadTradeHistory;
 
-// NEW: Cleanup functions
+// Cleanup functions
 window.triggerManualCleanup = triggerManualCleanup;
 window.runFullStorageCleanup = runFullStorageCleanup;
 
-console.log('✅ storage.js fully loaded with NPC trader support, journal tracking, and storage cleanup functions');
+console.log('✅ storage.js fully loaded with NPC trader support, journal tracking, discovery lock, and storage cleanup functions');
