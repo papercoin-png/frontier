@@ -747,7 +747,6 @@
         const EXTRACTION_INTERVAL = 5000;
         const CARGO_MASS_LIMIT = 5000;
         
-        // Rarity configuration with base chances
         const RARITY_CONFIG = {
             'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', tier: 1 },
             'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0', tier: 2 },
@@ -756,7 +755,6 @@
             'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700', tier: 5 }
         };
 
-        // Pity system thresholds
         const PITY_CONFIG = {
             'common': { threshold: 2 },
             'uncommon': { threshold: 3 },
@@ -765,7 +763,6 @@
             'legendary': { threshold: 25 }
         };
 
-        // Tier-based rarity boost (higher tier = better chance for rare elements)
         const TIER_RARITY_BOOST = {
             1: { common: 1.0, uncommon: 0.5, rare: 0.2, veryRare: 0.1, legendary: 0.05 },
             2: { common: 0.9, uncommon: 1.0, rare: 0.6, veryRare: 0.3, legendary: 0.1 },
@@ -819,7 +816,6 @@
         let exploredElements = {};
         let totalElements = 4;
         
-        // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
         function getElementRarity(elementName) {
             if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
             if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
@@ -852,7 +848,6 @@
             });
         }
 
-        // ===== PLANET IMAGE LOADING =====
         async function loadPlanetSurfaceImage(planetName, planetType) {
             try {
                 loadingText.textContent = 'loading surface view...';
@@ -879,7 +874,6 @@
             }
         }
 
-        // ===== EXPLORED STATE =====
         function loadExploredState() {
             const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
             if (saved) {
@@ -897,7 +891,6 @@
             localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
         }
 
-        // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
 
         function showExtractionNotification(result) {
@@ -958,7 +951,6 @@
             return exploredElements[resource] || false;
         }
 
-        // FIXED: markElementExplored with direct claim button check
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
@@ -1139,7 +1131,6 @@
                 
                 await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
-                // Reset resource states to match planet's actual resources
                 resourceStates = {};
                 resourceChances = {};
                 
@@ -1253,7 +1244,6 @@
                     return;
                 }
                 
-                // ONLY extract from the planet's actual resources
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
@@ -1327,7 +1317,6 @@
                             window.dispatchEvent(new CustomEvent('cargo-updated', { detail: { element: resource, quantity, mass: totalMass } }));
                             markElementExplored(resource);
                             
-                            // Record trade for market dynamics
                             if (typeof recordTrade === 'function') {
                                 recordTrade(resource, quantity, 'buy');
                                 console.log(`📈 Recorded trade: extracted ${quantity}x ${resource}`);
