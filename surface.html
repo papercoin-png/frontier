@@ -727,6 +727,7 @@
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
 
+        // Expose storage functions to window for non-module code
         window.getCollection = getCollection;
         window.addElementToCollection = addElementToCollection;
         window.removeElementFromCollection = removeElementFromCollection;
@@ -740,6 +741,7 @@
         const EXTRACTION_INTERVAL = 5000;
         const CARGO_MASS_LIMIT = 5000;
         
+        // Rarity configuration with base chances
         const RARITY_CONFIG = {
             'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', tier: 1 },
             'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0', tier: 2 },
@@ -748,6 +750,7 @@
             'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700', tier: 5 }
         };
 
+        // Pity system thresholds
         const PITY_CONFIG = {
             'common': { threshold: 2 },
             'uncommon': { threshold: 3 },
@@ -756,6 +759,7 @@
             'legendary': { threshold: 25 }
         };
 
+        // Tier-based rarity boost (higher tier = better chance for rare elements)
         const TIER_RARITY_BOOST = {
             1: { common: 1.0, uncommon: 0.5, rare: 0.2, veryRare: 0.1, legendary: 0.05 },
             2: { common: 0.9, uncommon: 1.0, rare: 0.6, veryRare: 0.3, legendary: 0.1 },
@@ -809,6 +813,7 @@
         let exploredElements = {};
         let totalElements = 4;
         
+        // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
         function getElementRarity(elementName) {
             if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
             if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
@@ -840,6 +845,7 @@
             });
         }
 
+        // ===== PLANET IMAGE LOADING =====
         async function loadPlanetSurfaceImage(planetName, planetType) {
             try {
                 loadingText.textContent = 'loading surface view...';
@@ -866,6 +872,7 @@
             }
         }
 
+        // ===== EXPLORED STATE =====
         function loadExploredState() {
             const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
             if (saved) {
@@ -883,6 +890,7 @@
             localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
         }
 
+        // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
 
         function showExtractionNotification(result) {
@@ -950,6 +958,7 @@
                 updateExploredCount();
                 renderResourceToggles();
                 
+                // DIRECT CHECK - show claim button immediately when all elements are explored
                 const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
                 if (allExplored) {
                     claimBtn.classList.add('visible');
