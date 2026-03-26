@@ -3,6 +3,7 @@
 // OPTIMIZED: Cleaned up code, removed redundancies, improved performance
 // FIXED: Added storage limits and error handling for supply/demand indices AND price history
 // FIXED: Exposed recordTrade and supply/demand functions to window for shipyard integration
+// FIXED: UPDATE_INTERVAL changed to 1 minute for more dynamic market reactions
 
 import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
 
@@ -12,7 +13,7 @@ const MARKET_CONFIG = {
     BASE_VOLATILITY: 0.05,
     EVENT_VOLATILITY: 0.15,
     TREND_STRENGTH: 0.7,
-    UPDATE_INTERVAL: 3600000, // 1 hour
+    UPDATE_INTERVAL: 60000, // 1 minute (60,000 ms) - changed from 1 hour for more dynamic market
     MIN_PRICE_MULTIPLIER: 0.3,
     MAX_PRICE_MULTIPLIER: 3.0,
     DEFAULT_TRANSACTION_FEE: 0.02,
@@ -192,7 +193,7 @@ export function updatePrices(activeEvents = []) {
     const now = Date.now();
     const lastUpdate = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_UPDATE)) || now;
     
-    // Update at most once per hour
+    // Update at most once per minute (now that UPDATE_INTERVAL is 60000)
     if ((now - lastUpdate) < MARKET_CONFIG.UPDATE_INTERVAL) return prices;
     
     const eventEffects = calculateEventEffects(activeEvents);
@@ -953,4 +954,4 @@ window.getSupplyIndex = getSupplyIndex;
 window.getDemandIndex = getDemandIndex;
 window.updateSupplyDemand = updateSupplyDemand;
 
-console.log('✅ market-dynamics.js loaded - Optimized market system ready with aggressive storage limits');
+console.log('✅ market-dynamics.js loaded - Optimized market system ready with aggressive storage limits (UPDATES EVERY MINUTE)');
