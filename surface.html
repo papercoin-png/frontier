@@ -951,6 +951,7 @@
             return exploredElements[resource] || false;
         }
 
+        // FIXED: markElementExplored with direct DOM element retrieval
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
@@ -962,9 +963,12 @@
                 if (currentPlanet.resources && currentPlanet.resources.length > 0) {
                     const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
                     if (allExplored) {
-                        claimBtn.classList.add('visible');
-                        claimBtn.disabled = false;
-                        claimBtn.textContent = '✨ CLAIM PLANET';
+                        const claimButton = document.getElementById('claimBtn');
+                        if (claimButton) {
+                            claimButton.classList.add('visible');
+                            claimButton.disabled = false;
+                            claimButton.textContent = '✨ CLAIM PLANET';
+                        }
                         showExtractionNotification({
                             success: true,
                             resource: 'All Elements',
@@ -1164,18 +1168,30 @@
                 const status = await getPlanetStatus(currentPlanet.name);
                 if (status) {
                     if (status.fullyExplored && !status.claimed) {
-                        claimBtn.classList.add('visible');
-                        claimBtn.disabled = false;
-                        claimBtn.textContent = '✨ CLAIM PLANET';
+                        const claimButton = document.getElementById('claimBtn');
+                        if (claimButton) {
+                            claimButton.classList.add('visible');
+                            claimButton.disabled = false;
+                            claimButton.textContent = '✨ CLAIM PLANET';
+                        }
                     } else if (status.claimed) {
-                        claimBtn.classList.add('visible');
-                        claimBtn.disabled = true;
-                        claimBtn.textContent = '✓ CLAIMED';
+                        const claimButton = document.getElementById('claimBtn');
+                        if (claimButton) {
+                            claimButton.classList.add('visible');
+                            claimButton.disabled = true;
+                            claimButton.textContent = '✓ CLAIMED';
+                        }
                     } else {
-                        claimBtn.classList.remove('visible');
+                        const claimButton = document.getElementById('claimBtn');
+                        if (claimButton) {
+                            claimButton.classList.remove('visible');
+                        }
                     }
                 } else {
-                    claimBtn.classList.remove('visible');
+                    const claimButton = document.getElementById('claimBtn');
+                    if (claimButton) {
+                        claimButton.classList.remove('visible');
+                    }
                 }
             } catch (error) {}
         }
