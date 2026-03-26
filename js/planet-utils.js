@@ -1,11 +1,14 @@
 // js/planet-utils.js
 // Shared planet generation utilities for Voidfarer
 // Handles planet types, resource generation, and planet properties
-// UPDATED: Added tier-based resource generation matching galaxy map progression
+// UPDATED: Tier-based resource generation using corrected element classification from galaxy-data.js
 // UPDATED: Exactly 4 elements per planet, filtered by galaxy tier
-// FIXED: Strict tier filtering - Tier 1 planets ONLY get Common elements (no Magnesium, no Iron)
+// FIXED: Strict tier filtering using TIER_1_ELEMENTS, TIER_2_ELEMENTS, etc.
 
-import { ELEMENTS_BY_TIER, getElementsForTier, getTierByDistance, TIERS } from './galaxy-data.js';
+import { 
+    TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS,
+    getElementsForTier, getTierByDistance, TIERS 
+} from './galaxy-data.js';
 
 // ===== PLANET TYPE DEFINITIONS =====
 export const PLANET_TYPES = {
@@ -148,14 +151,6 @@ export const RESOURCE_POOLS = {
     ]
 };
 
-// ===== COMMON ELEMENTS (Tier 1 only) =====
-const COMMON_ELEMENTS = [
-    'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron',
-    'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
-    'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Phosphorus',
-    'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'
-];
-
 // ===== UTILITY FUNCTIONS =====
 export function seededRandom(seed, index = 0) {
     const x = Math.sin(seed * (index + 1)) * 10000;
@@ -192,6 +187,28 @@ export function getRandomPlanetType(seed, index = 0) {
 
 // ===== TIER-BASED RESOURCE GENERATION =====
 /**
+ * Get allowed elements for a given tier
+ * @param {number} galaxyTier - Galaxy tier (1-10)
+ * @returns {Array} Array of allowed element names
+ */
+function getAllowedElementsForTier(galaxyTier) {
+    const tier = Math.min(Math.max(galaxyTier, 1), 10);
+    
+    if (tier === 1) {
+        return [...TIER_1_ELEMENTS];
+    } else if (tier === 2) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS];
+    } else if (tier === 3) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS];
+    } else if (tier === 4) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+    } else {
+        // Tier 5+ includes all elements
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS, ...TIER_5_ELEMENTS];
+    }
+}
+
+/**
  * Generate exactly 4 resources for a planet based on galaxy tier
  * @param {number} seed - Generation seed
  * @param {string} planetType - Planet type
@@ -202,51 +219,28 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     const pool = RESOURCE_POOLS[planetType] || RESOURCE_POOLS[PLANET_TYPES.BARREN];
     const tierNum = Math.min(Math.max(galaxyTier, 1), 10);
     
-    // Define allowed elements based on tier
-    let allowedElements = [];
-    
-    if (tierNum === 1) {
-        // TIER 1: ONLY Common elements
-        allowedElements = [...COMMON_ELEMENTS];
-    } else if (tierNum === 2) {
-        // TIER 2: Common + Uncommon
-        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || [])];
-    } else if (tierNum === 3) {
-        // TIER 3: Common + Uncommon + Rare
-        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || [])];
-    } else if (tierNum === 4) {
-        // TIER 4: Common + Uncommon + Rare + Very Rare
-        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || []), ...(ELEMENTS_BY_TIER[4] || [])];
-    } else {
-        // TIER 5+: All elements
-        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || []), ...(ELEMENTS_BY_TIER[4] || []), ...(ELEMENTS_BY_TIER[5] || [])];
-    }
-    
-    // Remove duplicates
-    allowedElements = [...new Set(allowedElements)];
+    // Get allowed elements for this tier
+    const allowedElements = getAllowedElementsForTier(tierNum);
     
     // Filter pool to only allowed elements
     let availablePool = pool.filter(element => allowedElements.includes(element));
     
-    // For Tier 1, also ensure no Magnesium or other Tier 2+ elements slip through
+    // For Tier 1, double-check no Tier 2+ elements slip through
     if (tierNum === 1) {
-        availablePool = availablePool.filter(element => COMMON_ELEMENTS.includes(element));
+        availablePool = availablePool.filter(element => TIER_1_ELEMENTS.includes(element));
     }
     
-    // If still empty, use hardcoded common elements
+    // If still empty, use hardcoded fallback
     if (availablePool.length === 0) {
         if (tierNum === 1) {
-            availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'];
+            availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine', 'Argon'];
         } else {
-            // For higher tiers, use a mix of common and appropriate tier elements
-            availablePool = [...COMMON_ELEMENTS];
-            if (ELEMENTS_BY_TIER[Math.min(tierNum, 5)]) {
-                availablePool.push(...ELEMENTS_BY_TIER[Math.min(tierNum, 5)]);
-            }
+            availablePool = [...TIER_1_ELEMENTS];
+            if (tierNum >= 2) availablePool.push(...TIER_2_ELEMENTS.slice(0, 10));
         }
     }
     
-    // Remove duplicates and shuffle
+    // Remove duplicates
     availablePool = [...new Set(availablePool)];
     
     // Shuffle the pool using seeded random
@@ -263,10 +257,10 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
         resources.push(availablePool[i]);
     }
     
-    // Ensure we have exactly 4 resources
+    // Ensure we have exactly 4 resources (no duplicates)
     if (resources.length < targetCount) {
         const fallbackPool = tierNum === 1 ? 
-            ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine'] :
+            ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon'] :
             allowedElements;
         
         for (const elem of fallbackPool) {
@@ -276,15 +270,15 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
         }
     }
     
-    // Final verification for Tier 1: remove any non-common elements
+    // Final verification for Tier 1: ensure no non-common elements
     if (tierNum === 1) {
-        const verifiedResources = resources.filter(r => COMMON_ELEMENTS.includes(r));
-        if (verifiedResources.length >= targetCount) {
-            return verifiedResources.slice(0, targetCount);
+        const verifiedResources = resources.filter(r => TIER_1_ELEMENTS.includes(r));
+        if (verifiedResources.length === targetCount) {
+            return verifiedResources;
         } else {
             // Add missing common elements
             const result = [...verifiedResources];
-            for (const elem of COMMON_ELEMENTS) {
+            for (const elem of TIER_1_ELEMENTS) {
                 if (!result.includes(elem) && result.length < targetCount) {
                     result.push(elem);
                 }
@@ -293,7 +287,8 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
         }
     }
     
-    return resources.slice(0, targetCount);
+    // Ensure no duplicates in final result
+    return [...new Set(resources)].slice(0, targetCount);
 }
 
 // ===== PLANET GENERATION =====
@@ -554,6 +549,7 @@ export default {
     seededRandomRange,
     hashString,
     getRandomPlanetType,
+    getAllowedElementsForTier,
     generatePlanetResources,
     generatePlanet,
     generateStar,
