@@ -727,6 +727,12 @@
         import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { getCurrentTier, getTierByDistance, TIERS } from './js/galaxy-data.js';
+        import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+
+        // Expose storage functions to window for non-module code
+        window.getCollection = getCollection;
+        window.addElementToCollection = addElementToCollection;
+        window.removeElementFromCollection = removeElementFromCollection;
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -1048,7 +1054,7 @@
 
         async function getFreshCargoMass() {
             try {
-                const collection = await window.getCollection();
+                const collection = await getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     mass += (data.count || 1) * getElementMass(name);
@@ -1308,7 +1314,7 @@
                             value: RARITY_CONFIG[rarity]?.basePrice || 100
                         };
                         
-                        const result = await window.addElementToCollection(resource, quantity, locationData);
+                        const result = await addElementToCollection(resource, quantity, locationData);
                         
                         if (result && result.success) {
                             const currentDisplay = cargoMass.innerHTML;
