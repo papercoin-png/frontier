@@ -728,11 +728,15 @@
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+        import { recordTrade } from './js/market-dynamics.js';
 
         // Expose storage functions to window for non-module code
         window.getCollection = getCollection;
         window.addElementToCollection = addElementToCollection;
         window.removeElementFromCollection = removeElementFromCollection;
+        
+        // Expose market dynamics functions
+        window.recordTrade = recordTrade;
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -953,6 +957,7 @@
             return exploredElements[resource] || false;
         }
 
+        // FIXED: markElementExplored with direct claim button check
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
@@ -961,18 +966,20 @@
                 renderResourceToggles();
                 
                 // DIRECT CHECK - show claim button immediately when all elements are explored
-                const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
-                if (allExplored) {
-                    claimBtn.classList.add('visible');
-                    claimBtn.disabled = false;
-                    claimBtn.textContent = '✨ CLAIM PLANET';
-                    showExtractionNotification({
-                        success: true,
-                        resource: 'All Elements',
-                        quantity: 0,
-                        mass: 0,
-                        wasPity: false
-                    });
+                if (currentPlanet.resources && currentPlanet.resources.length > 0) {
+                    const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
+                    if (allExplored) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = false;
+                        claimBtn.textContent = '✨ CLAIM PLANET';
+                        showExtractionNotification({
+                            success: true,
+                            resource: 'All Elements',
+                            quantity: 0,
+                            mass: 0,
+                            wasPity: false
+                        });
+                    }
                 }
             }
         }
@@ -1309,6 +1316,12 @@
                             
                             window.dispatchEvent(new CustomEvent('cargo-updated', { detail: { element: resource, quantity, mass: totalMass } }));
                             markElementExplored(resource);
+                            
+                            // Record trade for market dynamics
+                            if (typeof recordTrade === 'function') {
+                                recordTrade(resource, quantity, 'buy');
+                                console.log(`📈 Recorded trade: extracted ${quantity}x ${resource}`);
+                            }
                             
                             showExtractionNotification({
                                 success: true,
