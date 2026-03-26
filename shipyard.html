@@ -677,6 +677,23 @@
             text-align: center;
             margin-top: 6px;
         }
+        
+        .market-update-badge {
+            background: rgba(74, 255, 170, 0.15);
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 9px;
+            color: #4affaa;
+            display: inline-block;
+            margin-left: 8px;
+            animation: pulse-green 2s infinite;
+        }
+        
+        @keyframes pulse-green {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
@@ -687,7 +704,7 @@
                     <span>✦ SHIPYARD</span>
                     <span>✦ MINING FLEET</span>
                 </div>
-                <div class="top-bar-right">v5.0.0</div>
+                <div class="top-bar-right">v5.1.0 <span class="market-update-badge">⚡ LIVE MARKET</span></div>
             </div>
             
             <div class="shipyard-title">
@@ -698,7 +715,7 @@
             
             <div class="cognatus-presence">
                 <div class="cognatus-pulse"></div>
-                <div class="cognatus-label">COGNATUS ONLINE</div>
+                <div class="cognatus-label">COGNATUS ONLINE • MARKET UPDATES EVERY 60s</div>
             </div>
             
             <div class="player-card">
@@ -739,7 +756,7 @@
 
     <script type="module">
         import { getCredits, getPlayer, getCollection, addCredits, spendCredits, addElementToCollection, removeElementFromCollection } from './js/storage.js';
-        import { recordTrade } from './js/market-dynamics.js';
+        import { recordTrade, updatePrices } from './js/market-dynamics.js';
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -966,7 +983,7 @@
                     price: price
                 });
                 
-                // ===== RECORD TRADE FOR MARKET DYNAMICS =====
+                // Record trade for market dynamics
                 if (typeof recordTrade === 'function') {
                     recordTrade(element, missingAmount, 'buy');
                     console.log(`📈 Recorded trade: bought ${missingAmount}x ${element} for market dynamics`);
@@ -1031,7 +1048,7 @@
                     await removeElementFromCollection(element, amount);
                 }
                 
-                // ===== RECORD MATERIALS USED FOR MARKET DYNAMICS (SELL) =====
+                // Record materials used for market dynamics (sell)
                 if (typeof recordTrade === 'function') {
                     for (const [element, amount] of Object.entries(ship.elements)) {
                         recordTrade(element, amount, 'sell');
@@ -1209,7 +1226,7 @@
                         <div class="cost-row total-row"><span class="cost-label">TOTAL COST:</span><span class="cost-total">${totalCost.toLocaleString()} ⭐</span></div>
                         <div class="labor-note">👷 Labor fees distributed to certificate holders</div>
                         <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY</div>
-                        <div class="price-note">📊 Prices update dynamically from VoidEx market</div>
+                        <div class="price-note">📊 Market updates every 60 seconds</div>
                     </div>
                     <div class="requirements-section">
                         <div class="requirements-title">⚒️ CONSTRUCTION REQUIREMENTS</div>
@@ -1250,7 +1267,53 @@
             await refreshShipCards();
         }
         
-        document.addEventListener('DOMContentLoaded', () => loadShips());
+        // ===== AUTO MARKET UPDATE EVERY MINUTE =====
+        let marketUpdateInterval = null;
+        
+        function startMarketUpdates() {
+            if (marketUpdateInterval) clearInterval(marketUpdateInterval);
+            
+            marketUpdateInterval = setInterval(async () => {
+                try {
+                    if (typeof updatePrices === 'function') {
+                        await updatePrices();
+                        await refreshShipCards();
+                        console.log('📊 Market prices updated (60s interval)');
+                        
+                        // Optional: Add a subtle visual indicator
+                        const priceNote = document.querySelector('.price-note');
+                        if (priceNote) {
+                            priceNote.style.opacity = '0.5';
+                            setTimeout(() => {
+                                priceNote.style.opacity = '1';
+                            }, 500);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Market update failed:', error);
+                }
+            }, 60000); // 60,000 ms = 1 minute
+            
+            console.log('✅ Auto market updates started (every 60 seconds)');
+        }
+        
+        function stopMarketUpdates() {
+            if (marketUpdateInterval) {
+                clearInterval(marketUpdateInterval);
+                marketUpdateInterval = null;
+                console.log('⏹️ Auto market updates stopped');
+            }
+        }
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopMarketUpdates();
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShips();
+            startMarketUpdates();
+        });
     </script>
 </body>
 </html>
