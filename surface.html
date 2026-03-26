@@ -973,13 +973,28 @@
             return exploredElements[resource] || false;
         }
 
+        // FIXED: markElementExplored with direct claim button check
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
                 saveExploredState();
                 updateExploredCount();
                 renderResourceToggles();
-                checkAllElementsExplored();
+                
+                // DIRECT CHECK - show claim button immediately when all elements are explored
+                const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
+                if (allExplored) {
+                    claimBtn.classList.add('visible');
+                    claimBtn.disabled = false;
+                    claimBtn.textContent = '✨ CLAIM PLANET';
+                    showExtractionNotification({
+                        success: true,
+                        resource: 'All Elements',
+                        quantity: 0,
+                        mass: 0,
+                        wasPity: false
+                    });
+                }
             }
         }
 
@@ -990,22 +1005,6 @@
                 exploredProgress.textContent = `${explored}/${totalElements}`;
             }
             return explored;
-        }
-
-        function checkAllElementsExplored() {
-            const explored = Object.values(exploredElements).filter(v => v).length;
-            if (explored === totalElements && totalElements > 0) {
-                claimBtn.classList.add('visible');
-                claimBtn.disabled = false;
-                claimBtn.textContent = '✨ CLAIM PLANET';
-                showExtractionNotification({
-                    success: true,
-                    resource: 'All Elements',
-                    quantity: 0,
-                    mass: 0,
-                    wasPity: false
-                });
-            }
         }
 
         const elementData = {
