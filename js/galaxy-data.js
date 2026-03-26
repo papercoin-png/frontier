@@ -2,6 +2,7 @@
 // Galaxy structure and sector data for Voidfarer's shared procedural universe
 // UPDATED: 10 tiers matching the new galaxy map with Earth at center
 // UPDATED: Added element pools by tier for planet resource generation
+// FIXED: Correct element classification - Magnesium moved to Uncommon (Tier 2)
 
 // ===== CONSTANTS =====
 export const GALAXY_SEED = 42793;
@@ -22,36 +23,55 @@ export const TIERS = [
 ];
 
 // ===== ELEMENT POOLS BY TIER =====
-// Tier 1: Common elements (0-100 LY)
+// CORRECTED: Proper element classification by rarity/tier
+
+// Tier 1: Common Elements (0-100 LY)
+export const TIER_1_ELEMENTS = [
+    'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron',
+    'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
+    'Sodium', 'Aluminum', 'Silicon', 'Phosphorus',
+    'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'
+];
+
+// Tier 2: Uncommon Elements (100-250 LY)
+export const TIER_2_ELEMENTS = [
+    'Magnesium', 'Iron', 'Nickel', 'Copper', 'Zinc',
+    'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton',
+    'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
+    'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver',
+    'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon',
+    'Cesium', 'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium',
+    'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium', 'Holmium',
+    'Erbium', 'Thulium', 'Ytterbium', 'Lutetium'
+];
+
+// Tier 3: Rare Elements (250-500 LY)
+export const TIER_3_ELEMENTS = [
+    'Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium',
+    'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium'
+];
+
+// Tier 4: Very Rare Elements (500-1000 LY)
+export const TIER_4_ELEMENTS = [
+    'Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'
+];
+
+// Tier 5: Legendary Elements (1000+ LY)
+export const TIER_5_ELEMENTS = [
+    'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium',
+    'Nobelium', 'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium',
+    'Bohrium', 'Hassium', 'Meitnerium', 'Darmstadtium', 'Roentgenium',
+    'Copernicium', 'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium',
+    'Tennessine', 'Oganesson'
+];
+
+// Combined element pools by tier (for easy access)
 export const ELEMENTS_BY_TIER = {
-    1: [
-        'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron',
-        'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
-        'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Phosphorus',
-        'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'
-    ],
-    2: [
-        'Iron', 'Nickel', 'Copper', 'Zinc', 'Gallium', 'Germanium',
-        'Arsenic', 'Selenium', 'Bromine', 'Krypton', 'Rubidium',
-        'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
-        'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver',
-        'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine',
-        'Xenon', 'Cesium', 'Barium'
-    ],
-    3: [
-        'Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium',
-        'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium'
-    ],
-    4: [
-        'Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'
-    ],
-    5: [
-        'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium',
-        'Nobelium', 'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium',
-        'Bohrium', 'Hassium', 'Meitnerium', 'Darmstadtium', 'Roentgenium',
-        'Copernicium', 'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium',
-        'Tennessine', 'Oganesson'
-    ]
+    1: TIER_1_ELEMENTS,
+    2: TIER_2_ELEMENTS,
+    3: TIER_3_ELEMENTS,
+    4: TIER_4_ELEMENTS,
+    5: TIER_5_ELEMENTS
 };
 
 // ===== HELPER FUNCTIONS =====
@@ -64,10 +84,9 @@ export const ELEMENTS_BY_TIER = {
  */
 export function getElementsForTier(tier) {
     const elements = [];
-    // Tier 5-10 all use the legendary pool (tier 5 elements)
-    const effectiveTier = Math.min(tier, 5);
+    const maxTier = Math.min(tier, 5);
     
-    for (let t = 1; t <= effectiveTier; t++) {
+    for (let t = 1; t <= maxTier; t++) {
         if (ELEMENTS_BY_TIER[t]) {
             elements.push(...ELEMENTS_BY_TIER[t]);
         }
@@ -291,6 +310,11 @@ export default {
     GALAXY_SEED,
     TIERS,
     SECTORS,
+    TIER_1_ELEMENTS,
+    TIER_2_ELEMENTS,
+    TIER_3_ELEMENTS,
+    TIER_4_ELEMENTS,
+    TIER_5_ELEMENTS,
     ELEMENTS_BY_TIER,
     getElementsForTier,
     getRarityByTier,
