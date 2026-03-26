@@ -454,6 +454,145 @@
             transform: scale(0.96);
         }
         
+        /* NEW: Rights Marketplace Card */
+        .rights-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .rights-title {
+            color: #ffaa4a;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-family: 'Exo 2', sans-serif;
+            border-bottom: 1px solid #ffaa4a;
+            padding-bottom: 8px;
+        }
+        
+        .rights-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .rights-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-left: 3px solid #ffaa4a;
+        }
+        
+        .rights-item.expiring {
+            border-left-color: #ffaa4a;
+            background: rgba(255, 170, 74, 0.1);
+        }
+        
+        .rights-item-name {
+            font-weight: 600;
+            color: #ffd966;
+            font-size: 14px;
+        }
+        
+        .rights-item-details {
+            font-size: 11px;
+            color: #a0c0ff;
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .rights-expiry {
+            color: #ffaa4a;
+        }
+        
+        .rights-expiry.warning {
+            color: #ffaa4a;
+            font-weight: bold;
+        }
+        
+        .rights-renew-btn {
+            background: #ffaa4a;
+            border: none;
+            color: #0a0a1a;
+            padding: 4px 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            margin-top: 6px;
+            font-weight: 600;
+        }
+        
+        /* NEW: Scan History Card */
+        .scan-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .scan-title {
+            color: #4affaa;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-family: 'Exo 2', sans-serif;
+            border-bottom: 1px solid #4affaa;
+            padding-bottom: 8px;
+        }
+        
+        .scan-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        
+        .scan-stat {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 6px;
+        }
+        
+        .scan-stat-number {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffd966;
+        }
+        
+        .scan-stat-label {
+            font-size: 8px;
+            color: #a0c0ff;
+        }
+        
+        .scan-list {
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 10px;
+        }
+        
+        .scan-item {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .scan-item-name {
+            color: #4affaa;
+        }
+        
+        .scan-item-date {
+            color: #a0c0ff;
+        }
+        
         .earth-hub-button {
             position: sticky;
             bottom: 20px;
@@ -515,6 +654,35 @@
             z-index: 1001;
             display: none;
         }
+        
+        /* NEW: Expiration Warning Banner */
+        .expiry-warning {
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            display: none;
+            animation: pulse-warning 2s infinite;
+        }
+        
+        @keyframes pulse-warning {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 0px #ffaa4a; }
+            50% { border-color: #ffcc66; box-shadow: 0 0 15px #ffaa4a; }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 0px #ffaa4a; }
+        }
+        
+        .expiry-warning-title {
+            color: #ffaa4a;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .expiry-warning-text {
+            color: white;
+            font-size: 10px;
+        }
     </style>
 </head>
 <body>
@@ -527,6 +695,12 @@
                     <span class="earth-icon">🌍</span>
                     <span>EARTH HUB</span>
                 </button>
+            </div>
+            
+            <!-- NEW: Expiration Warning Banner -->
+            <div class="expiry-warning" id="expiryWarning">
+                <div class="expiry-warning-title">⚠️ RIGHTS EXPIRING SOON</div>
+                <div class="expiry-warning-text" id="expiryWarningText">Your mining rights on some planets will expire soon!</div>
             </div>
             
             <div class="stats-bar">
@@ -630,6 +804,36 @@
                 </div>
             </div>
             
+            <!-- NEW: Rights Marketplace Card -->
+            <div class="rights-card" id="rightsCard" style="display: none;">
+                <div class="rights-title">👑 YOUR MINING RIGHTS</div>
+                <div class="rights-list" id="rightsList">
+                    <div style="color: #a0c0ff; text-align: center; padding: 10px;">No active mining rights</div>
+                </div>
+            </div>
+            
+            <!-- NEW: Scan History Card -->
+            <div class="scan-card" id="scanCard" style="display: none;">
+                <div class="scan-title">🔍 SCAN HISTORY</div>
+                <div class="scan-stats">
+                    <div class="scan-stat">
+                        <div class="scan-stat-number" id="scannedSectorsCount">0</div>
+                        <div class="scan-stat-label">SECTORS</div>
+                    </div>
+                    <div class="scan-stat">
+                        <div class="scan-stat-number" id="scannedStarSectorsCount">0</div>
+                        <div class="scan-stat-label">STAR SECTORS</div>
+                    </div>
+                    <div class="scan-stat">
+                        <div class="scan-stat-number" id="scannedStarsCount">0</div>
+                        <div class="scan-stat-label">STARS</div>
+                    </div>
+                </div>
+                <div class="scan-list" id="scanList">
+                    <div style="color: #a0c0ff; text-align: center; padding: 5px;">No scan history</div>
+                </div>
+            </div>
+            
             <button class="earth-hub-button" onclick="goToEarthHub()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">EARTH HUB</span>
@@ -649,7 +853,8 @@
     <script type="module" src="js/storage.js"></script>
 
     <script type="module">
-        import { getCredits, getPlayer, getCollection, addCredits, spendCredits } from './js/storage.js';
+        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars } from './js/storage.js';
+        import { getPlanetClaim, getPlanetRightsStatus, getPlanetDiscoveryHistory, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -669,13 +874,21 @@
         const claimOwner = document.getElementById('claimOwner');
         const claimFee = document.getElementById('claimFee');
         const planetLabel = document.getElementById('planetLabel');
+        
+        // NEW: Rights and Scan Elements
+        const rightsCard = document.getElementById('rightsCard');
+        const rightsList = document.getElementById('rightsList');
+        const scanCard = document.getElementById('scanCard');
+        const scanList = document.getElementById('scanList');
+        const expiryWarning = document.getElementById('expiryWarning');
+        const expiryWarningText = document.getElementById('expiryWarningText');
 
         // ===== GET PLAYER ID =====
         function getPlayerId() {
             return localStorage.getItem('voidfarer_player_id') || 'main';
         }
 
-        // ===== FIXED: UPDATE CREDITS USING STORAGE.JS =====
+        // ===== UPDATE CREDITS USING STORAGE.JS =====
         async function updateCreditsDisplay() {
             try {
                 const playerId = getPlayerId();
@@ -766,6 +979,149 @@
                 console.error('Error loading claim data:', error);
             }
         }
+
+        // ===== LOAD RIGHTS MARKETPLACE (NEW) =====
+        async function loadRightsMarketplace() {
+            try {
+                const playerId = getPlayerId();
+                const claims = getPlayerClaims(playerId);
+                
+                if (claims.length === 0) {
+                    rightsCard.style.display = 'none';
+                    return;
+                }
+                
+                rightsCard.style.display = 'block';
+                rightsList.innerHTML = '';
+                
+                let hasExpiring = false;
+                
+                for (const claim of claims) {
+                    const rights = await getPlanetRightsStatus(claim.planetName);
+                    const expiresAt = rights.expiresAt;
+                    const daysRemaining = rights.daysRemaining;
+                    
+                    const isExpiring = daysRemaining <= 3 && daysRemaining > 0;
+                    if (isExpiring) hasExpiring = true;
+                    
+                    const item = document.createElement('div');
+                    item.className = 'rights-item';
+                    if (isExpiring) item.classList.add('expiring');
+                    
+                    let expiryClass = '';
+                    let expiryText = '';
+                    if (daysRemaining <= 0) {
+                        expiryText = 'EXPIRED';
+                        expiryClass = 'danger';
+                    } else if (daysRemaining <= 3) {
+                        expiryText = `${daysRemaining} days left - EXPIRING SOON!`;
+                        expiryClass = 'warning';
+                    } else {
+                        expiryText = `${daysRemaining} days left`;
+                    }
+                    
+                    item.innerHTML = `
+                        <div class="rights-item-name">${claim.planetName} (Tier ${claim.highestRarity ? claim.highestRarity.toUpperCase() : '?'})</div>
+                        <div class="rights-item-details">
+                            <span>👑 ${claim.ownerName}</span>
+                            <span class="rights-expiry ${expiryClass}">⏳ ${expiryText}</span>
+                        </div>
+                        ${daysRemaining > 0 && daysRemaining <= 3 ? `<button class="rights-renew-btn" onclick="renewRights('${claim.planetName}', ${claim.baseFee * 0.5})">🔁 RENEW (${Math.floor(claim.baseFee * 0.5)}⭐)</button>` : ''}
+                    `;
+                    rightsList.appendChild(item);
+                }
+                
+                if (hasExpiring) {
+                    expiryWarning.style.display = 'block';
+                    expiryWarningText.textContent = 'Your mining rights on some planets will expire within 3 days! Renew them to keep access.';
+                } else {
+                    expiryWarning.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading rights marketplace:', error);
+                rightsCard.style.display = 'none';
+            }
+        }
+
+        // ===== LOAD SCAN HISTORY (NEW) =====
+        async function loadScanHistory() {
+            try {
+                const playerId = getPlayerId();
+                
+                const scannedSectors = await getScannedSectors(playerId);
+                const scannedStarSectors = await getScannedStarSectors(playerId);
+                const scannedStars = await getScannedStars(playerId);
+                
+                document.getElementById('scannedSectorsCount').textContent = scannedSectors.length;
+                document.getElementById('scannedStarSectorsCount').textContent = scannedStarSectors.length;
+                document.getElementById('scannedStarsCount').textContent = scannedStars.length;
+                
+                const allScans = [
+                    ...scannedSectors.map(s => ({ name: s, type: 'Galactic Sector', date: 'Scanned' })),
+                    ...scannedStarSectors.map(s => ({ name: s, type: 'Star Sector', date: 'Scanned' })),
+                    ...scannedStars.map(s => ({ name: s, type: 'Star System', date: 'Scanned' }))
+                ].slice(0, 10);
+                
+                if (allScans.length === 0) {
+                    scanCard.style.display = 'none';
+                    return;
+                }
+                
+                scanCard.style.display = 'block';
+                scanList.innerHTML = '';
+                
+                allScans.forEach(scan => {
+                    const item = document.createElement('div');
+                    item.className = 'scan-item';
+                    item.innerHTML = `
+                        <span class="scan-item-name">${scan.type}: ${scan.name}</span>
+                        <span class="scan-item-date">${scan.date}</span>
+                    `;
+                    scanList.appendChild(item);
+                });
+                
+            } catch (error) {
+                console.error('Error loading scan history:', error);
+                scanCard.style.display = 'none';
+            }
+        }
+
+        // ===== RENEW RIGHTS (NEW) =====
+        window.renewRights = async function(planetName, cost) {
+            try {
+                const playerId = getPlayerId();
+                const credits = await getCredits(playerId);
+                
+                if (credits < cost) {
+                    alert(`Not enough credits! Need ${cost}⭐`);
+                    return;
+                }
+                
+                const success = await spendCredits(cost, playerId);
+                if (success) {
+                    // Update claim expiration
+                    const planetClaims = JSON.parse(localStorage.getItem('voidfarer_planet_claims') || '{}');
+                    if (planetClaims[planetName]) {
+                        planetClaims[planetName].claimedAt = Date.now();
+                        planetClaims[planetName].lastRenewed = Date.now();
+                        planetClaims[planetName].totalRenewals = (planetClaims[planetName].totalRenewals || 0) + 1;
+                        localStorage.setItem('voidfarer_planet_claims', JSON.stringify(planetClaims));
+                    }
+                    
+                    await updateCreditsDisplay();
+                    await loadRightsMarketplace();
+                    alert(`✅ Mining rights for ${planetName} renewed for 30 days!`);
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert('Failed to renew rights.');
+                }
+            } catch (error) {
+                console.error('Error renewing rights:', error);
+                alert('Failed to renew rights.');
+            }
+        };
 
         // ===== LOAD CURRENT LOCATION =====
         function loadCurrentLocation() {
@@ -898,6 +1254,8 @@
             loadCurrentLocation();
             loadClaimData();
             loadLaborEarnings();
+            await loadRightsMarketplace();
+            await loadScanHistory();
             
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
@@ -907,6 +1265,8 @@
                 await loadShipData();
                 loadLaborEarnings();
                 loadClaimData();
+                await loadRightsMarketplace();
+                await loadScanHistory();
             }, 30000);
         }
 
@@ -919,6 +1279,7 @@
         window.goToLaborExchange = goToLaborExchange;
         window.quickRefuel = quickRefuel;
         window.quickRepair = quickRepair;
+        window.renewRights = renewRights;
 
         init();
     </script>
