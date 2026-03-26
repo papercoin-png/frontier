@@ -254,8 +254,10 @@
             letter-spacing: 1px;
             box-shadow: 0 0 30px gold;
             display: none;
-            position: relative;
-            margin-top: 10px;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 10px;
             z-index: 35;
         }
         
@@ -726,12 +728,11 @@
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
-        import { recordTrade } from './js/market-dynamics.js';
 
+        // Expose storage functions to window for non-module code
         window.getCollection = getCollection;
         window.addElementToCollection = addElementToCollection;
         window.removeElementFromCollection = removeElementFromCollection;
-        window.recordTrade = recordTrade;
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -742,6 +743,7 @@
         const EXTRACTION_INTERVAL = 5000;
         const CARGO_MASS_LIMIT = 5000;
         
+        // Rarity configuration with base chances
         const RARITY_CONFIG = {
             'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', tier: 1 },
             'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0', tier: 2 },
@@ -750,6 +752,7 @@
             'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700', tier: 5 }
         };
 
+        // Pity system thresholds
         const PITY_CONFIG = {
             'common': { threshold: 2 },
             'uncommon': { threshold: 3 },
@@ -758,6 +761,7 @@
             'legendary': { threshold: 25 }
         };
 
+        // Tier-based rarity boost (higher tier = better chance for rare elements)
         const TIER_RARITY_BOOST = {
             1: { common: 1.0, uncommon: 0.5, rare: 0.2, veryRare: 0.1, legendary: 0.05 },
             2: { common: 0.9, uncommon: 1.0, rare: 0.6, veryRare: 0.3, legendary: 0.1 },
@@ -784,6 +788,7 @@
         const resourceGrid = document.getElementById('resourceGrid');
         const activeCount = document.getElementById('activeCount');
         const extractorText = document.getElementById('extractorText');
+        const claimBtn = document.getElementById('claimBtn');
         const statusBar = document.getElementById('statusBar');
         
         const extractionNotification = document.getElementById('extractionNotification');
@@ -810,6 +815,7 @@
         let exploredElements = {};
         let totalElements = 4;
         
+        // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
         function getElementRarity(elementName) {
             if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
             if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
@@ -832,7 +838,6 @@
         }
 
         function initializePityCounters() {
-            pityCounters = {};
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
                 pityCounters[resource] = {
@@ -842,6 +847,7 @@
             });
         }
 
+        // ===== PLANET IMAGE LOADING =====
         async function loadPlanetSurfaceImage(planetName, planetType) {
             try {
                 loadingText.textContent = 'loading surface view...';
@@ -868,6 +874,7 @@
             }
         }
 
+        // ===== EXPLORED STATE =====
         function loadExploredState() {
             const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
             if (saved) {
@@ -885,6 +892,7 @@
             localStorage.setItem(`explored_${currentPlanet.name}`, JSON.stringify(exploredElements));
         }
 
+        // ===== NOTIFICATION SYSTEM =====
         let notificationTimeout = null;
 
         function showExtractionNotification(result) {
@@ -952,24 +960,19 @@
                 updateExploredCount();
                 renderResourceToggles();
                 
-                if (currentPlanet.resources && currentPlanet.resources.length > 0) {
-                    const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
-                    if (allExplored) {
-                        const claimButton = document.getElementById('claimBtn');
-                        if (claimButton) {
-                            claimButton.classList.add('visible');
-                            claimButton.disabled = false;
-                            claimButton.textContent = '✨ CLAIM PLANET';
-                        }
-                        showExtractionNotification({
-                            success: true,
-                            resource: 'All Elements',
-                            quantity: 0,
-                            mass: 0,
-                            wasPity: false
-                        });
-                        console.log('🎉 All 4 resources discovered! Claim button should now be visible.');
-                    }
+                // DIRECT CHECK - show claim button immediately when all elements are explored
+                const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
+                if (allExplored) {
+                    claimBtn.classList.add('visible');
+                    claimBtn.disabled = false;
+                    claimBtn.textContent = '✨ CLAIM PLANET';
+                    showExtractionNotification({
+                        success: true,
+                        resource: 'All Elements',
+                        quantity: 0,
+                        mass: 0,
+                        wasPity: false
+                    });
                 }
             }
         }
@@ -1104,7 +1107,7 @@
                     planetResources = generateFallbackResources(planetTypeStr);
                 }
                 
-                if (planetResources.length !== 4) {
+                if (planetResources.length > 4) {
                     planetResources = planetResources.slice(0, 4);
                 }
                 
@@ -1127,17 +1130,11 @@
                 
                 await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
-                resourceStates = {};
-                resourceChances = {};
-                
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
                     const chance = getElementRarityChance(resource);
                     resourceChances[resource] = chance > 0 ? chance : 5;
                 });
-                
-                console.log('Planet resources loaded:', currentPlanet.resources);
-                console.log('Resource states:', resourceStates);
                 
                 initializePityCounters();
                 initializeExplorationTracking();
@@ -1158,23 +1155,20 @@
         async function updateClaimButton() {
             try {
                 const status = await getPlanetStatus(currentPlanet.name);
-                const claimButton = document.getElementById('claimBtn');
-                if (!claimButton) return;
-                
                 if (status) {
-                    if (status.claimed) {
-                        claimButton.classList.add('visible');
-                        claimButton.disabled = true;
-                        claimButton.textContent = '✓ CLAIMED';
-                    } else if (status.fullyExplored) {
-                        claimButton.classList.add('visible');
-                        claimButton.disabled = false;
-                        claimButton.textContent = '✨ CLAIM PLANET';
+                    if (status.fullyExplored && !status.claimed) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = false;
+                        claimBtn.textContent = '✨ CLAIM PLANET';
+                    } else if (status.claimed) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = true;
+                        claimBtn.textContent = '✓ CLAIMED';
                     } else {
-                        claimButton.classList.remove('visible');
+                        claimBtn.classList.remove('visible');
                     }
                 } else {
-                    claimButton.classList.remove('visible');
+                    claimBtn.classList.remove('visible');
                 }
             } catch (error) {}
         }
@@ -1315,11 +1309,6 @@
                             
                             window.dispatchEvent(new CustomEvent('cargo-updated', { detail: { element: resource, quantity, mass: totalMass } }));
                             markElementExplored(resource);
-                            
-                            if (typeof recordTrade === 'function') {
-                                recordTrade(resource, quantity, 'buy');
-                                console.log(`📈 Recorded trade: extracted ${quantity}x ${resource}`);
-                            }
                             
                             showExtractionNotification({
                                 success: true,
