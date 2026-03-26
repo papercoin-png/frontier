@@ -17,6 +17,19 @@
         .sector-card { position: absolute; width: 22px; height: 22px; cursor: pointer; z-index: 10; transform: translate(-50%, -50%); transition: 0.1s; }
         .sector-card:hover { transform: translate(-50%, -50%) scale(1.2); z-index: 20; }
         .sector-dot { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; box-shadow: 0 0 4px currentColor; }
+        
+        /* NEW: Hidden sector style */
+        .sector-card.hidden .sector-dot {
+            background: radial-gradient(circle at 30% 30%, #444444, #222222) !important;
+            box-shadow: 0 0 4px #ff4444 !important;
+            filter: grayscale(0.8);
+        }
+        
+        .sector-card.hidden .sector-name-tooltip {
+            border-color: #ff4444;
+            color: #ff8888;
+        }
+        
         .sector-name-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; font-size: 8px; padding: 2px 5px; border-radius: 8px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; font-family: monospace; margin-bottom: 3px; border: 1px solid #ffaa4a; z-index: 30; }
         .sector-card:hover .sector-name-tooltip { opacity: 1; }
 
@@ -26,7 +39,7 @@
         .damage-bar { background: #2a2a3a; border-radius: 20px; height: 3px; margin: 4px 0; overflow: hidden; }
         .damage-fill { height: 100%; background: #ff4444; width: 0%; }
 
-        .info-panel { position: fixed; bottom: 20px; right: 20px; background: rgba(10,20,35,0.96); backdrop-filter: blur(12px); border: 2px solid #ffaa4a; border-radius: 40px 15px 40px 15px; padding: 12px; width: 260px; z-index: 100; }
+        .info-panel { position: fixed; bottom: 20px; right: 20px; background: rgba(10,20,35,0.96); backdrop-filter: blur(12px); border: 2px solid #ffaa4a; border-radius: 40px 15px 40px 15px; padding: 12px; width: 280px; z-index: 100; max-height: 80vh; overflow-y: auto; }
         .info-panel.hidden { display: none; }
         .info-title { font-size: 12px; color: #ffaa4a; margin-bottom: 6px; text-align: center; }
         .info-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 10px; }
@@ -36,6 +49,27 @@
         .risk-fill { height: 100%; background: linear-gradient(90deg, #4affaa, #ffaa44, #ff4444); width: 0%; }
         .travel-btn { width: 100%; background: #ffaa4a; border: none; color: #0a0a1a; padding: 6px; border-radius: 40px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
         .travel-btn.disabled { background: #4a4a6a; color: #aaa; cursor: not-allowed; }
+        
+        /* NEW: Scan Button */
+        .scan-sector-btn { width: 100%; background: #4a8ac0; border: none; color: white; padding: 6px; border-radius: 40px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+        .scan-sector-btn:active { background: #6aa0e0; transform: scale(0.98); }
+        
+        /* NEW: Rights Status Panel */
+        .rights-status { background: rgba(74, 255, 170, 0.1); border: 1px solid #4affaa; border-radius: 40px 10px 40px 10px; padding: 6px 10px; margin: 8px 0; display: flex; justify-content: space-between; align-items: center; }
+        .rights-status.expiring { border-color: #ffaa4a; background: rgba(255, 170, 74, 0.1); }
+        .rights-status.expired { border-color: #ff4444; background: rgba(255, 68, 68, 0.1); }
+        .rights-label { font-size: 9px; color: #a0c0ff; }
+        .rights-value { font-size: 10px; font-weight: 600; color: #4affaa; }
+        .rights-value.warning { color: #ffaa4a; }
+        .rights-value.danger { color: #ff4444; }
+        
+        /* NEW: Discovery History Panel */
+        .discovery-panel { margin-top: 8px; background: rgba(0, 0, 0, 0.3); border-radius: 30px 8px 30px 8px; padding: 6px; max-height: 80px; overflow-y: auto; }
+        .discovery-title { color: #ffaa4a; font-size: 9px; font-weight: 600; margin-bottom: 4px; text-align: center; }
+        .discovery-item { display: flex; justify-content: space-between; padding: 2px 0; font-size: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .discovery-player { color: #4affaa; }
+        .discovery-date { color: #a0c0ff; }
+        .discovery-badge { font-size: 7px; background: rgba(255,215,0,0.2); padding: 1px 3px; border-radius: 10px; color: #ffd700; margin-left: 3px; }
 
         .zoom-controls { position: fixed; bottom: 20px; left: 20px; display: flex; gap: 8px; z-index: 100; }
         .zoom-btn { width: 40px; height: 40px; background: rgba(10,20,35,0.9); backdrop-filter: blur(8px); border: 2px solid #4affaa; border-radius: 50%; color: #4affaa; font-size: 20px; cursor: pointer; }
@@ -56,6 +90,31 @@
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #03030f; display: flex; justify-content: center; align-items: center; z-index: 1000; flex-direction: column; gap: 20px; }
         .loading-overlay.hidden { display: none; }
         .loading-spinner { width: 40px; height: 40px; border: 3px solid #8a6aff; border-top: 3px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+        
+        /* NEW: Rediscovery Notification */
+        .rediscovery-notification {
+            position: fixed;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(74, 255, 170, 0.95);
+            color: #0a0a1a;
+            padding: 10px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 5000;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+            white-space: nowrap;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -96,11 +155,28 @@
             <div class="info-row"><span class="info-label">Extraction:</span><span class="info-value" id="infoExtract">100%</span></div>
             <div class="info-row"><span class="info-label">Rare Chance:</span><span class="info-value" id="infoRare">0%</span></div>
             <div class="info-row"><span class="info-label">Ship Required:</span><span class="info-value" id="infoTier">Tier 1</span></div>
+            
+            <!-- NEW: Rights Status Panel -->
+            <div class="rights-status" id="rightsStatus" style="display: none;">
+                <span class="rights-label">⚡ MINING RIGHTS</span>
+                <span class="rights-value" id="rightsValue">Loading...</span>
+            </div>
+            
+            <!-- NEW: Discovery History Panel -->
+            <div class="discovery-panel" id="discoveryPanel" style="display: none;">
+                <div class="discovery-title">📜 DISCOVERY HISTORY</div>
+                <div id="discoveryList"></div>
+            </div>
+            
             <div style="background:rgba(74,138,192,0.2);border-radius:20px;padding:4px;margin:4px 0;">
                 <div class="info-row"><span class="info-label">Warp Time:</span><span class="info-value" id="infoWarpTime">0 min</span></div>
                 <div class="info-row"><span class="info-label">Fuel Cost:</span><span class="info-value" id="infoFuel">0⭐</span></div>
                 <div class="info-row"><span class="info-label">Arrival Damage:</span><span class="info-value" id="infoDamage">0%</span></div>
             </div>
+            
+            <!-- NEW: Scan Button -->
+            <button class="scan-sector-btn" id="scanBtn" onclick="window.scanSector()" style="display: none;">🔭 SCAN SECTOR</button>
+            
             <button class="travel-btn" id="travelBtn" onclick="startTravel()">🚀 TRAVEL</button>
         </div>
 
@@ -124,9 +200,15 @@
             <div class="loading-spinner"></div>
             <div class="loading-text">Generating condensed galaxy...</div>
         </div>
+        
+        <!-- NEW: Rediscovery Notification -->
+        <div class="rediscovery-notification" id="rediscoveryNotification"></div>
     </div>
 
-    <script>
+    <script type="module">
+        import { getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
+        import { getHiddenPlanets, revealPlanet, getScannedSectors, markSectorScanned, getCurrentPlanetTier } from './js/storage.js';
+
         // Center Earth with balanced padding: max radius is 3400px, add 400px padding = 3800px from center to edge
         // So map size = 3800 * 2 = 7600, but we'll use 7000 for tighter fit
         const EARTH_X = 3500;
@@ -166,6 +248,119 @@
         let zoom = 1;
         let isWarping = false;
         let allSectors = [];
+        let hiddenSectors = [];
+        let scannedSectors = [];
+
+        // ===== DISCOVERY LOCK FUNCTIONS (NEW) =====
+        
+        async function loadHiddenSectors() {
+            try {
+                const hidden = JSON.parse(localStorage.getItem('voidfarer_hidden_sectors') || '[]');
+                hiddenSectors = hidden;
+            } catch (error) {
+                console.error('Error loading hidden sectors:', error);
+                hiddenSectors = [];
+            }
+        }
+        
+        async function loadScannedSectors() {
+            const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+            try {
+                const scanned = JSON.parse(localStorage.getItem(`voidfarer_scanned_sectors_${playerId}`) || '[]');
+                scannedSectors = scanned;
+            } catch (error) {
+                console.error('Error loading scanned sectors:', error);
+                scannedSectors = [];
+            }
+        }
+        
+        async function isSectorHidden(sectorId) {
+            return hiddenSectors.includes(sectorId);
+        }
+        
+        async function isSectorVisible(sectorId) {
+            // Sector is visible if it's been scanned
+            if (scannedSectors.includes(sectorId)) return true;
+            // Or if it's not hidden
+            return !(await isSectorHidden(sectorId));
+        }
+        
+        async function scanSector() {
+            if (!selectedSector) return;
+            
+            try {
+                const loading = document.getElementById('loadingOverlay');
+                loading.classList.remove('hidden');
+                
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+                
+                // Mark sector as scanned
+                const key = `voidfarer_scanned_sectors_${playerId}`;
+                const scanned = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!scanned.includes(selectedSector.id.toString())) {
+                    scanned.push(selectedSector.id.toString());
+                    localStorage.setItem(key, JSON.stringify(scanned));
+                }
+                
+                await loadScannedSectors();
+                
+                // Remove from hidden list if present
+                const hidden = JSON.parse(localStorage.getItem('voidfarer_hidden_sectors') || '[]');
+                const updatedHidden = hidden.filter(h => h !== selectedSector.id.toString());
+                localStorage.setItem('voidfarer_hidden_sectors', JSON.stringify(updatedHidden));
+                await loadHiddenSectors();
+                
+                // Show rediscovery notification
+                const notification = document.getElementById('rediscoveryNotification');
+                notification.textContent = `🔓 REDISCOVERED! ${selectedSector.name} sector has been mapped again.`;
+                notification.style.display = 'block';
+                
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+                
+                // Refresh the sector display
+                renderGalaxy(allSectors);
+                
+                // Refresh the current sector info
+                if (selectedSector) {
+                    await loadDiscoveryHistory(selectedSector);
+                    await loadRightsStatus(selectedSector);
+                }
+                
+                loading.classList.add('hidden');
+                
+                if (window.Telegram?.WebApp?.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+                
+            } catch (error) {
+                console.error('Error scanning sector:', error);
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                alert('Failed to scan sector. Please try again.');
+            }
+        }
+        
+        async function loadDiscoveryHistory(sector) {
+            try {
+                // For galactic sectors, we might not have discovery history directly
+                // This would need to be implemented based on planets within the sector
+                const discoveryPanel = document.getElementById('discoveryPanel');
+                discoveryPanel.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading discovery history:', error);
+            }
+        }
+        
+        async function loadRightsStatus(sector) {
+            try {
+                const rightsStatus = document.getElementById('rightsStatus');
+                rightsStatus.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading rights status:', error);
+            }
+        }
 
         function drawRingBoundaries() {
             const svg = document.getElementById('ringSvg');
@@ -270,16 +465,25 @@
             return sectors;
         }
 
-        function renderGalaxy(sectors) {
+        async function renderGalaxy(sectors) {
             const container = document.getElementById('galaxyMap');
             const existingSvg = container.querySelector('.ring-svg');
             container.innerHTML = '';
             if (existingSvg) container.appendChild(existingSvg);
             else container.appendChild(document.getElementById('ringSvg'));
             
-            sectors.forEach(sector => {
+            await loadHiddenSectors();
+            await loadScannedSectors();
+            
+            for (const sector of sectors) {
+                const isHidden = await isSectorHidden(sector.id.toString());
+                const isVisible = await isSectorVisible(sector.id.toString());
+                
                 const card = document.createElement('div');
                 card.className = 'sector-card';
+                if (isHidden && !isVisible) {
+                    card.classList.add('hidden');
+                }
                 card.style.left = `${sector.x}px`;
                 card.style.top = `${sector.y}px`;
                 card.onclick = (function(s) { return function() { selectSector(s); }; })(sector);
@@ -287,23 +491,32 @@
                 const isEarth = sector.distance === 0;
                 const size = isEarth ? 26 : 12;
                 
+                let tooltipText = `${sector.name}<br>${sector.distance} LY • Risk: ${sector.risk}%<br>Extract: ${sector.extractRate}% • Rare: ${sector.rareChance}%<br>Requires: Tier ${sector.requiredTier}`;
+                if (isHidden && !isVisible) {
+                    tooltipText = `${sector.name}<br>🔒 HIDDEN SECTOR - Requires scan to reveal`;
+                }
+                
                 card.innerHTML = `
                     <div class="sector-dot" style="background: radial-gradient(circle at 30% 30%, ${sector.color}, ${sector.color}); width: ${size}px; height: ${size}px; margin: ${(22-size)/2}px; border: ${isEarth ? '2px solid white' : 'none'};">
                         ${isEarth ? '🌍' : ''}
                     </div>
                     <div class="sector-name-tooltip">
-                        ${sector.name}<br>${sector.distance} LY • Risk: ${sector.risk}%<br>Extract: ${sector.extractRate}% • Rare: ${sector.rareChance}%<br>Requires: Tier ${sector.requiredTier}
+                        ${tooltipText}
                     </div>
                 `;
                 container.appendChild(card);
-            });
+            }
             
             document.getElementById('shipName').innerHTML = SHIP_TIERS[currentShipTier].name;
             document.getElementById('shipTier').innerHTML = `Tier ${currentShipTier} • Range: ${SHIP_TIERS[currentShipTier].range} LY`;
         }
 
-        function selectSector(sector) {
+        async function selectSector(sector) {
             if (isWarping) return;
+            
+            const isHidden = await isSectorHidden(sector.id.toString());
+            const isVisible = await isSectorVisible(sector.id.toString());
+            
             selectedSector = sector;
             
             const ship = SHIP_TIERS[currentShipTier];
@@ -322,6 +535,19 @@
             document.getElementById('infoFuel').innerHTML = `${fuelCost}⭐`;
             document.getElementById('infoDamage').innerHTML = `+${arrivalDamage}%`;
             
+            // Load discovery history and rights status
+            await loadDiscoveryHistory(sector);
+            await loadRightsStatus(sector);
+            
+            // Show/hide scan button
+            const scanBtn = document.getElementById('scanBtn');
+            if (isHidden && !isVisible) {
+                scanBtn.style.display = 'block';
+                scanBtn.textContent = '🔭 SCAN SECTOR (Reveal)';
+            } else {
+                scanBtn.style.display = 'none';
+            }
+            
             const btn = document.getElementById('travelBtn');
             if (sector.requiredTier > currentShipTier) {
                 btn.classList.add('disabled'); btn.disabled = true;
@@ -329,6 +555,9 @@
             } else if (currentDamage + arrivalDamage >= 100) {
                 btn.classList.add('disabled'); btn.disabled = true;
                 btn.innerHTML = '⚠️ REPAIR SHIP';
+            } else if (!isVisible) {
+                btn.classList.add('disabled'); btn.disabled = true;
+                btn.innerHTML = '🔒 SECTOR HIDDEN';
             } else {
                 btn.classList.remove('disabled'); btn.disabled = false;
                 btn.innerHTML = `🚀 TRAVEL (${warpTime} min)`;
@@ -339,8 +568,15 @@
 
         let warpInterval = null, warpStartTime = 0, warpDuration = 0;
         
-        function startTravel() {
+        async function startTravel() {
             if (!selectedSector) return;
+            
+            const isVisible = await isSectorVisible(selectedSector.id.toString());
+            if (!isVisible) {
+                alert('This sector is hidden. Scan it first to reveal its location.');
+                return;
+            }
+            
             if (selectedSector.requiredTier > currentShipTier) {
                 alert(`Requires Tier ${selectedSector.requiredTier} ship. You have Tier ${currentShipTier}.`);
                 return;
@@ -388,7 +624,7 @@
             if (progress >= 100) completeWarp();
         }
         
-        function completeWarp() {
+        async function completeWarp() {
             if (warpInterval) clearInterval(warpInterval);
             warpInterval = null;
             
@@ -434,15 +670,20 @@
         document.getElementById('zoomIn').onclick = () => setZoom(zoom + 0.1);
         document.getElementById('zoomOut').onclick = () => setZoom(zoom - 0.1);
         
-        function init() {
+        // Expose functions to window
+        window.startTravel = startTravel;
+        window.abortWarp = abortWarp;
+        window.scanSector = scanSector;
+        
+        async function init() {
             const loading = document.getElementById('loadingOverlay');
             loading.classList.remove('hidden');
             
             drawRingBoundaries();
             
-            setTimeout(() => {
+            setTimeout(async () => {
                 allSectors = generateGalaxy();
-                renderGalaxy(allSectors);
+                await renderGalaxy(allSectors);
                 loading.classList.add('hidden');
                 
                 const scroll = document.getElementById('mapScroll');
