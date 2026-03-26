@@ -7,6 +7,7 @@
 // UPDATED: Added market data cleanup functions to prevent localStorage quota issues
 // UPDATED: Added location saving to IndexedDB when collecting elements
 // FIXED: Added recordTrade call to update market dynamics when elements are added
+// FIXED: Added dbSaveElementLocation function for journal tracking
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -688,25 +689,19 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         // ===== FIX: Save location to IndexedDB if metadata contains planet info =====
         if (metadata && metadata.planet) {
             try {
-                // Check if dbSaveElementLocation is available
-                if (typeof window.dbSaveElementLocation === 'function') {
-                    const locationData = {
-                        planet: metadata.planet,
-                        planetType: metadata.planetType || 'unknown',
-                        quantity: quantity,
-                        timestamp: metadata.timestamp || Date.now(),
-                        discoveredDate: metadata.discoveredDate || new Date().toISOString(),
-                        rarity: metadata.rarity || 'common',
-                        value: metadata.value || 100
-                    };
-                    
-                    await window.dbSaveElementLocation(elementName, metadata.planet, locationData);
-                    console.log(`📍 Saved location for ${elementName} on ${metadata.planet}`);
-                } else {
-                    console.warn('dbSaveElementLocation not available, location not saved');
-                }
+                // Call the location saving function
+                await dbSaveElementLocation(elementName, metadata.planet, {
+                    planetType: metadata.planetType || 'unknown',
+                    galaxyTier: metadata.galaxyTier || 1,
+                    quantity: quantity,
+                    timestamp: metadata.timestamp || Date.now(),
+                    discoveredDate: metadata.discoveredDate || new Date().toISOString(),
+                    rarity: metadata.rarity || 'common',
+                    value: metadata.value || 100
+                });
+                console.log(`📍 Saved location for ${elementName} on ${metadata.planet}`);
             } catch (error) {
-                console.error('❌ Error saving element location to IndexedDB:', error);
+                console.error('❌ Error saving element location:', error);
                 // Don't fail the main operation if location saving fails
             }
         } else {
@@ -1343,7 +1338,7 @@ export async function initializeStorage(playerId = 'main') {
 }
 
 // ============================================================================
-// STORAGE CLEANUP FUNCTIONS (NEW)
+// STORAGE CLEANUP FUNCTIONS
 // ============================================================================
 
 /**
@@ -1667,120 +1662,259 @@ export async function triggerManualCleanup() {
 }
 
 // ============================================================================
-// RESET
+// JOURNAL / LOCATION TRACKING FUNCTIONS (ADDED)
 // ============================================================================
 
 /**
- * Reset all game data for a player
- * @param {string} playerId - Player ID
+ * Get the player's journal
+ * @returns {Promise<Object>} Journal object
  */
-export async function resetGame(playerId = 'main') {
-    // Save settings to restore after reset
-    const settings = {
-        haptics: getHapticsEnabled(),
-        autoGather: getAutoGatherEnabled(),
-        orbitSpeed: getOrbitSpeed(),
-        music: getMusicVolume(),
-        ambient: getAmbientVolume()
-    };
-    
-    // Clear all player-specific data
-    const keysToRemove = [
-        `${STORAGE_KEYS.PLAYER}_${playerId}`,
-        `${STORAGE_KEYS.COLLECTION}_${playerId}`,
-        `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`,
-        `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`,
-        `${STORAGE_KEYS.MATERIAL_QUALITY}_${playerId}`,
-        `${STORAGE_KEYS.ALCHEMY_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.METALLURGY_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.PHARMACEUTICALS_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.TEXTILES_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.CONSTRUCTION_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.AEROSPACE_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.NUCLEAR_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.OPTICAL_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.MAGNETIC_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.CRYOGENIC_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.POLYMERS_PROGRESS}_${playerId}`,
-        `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`,
-        `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`,
-        `${STORAGE_KEYS.PLAYER_PRODUCTS}_${playerId}`,
-        `${STORAGE_KEYS.PLAYER_LABOR_EARNINGS}_${playerId}`,
-        STORAGE_KEYS.CREDITS,
-        STORAGE_KEYS.SHIP_FUEL,
-        STORAGE_KEYS.SHIP_POWER,
-        STORAGE_KEYS.SHIP_UPGRADES,
-        STORAGE_KEYS.CURRENT_SECTOR,
-        STORAGE_KEYS.CURRENT_REGION,
-        STORAGE_KEYS.CURRENT_STAR_SECTOR,
-        STORAGE_KEYS.CURRENT_SECTOR_NAME,
-        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
-        STORAGE_KEYS.CURRENT_SECTOR_STARS,
-        STORAGE_KEYS.CURRENT_SECTOR_X,
-        STORAGE_KEYS.CURRENT_SECTOR_Y,
-        STORAGE_KEYS.CURRENT_STAR,
-        STORAGE_KEYS.CURRENT_STAR_TYPE,
-        STORAGE_KEYS.CURRENT_STAR_INDEX,
-        STORAGE_KEYS.CURRENT_STAR_X,
-        STORAGE_KEYS.CURRENT_STAR_Y,
-        STORAGE_KEYS.CURRENT_STAR_PLANETS,
-        STORAGE_KEYS.CURRENT_PLANET,
-        STORAGE_KEYS.CURRENT_PLANET_TYPE,
-        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
-        STORAGE_KEYS.CURRENT_PLANET_IMAGE,
-        STORAGE_KEYS.COLONIES,
-        STORAGE_KEYS.DISCOVERED_LOCATIONS,
-        STORAGE_KEYS.SCAN_HISTORY,
-        STORAGE_KEYS.HUB_INVENTORY,
-        STORAGE_KEYS.PLANET_CLAIMS,
-        STORAGE_KEYS.PLAYER_CLAIMS,
-        STORAGE_KEYS.CLAIM_HISTORY,
-        STORAGE_KEYS.CLAIM_NOTIFICATIONS,
-        STORAGE_KEYS.CERTIFICATE_HOLDERS
-    ];
-    
-    keysToRemove.forEach(key => {
-        localStorage.removeItem(key);
-    });
-    
-    // Restore settings
-    setHapticsEnabled(settings.haptics);
-    setAutoGatherEnabled(settings.autoGather);
-    setOrbitSpeed(settings.orbitSpeed);
-    setMusicVolume(settings.music);
-    setAmbientVolume(settings.ambient);
-    
-    // Re-initialize
-    await initializeStorage(playerId);
+export async function getJournal() {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const journalKey = `voidfarer_journal_${playerId}`;
+        const saved = localStorage.getItem(journalKey);
+        
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        
+        // Try IndexedDB if localStorage doesn't have it
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 1);
+                if (db.objectStoreNames.contains('journal')) {
+                    const entries = await db.getAll('journal');
+                    if (entries && entries.length > 0) {
+                        return {
+                            playerId: playerId,
+                            entries: entries.sort((a, b) => b.timestamp - a.timestamp),
+                            lastUpdated: new Date().toISOString()
+                        };
+                    }
+                }
+            } catch (idbError) {
+                console.debug('IndexedDB not available for journal');
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error getting journal:', error);
+        return null;
+    }
 }
 
-// ============================================================================
-// SETTINGS (additional)
-// ============================================================================
-
-function getOrbitSpeed() {
-    return localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED) || 'gentle';
+/**
+ * Save element extraction location to journal/IndexedDB
+ * @param {string} elementName - Name of the element extracted
+ * @param {string} planetName - Name of the planet where found
+ * @param {Object} locationData - Additional location data
+ * @returns {Promise<boolean>} Success status
+ */
+async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const journalKey = `voidfarer_journal_${playerId}`;
+        
+        // Get existing journal or create new one
+        let journal = await getJournal();
+        
+        if (!journal) {
+            journal = {
+                playerId: playerId,
+                entries: [],
+                lastUpdated: new Date().toISOString()
+            };
+        }
+        
+        // Create journal entry
+        const entry = {
+            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            type: 'extraction',
+            element: elementName,
+            quantity: locationData.quantity || 1,
+            location: {
+                planet: planetName,
+                planetType: locationData.planetType || 'unknown',
+                galaxyTier: locationData.galaxyTier || 1,
+                sector: getCurrentSector(),
+                region: getCurrentRegion()
+            },
+            rarity: locationData.rarity || 'common',
+            timestamp: locationData.timestamp || Date.now(),
+            date: new Date().toISOString(),
+            value: locationData.value || 100
+        };
+        
+        // Add to journal (newest first)
+        journal.entries.unshift(entry);
+        
+        // Keep only last 200 entries to prevent storage issues
+        if (journal.entries.length > 200) {
+            journal.entries = journal.entries.slice(0, 200);
+        }
+        
+        journal.lastUpdated = new Date().toISOString();
+        
+        // Save to localStorage
+        localStorage.setItem(journalKey, JSON.stringify(journal));
+        
+        // Also save to IndexedDB if available for more permanent storage
+        if (window.idb) {
+            try {
+                // Open or create database
+                const db = await window.idb.openDB('VoidfarerDB', 1, {
+                    upgrade(db) {
+                        if (!db.objectStoreNames.contains('journal')) {
+                            db.createObjectStore('journal', { keyPath: 'id' });
+                        }
+                        if (!db.objectStoreNames.contains('element_locations')) {
+                            const locationStore = db.createObjectStore('element_locations', { keyPath: 'id' });
+                            locationStore.createIndex('by_element', 'element');
+                            locationStore.createIndex('by_planet', 'location.planet');
+                            locationStore.createIndex('by_timestamp', 'timestamp');
+                        }
+                    }
+                });
+                
+                // Save to journal store
+                await db.put('journal', entry);
+                
+                // Also save to element_locations store for quick lookups
+                const locationEntry = {
+                    id: entry.id,
+                    element: elementName,
+                    planet: planetName,
+                    planetType: locationData.planetType || 'unknown',
+                    quantity: locationData.quantity || 1,
+                    timestamp: locationData.timestamp || Date.now(),
+                    date: entry.date,
+                    rarity: locationData.rarity || 'common'
+                };
+                await db.put('element_locations', locationEntry);
+                
+                console.log(`📝 Journal entry saved to IndexedDB: ${elementName} on ${planetName}`);
+            } catch (idbError) {
+                console.debug('IndexedDB not available for journal, using localStorage only:', idbError.message);
+            }
+        }
+        
+        console.log(`📝 Journal entry added: Extracted ${locationData.quantity || 1}x ${elementName} on ${planetName}`);
+        
+        // Dispatch event for UI updates (for live journal updates)
+        window.dispatchEvent(new CustomEvent('journal-updated', { 
+            detail: { entry: entry }
+        }));
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Failed to save journal entry:', error);
+        return false;
+    }
 }
 
-function setOrbitSpeed(speed) {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, speed);
+/**
+ * Get all locations where a specific element was found
+ * @param {string} elementName - Name of the element
+ * @returns {Promise<Array>} Array of location objects
+ */
+export async function getElementLocations(elementName) {
+    try {
+        // Try to use IndexedDB first if available
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 1);
+                if (db.objectStoreNames.contains('element_locations')) {
+                    const index = db.transaction('element_locations').store.index('by_element');
+                    const locations = await index.getAll(elementName);
+                    if (locations && locations.length > 0) {
+                        return locations;
+                    }
+                }
+            } catch (idbError) {
+                console.debug('IndexedDB not available for element locations');
+            }
+        }
+        
+        // Fallback: Check localStorage journal
+        const journal = await getJournal();
+        if (journal && journal.entries) {
+            return journal.entries
+                .filter(entry => entry.element === elementName)
+                .map(entry => ({
+                    id: entry.id,
+                    element: entry.element,
+                    planet: entry.location.planet,
+                    planetType: entry.location.planetType,
+                    quantity: entry.quantity,
+                    timestamp: entry.timestamp,
+                    date: entry.date,
+                    rarity: entry.rarity
+                }));
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error getting element locations:', error);
+        return [];
+    }
 }
 
-function getMusicVolume() {
-    return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) || 50;
+/**
+ * Get recent journal entries
+ * @param {number} limit - Maximum number of entries to return
+ * @returns {Promise<Array>} Array of journal entries
+ */
+export async function getRecentJournalEntries(limit = 20) {
+    try {
+        const journal = await getJournal();
+        if (journal && journal.entries) {
+            return journal.entries.slice(0, limit);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error getting recent journal entries:', error);
+        return [];
+    }
 }
 
-function setMusicVolume(volume) {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, volume.toString());
-}
-
-function getAmbientVolume() {
-    return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) || 50;
-}
-
-function setAmbientVolume(volume) {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
+/**
+ * Clear journal entries
+ * @returns {Promise<boolean>} Success status
+ */
+export async function clearJournal() {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const journalKey = `voidfarer_journal_${playerId}`;
+        localStorage.removeItem(journalKey);
+        
+        // Also clear IndexedDB if available
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 1);
+                if (db.objectStoreNames.contains('journal')) {
+                    const tx = db.transaction('journal', 'readwrite');
+                    await tx.objectStore('journal').clear();
+                    await tx.done;
+                }
+                if (db.objectStoreNames.contains('element_locations')) {
+                    const tx = db.transaction('element_locations', 'readwrite');
+                    await tx.objectStore('element_locations').clear();
+                    await tx.done;
+                }
+            } catch (idbError) {
+                console.debug('IndexedDB not available for clearing');
+            }
+        }
+        
+        console.log('📝 Journal cleared');
+        return true;
+    } catch (error) {
+        console.error('Error clearing journal:', error);
+        return false;
+    }
 }
 
 // ============================================================================
@@ -2331,39 +2465,136 @@ export async function claimPlayerLaborEarnings(playerId) {
 }
 
 // ============================================================================
-// ELEMENT LOCATIONS FUNCTIONS (ADDED FOR JOURNAL)
+// RESET
 // ============================================================================
 
 /**
- * Get all locations where a specific element was found
- * @param {string} elementName - Name of the element
- * @returns {Promise<Array>} Array of location objects
+ * Reset all game data for a player
+ * @param {string} playerId - Player ID
  */
-export async function getElementLocations(elementName) {
-    try {
-        // Try to use IndexedDB first if available
-        if (typeof window.dbGetElementLocations === 'function') {
-            return await window.dbGetElementLocations(elementName);
+export async function resetGame(playerId = 'main') {
+    // Save settings to restore after reset
+    const settings = {
+        haptics: getHapticsEnabled(),
+        autoGather: getAutoGatherEnabled(),
+        orbitSpeed: getOrbitSpeed(),
+        music: getMusicVolume(),
+        ambient: getAmbientVolume()
+    };
+    
+    // Clear all player-specific data
+    const keysToRemove = [
+        `${STORAGE_KEYS.PLAYER}_${playerId}`,
+        `${STORAGE_KEYS.COLLECTION}_${playerId}`,
+        `${STORAGE_KEYS.ELEMENT_INVENTORY}_${playerId}`,
+        `${STORAGE_KEYS.MATERIAL_INVENTORY}_${playerId}`,
+        `${STORAGE_KEYS.MATERIAL_QUALITY}_${playerId}`,
+        `${STORAGE_KEYS.ALCHEMY_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.METALLURGY_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.MATERIALS_SCIENCE_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.PHARMACEUTICALS_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.TEXTILES_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.CONSTRUCTION_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.AEROSPACE_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.NUCLEAR_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.OPTICAL_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.MAGNETIC_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.CRYOGENIC_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.POLYMERS_PROGRESS}_${playerId}`,
+        `${STORAGE_KEYS.RECIPE_UNLOCKS}_${playerId}`,
+        `${STORAGE_KEYS.FIELD_MASTERY}_${playerId}`,
+        `${STORAGE_KEYS.PLAYER_PRODUCTS}_${playerId}`,
+        `${STORAGE_KEYS.PLAYER_LABOR_EARNINGS}_${playerId}`,
+        STORAGE_KEYS.CREDITS,
+        STORAGE_KEYS.SHIP_FUEL,
+        STORAGE_KEYS.SHIP_POWER,
+        STORAGE_KEYS.SHIP_UPGRADES,
+        STORAGE_KEYS.CURRENT_SECTOR,
+        STORAGE_KEYS.CURRENT_REGION,
+        STORAGE_KEYS.CURRENT_STAR_SECTOR,
+        STORAGE_KEYS.CURRENT_SECTOR_NAME,
+        STORAGE_KEYS.CURRENT_SECTOR_TYPE,
+        STORAGE_KEYS.CURRENT_SECTOR_STARS,
+        STORAGE_KEYS.CURRENT_SECTOR_X,
+        STORAGE_KEYS.CURRENT_SECTOR_Y,
+        STORAGE_KEYS.CURRENT_STAR,
+        STORAGE_KEYS.CURRENT_STAR_TYPE,
+        STORAGE_KEYS.CURRENT_STAR_INDEX,
+        STORAGE_KEYS.CURRENT_STAR_X,
+        STORAGE_KEYS.CURRENT_STAR_Y,
+        STORAGE_KEYS.CURRENT_STAR_PLANETS,
+        STORAGE_KEYS.CURRENT_PLANET,
+        STORAGE_KEYS.CURRENT_PLANET_TYPE,
+        STORAGE_KEYS.CURRENT_PLANET_RESOURCES,
+        STORAGE_KEYS.CURRENT_PLANET_IMAGE,
+        STORAGE_KEYS.COLONIES,
+        STORAGE_KEYS.DISCOVERED_LOCATIONS,
+        STORAGE_KEYS.SCAN_HISTORY,
+        STORAGE_KEYS.HUB_INVENTORY,
+        STORAGE_KEYS.PLANET_CLAIMS,
+        STORAGE_KEYS.PLAYER_CLAIMS,
+        STORAGE_KEYS.CLAIM_HISTORY,
+        STORAGE_KEYS.CLAIM_NOTIFICATIONS,
+        STORAGE_KEYS.CERTIFICATE_HOLDERS,
+        `voidfarer_journal_${playerId}` // Clear journal too
+    ];
+    
+    keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+    });
+    
+    // Also clear IndexedDB journal
+    if (window.idb) {
+        try {
+            const db = await window.idb.openDB('VoidfarerDB', 1);
+            if (db.objectStoreNames.contains('journal')) {
+                await db.clear('journal');
+            }
+            if (db.objectStoreNames.contains('element_locations')) {
+                await db.clear('element_locations');
+            }
+        } catch (idbError) {
+            console.debug('IndexedDB not available for clearing');
         }
-        
-        // Fallback: Check localStorage for scan history
-        const scanHistory = localStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
-        if (scanHistory) {
-            const scans = JSON.parse(scanHistory);
-            return scans.filter(scan => scan.element === elementName).map(scan => ({
-                planet: scan.planet,
-                planetType: scan.planetType || 'unknown',
-                discoveredAt: scan.timestamp || Date.now(),
-                discoveredDate: scan.date || new Date().toISOString(),
-                quantity: scan.quantity || 1
-            }));
-        }
-        
-        return [];
-    } catch (error) {
-        console.error('Error getting element locations:', error);
-        return [];
     }
+    
+    // Restore settings
+    setHapticsEnabled(settings.haptics);
+    setAutoGatherEnabled(settings.autoGather);
+    setOrbitSpeed(settings.orbitSpeed);
+    setMusicVolume(settings.music);
+    setAmbientVolume(settings.ambient);
+    
+    // Re-initialize
+    await initializeStorage(playerId);
+}
+
+// ============================================================================
+// SETTINGS (additional)
+// ============================================================================
+
+function getOrbitSpeed() {
+    return localStorage.getItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED) || 'gentle';
+}
+
+function setOrbitSpeed(speed) {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS_ORBIT_SPEED, speed);
+}
+
+function getMusicVolume() {
+    return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) || 50;
+}
+
+function setMusicVolume(volume) {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, volume.toString());
+}
+
+function getAmbientVolume() {
+    return parseInt(localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) || 50;
+}
+
+function setAmbientVolume(volume) {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
 }
 
 // ============================================================================
@@ -2442,6 +2673,12 @@ export default {
     setLastNPCUpdate,
     updateNPCTraderAfterTrade,
     
+    // Journal Functions (NEW)
+    getJournal,
+    getElementLocations,
+    getRecentJournalEntries,
+    clearJournal,
+    
     // Location
     isAtEarth,
     getCurrentPlanetName,
@@ -2484,9 +2721,6 @@ export default {
     loadPortfolio,
     saveTradeHistory,
     loadTradeHistory,
-    
-    // Element Locations
-    getElementLocations,
     
     // System
     initializeStorage,
@@ -2564,6 +2798,13 @@ window.getLastNPCUpdate = getLastNPCUpdate;
 window.setLastNPCUpdate = setLastNPCUpdate;
 window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
+// Journal Functions (NEW)
+window.getJournal = getJournal;
+window.getElementLocations = getElementLocations;
+window.getRecentJournalEntries = getRecentJournalEntries;
+window.clearJournal = clearJournal;
+window.dbSaveElementLocation = dbSaveElementLocation; // Expose for HTML calls
+
 // Market data functions
 window.saveMarketData = saveMarketData;
 window.loadMarketData = loadMarketData;
@@ -2574,11 +2815,8 @@ window.loadPortfolio = loadPortfolio;
 window.saveTradeHistory = saveTradeHistory;
 window.loadTradeHistory = loadTradeHistory;
 
-// Element locations function
-window.getElementLocations = getElementLocations;
-
 // NEW: Cleanup functions
 window.triggerManualCleanup = triggerManualCleanup;
 window.runFullStorageCleanup = runFullStorageCleanup;
 
-console.log('✅ storage.js fully loaded with NPC trader support and storage cleanup functions');
+console.log('✅ storage.js fully loaded with NPC trader support, journal tracking, and storage cleanup functions');
