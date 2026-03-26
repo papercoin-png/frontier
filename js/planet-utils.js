@@ -3,9 +3,9 @@
 // Handles planet types, resource generation, and planet properties
 // UPDATED: Added tier-based resource generation matching galaxy map progression
 // UPDATED: Exactly 4 elements per planet, filtered by galaxy tier
-// FIXED: Strict tier filtering - Tier 1 planets ONLY get Common elements
+// FIXED: Strict tier filtering - Tier 1 planets ONLY get Common elements (no Magnesium, no Iron)
 
-import { getElementsForTier, getTierByDistance, TIERS, ELEMENTS_BY_TIER } from './galaxy-data.js';
+import { ELEMENTS_BY_TIER, getElementsForTier, getTierByDistance, TIERS } from './galaxy-data.js';
 
 // ===== PLANET TYPE DEFINITIONS =====
 export const PLANET_TYPES = {
@@ -148,30 +148,13 @@ export const RESOURCE_POOLS = {
     ]
 };
 
-// ===== TIER-BASED ELEMENT FILTERING =====
-/**
- * Strict filter elements by galaxy tier - only returns elements that belong to this tier
- * @param {Array} elements - Array of element names
- * @param {number} galaxyTier - Galaxy tier (1-10)
- * @returns {Array} Filtered elements that belong strictly to this tier
- */
-function filterElementsStrictByTier(elements, galaxyTier) {
-    // Get elements that belong to this exact tier (not lower tiers)
-    const tierElements = ELEMENTS_BY_TIER[Math.min(galaxyTier, 5)] || [];
-    return elements.filter(element => tierElements.includes(element));
-}
-
-/**
- * Get fallback common elements for Tier 1 planets
- * @returns {Array} Common elements for Tier 1
- */
-function getTier1CommonElements() {
-    return ELEMENTS_BY_TIER[1] || [
-        'Hydrogen', 'Helium', 'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
-        'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon',
-        'Potassium', 'Calcium'
-    ];
-}
+// ===== COMMON ELEMENTS (Tier 1 only) =====
+const COMMON_ELEMENTS = [
+    'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron',
+    'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
+    'Sodium', 'Magnesium', 'Aluminum', 'Silicon', 'Phosphorus',
+    'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'
+];
 
 // ===== UTILITY FUNCTIONS =====
 export function seededRandom(seed, index = 0) {
@@ -219,101 +202,98 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     const pool = RESOURCE_POOLS[planetType] || RESOURCE_POOLS[PLANET_TYPES.BARREN];
     const tierNum = Math.min(Math.max(galaxyTier, 1), 10);
     
-    // Get elements that are available at this EXACT tier (strict filtering)
-    let availablePool = [];
+    // Define allowed elements based on tier
+    let allowedElements = [];
     
     if (tierNum === 1) {
-        // Tier 1: ONLY common elements
-        availablePool = pool.filter(element => ELEMENTS_BY_TIER[1].includes(element));
+        // TIER 1: ONLY Common elements
+        allowedElements = [...COMMON_ELEMENTS];
     } else if (tierNum === 2) {
-        // Tier 2: Common + Uncommon elements
-        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
-        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
-        const allowedElements = [...tier1Elements, ...tier2Elements];
-        availablePool = pool.filter(element => allowedElements.includes(element));
+        // TIER 2: Common + Uncommon
+        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || [])];
     } else if (tierNum === 3) {
-        // Tier 3: Common + Uncommon + Rare elements
-        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
-        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
-        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
-        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements];
-        availablePool = pool.filter(element => allowedElements.includes(element));
+        // TIER 3: Common + Uncommon + Rare
+        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || [])];
     } else if (tierNum === 4) {
-        // Tier 4: Common + Uncommon + Rare + Very Rare
-        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
-        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
-        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
-        const tier4Elements = ELEMENTS_BY_TIER[4] || [];
-        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements, ...tier4Elements];
-        availablePool = pool.filter(element => allowedElements.includes(element));
+        // TIER 4: Common + Uncommon + Rare + Very Rare
+        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || []), ...(ELEMENTS_BY_TIER[4] || [])];
     } else {
-        // Tier 5+: All elements including Legendary
-        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
-        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
-        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
-        const tier4Elements = ELEMENTS_BY_TIER[4] || [];
-        const tier5Elements = ELEMENTS_BY_TIER[5] || [];
-        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements, ...tier4Elements, ...tier5Elements];
-        availablePool = pool.filter(element => allowedElements.includes(element));
+        // TIER 5+: All elements
+        allowedElements = [...COMMON_ELEMENTS, ...(ELEMENTS_BY_TIER[2] || []), ...(ELEMENTS_BY_TIER[3] || []), ...(ELEMENTS_BY_TIER[4] || []), ...(ELEMENTS_BY_TIER[5] || [])];
     }
     
-    // If no elements available in the pool after filtering, use Tier 1 common elements
+    // Remove duplicates
+    allowedElements = [...new Set(allowedElements)];
+    
+    // Filter pool to only allowed elements
+    let availablePool = pool.filter(element => allowedElements.includes(element));
+    
+    // For Tier 1, also ensure no Magnesium or other Tier 2+ elements slip through
+    if (tierNum === 1) {
+        availablePool = availablePool.filter(element => COMMON_ELEMENTS.includes(element));
+    }
+    
+    // If still empty, use hardcoded common elements
     if (availablePool.length === 0) {
-        const commonElements = getTier1CommonElements();
-        // Filter common elements by what's in the planet type pool
-        availablePool = pool.filter(element => commonElements.includes(element));
-        
-        // If still empty, use a hardcoded set of common elements
-        if (availablePool.length === 0) {
-            availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Sodium', 'Aluminum', 'Silicon'];
+        if (tierNum === 1) {
+            availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'];
+        } else {
+            // For higher tiers, use a mix of common and appropriate tier elements
+            availablePool = [...COMMON_ELEMENTS];
+            if (ELEMENTS_BY_TIER[Math.min(tierNum, 5)]) {
+                availablePool.push(...ELEMENTS_BY_TIER[Math.min(tierNum, 5)]);
+            }
         }
+    }
+    
+    // Remove duplicates and shuffle
+    availablePool = [...new Set(availablePool)];
+    
+    // Shuffle the pool using seeded random
+    for (let i = availablePool.length - 1; i > 0; i--) {
+        const j = Math.floor(seededRandom(seed, i + 100) * (i + 1));
+        [availablePool[i], availablePool[j]] = [availablePool[j], availablePool[i]];
     }
     
     const resources = [];
-    const tempPool = [...availablePool];
     const targetCount = 4;
     
-    // Shuffle the pool using seeded random for deterministic generation
-    for (let i = tempPool.length - 1; i > 0; i--) {
-        const j = Math.floor(seededRandom(seed, i + 100) * (i + 1));
-        [tempPool[i], tempPool[j]] = [tempPool[j], tempPool[i]];
-    }
-    
     // Take first targetCount elements
-    for (let i = 0; i < Math.min(targetCount, tempPool.length); i++) {
-        resources.push(tempPool[i]);
+    for (let i = 0; i < Math.min(targetCount, availablePool.length); i++) {
+        resources.push(availablePool[i]);
     }
     
-    // If we don't have enough, fill with common elements
-    while (resources.length < targetCount) {
-        const commonElements = getTier1CommonElements();
-        // Find an element not already in resources
-        let fallbackElement = null;
-        for (const elem of commonElements) {
-            if (!resources.includes(elem) && !resources.includes(elem)) {
-                fallbackElement = elem;
-                break;
-            }
-        }
-        if (!fallbackElement) {
-            fallbackElement = 'Carbon';
-        }
-        resources.push(fallbackElement);
-    }
-    
-    // Ensure no duplicates
-    const uniqueResources = [...new Set(resources)];
-    if (uniqueResources.length < targetCount) {
-        // Add missing elements from common pool
-        const commonElements = getTier1CommonElements();
-        for (const elem of commonElements) {
-            if (!uniqueResources.includes(elem) && uniqueResources.length < targetCount) {
-                uniqueResources.push(elem);
+    // Ensure we have exactly 4 resources
+    if (resources.length < targetCount) {
+        const fallbackPool = tierNum === 1 ? 
+            ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine'] :
+            allowedElements;
+        
+        for (const elem of fallbackPool) {
+            if (!resources.includes(elem) && resources.length < targetCount) {
+                resources.push(elem);
             }
         }
     }
     
-    return uniqueResources.slice(0, targetCount);
+    // Final verification for Tier 1: remove any non-common elements
+    if (tierNum === 1) {
+        const verifiedResources = resources.filter(r => COMMON_ELEMENTS.includes(r));
+        if (verifiedResources.length >= targetCount) {
+            return verifiedResources.slice(0, targetCount);
+        } else {
+            // Add missing common elements
+            const result = [...verifiedResources];
+            for (const elem of COMMON_ELEMENTS) {
+                if (!result.includes(elem) && result.length < targetCount) {
+                    result.push(elem);
+                }
+            }
+            return result.slice(0, targetCount);
+        }
+    }
+    
+    return resources.slice(0, targetCount);
 }
 
 // ===== PLANET GENERATION =====
@@ -574,7 +554,6 @@ export default {
     seededRandomRange,
     hashString,
     getRandomPlanetType,
-    filterElementsStrictByTier,
     generatePlanetResources,
     generatePlanet,
     generateStar,
