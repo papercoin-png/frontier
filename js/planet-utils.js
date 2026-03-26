@@ -1,7 +1,10 @@
 // js/planet-utils.js
 // Shared planet generation utilities for Voidfarer
 // Handles planet types, resource generation, and planet properties
-// This is a module - must be loaded with type="module"
+// UPDATED: Added tier-based resource generation matching galaxy map progression
+// UPDATED: Each element now has rarity that matches its galaxy tier
+
+import { getTierByDistance, getRarityByTier, TIERS } from './galaxy-data.js';
 
 // ===== PLANET TYPE DEFINITIONS =====
 export const PLANET_TYPES = {
@@ -108,6 +111,7 @@ export const PLANET_TYPE_DATA = {
 };
 
 // ===== RESOURCE POOLS BY PLANET TYPE =====
+// These are the possible elements that can appear on each planet type
 export const RESOURCE_POOLS = {
     [PLANET_TYPES.SCORCHED]: [
         'Iron', 'Sulfur', 'Copper', 'Gold', 'Uranium', 'Platinum', 'Lead', 'Mercury',
@@ -143,32 +147,95 @@ export const RESOURCE_POOLS = {
     ]
 };
 
-// ===== RARITY WEIGHTS =====
-export const RARITY_WEIGHTS = {
-    'Hydrogen': 100, 'Helium': 90, 'Oxygen': 100, 'Carbon': 100, 'Nitrogen': 80,
-    'Iron': 100, 'Silicon': 100, 'Aluminum': 90, 'Magnesium': 85, 'Calcium': 80,
-    'Sodium': 75, 'Potassium': 75, 'Sulfur': 70, 'Phosphorus': 65, 'Chlorine': 60,
-    'Titanium': 50, 'Nickel': 55, 'Copper': 50, 'Zinc': 45, 'Manganese': 40,
-    'Chromium': 40, 'Vanadium': 35, 'Cobalt': 35, 'Lead': 40, 'Tin': 35,
-    'Argon': 40, 'Neon': 35, 'Krypton': 30, 'Xenon': 25, 'Radon': 10,
-    'Gold': 20, 'Silver': 25, 'Platinum': 15, 'Palladium': 12, 'Rhodium': 10,
-    'Iridium': 8, 'Ruthenium': 8, 'Osmium': 7, 'Rhenium': 6, 'Tungsten': 15,
-    'Uranium': 12, 'Thorium': 10, 'Gallium': 15, 'Germanium': 12, 'Arsenic': 10,
-    'Selenium': 12, 'Bromine': 15, 'Rubidium': 10, 'Strontium': 12, 'Yttrium': 8,
-    'Zirconium': 10, 'Niobium': 8, 'Molybdenum': 15, 'Technetium': 1,
-    'Cadmium': 10, 'Indium': 8, 'Antimony': 8, 'Tellurium': 7, 'Iodine': 10,
-    'Cesium': 6, 'Barium': 8, 'Lanthanum': 5, 'Cerium': 5, 'Praseodymium': 4,
-    'Neodymium': 5, 'Promethium': 1, 'Samarium': 4, 'Europium': 3, 'Gadolinium': 4,
-    'Terbium': 3, 'Dysprosium': 4, 'Holmium': 3, 'Erbium': 4, 'Thulium': 3,
-    'Ytterbium': 4, 'Lutetium': 3, 'Hafnium': 4, 'Tantalum': 4, 'Bismuth': 6,
-    'Polonium': 2, 'Astatine': 1, 'Francium': 1, 'Radium': 2, 'Actinium': 2,
-    'Protactinium': 2, 'Neptunium': 1, 'Plutonium': 1, 'Americium': 1, 'Curium': 1,
-    'Berkelium': 1, 'Californium': 1, 'Einsteinium': 1, 'Fermium': 1, 'Mendelevium': 1,
-    'Nobelium': 1, 'Lawrencium': 1, 'Rutherfordium': 1, 'Dubnium': 1, 'Seaborgium': 1,
-    'Bohrium': 1, 'Hassium': 1, 'Meitnerium': 1, 'Darmstadtium': 1, 'Roentgenium': 1,
-    'Copernicium': 1, 'Nihonium': 1, 'Flerovium': 1, 'Moscovium': 1, 'Livermorium': 1,
-    'Tennessine': 1, 'Oganesson': 1
-};
+// ===== TIER-BASED RARITY WEIGHTS =====
+// These weights determine the probability of each element appearing based on galaxy tier
+// Higher tier = higher chance of rare elements
+
+/**
+ * Get rarity weights based on galaxy tier
+ * @param {number} tier - Galaxy tier (1-10)
+ * @returns {Object} Weights for each element rarity
+ */
+export function getRarityWeightsByTier(tier) {
+    const tierNum = Math.min(Math.max(tier, 1), 10);
+    
+    // Base weights per tier (percentage chance)
+    // Tier 1 = common only, Tier 10 = legendary only
+    const weights = {
+        1: { common: 100, uncommon: 0, rare: 0, veryRare: 0, legendary: 0, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        2: { common: 80, uncommon: 20, rare: 0, veryRare: 0, legendary: 0, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        3: { common: 60, uncommon: 30, rare: 10, veryRare: 0, legendary: 0, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        4: { common: 40, uncommon: 30, rare: 25, veryRare: 5, legendary: 0, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        5: { common: 20, uncommon: 30, rare: 30, veryRare: 15, legendary: 5, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        6: { common: 10, uncommon: 25, rare: 30, veryRare: 25, legendary: 10, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        7: { common: 5, uncommon: 20, rare: 30, veryRare: 30, legendary: 15, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        8: { common: 0, uncommon: 15, rare: 30, veryRare: 35, legendary: 20, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        9: { common: 0, uncommon: 10, rare: 25, veryRare: 35, legendary: 30, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 },
+        10: { common: 0, uncommon: 0, rare: 0, veryRare: 20, legendary: 80, exotic: 0, mythic: 0, cosmic: 0, void: 0, transcendent: 0 }
+    };
+    
+    return weights[tierNum];
+}
+
+/**
+ * Get element rarity based on element name and galaxy tier
+ * @param {string} elementName - Name of the element
+ * @param {number} tier - Galaxy tier (1-10)
+ * @returns {string} Rarity name
+ */
+export function getElementRarityByTier(elementName, tier) {
+    // First, define which elements belong to which rarity tier
+    const elementRarityMap = {
+        // Common elements (Tier 1)
+        common: ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Sodium', 'Magnesium', 
+                  'Aluminum', 'Silicon', 'Potassium', 'Calcium', 'Carbon', 'Oxygen', 'Nitrogen',
+                  'Iron', 'Nickel', 'Copper', 'Zinc', 'Tin', 'Lead'],
+        
+        // Uncommon elements (Tier 2)
+        uncommon: ['Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Gallium', 'Germanium',
+                   'Arsenic', 'Selenium', 'Bromine', 'Krypton', 'Rubidium', 'Strontium', 'Yttrium',
+                   'Zirconium', 'Niobium', 'Molybdenum', 'Silver', 'Cadmium', 'Indium', 'Antimony',
+                   'Tellurium', 'Iodine', 'Xenon', 'Cesium', 'Barium'],
+        
+        // Rare elements (Tier 3)
+        rare: ['Gold', 'Platinum', 'Palladium', 'Rhodium', 'Ruthenium', 'Osmium', 'Iridium', 
+               'Rhenium', 'Technetium', 'Promethium'],
+        
+        // Very Rare elements (Tier 4)
+        veryRare: ['Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'],
+        
+        // Legendary elements (Tier 5-10)
+        legendary: ['Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium',
+                    'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium',
+                    'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium', 'Nihonium', 'Flerovium',
+                    'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson']
+    };
+    
+    // Determine the element's base rarity
+    let baseRarity = 'common';
+    if (elementRarityMap.uncommon.includes(elementName)) baseRarity = 'uncommon';
+    if (elementRarityMap.rare.includes(elementName)) baseRarity = 'rare';
+    if (elementRarityMap.veryRare.includes(elementName)) baseRarity = 'very-rare';
+    if (elementRarityMap.legendary.includes(elementName)) baseRarity = 'legendary';
+    
+    // Apply tier restrictions: elements can only appear at or above their tier
+    const tierRequirements = {
+        'common': 1,
+        'uncommon': 2,
+        'rare': 3,
+        'very-rare': 4,
+        'legendary': 5
+    };
+    
+    const requiredTier = tierRequirements[baseRarity];
+    
+    // If the current tier is below the required tier, the element is not available
+    if (tier < requiredTier) {
+        return null; // Element not available at this tier
+    }
+    
+    return baseRarity;
+}
 
 // ===== UTILITY FUNCTIONS =====
 export function seededRandom(seed, index = 0) {
@@ -204,43 +271,111 @@ export function getRandomPlanetType(seed, index = 0) {
     return PLANET_TYPES.BARREN;
 }
 
-// ===== RESOURCE GENERATION =====
-export function generatePlanetResources(seed, planetType, maxResources = 4) {
+// ===== TIER-BASED RESOURCE GENERATION =====
+/**
+ * Generate resources for a planet based on galaxy tier
+ * @param {number} seed - Generation seed
+ * @param {string} planetType - Planet type
+ * @param {number} galaxyTier - Galaxy tier (1-10)
+ * @param {number} maxResources - Maximum number of resources (default 4)
+ * @returns {Array} Array of element names
+ */
+export function generatePlanetResources(seed, planetType, galaxyTier = 1, maxResources = 4) {
     const pool = RESOURCE_POOLS[planetType] || RESOURCE_POOLS[PLANET_TYPES.BARREN];
     const resources = [];
-    const weightedPool = pool.map(resource => ({
-        name: resource,
-        weight: RARITY_WEIGHTS[resource] || 10
-    }));
+    const tierWeights = getRarityWeightsByTier(galaxyTier);
     
-    while (resources.length < maxResources && weightedPool.length > 0) {
-        const totalWeight = weightedPool.reduce((sum, item) => sum + item.weight, 0);
+    // Create weighted pool where each element gets weight based on its rarity and tier
+    const weightedPool = [];
+    
+    for (const element of pool) {
+        // Get the element's base rarity
+        let elementRarity = 'common';
+        if (['Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Silver', 'Gold', 'Platinum'].includes(element)) {
+            elementRarity = 'uncommon';
+        }
+        if (['Gold', 'Platinum', 'Palladium', 'Rhodium', 'Iridium', 'Osmium', 'Uranium', 'Thorium'].includes(element)) {
+            elementRarity = 'rare';
+        }
+        if (['Uranium', 'Thorium', 'Plutonium'].includes(element)) {
+            elementRarity = 'very-rare';
+        }
+        if (['Californium', 'Einsteinium', 'Fermium', 'Lawrencium'].includes(element)) {
+            elementRarity = 'legendary';
+        }
+        
+        // Get weight based on tier
+        let weight = 0;
+        switch (elementRarity) {
+            case 'common':
+                weight = tierWeights.common;
+                break;
+            case 'uncommon':
+                weight = tierWeights.uncommon;
+                break;
+            case 'rare':
+                weight = tierWeights.rare;
+                break;
+            case 'very-rare':
+                weight = tierWeights.veryRare;
+                break;
+            case 'legendary':
+                weight = tierWeights.legendary;
+                break;
+            default:
+                weight = tierWeights.common;
+        }
+        
+        // Only include elements with weight > 0
+        if (weight > 0) {
+            weightedPool.push({ name: element, weight: weight });
+        }
+    }
+    
+    // If no elements match the tier, fallback to common elements
+    if (weightedPool.length === 0) {
+        // Fallback: include all elements with weight 1
+        for (const element of pool) {
+            weightedPool.push({ name: element, weight: 1 });
+        }
+    }
+    
+    // Select resources
+    const tempPool = [...weightedPool];
+    
+    while (resources.length < maxResources && tempPool.length > 0) {
+        const totalWeight = tempPool.reduce((sum, item) => sum + item.weight, 0);
         let rand = seededRandom(seed, resources.length + 100) * totalWeight;
         let selectedIndex = 0;
         let cumulative = 0;
         
-        for (let i = 0; i < weightedPool.length; i++) {
-            cumulative += weightedPool[i].weight;
+        for (let i = 0; i < tempPool.length; i++) {
+            cumulative += tempPool[i].weight;
             if (rand < cumulative) {
                 selectedIndex = i;
                 break;
             }
         }
         
-        const selected = weightedPool[selectedIndex];
+        const selected = tempPool[selectedIndex];
         resources.push(selected.name);
-        weightedPool.splice(selectedIndex, 1);
+        tempPool.splice(selectedIndex, 1);
+    }
+    
+    // Ensure we always have at least one resource
+    if (resources.length === 0 && weightedPool.length > 0) {
+        resources.push(weightedPool[0].name);
     }
     
     return resources;
 }
 
 // ===== PLANET GENERATION =====
-export function generatePlanet(seed, index, starType, sectorId) {
+export function generatePlanet(seed, index, starType, sectorId, galaxyTier = 1) {
     const planetSeed = seed + index * 1000;
     const planetType = getRandomPlanetType(planetSeed, 0);
     const planetData = PLANET_TYPE_DATA[planetType];
-    const resources = generatePlanetResources(planetSeed, planetType);
+    const resources = generatePlanetResources(planetSeed, planetType, galaxyTier);
     const orbitRadius = 70 + index * 40;
     const orbitSpeed = 0.002 - (index * 0.0002);
     
@@ -261,12 +396,13 @@ export function generatePlanet(seed, index, starType, sectorId) {
         orbitRadius: orbitRadius,
         orbitSpeed: orbitSpeed,
         angle: seededRandom(planetSeed, 100) * Math.PI * 2,
-        distanceFromStar: 0.5 + (index * 0.8)
+        distanceFromStar: 0.5 + (index * 0.8),
+        galaxyTier: galaxyTier  // Store the galaxy tier with the planet
     };
 }
 
 // ===== STAR GENERATION =====
-export function generateStar(seed, index, clusterName) {
+export function generateStar(seed, index, clusterName, galaxyTier = 1) {
     const starSeed = seed + index * 1000;
     
     const starTypes = [
@@ -296,7 +432,7 @@ export function generateStar(seed, index, clusterName) {
     
     const planets = [];
     for (let i = 0; i < planetCount; i++) {
-        planets.push(generatePlanet(starSeed, i, starType.type, clusterName));
+        planets.push(generatePlanet(starSeed, i, starType.type, clusterName, galaxyTier));
     }
     
     return {
@@ -309,6 +445,7 @@ export function generateStar(seed, index, clusterName) {
         planetCount: planetCount,
         planets: planets,
         seed: starSeed,
+        galaxyTier: galaxyTier,
         position: {
             x: seededRandom(starSeed, 2) * 90 + 5,
             y: seededRandom(starSeed, 3) * 90 + 5
@@ -326,7 +463,8 @@ export function saveSystemData(star, planets, clusterName) {
             color: star.color,
             icon: star.icon,
             index: star.index,
-            seed: star.seed
+            seed: star.seed,
+            galaxyTier: star.galaxyTier
         },
         planets: planets.map(p => ({ ...p, resources: p.resources || [] })),
         clusterName: clusterName,
@@ -352,8 +490,13 @@ export function clearSystemData() {
     localStorage.removeItem('voidfarer_system_data');
 }
 
-export function savePlanetResources(planetName, resources) {
-    localStorage.setItem(`voidfarer_planet_resources_${planetName}`, JSON.stringify(resources));
+export function savePlanetResources(planetName, resources, galaxyTier = null) {
+    const data = {
+        resources: resources,
+        galaxyTier: galaxyTier,
+        timestamp: Date.now()
+    };
+    localStorage.setItem(`voidfarer_planet_resources_${planetName}`, JSON.stringify(data));
 }
 
 export function loadPlanetResources(planetName) {
@@ -480,13 +623,14 @@ export default {
     PLANET_TYPES,
     PLANET_TYPE_DATA,
     RESOURCE_POOLS,
-    RARITY_WEIGHTS,
     MAX_IMAGES_PER_BIOME,
     EXTERNAL_FALLBACK_URL,
     seededRandom,
     seededRandomRange,
     hashString,
     getRandomPlanetType,
+    getRarityWeightsByTier,
+    getElementRarityByTier,
     generatePlanetResources,
     generatePlanet,
     generateStar,
