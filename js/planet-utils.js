@@ -3,7 +3,7 @@
 // Handles planet types, resource generation, and planet properties
 // UPDATED: Tier-based resource generation using corrected element classification from galaxy-data.js
 // UPDATED: Exactly 4 elements per planet, filtered by galaxy tier
-// FIXED: Strict tier filtering using TIER_1_ELEMENTS, TIER_2_ELEMENTS, etc.
+// UPDATED: Gradual element progression - Legendaries only appear at Tier 8+
 
 import { 
     TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS,
@@ -188,24 +188,64 @@ export function getRandomPlanetType(seed, index = 0) {
 // ===== TIER-BASED RESOURCE GENERATION =====
 /**
  * Get allowed elements for a given tier
+ * Gradual progression: Legendaries only appear at Tier 8+
  * @param {number} galaxyTier - Galaxy tier (1-10)
  * @returns {Array} Array of allowed element names
  */
 function getAllowedElementsForTier(galaxyTier) {
     const tier = Math.min(Math.max(galaxyTier, 1), 10);
     
+    // Tier 1: Only Common
     if (tier === 1) {
         return [...TIER_1_ELEMENTS];
-    } else if (tier === 2) {
-        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS];
-    } else if (tier === 3) {
-        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS];
-    } else if (tier === 4) {
-        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
-    } else {
-        // Tier 5+ includes all elements
-        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS, ...TIER_5_ELEMENTS];
     }
+    
+    // Tier 2: Common + Uncommon
+    if (tier === 2) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS];
+    }
+    
+    // Tier 3: Common + Uncommon + Rare
+    if (tier === 3) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS];
+    }
+    
+    // Tier 4: Common + Uncommon + Rare + Very Rare
+    if (tier === 4) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+    }
+    
+    // Tier 5: Common + Uncommon + Rare + Very Rare (NO Legendary)
+    if (tier === 5) {
+        return [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+    }
+    
+    // Tier 6: Uncommon + Rare + Very Rare (Common removed)
+    if (tier === 6) {
+        return [...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+    }
+    
+    // Tier 7: Rare + Very Rare (Uncommon removed)
+    if (tier === 7) {
+        return [...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+    }
+    
+    // Tier 8: Very Rare + Legendary (Rare removed, Legendary appears)
+    if (tier === 8) {
+        return [...TIER_4_ELEMENTS, ...TIER_5_ELEMENTS];
+    }
+    
+    // Tier 9: Very Rare + Legendary (same as Tier 8)
+    if (tier === 9) {
+        return [...TIER_4_ELEMENTS, ...TIER_5_ELEMENTS];
+    }
+    
+    // Tier 10: Legendary only
+    if (tier === 10) {
+        return [...TIER_5_ELEMENTS];
+    }
+    
+    return [...TIER_1_ELEMENTS];
 }
 
 /**
@@ -234,9 +274,13 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     if (availablePool.length === 0) {
         if (tierNum === 1) {
             availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Sulfur', 'Chlorine', 'Argon'];
+        } else if (tierNum === 10) {
+            availablePool = [...TIER_5_ELEMENTS];
         } else {
             availablePool = [...TIER_1_ELEMENTS];
             if (tierNum >= 2) availablePool.push(...TIER_2_ELEMENTS.slice(0, 10));
+            if (tierNum >= 3) availablePool.push(...TIER_3_ELEMENTS.slice(0, 5));
+            if (tierNum >= 4) availablePool.push(...TIER_4_ELEMENTS.slice(0, 3));
         }
     }
     
@@ -259,9 +303,20 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     
     // Ensure we have exactly 4 resources (no duplicates)
     if (resources.length < targetCount) {
-        const fallbackPool = tierNum === 1 ? 
-            ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Neon', 'Sodium', 'Aluminum', 'Silicon'] :
-            allowedElements;
+        let fallbackPool;
+        if (tierNum === 10) {
+            fallbackPool = TIER_5_ELEMENTS;
+        } else if (tierNum === 9 || tierNum === 8) {
+            fallbackPool = [...TIER_4_ELEMENTS, ...TIER_5_ELEMENTS];
+        } else if (tierNum === 7) {
+            fallbackPool = [...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+        } else if (tierNum === 6) {
+            fallbackPool = [...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+        } else if (tierNum === 5 || tierNum === 4) {
+            fallbackPool = [...TIER_1_ELEMENTS, ...TIER_2_ELEMENTS, ...TIER_3_ELEMENTS, ...TIER_4_ELEMENTS];
+        } else {
+            fallbackPool = allowedElements;
+        }
         
         for (const elem of fallbackPool) {
             if (!resources.includes(elem) && resources.length < targetCount) {
