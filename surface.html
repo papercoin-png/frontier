@@ -842,6 +842,7 @@
         }
 
         function initializePityCounters() {
+            pityCounters = {};
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
                 pityCounters[resource] = {
@@ -979,6 +980,7 @@
                             mass: 0,
                             wasPity: false
                         });
+                        console.log('🎉 All 4 resources discovered! Claim button should now be visible.');
                     }
                 }
             }
@@ -1114,7 +1116,7 @@
                     planetResources = generateFallbackResources(planetTypeStr);
                 }
                 
-                if (planetResources.length > 4) {
+                if (planetResources.length !== 4) {
                     planetResources = planetResources.slice(0, 4);
                 }
                 
@@ -1137,11 +1139,18 @@
                 
                 await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
+                // Reset resource states to match planet's actual resources
+                resourceStates = {};
+                resourceChances = {};
+                
                 currentPlanet.resources.forEach(resource => {
                     resourceStates[resource] = true;
                     const chance = getElementRarityChance(resource);
                     resourceChances[resource] = chance > 0 ? chance : 5;
                 });
+                
+                console.log('Planet resources loaded:', currentPlanet.resources);
+                console.log('Resource states:', resourceStates);
                 
                 initializePityCounters();
                 initializeExplorationTracking();
@@ -1244,6 +1253,7 @@
                     return;
                 }
                 
+                // ONLY extract from the planet's actual resources
                 const activeResources = currentPlanet.resources.filter(r => resourceStates[r]);
                 if (activeResources.length === 0) {
                     extractorText.textContent = 'No resources selected';
