@@ -3,6 +3,7 @@
 // Handles determining planet colors based on highest rarity found
 // Tracks completion status for the calm, minimalist exploration system
 // Now includes claim status integration
+// UPDATED: Added discovery history and rights status functions
 
 // ===== RARITY LEVELS (ordered from lowest to highest) =====
 export const RARITY_LEVELS = {
@@ -306,7 +307,11 @@ export async function claimPlanet(planetName, playerId, playerName, discoveryEle
             totalEarned: 0,
             totalMiners: 0,
             sectorX: sectorX,
-            sectorY: sectorY
+            sectorY: sectorY,
+            totalRenewals: 0,
+            lastRenewed: null,
+            expiredAt: null,
+            isExpired: false
         };
         
         // Save to planet claims
@@ -450,7 +455,14 @@ export async function isPlanetClaimed(planetName) {
         const saved = localStorage.getItem(STORAGE_KEYS.PLANET_CLAIMS);
         if (saved) {
             const planetClaims = JSON.parse(saved);
-            if (planetClaims[planetName]) return true;
+            if (planetClaims[planetName]) {
+                // Check if expired
+                const claim = planetClaims[planetName];
+                const expiresAt = claim.claimedAt + (30 * 24 * 60 * 60 * 1000);
+                if (Date.now() < expiresAt) {
+                    return true;
+                }
+            }
         }
         
         // Fallback to legacy claimed planets list
@@ -806,6 +818,150 @@ export function resetPlanetStatus(planetName) {
     }
 }
 
+// ===== DISCOVERY HISTORY FUNCTIONS (NEW) =====
+
+/**
+ * Get planet discovery history from storage
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<Array>} Array of discovery records
+ */
+export async function getPlanetDiscoveryHistory(planetName) {
+    try {
+        if (typeof window.getDiscoveryHistory === 'function') {
+            return await window.getDiscoveryHistory(planetName);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error getting planet discovery history:', error);
+        return [];
+    }
+}
+
+/**
+ * Get formatted planet discovery history for display
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<Array>} Formatted discovery records
+ */
+export async function getFormattedPlanetDiscoveryHistory(planetName) {
+    try {
+        const history = await getPlanetDiscoveryHistory(planetName);
+        
+        return history.map(record => ({
+            playerName: record.playerName,
+            date: record.date,
+            timestamp: record.timestamp,
+            isFirstDiscovery: record.isFirstDiscovery,
+            planetTier: record.planetTier,
+            formattedDate: new Date(record.timestamp).toLocaleDateString()
+        }));
+        
+    } catch (error) {
+        console.error('Error getting formatted planet discovery history:', error);
+        return [];
+    }
+}
+
+/**
+ * Get first discoverer of a planet
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<Object|null>} First discoverer info
+ */
+export async function getFirstDiscoverer(planetName) {
+    try {
+        const history = await getPlanetDiscoveryHistory(planetName);
+        if (history.length === 0) return null;
+        
+        const first = history[0];
+        return {
+            playerName: first.playerName,
+            date: first.date,
+            timestamp: first.timestamp
+        };
+        
+    } catch (error) {
+        console.error('Error getting first discoverer:', error);
+        return null;
+    }
+}
+
+/**
+ * Add a discovery record for a planet
+ * @param {string} planetName - Name of the planet
+ * @param {string} playerId - Player ID
+ * @param {string} playerName - Player name
+ * @param {number} planetTier - Planet tier
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addPlanetDiscoveryRecord(planetName, playerId, playerName, planetTier) {
+    try {
+        if (typeof window.addToDiscoveryHistory === 'function') {
+            return await window.addToDiscoveryHistory(planetName, playerId, playerName, planetTier);
+        }
+        return false;
+    } catch (error) {
+        console.error('Error adding planet discovery record:', error);
+        return false;
+    }
+}
+
+// ===== RIGHTS STATUS FUNCTIONS (NEW) =====
+
+/**
+ * Get rights status for a planet (active, expiring, expired, available)
+ * @param {string} planetName - Name of the planet
+ * @returns {Promise<Object>} Rights status object
+ */
+export async function getPlanetRightsStatus(planetName) {
+    try {
+        const claim = await getPlanetClaim(planetName);
+        
+        if (!claim) {
+            return {
+                status: 'available',
+                owner: null,
+                ownerId: null,
+                expiresAt: null,
+                daysRemaining: 0,
+                canRenew: false,
+                renewalCost: 0
+            };
+        }
+        
+        const expiresAt = claim.claimedAt + (30 * 24 * 60 * 60 * 1000);
+        const now = Date.now();
+        const daysRemaining = Math.max(0, Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000)));
+        
+        let status = 'active';
+        if (daysRemaining <= 0) {
+            status = 'expired';
+        } else if (daysRemaining <= 3) {
+            status = 'expiring_soon';
+        }
+        
+        return {
+            status: status,
+            owner: claim.ownerName,
+            ownerId: claim.ownerId,
+            expiresAt: expiresAt,
+            daysRemaining: daysRemaining,
+            canRenew: status === 'active' || status === 'expiring_soon',
+            renewalCost: claim.baseFee * 0.5
+        };
+        
+    } catch (error) {
+        console.error('Error getting planet rights status:', error);
+        return {
+            status: 'available',
+            owner: null,
+            ownerId: null,
+            expiresAt: null,
+            daysRemaining: 0,
+            canRenew: false,
+            renewalCost: 0
+        };
+    }
+}
+
 // ===== EXPORT ALL =====
 export default {
     RARITY_LEVELS,
@@ -835,5 +991,12 @@ export default {
     getOwnerEarningsHistory,
     updatePlanetFee,
     getPlayerClaimStats,
-    resetPlanetStatus
+    resetPlanetStatus,
+    // New Discovery History Functions
+    getPlanetDiscoveryHistory,
+    getFormattedPlanetDiscoveryHistory,
+    getFirstDiscoverer,
+    addPlanetDiscoveryRecord,
+    // New Rights Status Functions
+    getPlanetRightsStatus
 };
