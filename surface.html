@@ -254,10 +254,8 @@
             letter-spacing: 1px;
             box-shadow: 0 0 30px gold;
             display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 10px;
+            position: relative;
+            margin-top: 10px;
             z-index: 35;
         }
         
@@ -726,7 +724,13 @@
     <script type="module">
         import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
-        import { getCurrentTier, getTierByDistance, TIERS } from './js/galaxy-data.js';
+        import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
+        import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+
+        // Expose storage functions to window for non-module code
+        window.getCollection = getCollection;
+        window.addElementToCollection = addElementToCollection;
+        window.removeElementFromCollection = removeElementFromCollection;
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -809,37 +813,19 @@
         let exploredElements = {};
         let totalElements = 4;
         
-        // ===== TIER-BASED RARITY FUNCTION =====
+        // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
         function getElementRarity(elementName) {
-            // Get the element's base rarity from its name
-            const legendaryElements = ['Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium', 'Plutonium', 'Neptunium', 'Americium', 'Curium', 'Berkelium'];
-            const veryRareElements = ['Uranium', 'Thorium', 'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium', 'Rhodium', 'Palladium', 'Ruthenium'];
-            const rareElements = ['Titanium', 'Chromium', 'Nickel', 'Cobalt', 'Vanadium', 'Manganese', 'Silver', 'Copper', 'Zinc', 'Tin', 'Lead'];
-            const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon', 'Sulfur', 'Calcium', 'Potassium', 'Magnesium'];
-            
-            let baseRarity = 'common';
-            if (legendaryElements.includes(elementName)) baseRarity = 'legendary';
-            else if (veryRareElements.includes(elementName)) baseRarity = 'very-rare';
-            else if (rareElements.includes(elementName)) baseRarity = 'rare';
-            else if (uncommonElements.includes(elementName)) baseRarity = 'uncommon';
-            
-            // Apply tier boost - higher tier planets can find rarer elements more easily
-            const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
-            
-            // Elements can only be found at or above their native tier
-            const elementTier = RARITY_CONFIG[baseRarity]?.tier || 1;
-            if (currentPlanetTier < elementTier) {
-                return null; // Element not available at this tier
-            }
-            
-            return baseRarity;
+            if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
+            if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
+            if (TIER_3_ELEMENTS.includes(elementName)) return 'rare';
+            if (TIER_4_ELEMENTS.includes(elementName)) return 'very-rare';
+            if (TIER_5_ELEMENTS.includes(elementName)) return 'legendary';
+            return 'common';
         }
         
         function getElementRarityChance(elementName) {
             const rarity = getElementRarity(elementName);
-            if (!rarity) return 0;
-            
-            const config = RARITY_CONFIG[rarity];
+            const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
             const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
             const boostMultiplier = boost[rarity] || 1.0;
             
@@ -852,12 +838,10 @@
         function initializePityCounters() {
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
-                if (rarity) {
-                    pityCounters[resource] = {
-                        attempts: 0,
-                        threshold: PITY_CONFIG[rarity].threshold
-                    };
-                }
+                pityCounters[resource] = {
+                    attempts: 0,
+                    threshold: PITY_CONFIG[rarity].threshold
+                };
             });
         }
 
@@ -973,7 +957,21 @@
                 saveExploredState();
                 updateExploredCount();
                 renderResourceToggles();
-                checkAllElementsExplored();
+                
+                // DIRECT CHECK - show claim button immediately when all elements are explored
+                const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
+                if (allExplored) {
+                    claimBtn.classList.add('visible');
+                    claimBtn.disabled = false;
+                    claimBtn.textContent = '✨ CLAIM PLANET';
+                    showExtractionNotification({
+                        success: true,
+                        resource: 'All Elements',
+                        quantity: 0,
+                        mass: 0,
+                        wasPity: false
+                    });
+                }
             }
         }
 
@@ -984,22 +982,6 @@
                 exploredProgress.textContent = `${explored}/${totalElements}`;
             }
             return explored;
-        }
-
-        function checkAllElementsExplored() {
-            const explored = Object.values(exploredElements).filter(v => v).length;
-            if (explored === totalElements && totalElements > 0) {
-                claimBtn.classList.add('visible');
-                claimBtn.disabled = false;
-                claimBtn.textContent = '✨ CLAIM PLANET';
-                showExtractionNotification({
-                    success: true,
-                    resource: 'All Elements',
-                    quantity: 0,
-                    mass: 0,
-                    wasPity: false
-                });
-            }
         }
 
         const elementData = {
@@ -1019,7 +1001,11 @@
             'Radium': { symbol: 'Ra' }, 'Polonium': { symbol: 'Po' }, 'Promethium': { symbol: 'Pm' },
             'Technetium': { symbol: 'Tc' }, 'Astatine': { symbol: 'At' }, 'Francium': { symbol: 'Fr' },
             'Californium': { symbol: 'Cf' }, 'Einsteinium': { symbol: 'Es' }, 'Fermium': { symbol: 'Fm' },
-            'Mendelevium': { symbol: 'Md' }, 'Nobelium': { symbol: 'No' }, 'Lawrencium': { symbol: 'Lr' }
+            'Mendelevium': { symbol: 'Md' }, 'Nobelium': { symbol: 'No' }, 'Lawrencium': { symbol: 'Lr' },
+            'Selenium': { symbol: 'Se' }, 'Bismuth': { symbol: 'Bi' }, 'Thallium': { symbol: 'Tl' },
+            'Tungsten': { symbol: 'W' }, 'Ruthenium': { symbol: 'Ru' }, 'Rhodium': { symbol: 'Rh' },
+            'Palladium': { symbol: 'Pd' }, 'Osmium': { symbol: 'Os' }, 'Iridium': { symbol: 'Ir' },
+            'Rhenium': { symbol: 'Re' }, 'Hafnium': { symbol: 'Hf' }
         };
 
         function getElementSymbol(resource) {
@@ -1041,6 +1027,9 @@
                 'Polonium': 209.0, 'Promethium': 145.0, 'Technetium': 98.0,
                 'Californium': 251.0, 'Einsteinium': 252.0, 'Fermium': 257.0,
                 'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0,
+                'Selenium': 78.97, 'Bismuth': 209.0, 'Thallium': 204.4, 'Tungsten': 183.8,
+                'Ruthenium': 101.1, 'Rhodium': 102.9, 'Palladium': 106.4, 'Osmium': 190.2,
+                'Iridium': 192.2, 'Rhenium': 186.2, 'Hafnium': 178.5,
                 'default': 100.0
             };
             return masses[elementName] || masses.default;
@@ -1048,7 +1037,7 @@
 
         async function getFreshCargoMass() {
             try {
-                const collection = await window.getCollection();
+                const collection = await getCollection();
                 let mass = 0;
                 for (const [name, data] of Object.entries(collection)) {
                     mass += (data.count || 1) * getElementMass(name);
@@ -1191,9 +1180,7 @@
             let html = '';
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
-                if (!rarity) return;
-                
-                const config = RARITY_CONFIG[rarity];
+                const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const symbol = getElementSymbol(resource);
                 const chance = resourceChances[resource] || config.baseChance;
                 const isActive = resourceStates[resource];
@@ -1258,9 +1245,7 @@
                 
                 const resource = activeResources[Math.floor(Math.random() * activeResources.length)];
                 const rarity = getElementRarity(resource);
-                if (!rarity) return;
-                
-                const config = RARITY_CONFIG[rarity];
+                const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const massPerUnit = getElementMass(resource);
                 
                 if (!pityCounters[resource]) {
@@ -1308,7 +1293,7 @@
                             value: RARITY_CONFIG[rarity]?.basePrice || 100
                         };
                         
-                        const result = await window.addElementToCollection(resource, quantity, locationData);
+                        const result = await addElementToCollection(resource, quantity, locationData);
                         
                         if (result && result.success) {
                             const currentDisplay = cargoMass.innerHTML;
