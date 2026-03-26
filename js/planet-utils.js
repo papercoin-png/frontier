@@ -3,8 +3,9 @@
 // Handles planet types, resource generation, and planet properties
 // UPDATED: Added tier-based resource generation matching galaxy map progression
 // UPDATED: Exactly 4 elements per planet, filtered by galaxy tier
+// FIXED: Strict tier filtering - Tier 1 planets ONLY get Common elements
 
-import { getElementsForTier, getTierByDistance, TIERS } from './galaxy-data.js';
+import { getElementsForTier, getTierByDistance, TIERS, ELEMENTS_BY_TIER } from './galaxy-data.js';
 
 // ===== PLANET TYPE DEFINITIONS =====
 export const PLANET_TYPES = {
@@ -149,14 +150,27 @@ export const RESOURCE_POOLS = {
 
 // ===== TIER-BASED ELEMENT FILTERING =====
 /**
- * Filter elements by galaxy tier
+ * Strict filter elements by galaxy tier - only returns elements that belong to this tier
  * @param {Array} elements - Array of element names
  * @param {number} galaxyTier - Galaxy tier (1-10)
- * @returns {Array} Filtered elements that are available at this tier
+ * @returns {Array} Filtered elements that belong strictly to this tier
  */
-function filterElementsByTier(elements, galaxyTier) {
-    const availableElements = getElementsForTier(galaxyTier);
-    return elements.filter(element => availableElements.includes(element));
+function filterElementsStrictByTier(elements, galaxyTier) {
+    // Get elements that belong to this exact tier (not lower tiers)
+    const tierElements = ELEMENTS_BY_TIER[Math.min(galaxyTier, 5)] || [];
+    return elements.filter(element => tierElements.includes(element));
+}
+
+/**
+ * Get fallback common elements for Tier 1 planets
+ * @returns {Array} Common elements for Tier 1
+ */
+function getTier1CommonElements() {
+    return ELEMENTS_BY_TIER[1] || [
+        'Hydrogen', 'Helium', 'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon',
+        'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon',
+        'Potassium', 'Calcium'
+    ];
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -203,16 +217,55 @@ export function getRandomPlanetType(seed, index = 0) {
  */
 export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     const pool = RESOURCE_POOLS[planetType] || RESOURCE_POOLS[PLANET_TYPES.BARREN];
+    const tierNum = Math.min(Math.max(galaxyTier, 1), 10);
     
-    // Filter pool by galaxy tier - only elements available at this tier
-    let availablePool = filterElementsByTier(pool, galaxyTier);
+    // Get elements that are available at this EXACT tier (strict filtering)
+    let availablePool = [];
     
-    // If no elements available at this tier, fallback to tier 1 common elements
+    if (tierNum === 1) {
+        // Tier 1: ONLY common elements
+        availablePool = pool.filter(element => ELEMENTS_BY_TIER[1].includes(element));
+    } else if (tierNum === 2) {
+        // Tier 2: Common + Uncommon elements
+        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
+        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
+        const allowedElements = [...tier1Elements, ...tier2Elements];
+        availablePool = pool.filter(element => allowedElements.includes(element));
+    } else if (tierNum === 3) {
+        // Tier 3: Common + Uncommon + Rare elements
+        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
+        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
+        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
+        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements];
+        availablePool = pool.filter(element => allowedElements.includes(element));
+    } else if (tierNum === 4) {
+        // Tier 4: Common + Uncommon + Rare + Very Rare
+        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
+        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
+        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
+        const tier4Elements = ELEMENTS_BY_TIER[4] || [];
+        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements, ...tier4Elements];
+        availablePool = pool.filter(element => allowedElements.includes(element));
+    } else {
+        // Tier 5+: All elements including Legendary
+        const tier1Elements = ELEMENTS_BY_TIER[1] || [];
+        const tier2Elements = ELEMENTS_BY_TIER[2] || [];
+        const tier3Elements = ELEMENTS_BY_TIER[3] || [];
+        const tier4Elements = ELEMENTS_BY_TIER[4] || [];
+        const tier5Elements = ELEMENTS_BY_TIER[5] || [];
+        const allowedElements = [...tier1Elements, ...tier2Elements, ...tier3Elements, ...tier4Elements, ...tier5Elements];
+        availablePool = pool.filter(element => allowedElements.includes(element));
+    }
+    
+    // If no elements available in the pool after filtering, use Tier 1 common elements
     if (availablePool.length === 0) {
-        const tier1Elements = getElementsForTier(1);
-        availablePool = tier1Elements.filter(e => pool.includes(e) || true);
+        const commonElements = getTier1CommonElements();
+        // Filter common elements by what's in the planet type pool
+        availablePool = pool.filter(element => commonElements.includes(element));
+        
+        // If still empty, use a hardcoded set of common elements
         if (availablePool.length === 0) {
-            availablePool = ['Iron', 'Carbon', 'Silicon', 'Aluminum'];
+            availablePool = ['Hydrogen', 'Helium', 'Carbon', 'Oxygen', 'Nitrogen', 'Sodium', 'Aluminum', 'Silicon'];
         }
     }
     
@@ -233,22 +286,34 @@ export function generatePlanetResources(seed, planetType, galaxyTier = 1) {
     
     // If we don't have enough, fill with common elements
     while (resources.length < targetCount) {
-        const commonElements = getElementsForTier(1);
-        const fallback = commonElements[resources.length % commonElements.length];
-        if (!resources.includes(fallback)) {
-            resources.push(fallback);
-        } else {
-            // Find any element not already in resources
-            for (const elem of commonElements) {
-                if (!resources.includes(elem)) {
-                    resources.push(elem);
-                    break;
-                }
+        const commonElements = getTier1CommonElements();
+        // Find an element not already in resources
+        let fallbackElement = null;
+        for (const elem of commonElements) {
+            if (!resources.includes(elem) && !resources.includes(elem)) {
+                fallbackElement = elem;
+                break;
+            }
+        }
+        if (!fallbackElement) {
+            fallbackElement = 'Carbon';
+        }
+        resources.push(fallbackElement);
+    }
+    
+    // Ensure no duplicates
+    const uniqueResources = [...new Set(resources)];
+    if (uniqueResources.length < targetCount) {
+        // Add missing elements from common pool
+        const commonElements = getTier1CommonElements();
+        for (const elem of commonElements) {
+            if (!uniqueResources.includes(elem) && uniqueResources.length < targetCount) {
+                uniqueResources.push(elem);
             }
         }
     }
     
-    return resources;
+    return uniqueResources.slice(0, targetCount);
 }
 
 // ===== PLANET GENERATION =====
@@ -509,7 +574,7 @@ export default {
     seededRandomRange,
     hashString,
     getRandomPlanetType,
-    filterElementsByTier,
+    filterElementsStrictByTier,
     generatePlanetResources,
     generatePlanet,
     generateStar,
