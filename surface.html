@@ -726,7 +726,7 @@
     <script type="module">
         import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
-        import { getCurrentTier, getTierByDistance, TIERS } from './js/galaxy-data.js';
+        import { TIERS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
 
         // Expose storage functions to window for non-module code
@@ -815,37 +815,27 @@
         let exploredElements = {};
         let totalElements = 4;
         
-        // ===== TIER-BASED RARITY FUNCTION =====
+        // ===== SIMPLIFIED RARITY FUNCTION - ONLY BASED ON ELEMENT NAME =====
         function getElementRarity(elementName) {
-            // Get the element's base rarity from its name
+            // Legendary elements
             const legendaryElements = ['Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium', 'Plutonium', 'Neptunium', 'Americium', 'Curium', 'Berkelium'];
-            const veryRareElements = ['Uranium', 'Thorium', 'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium', 'Rhodium', 'Palladium', 'Ruthenium'];
+            // Very Rare elements
+            const veryRareElements = ['Uranium', 'Thorium', 'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium', 'Rhodium', 'Palladium', 'Ruthenium', 'Tungsten'];
+            // Rare elements
             const rareElements = ['Titanium', 'Chromium', 'Nickel', 'Cobalt', 'Vanadium', 'Manganese', 'Silver', 'Copper', 'Zinc', 'Tin', 'Lead'];
-            const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon', 'Sulfur', 'Calcium', 'Potassium', 'Magnesium'];
+            // Uncommon elements
+            const uncommonElements = ['Carbon', 'Oxygen', 'Nitrogen', 'Iron', 'Aluminum', 'Silicon', 'Sulfur', 'Calcium', 'Potassium', 'Magnesium', 'Selenium', 'Bismuth', 'Fluorine', 'Thallium'];
             
-            let baseRarity = 'common';
-            if (legendaryElements.includes(elementName)) baseRarity = 'legendary';
-            else if (veryRareElements.includes(elementName)) baseRarity = 'very-rare';
-            else if (rareElements.includes(elementName)) baseRarity = 'rare';
-            else if (uncommonElements.includes(elementName)) baseRarity = 'uncommon';
-            
-            // Apply tier boost - higher tier planets can find rarer elements more easily
-            const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
-            
-            // Elements can only be found at or above their native tier
-            const elementTier = RARITY_CONFIG[baseRarity]?.tier || 1;
-            if (currentPlanetTier < elementTier) {
-                return null; // Element not available at this tier
-            }
-            
-            return baseRarity;
+            if (legendaryElements.includes(elementName)) return 'legendary';
+            if (veryRareElements.includes(elementName)) return 'very-rare';
+            if (rareElements.includes(elementName)) return 'rare';
+            if (uncommonElements.includes(elementName)) return 'uncommon';
+            return 'common';
         }
         
         function getElementRarityChance(elementName) {
             const rarity = getElementRarity(elementName);
-            if (!rarity) return 0;
-            
-            const config = RARITY_CONFIG[rarity];
+            const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
             const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
             const boostMultiplier = boost[rarity] || 1.0;
             
@@ -858,12 +848,10 @@
         function initializePityCounters() {
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
-                if (rarity) {
-                    pityCounters[resource] = {
-                        attempts: 0,
-                        threshold: PITY_CONFIG[rarity].threshold
-                    };
-                }
+                pityCounters[resource] = {
+                    attempts: 0,
+                    threshold: PITY_CONFIG[rarity].threshold
+                };
             });
         }
 
@@ -973,7 +961,7 @@
             return exploredElements[resource] || false;
         }
 
-        // FIXED: markElementExplored with direct claim button check
+        // markElementExplored with direct claim button check
         function markElementExplored(resource) {
             if (!exploredElements[resource]) {
                 exploredElements[resource] = true;
@@ -1024,7 +1012,9 @@
             'Radium': { symbol: 'Ra' }, 'Polonium': { symbol: 'Po' }, 'Promethium': { symbol: 'Pm' },
             'Technetium': { symbol: 'Tc' }, 'Astatine': { symbol: 'At' }, 'Francium': { symbol: 'Fr' },
             'Californium': { symbol: 'Cf' }, 'Einsteinium': { symbol: 'Es' }, 'Fermium': { symbol: 'Fm' },
-            'Mendelevium': { symbol: 'Md' }, 'Nobelium': { symbol: 'No' }, 'Lawrencium': { symbol: 'Lr' }
+            'Mendelevium': { symbol: 'Md' }, 'Nobelium': { symbol: 'No' }, 'Lawrencium': { symbol: 'Lr' },
+            'Selenium': { symbol: 'Se' }, 'Bismuth': { symbol: 'Bi' }, 'Thallium': { symbol: 'Tl' },
+            'Tungsten': { symbol: 'W' }
         };
 
         function getElementSymbol(resource) {
@@ -1046,6 +1036,7 @@
                 'Polonium': 209.0, 'Promethium': 145.0, 'Technetium': 98.0,
                 'Californium': 251.0, 'Einsteinium': 252.0, 'Fermium': 257.0,
                 'Mendelevium': 258.0, 'Nobelium': 259.0, 'Lawrencium': 262.0,
+                'Selenium': 78.97, 'Bismuth': 209.0, 'Thallium': 204.4, 'Tungsten': 183.8,
                 'default': 100.0
             };
             return masses[elementName] || masses.default;
@@ -1196,9 +1187,7 @@
             let html = '';
             currentPlanet.resources.forEach(resource => {
                 const rarity = getElementRarity(resource);
-                if (!rarity) return;
-                
-                const config = RARITY_CONFIG[rarity];
+                const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const symbol = getElementSymbol(resource);
                 const chance = resourceChances[resource] || config.baseChance;
                 const isActive = resourceStates[resource];
@@ -1263,9 +1252,7 @@
                 
                 const resource = activeResources[Math.floor(Math.random() * activeResources.length)];
                 const rarity = getElementRarity(resource);
-                if (!rarity) return;
-                
-                const config = RARITY_CONFIG[rarity];
+                const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const massPerUnit = getElementMass(resource);
                 
                 if (!pityCounters[resource]) {
