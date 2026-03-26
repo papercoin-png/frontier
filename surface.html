@@ -72,7 +72,6 @@
             border-radius: 40px;
         }
         
-        /* For landscape/gas giant images - prevent stretching */
         .planet-canvas.landscape {
             object-fit: contain;
             background: #000;
@@ -662,6 +661,126 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* NEW: Discovery History Panel Styles */
+        .discovery-panel {
+            background: rgba(10, 10, 26, 0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(74, 138, 192, 0.3);
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 10px;
+        }
+        
+        .discovery-title {
+            color: #ffaa4a;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 170, 74, 0.3);
+            padding-bottom: 4px;
+        }
+        
+        .discovery-list {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        
+        .discovery-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 9px;
+        }
+        
+        .discovery-player {
+            color: #4affaa;
+            font-weight: 500;
+        }
+        
+        .discovery-date {
+            color: #a0c0ff;
+        }
+        
+        .discovery-badge {
+            font-size: 8px;
+            background: rgba(255, 215, 0, 0.2);
+            padding: 2px 5px;
+            border-radius: 20px;
+            color: #ffd700;
+        }
+        
+        .rights-status {
+            background: rgba(74, 255, 170, 0.1);
+            border: 1px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .rights-status.expiring {
+            border-color: #ffaa4a;
+            background: rgba(255, 170, 74, 0.1);
+        }
+        
+        .rights-status.expired {
+            border-color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+        }
+        
+        .rights-label {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .rights-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .rights-value.warning {
+            color: #ffaa4a;
+        }
+        
+        .rights-value.danger {
+            color: #ff4444;
+        }
+        
+        .rediscovery-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(74, 255, 170, 0.95);
+            color: #0a0a1a;
+            padding: 10px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 5000;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+            white-space: nowrap;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -705,6 +824,18 @@
                     </div>
                     <div class="active-count" id="activeCount">Extracting: 0 resources</div>
                 </div>
+                
+                <!-- NEW: Discovery History Panel -->
+                <div class="discovery-panel" id="discoveryPanel" style="display: none;">
+                    <div class="discovery-title">📜 DISCOVERY HISTORY</div>
+                    <div class="discovery-list" id="discoveryList"></div>
+                </div>
+                
+                <!-- NEW: Rights Status Panel -->
+                <div class="rights-status" id="rightsStatus" style="display: none;">
+                    <span class="rights-label">⚡ MINING RIGHTS</span>
+                    <span class="rights-value" id="rightsValue">Loading...</span>
+                </div>
             </div>
             
             <div class="extraction-notification" id="extractionNotification">
@@ -720,14 +851,17 @@
                 <div class="loading-spinner"></div>
                 <div class="loading-text" id="loadingText">processing...</div>
             </div>
+            
+            <!-- NEW: Rediscovery Notification -->
+            <div class="rediscovery-notification" id="rediscoveryNotification"></div>
         </div>
     </div>
 
     <script type="module">
-        import { getPlanetStatus, claimPlanet } from './js/planet-status.js';
+        import { getPlanetStatus, claimPlanet, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
-        import { getCollection, addElementToCollection, removeElementFromCollection } from './js/storage.js';
+        import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
 
         // Expose storage functions to window for non-module code
         window.getCollection = getCollection;
@@ -798,6 +932,13 @@
         const notificationQuantity = document.getElementById('notificationQuantity');
         const notificationRarity = document.getElementById('notificationRarity');
         const notificationPity = document.getElementById('notificationPity');
+        
+        // NEW: Discovery and Rights Elements
+        const discoveryPanel = document.getElementById('discoveryPanel');
+        const discoveryList = document.getElementById('discoveryList');
+        const rightsStatus = document.getElementById('rightsStatus');
+        const rightsValue = document.getElementById('rightsValue');
+        const rediscoveryNotification = document.getElementById('rediscoveryNotification');
 
         let currentPlanet = {
             name: 'Earth',
@@ -816,17 +957,23 @@
         let totalElements = 4;
         
         // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
-        function getElementRarity(elementName) {
+        function getElementRarity(elementName, planetTier = currentPlanetTier) {
             if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
             if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
             if (TIER_3_ELEMENTS.includes(elementName)) return 'rare';
             if (TIER_4_ELEMENTS.includes(elementName)) return 'very-rare';
             if (TIER_5_ELEMENTS.includes(elementName)) return 'legendary';
+            
+            // For elements from tiers 6-10, they are legendary rarity
+            if (planetTier >= 5) {
+                return 'legendary';
+            }
+            
             return 'common';
         }
         
         function getElementRarityChance(elementName) {
-            const rarity = getElementRarity(elementName);
+            const rarity = getElementRarity(elementName, currentPlanetTier);
             const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
             const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
             const boostMultiplier = boost[rarity] || 1.0;
@@ -839,7 +986,7 @@
 
         function initializePityCounters() {
             currentPlanet.resources.forEach(resource => {
-                const rarity = getElementRarity(resource);
+                const rarity = getElementRarity(resource, currentPlanetTier);
                 pityCounters[resource] = {
                     attempts: 0,
                     threshold: PITY_CONFIG[rarity].threshold
@@ -874,6 +1021,108 @@
             }
         }
 
+        // ===== DISCOVERY HISTORY FUNCTIONS (NEW) =====
+        async function loadDiscoveryHistory() {
+            try {
+                const history = await getFormattedPlanetDiscoveryHistory(currentPlanet.name);
+                
+                if (history && history.length > 0) {
+                    discoveryPanel.style.display = 'block';
+                    discoveryList.innerHTML = '';
+                    
+                    history.forEach(record => {
+                        const item = document.createElement('div');
+                        item.className = 'discovery-item';
+                        const badge = record.isFirstDiscovery ? '<span class="discovery-badge">FIRST</span>' : '';
+                        item.innerHTML = `
+                            <span class="discovery-player">${record.playerName} ${badge}</span>
+                            <span class="discovery-date">${record.formattedDate}</span>
+                        `;
+                        discoveryList.appendChild(item);
+                    });
+                } else {
+                    discoveryPanel.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading discovery history:', error);
+                discoveryPanel.style.display = 'none';
+            }
+        }
+
+        // ===== RIGHTS STATUS FUNCTIONS (NEW) =====
+        async function loadRightsStatus() {
+            try {
+                const rights = await getPlanetRightsStatus(currentPlanet.name);
+                
+                if (rights && rights.status !== 'available') {
+                    rightsStatus.style.display = 'flex';
+                    
+                    let statusText = '';
+                    let statusClass = '';
+                    
+                    if (rights.status === 'active') {
+                        statusText = `👑 ${rights.owner} • ${rights.daysRemaining} days left`;
+                        statusClass = '';
+                    } else if (rights.status === 'expiring_soon') {
+                        statusText = `⚠️ ${rights.owner} • ${rights.daysRemaining} days left (expiring soon)`;
+                        statusClass = 'warning';
+                    } else if (rights.status === 'expired') {
+                        statusText = `🔒 Rights expired • Planet is hidden`;
+                        statusClass = 'danger';
+                    }
+                    
+                    rightsValue.textContent = statusText;
+                    rightsValue.className = `rights-value ${statusClass}`;
+                    
+                    if (rights.status === 'expired') {
+                        rightsStatus.classList.add('expired');
+                    } else if (rights.status === 'expiring_soon') {
+                        rightsStatus.classList.add('expiring');
+                    } else {
+                        rightsStatus.classList.remove('expiring', 'expired');
+                    }
+                } else {
+                    rightsStatus.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading rights status:', error);
+                rightsStatus.style.display = 'none';
+            }
+        }
+
+        // ===== RECORD REDISCOVERY (NEW) =====
+        async function recordRediscovery() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+                
+                // Check if this planet was hidden (rights expired)
+                const hiddenPlanets = JSON.parse(localStorage.getItem('voidfarer_hidden_planets') || '[]');
+                
+                if (hiddenPlanets.includes(currentPlanet.name)) {
+                    // Record rediscovery
+                    await addPlanetDiscoveryRecord(currentPlanet.name, playerId, playerName, currentPlanetTier);
+                    
+                    // Reveal the planet
+                    if (typeof window.revealPlanet === 'function') {
+                        await window.revealPlanet(currentPlanet.name);
+                    }
+                    
+                    // Show rediscovery notification
+                    rediscoveryNotification.textContent = `🔓 REDISCOVERED! ${currentPlanet.name} has been mapped again.`;
+                    rediscoveryNotification.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        rediscoveryNotification.style.display = 'none';
+                    }, 3000);
+                    
+                    console.log(`🔓 Planet ${currentPlanet.name} rediscovered by ${playerName}`);
+                }
+            } catch (error) {
+                console.error('Error recording rediscovery:', error);
+            }
+        }
+
         // ===== EXPLORED STATE =====
         function loadExploredState() {
             const saved = localStorage.getItem(`explored_${currentPlanet.name}`);
@@ -902,7 +1151,7 @@
             
             if (result.success) {
                 extractionNotification.classList.add('success');
-                const rarity = getElementRarity(result.resource);
+                const rarity = getElementRarity(result.resource, currentPlanetTier);
                 extractionNotification.classList.add(`rarity-${rarity}`);
                 
                 notificationIcon.textContent = '✨';
@@ -919,7 +1168,7 @@
                 notificationTitle.textContent = 'FAIL';
                 
                 if (result.resource) {
-                    const rarity = getElementRarity(result.resource);
+                    const rarity = getElementRarity(result.resource, currentPlanetTier);
                     notificationResource.textContent = result.resource;
                     notificationQuantity.textContent = `Extraction failed`;
                     notificationRarity.textContent = `${rarity}`;
@@ -1144,6 +1393,13 @@
                 renderResourceToggles();
                 await updateCargoDisplay();
                 
+                // Load discovery history and rights status
+                await loadDiscoveryHistory();
+                await loadRightsStatus();
+                
+                // Record rediscovery if this planet was hidden
+                await recordRediscovery();
+                
                 return true;
                 
             } catch (error) {
@@ -1181,7 +1437,7 @@
             
             let html = '';
             currentPlanet.resources.forEach(resource => {
-                const rarity = getElementRarity(resource);
+                const rarity = getElementRarity(resource, currentPlanetTier);
                 const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const symbol = getElementSymbol(resource);
                 const chance = resourceChances[resource] || config.baseChance;
@@ -1246,7 +1502,7 @@
                 }
                 
                 const resource = activeResources[Math.floor(Math.random() * activeResources.length)];
-                const rarity = getElementRarity(resource);
+                const rarity = getElementRarity(resource, currentPlanetTier);
                 const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
                 const massPerUnit = getElementMass(resource);
                 
@@ -1377,13 +1633,14 @@
                 const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 const discoveryElement = currentPlanet.resources[0] || 'Unknown';
-                const discoveryRarity = getElementRarity(discoveryElement) || 'common';
+                const discoveryRarity = getElementRarity(discoveryElement, currentPlanetTier) || 'common';
                 
                 const success = await claimPlanet(currentPlanet.name, playerId, playerName, discoveryElement, discoveryRarity);
                 
                 if (success) {
                     showExtractionNotification({ success: true, resource: 'Planet', quantity: 0, mass: 0, wasPity: false });
                     await updateClaimButton();
+                    await loadRightsStatus();
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 } else {
                     showExtractionNotification({ success: false, resource: null, reason: 'claim_failed' });
