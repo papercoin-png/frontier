@@ -2,14 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Voidfarer - My Claims</title>
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Add idb library for IndexedDB -->
-    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
     <style>
         * {
             margin: 0;
@@ -20,116 +15,83 @@
         
         body {
             background: #0a0a1a;
+            font-family: 'Libre Baskerville', serif;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            font-family: 'Libre Baskerville', serif;
+            padding: 20px;
         }
         
         .phone-frame {
             width: 100%;
             max-width: 390px;
-            height: 844px;
+            min-height: 844px;
             position: relative;
             overflow: hidden;
             border-radius: 40px;
             box-shadow: 0 30px 60px rgba(0,0,0,0.5);
             background: #0a0a1a;
+            margin: 0 auto;
         }
         
-        .myclaims-view {
+        .claims-view {
             position: relative;
             width: 100%;
             height: 100%;
             background: #0a1a2a;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 20px 20px 30px 20px;
+            padding: 20px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
         }
         
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-            opacity: 1;
-            pointer-events: all;
-        }
-        
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #4affaa;
-            border-top: 4px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        .loading-text {
-            color: #e0f0ff;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            text-shadow: 0 0 30px #4affaa;
-            animation: pulse 1.5s infinite;
-            font-weight: 500;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-        }
-        
         /* Header */
-        .myclaims-header {
-            margin-bottom: 20px;
+        .claims-header {
             text-align: center;
+            margin-bottom: 20px;
             position: relative;
         }
         
-        .myclaims-title {
+        .claims-title {
             font-family: 'Exo 2', sans-serif;
-            font-size: 36px;
-            color: #4affaa;
-            text-shadow: 0 0 20px #4affaa, 0 0 40px #2a8a6a;
-            margin-bottom: 5px;
+            font-size: 28px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #6a8ac0;
             font-weight: 600;
         }
         
-        .myclaims-subtitle {
+        .claims-subtitle {
             color: #a0c0ff;
-            font-size: 14px;
+            font-size: 12px;
             letter-spacing: 2px;
+        }
+        
+        .back-btn {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(74, 255, 170, 0.2);
+            border: 1px solid #4affaa;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .back-btn:active {
+            background: rgba(74, 255, 170, 0.5);
+            transform: scale(0.95);
         }
         
         /* Stats Bar */
         .stats-bar {
             background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
-            border: 2px solid #4affaa;
+            border: 2px solid #6a8ac0;
             border-radius: 60px 20px 60px 20px;
             padding: 16px;
             margin-bottom: 20px;
@@ -152,427 +114,277 @@
             font-size: 22px;
         }
         
-        .claim-count {
-            font-size: 14px;
-            color: #4affaa;
+        .location {
+            font-size: 12px;
+            color: #a0c0ff;
             text-align: right;
         }
         
-        .claim-count span {
-            color: #ffd966;
+        .location span {
+            color: #4affaa;
             font-weight: 600;
-            font-size: 18px;
         }
         
-        /* Summary Cards */
-        .summary-grid {
+        /* Expiration Warning Banner */
+        .expiry-warning {
+            background: rgba(255, 170, 74, 0.2);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            display: none;
+            animation: pulse-warning 2s infinite;
+        }
+        
+        @keyframes pulse-warning {
+            0% { border-color: #ffaa4a; box-shadow: 0 0 0px #ffaa4a; }
+            50% { border-color: #ffcc66; box-shadow: 0 0 15px #ffaa4a; }
+            100% { border-color: #ffaa4a; box-shadow: 0 0 0px #ffaa4a; }
+        }
+        
+        .expiry-warning-title {
+            color: #ffaa4a;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .expiry-warning-text {
+            color: white;
+            font-size: 12px;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 20px;
         }
         
-        .summary-card {
-            background: rgba(30, 45, 70, 0.7);
+        .stat-card {
+            background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
-            border: 2px solid #4a8ac0;
+            border: 1px solid #6a8ac0;
             border-radius: 40px 15px 40px 15px;
-            padding: 16px;
+            padding: 12px;
             text-align: center;
         }
         
-        .summary-card.gold {
-            border-color: gold;
-            background: rgba(50, 40, 20, 0.7);
-        }
-        
-        .summary-card .summary-label {
-            font-size: 11px;
+        .stat-label {
             color: #a0c0ff;
-            margin-bottom: 8px;
+            font-size: 11px;
             letter-spacing: 1px;
+            margin-bottom: 6px;
         }
         
-        .summary-card .summary-value {
-            font-size: 24px;
-            font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
+        .stat-value {
             color: #ffd966;
+            font-size: 24px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
         }
         
-        .summary-card .summary-unit {
-            font-size: 12px;
-            color: #a0c0ff;
-            margin-left: 2px;
+        .stat-sub {
+            color: #6a8ac0;
+            font-size: 10px;
+            margin-top: 4px;
         }
         
-        .summary-card .summary-sub {
-            font-size: 11px;
-            color: #4affaa;
-            margin-top: 5px;
-        }
-        
-        /* Fee Management Card */
+        /* Fee Management */
         .fee-card {
-            background: rgba(30, 45, 70, 0.7);
+            background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
-            border: 2px solid gold;
+            border: 2px solid #ffaa4a;
             border-radius: 40px 15px 40px 15px;
             padding: 16px;
             margin-bottom: 20px;
         }
         
-        .fee-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
         .fee-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 18px;
+            color: #ffaa4a;
+            font-size: 16px;
             font-weight: 600;
-            color: gold;
+            margin-bottom: 12px;
+            font-family: 'Exo 2', sans-serif;
             display: flex;
             align-items: center;
             gap: 8px;
         }
         
-        .fee-title span {
-            font-size: 20px;
-        }
-        
-        .fee-value {
-            font-size: 20px;
-            font-weight: 700;
-            color: #4affaa;
-        }
-        
-        .fee-slider-container {
-            margin: 15px 0;
-        }
-        
         .fee-slider {
             width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: linear-gradient(90deg, #4affaa, gold);
-            -webkit-appearance: none;
-            appearance: none;
-            outline: none;
+            margin: 10px 0;
         }
         
-        .fee-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid gold;
-            cursor: pointer;
-            box-shadow: 0 0 10px gold;
-        }
-        
-        .fee-slider::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid gold;
-            cursor: pointer;
-            box-shadow: 0 0 10px gold;
-        }
-        
-        .fee-labels {
+        .fee-buttons {
             display: flex;
-            justify-content: space-between;
-            margin-top: 8px;
-            font-size: 11px;
-            color: #a0c0ff;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
         }
         
-        .fee-warning {
-            font-size: 11px;
-            color: #ffaa4a;
-            margin-top: 10px;
-            padding: 8px;
-            background: rgba(255, 170, 74, 0.1);
-            border-radius: 20px;
+        .fee-btn {
+            background: rgba(74, 138, 192, 0.3);
+            border: 1px solid #6a8ac0;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .fee-btn.active {
+            background: #ffaa4a;
+            border-color: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .fee-note {
+            color: #a0c0ff;
+            font-size: 10px;
+            margin-top: 8px;
             text-align: center;
         }
         
         /* Claims List */
         .claims-list {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-bottom: 25px;
-            max-height: 400px;
-            overflow-y: auto;
-            padding-right: 5px;
+            margin-bottom: 20px;
         }
         
-        .claim-card {
-            background: rgba(30, 45, 70, 0.7);
+        .section-title {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            margin-bottom: 12px;
+            border-left: 3px solid #ffaa4a;
+            padding-left: 12px;
+        }
+        
+        .claim-item {
+            background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
-            border: 2px solid;
+            border: 1px solid #6a8ac0;
             border-radius: 40px 15px 40px 15px;
-            padding: 16px;
-            transition: all 0.1s;
-            position: relative;
-            overflow: hidden;
+            padding: 15px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
         }
         
-        .claim-card.rarity-very-rare {
-            border-color: #e0b0ff;
-            box-shadow: 0 0 15px rgba(224, 176, 255, 0.3);
+        .claim-item.expiring {
+            border-left: 4px solid #ffaa4a;
+            background: rgba(255, 170, 74, 0.1);
         }
         
-        .claim-card.rarity-legendary {
-            border-color: gold;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+        .claim-item.expired {
+            border-left: 4px solid #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+            opacity: 0.8;
         }
         
         .claim-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .planet-name {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 20px;
-            font-weight: 600;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
             gap: 8px;
         }
         
-        .planet-name .crown-icon {
-            color: gold;
+        .claim-name {
             font-size: 18px;
-            filter: drop-shadow(0 0 5px gold);
-        }
-        
-        .planet-type {
-            font-size: 11px;
-            color: #a0c0ff;
-            background: rgba(0,0,0,0.3);
-            padding: 3px 8px;
-            border-radius: 30px;
-        }
-        
-        .rarity-badge {
-            padding: 4px 10px;
-            border-radius: 30px 5px 30px 5px;
-            font-size: 11px;
             font-weight: 600;
-            text-transform: uppercase;
-            background: rgba(0,0,0,0.3);
-        }
-        
-        .rarity-badge.very-rare {
-            color: #e0b0ff;
-            border: 1px solid #e0b0ff;
-        }
-        
-        .rarity-badge.legendary {
-            color: gold;
-            border: 1px solid gold;
-        }
-        
-        .claim-details {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 12px;
-            padding: 10px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 30px 8px 30px 8px;
-        }
-        
-        .detail-item {
-            text-align: center;
-        }
-        
-        .detail-label {
-            font-size: 9px;
-            color: #a0c0ff;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-        
-        .detail-value {
-            font-size: 16px;
-            font-weight: 600;
+            color: #ffd966;
             font-family: 'Exo 2', sans-serif;
         }
         
-        .detail-value.fee {
-            color: gold;
+        .claim-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 40px;
+            font-weight: 600;
         }
         
-        .detail-value.earned {
+        .status-active {
+            background: rgba(74, 255, 170, 0.2);
             color: #4affaa;
+            border: 1px solid #4affaa;
         }
         
-        .detail-value.miners {
+        .status-expiring {
+            background: rgba(255, 170, 74, 0.2);
             color: #ffaa4a;
+            border: 1px solid #ffaa4a;
+            animation: pulse 1.5s infinite;
         }
         
-        .stats-row {
+        .status-expired {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff8888;
+            border: 1px solid #ff4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .claim-details {
             display: flex;
-            justify-content: space-between;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 11px;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 10px 0;
+            font-size: 12px;
             color: #a0c0ff;
         }
         
-        .stat-highlight {
+        .claim-detail {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .claim-value {
             color: #ffd966;
             font-weight: 600;
         }
         
-        .fee-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        
-        .fee-input {
-            flex: 1;
-            background: rgba(20, 30, 50, 0.6);
-            border: 2px solid gold;
-            border-radius: 30px 5px 30px 5px;
-            padding: 8px 12px;
-            color: white;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            text-align: center;
-        }
-        
-        .fee-input:focus {
-            outline: none;
-            box-shadow: 0 0 15px gold;
-        }
-        
-        .update-fee-btn {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid gold;
-            color: gold;
+        .renew-btn {
+            background: #ffaa4a;
+            border: none;
+            color: #0a0a1a;
             padding: 8px 16px;
-            border-radius: 30px 5px 30px 5px;
+            border-radius: 40px 10px 40px 10px;
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
+            margin-top: 10px;
             transition: all 0.1s;
-            font-family: 'Exo 2', sans-serif;
+            width: 100%;
         }
         
-        .update-fee-btn:active {
-            background: gold;
-            color: #0a0a1a;
+        .renew-btn:active {
             transform: scale(0.96);
+            background: #ffcc66;
         }
         
-        .update-fee-btn:disabled {
-            opacity: 0.3;
-            pointer-events: none;
-        }
-        
-        /* Activity Section */
-        .activity-section {
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .activity-title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 18px;
-            color: #ffffff;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .activity-title span {
-            color: #4affaa;
-        }
-        
-        .activity-list {
-            background: rgba(30, 45, 70, 0.5);
-            backdrop-filter: blur(5px);
-            border: 1px solid #4a8ac0;
-            border-radius: 40px 15px 40px 15px;
-            padding: 15px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .activity-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-        
-        .activity-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .activity-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(74, 255, 170, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-        }
-        
-        .activity-details {
+        .rediscover-btn {
+            background: #4a8ac0;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 40px 10px 40px 10px;
             font-size: 12px;
-        }
-        
-        .activity-planet {
-            color: #ffffff;
             font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
         }
         
-        .activity-miner {
-            color: #a0c0ff;
-            font-size: 10px;
-        }
-        
-        .activity-right {
-            text-align: right;
-        }
-        
-        .activity-amount {
-            color: #4affaa;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .activity-time {
-            color: #a0c0ff;
-            font-size: 9px;
+        .rediscover-btn:active {
+            transform: scale(0.96);
+            background: #6aa0e0;
         }
         
         /* Empty State */
@@ -583,218 +395,276 @@
         }
         
         .empty-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-            opacity: 0.5;
+            font-size: 48px;
+            margin-bottom: 15px;
         }
         
-        .empty-title {
+        .empty-text {
+            font-size: 14px;
+        }
+        
+        .empty-hint {
+            font-size: 12px;
+            margin-top: 10px;
+            opacity: 0.7;
+        }
+        
+        /* Recent Activity */
+        .activity-card {
+            background: rgba(30, 45, 70, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid #6a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+        }
+        
+        .activity-title {
+            color: #4affaa;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .activity-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 11px;
+        }
+        
+        .activity-planet {
+            color: #ffd966;
+        }
+        
+        .activity-amount {
+            color: #4affaa;
+        }
+        
+        .activity-date {
+            color: #a0c0ff;
+            font-size: 9px;
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+        
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .modal-content {
+            background: #1a2a3a;
+            border: 3px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 25px;
+            width: 280px;
+            text-align: center;
+        }
+        
+        .modal-title {
             font-size: 20px;
             font-weight: 600;
-            margin-bottom: 10px;
-            color: #ffffff;
+            color: #ffaa4a;
+            margin-bottom: 15px;
         }
         
-        .empty-message {
+        .modal-text {
+            color: white;
             font-size: 14px;
             margin-bottom: 20px;
         }
         
-        .claim-now-btn {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid gold;
-            color: gold;
-            padding: 12px 24px;
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .modal-btn {
+            padding: 10px 20px;
             border-radius: 40px 10px 40px 10px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.1s;
-            display: inline-block;
+            border: none;
         }
         
-        .claim-now-btn:active {
-            background: gold;
+        .modal-confirm {
+            background: #ffaa4a;
             color: #0a0a1a;
-            transform: scale(0.96);
         }
         
-        /* Back button */
-        .back-button {
-            position: sticky;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(30, 45, 70, 0.9);
-            backdrop-filter: blur(15px);
-            border: 2px solid #4affaa;
-            color: #4affaa;
-            padding: 12px 30px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.2s;
-            width: fit-content;
-            box-shadow: 0 0 30px rgba(74, 255, 170, 0.3);
-            z-index: 100;
-            margin-top: 10px;
-            font-weight: 500;
+        .modal-cancel {
+            background: rgba(106, 138, 192, 0.3);
+            color: white;
+            border: 1px solid #6a8ac0;
         }
         
-        .back-button:active {
-            background: #4affaa;
-            color: #0a0a1a;
-            transform: translateX(-50%) scale(0.98);
-        }
-        
-        /* Rarity colors */
-        .rarity-common { color: #ffffff; }
-        .rarity-uncommon { color: #b0ffb0; }
-        .rarity-rare { color: #4169E1; }
-        .rarity-very-rare { color: #e0b0ff; }
-        .rarity-legendary { color: #ffd700; }
-
-        /* Migration status (debug) */
-        .migration-status {
+        .loading-overlay {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
             display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #6a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="phone-frame">
-        <div class="myclaims-view" id="myclaimsView">
-            <!-- Header -->
-            <div class="myclaims-header">
-                <div class="myclaims-title">MY CLAIMS</div>
-                <div class="myclaims-subtitle">✦ your planetary empire ✦</div>
+        <div class="claims-view">
+            <div class="claims-header">
+                <button class="back-btn" onclick="goBack()">← BACK</button>
+                <div class="claims-title">MY CLAIMS</div>
+                <div class="claims-subtitle">✦ your planetary empire ✦</div>
             </div>
             
-            <!-- Stats Bar -->
             <div class="stats-bar">
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
-                <div class="claim-count" id="claimCount">
-                    Owned: <span id="totalClaims">0</span>
+                <div class="location" id="locationDisplay">
+                    <span id="currentPlanet">Loading...</span>
                 </div>
             </div>
             
-            <!-- Summary Cards -->
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <div class="summary-label">TOTAL EARNED</div>
-                    <div class="summary-value" id="totalEarned">0</div>
-                    <div class="summary-unit">⭐</div>
-                    <div class="summary-sub" id="avgEarned">lifetime</div>
+            <!-- Expiration Warning Banner -->
+            <div class="expiry-warning" id="expiryWarning">
+                <div class="expiry-warning-title">⚠️ MINING RIGHTS EXPIRING SOON</div>
+                <div class="expiry-warning-text" id="expiryWarningText">You have planets with rights expiring within 3 days!</div>
+            </div>
+            
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">OWNED</div>
+                    <div class="stat-value" id="ownedCount">0</div>
+                    <div class="stat-sub">planets</div>
                 </div>
-                
-                <div class="summary-card gold">
-                    <div class="summary-label">MOST PROFITABLE</div>
-                    <div class="summary-value" id="bestPlanet">---</div>
-                    <div class="summary-sub" id="bestAmount">0⭐</div>
+                <div class="stat-card">
+                    <div class="stat-label">TOTAL EARNED</div>
+                    <div class="stat-value" id="totalEarned">0</div>
+                    <div class="stat-sub">⭐</div>
                 </div>
-                
-                <div class="summary-card">
-                    <div class="summary-label">UNIQUE MINERS</div>
-                    <div class="summary-value" id="uniqueMiners">0</div>
-                    <div class="summary-sub" id="avgPerMiner">travelers</div>
+                <div class="stat-card">
+                    <div class="stat-label">MOST PROFITABLE</div>
+                    <div class="stat-value" id="mostProfitable">0</div>
+                    <div class="stat-sub">⭐</div>
                 </div>
-                
-                <div class="summary-card">
-                    <div class="summary-label">TRANSACTIONS</div>
-                    <div class="summary-value" id="transactions">0</div>
-                    <div class="summary-sub" id="lastActivity">recent</div>
+                <div class="stat-card">
+                    <div class="stat-label">UNIQUE MINERS</div>
+                    <div class="stat-value" id="uniqueMiners">0</div>
+                    <div class="stat-sub">miners</div>
                 </div>
             </div>
             
-            <!-- Global Fee Management Card (shown when player has claims) -->
-            <div class="fee-card" id="feeManagementCard" style="display: none;">
-                <div class="fee-header">
-                    <div class="fee-title">
-                        <span>⚙️</span> FEE MANAGEMENT
-                    </div>
-                    <div class="fee-value" id="currentGlobalFee">10%</div>
+            <!-- Fee Management -->
+            <div class="fee-card">
+                <div class="fee-title">⚙️ FEE MANAGEMENT</div>
+                <div class="fee-buttons" id="feeButtons">
+                    <button class="fee-btn" data-fee="1">1%</button>
+                    <button class="fee-btn" data-fee="5">5%</button>
+                    <button class="fee-btn active" data-fee="10">10%</button>
+                    <button class="fee-btn" data-fee="15">15%</button>
+                    <button class="fee-btn" data-fee="20">20%</button>
                 </div>
-                
-                <div class="fee-slider-container">
-                    <input type="range" min="1" max="20" value="10" class="fee-slider" id="feeSlider" oninput="window.updateFeeDisplay(this.value)">
-                    <div class="fee-labels">
-                        <span>1%</span>
-                        <span>5%</span>
-                        <span>10%</span>
-                        <span>15%</span>
-                        <span>20%</span>
-                    </div>
-                </div>
-                
-                <div class="fee-warning" id="feeWarning">
-                    Higher fees may reduce miner activity. Recommended range: 5-15%
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button class="update-fee-btn" style="flex: 1;" onclick="window.updateAllFees()">UPDATE ALL CLAIMS</button>
-                    <button class="update-fee-btn" style="flex: 1;" onclick="window.resetFeeSlider()">RESET</button>
-                </div>
+                <div class="fee-note">Higher fees may reduce miner activity. Recommended range: 5-15%</div>
             </div>
             
-            <!-- Claims List Container -->
-            <div id="claimsContainer">
-                <div class="claims-list" id="claimsList">
-                    <!-- Filled by JavaScript -->
+            <!-- Claims List -->
+            <div class="claims-list">
+                <div class="section-title">👑 YOUR CLAIMS</div>
+                <div id="claimsContainer">
                     <div class="empty-state">
-                        <div class="empty-icon">👑</div>
-                        <div class="empty-title">No Claims Yet</div>
-                        <div class="empty-message">You haven't claimed any planets. Discover all elements on a planet with a Very Rare or Legendary find to claim it!</div>
-                        <button class="claim-now-btn" onclick="window.goToGalaxyMap()">🚀 EXPLORE</button>
+                        <div class="empty-icon">🌍</div>
+                        <div class="empty-text">No Claims Yet</div>
+                        <div class="empty-hint">Discover all elements on a planet with a Very Rare or Legendary find to claim it!</div>
                     </div>
                 </div>
             </div>
             
-            <!-- Recent Activity Section (shown when player has earnings) -->
-            <div class="activity-section" id="activitySection" style="display: none;">
-                <div class="activity-title">
-                    <span>📋</span> RECENT MINING ACTIVITY
-                </div>
+            <!-- Recent Activity -->
+            <div class="activity-card">
+                <div class="activity-title">📋 RECENT MINING ACTIVITY</div>
                 <div class="activity-list" id="activityList">
-                    <!-- Filled by JavaScript -->
+                    <div style="text-align: center; color: #a0c0ff; padding: 10px;">No mining activity yet</div>
                 </div>
             </div>
-            
-            <!-- Back button -->
-            <button class="back-button" onclick="window.returnToPrevious()">← BACK</button>
-            
-            <!-- Loading Overlay -->
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-spinner"></div>
-                <div class="loading-text" id="loadingText">loading your claims...</div>
-            </div>
-
-            <!-- Migration status (debug) -->
-            <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
-
-    <!-- Load all JavaScript files -->
-    <script type="module" src="js/storage.js"></script>
-    <script type="module" src="js/db.js"></script>
-    <script type="module" src="js/migration.js"></script>
-    <script type="module" src="js/planet-status.js"></script>
-    <script type="module" src="js/claim-system.js"></script>
-    <script type="module" src="js/claim-notifications.js"></script>
-
+    
+    <div class="modal-overlay" id="renewModal">
+        <div class="modal-content">
+            <div class="modal-title">🔁 RENEW RIGHTS</div>
+            <div class="modal-text" id="renewModalText">Renew mining rights for <strong id="renewPlanetName"></strong> for 30 days?</div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-cancel" onclick="closeRenewModal()">CANCEL</button>
+                <button class="modal-btn modal-confirm" onclick="confirmRenew()">RENEW</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">processing...</div>
+    </div>
+    
     <script type="module">
-        import { getPlayerClaims, getPlayerClaimStats, getOwnerEarningsHistory, updatePlanetFee } from './js/planet-status.js';
+        import { getCredits, getPlayer, addCredits, spendCredits } from './js/storage.js';
+        import { 
+            getPlanetClaim, 
+            getPlanetRightsStatus, 
+            getPlayerClaims,
+            getOwnerEarningsHistory,
+            updatePlanetFee,
+            getPlanetStatus
+        } from './js/planet-status.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -805,460 +675,380 @@
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingText = document.getElementById('loadingText');
-        const claimsList = document.getElementById('claimsList');
-        const totalClaimsSpan = document.getElementById('totalClaims');
         const creditsDisplay = document.getElementById('creditsDisplay');
-        const feeManagementCard = document.getElementById('feeManagementCard');
-        const activitySection = document.getElementById('activitySection');
+        const claimsContainer = document.getElementById('claimsContainer');
         const activityList = document.getElementById('activityList');
+        const expiryWarning = document.getElementById('expiryWarning');
+        const expiryWarningText = document.getElementById('expiryWarningText');
+        const ownedCount = document.getElementById('ownedCount');
+        const totalEarned = document.getElementById('totalEarned');
+        const mostProfitable = document.getElementById('mostProfitable');
+        const uniqueMiners = document.getElementById('uniqueMiners');
         
-        // Summary elements
-        const totalEarnedSpan = document.getElementById('totalEarned');
-        const avgEarnedSpan = document.getElementById('avgEarned');
-        const bestPlanetSpan = document.getElementById('bestPlanet');
-        const bestAmountSpan = document.getElementById('bestAmount');
-        const uniqueMinersSpan = document.getElementById('uniqueMiners');
-        const avgPerMinerSpan = document.getElementById('avgPerMiner');
-        const transactionsSpan = document.getElementById('transactions');
-        const lastActivitySpan = document.getElementById('lastActivity');
-        
-        // Fee management elements
-        const currentGlobalFeeSpan = document.getElementById('currentGlobalFee');
-        const feeSlider = document.getElementById('feeSlider');
-        const feeWarning = document.getElementById('feeWarning');
-
-        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        window.returnToPrevious = returnToPrevious;
-        window.goToGalaxyMap = goToGalaxyMap;
-        window.updateFeeDisplay = updateFeeDisplay;
-        window.updateAllFees = updateAllFees;
-        window.resetFeeSlider = resetFeeSlider;
-
         // ===== STATE =====
-        let playerClaims = [];
-        let playerStats = null;
-        let activityHistory = [];
-        let currentPlayerId = null;
-        let selectedFeeValue = 10;
-
-        // ===== LOAD CREDITS =====
-        async function loadCredits() {
+        let playerId = null;
+        let playerName = 'Voidfarer';
+        let currentFee = 10;
+        let claims = [];
+        let pendingRenewal = null;
+        
+        // ===== GET PLAYER ID =====
+        function getPlayerId() {
+            return localStorage.getItem('voidfarer_player_id') || 'player_default';
+        }
+        
+        // ===== UPDATE CREDITS =====
+        async function updateCreditsDisplay() {
             try {
-                let credits = 5000;
-                if (typeof window.getCredits === 'function') {
-                    credits = await window.getCredits();
-                }
+                const credits = await getCredits(playerId);
                 creditsDisplay.innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
             } catch (error) {
                 console.error('Error loading credits:', error);
             }
         }
-
+        
         // ===== LOAD CLAIMS =====
         async function loadClaims() {
             try {
-                loadingText.textContent = 'retrieving your claims...';
+                loadingOverlay.classList.add('active');
                 
-                // Get player ID
-                currentPlayerId = localStorage.getItem('voidfarer_player_id') || 'player_' + Date.now();
+                const allClaims = getPlayerClaims(playerId);
+                claims = [];
+                let expiringCount = 0;
                 
-                // Get player's claims
-                playerClaims = await getPlayerClaims(currentPlayerId);
+                for (const claim of allClaims) {
+                    const rights = await getPlanetRightsStatus(claim.planetName);
+                    const status = await getPlanetStatus(claim.planetName);
+                    
+                    claims.push({
+                        ...claim,
+                        rightsStatus: rights.status,
+                        daysRemaining: rights.daysRemaining,
+                        canRenew: rights.canRenew,
+                        renewalCost: rights.renewalCost,
+                        explored: status.explored,
+                        fullyExplored: status.fullyExplored
+                    });
+                    
+                    if (rights.status === 'expiring_soon') {
+                        expiringCount++;
+                    }
+                }
                 
-                // Get player statistics
-                playerStats = await getPlayerClaimStats(currentPlayerId);
+                // Update stats
+                ownedCount.textContent = claims.length;
                 
-                // Get recent activity
-                activityHistory = await getOwnerEarningsHistory(currentPlayerId, 20);
+                let total = 0;
+                let highest = 0;
+                const minersSet = new Set();
                 
-                // Update UI
-                updateStats();
+                const earnings = await getOwnerEarningsHistory(playerId, 100);
+                earnings.forEach(e => {
+                    total += e.feeValue || 0;
+                    if (e.feeValue > highest) highest = e.feeValue;
+                    if (e.minerId) minersSet.add(e.minerId);
+                });
+                
+                totalEarned.textContent = total.toLocaleString();
+                mostProfitable.textContent = highest.toLocaleString();
+                uniqueMiners.textContent = minersSet.size;
+                
+                // Show/hide expiration warning
+                if (expiringCount > 0) {
+                    expiryWarning.style.display = 'block';
+                    expiryWarningText.textContent = `You have ${expiringCount} planet(s) with mining rights expiring within 3 days! Renew them to keep them on the map.`;
+                } else {
+                    expiryWarning.style.display = 'none';
+                }
+                
                 renderClaims();
-                renderActivity();
-                
-                console.log(`Loaded ${playerClaims.length} claims for player ${currentPlayerId}`);
-                
-            } catch (error) {
-                console.error('Error loading claims:', error);
-                showEmptyState('Error Loading Claims', 'Please try again later.');
-            }
-        }
-
-        // ===== UPDATE STATISTICS =====
-        function updateStats() {
-            // Update total claims count
-            totalClaimsSpan.textContent = playerClaims.length;
-            
-            if (playerStats) {
-                // Format numbers
-                totalEarnedSpan.textContent = playerStats.totalEarned.toLocaleString();
-                
-                const avgPerPlanet = playerStats.averagePerPlanet || 0;
-                avgEarnedSpan.textContent = `${avgPerPlanet.toLocaleString()}⭐ avg`;
-                
-                bestPlanetSpan.textContent = playerStats.mostProfitablePlanet ? 
-                    playerStats.mostProfitablePlanet.substring(0, 8) + (playerStats.mostProfitablePlanet.length > 8 ? '...' : '') : 
-                    '---';
-                bestAmountSpan.textContent = playerStats.mostProfitableAmount ? 
-                    `${playerStats.mostProfitableAmount.toLocaleString()}⭐` : 
-                    '0⭐';
-                
-                uniqueMinersSpan.textContent = playerStats.totalMiners || 0;
-                
-                const avgPerMiner = playerStats.totalMiners > 0 ? 
-                    Math.round(playerStats.totalEarned / playerStats.totalMiners) : 0;
-                avgPerMinerSpan.textContent = `${avgPerMiner.toLocaleString()}⭐ avg`;
-                
-                transactionsSpan.textContent = playerStats.totalTransactions || 0;
-                
-                if (playerStats.lastActivity) {
-                    const lastDate = new Date(playerStats.lastActivity);
-                    const now = new Date();
-                    const diffMs = now - lastDate;
-                    const diffMins = Math.floor(diffMs / 60000);
-                    const diffHours = Math.floor(diffMs / 3600000);
-                    const diffDays = Math.floor(diffMs / 86400000);
-                    
-                    if (diffMins < 1) {
-                        lastActivitySpan.textContent = 'just now';
-                    } else if (diffMins < 60) {
-                        lastActivitySpan.textContent = `${diffMins}m ago`;
-                    } else if (diffHours < 24) {
-                        lastActivitySpan.textContent = `${diffHours}h ago`;
-                    } else {
-                        lastActivitySpan.textContent = `${diffDays}d ago`;
-                    }
-                } else {
-                    lastActivitySpan.textContent = 'never';
-                }
-            }
-            
-            // Show/hide fee management card based on claims
-            if (playerClaims.length > 0) {
-                feeManagementCard.style.display = 'block';
-                
-                // Calculate average fee for display
-                const avgFee = playerClaims.reduce((sum, claim) => sum + (claim.currentFee || 10), 0) / playerClaims.length;
-                currentGlobalFeeSpan.textContent = Math.round(avgFee) + '%';
-                feeSlider.value = Math.round(avgFee);
-                selectedFeeValue = Math.round(avgFee);
-            } else {
-                feeManagementCard.style.display = 'none';
-            }
-        }
-
-        // ===== RENDER CLAIMS =====
-        function renderClaims() {
-            if (playerClaims.length === 0) {
-                return; // Empty state already showing
-            }
-            
-            let html = '';
-            
-            playerClaims.forEach(claim => {
-                const planetType = claim.planetType || 'unknown';
-                const typeDisplay = planetType.charAt(0).toUpperCase() + planetType.slice(1);
-                
-                // Format numbers
-                const totalEarned = claim.totalEarned || 0;
-                const totalMiners = claim.totalMiners || 0;
-                const currentFee = claim.currentFee || 10;
-                
-                // Format last activity
-                let lastActivityText = 'Never';
-                if (claim.lastActivity) {
-                    const lastDate = new Date(claim.lastActivity);
-                    const now = new Date();
-                    const diffMs = now - lastDate;
-                    const diffHours = Math.floor(diffMs / 3600000);
-                    
-                    if (diffHours < 24) {
-                        lastActivityText = `${diffHours}h ago`;
-                    } else {
-                        const diffDays = Math.floor(diffMs / 86400000);
-                        lastActivityText = `${diffDays}d ago`;
-                    }
-                }
-                
-                html += `
-                    <div class="claim-card rarity-${claim.rarity}" id="claim-${claim.planetName}">
-                        <div class="claim-header">
-                            <div class="planet-name">
-                                <span class="crown-icon">👑</span>
-                                ${claim.planetName}
-                                <span class="planet-type">${typeDisplay}</span>
-                            </div>
-                            <div class="rarity-badge ${claim.rarity}">${claim.rarity}</div>
-                        </div>
-                        
-                        <div class="claim-details">
-                            <div class="detail-item">
-                                <div class="detail-label">FEE</div>
-                                <div class="detail-value fee" id="fee-${claim.planetName}">${currentFee}%</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">EARNED</div>
-                                <div class="detail-value earned">${totalEarned.toLocaleString()}⭐</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">MINERS</div>
-                                <div class="detail-value miners">${totalMiners}</div>
-                            </div>
-                        </div>
-                        
-                        <div class="stats-row">
-                            <span>💎 Discovered: <span class="stat-highlight">${claim.discoveredElement || 'Unknown'}</span></span>
-                            <span>⏱️ Last: <span class="stat-highlight">${lastActivityText}</span></span>
-                        </div>
-                        
-                        <div class="fee-control">
-                            <input type="number" class="fee-input" id="input-${claim.planetName}" 
-                                   value="${currentFee}" min="1" max="20" step="1" 
-                                   placeholder="Fee %">
-                            <button class="update-fee-btn" onclick="window.updateClaimFee('${claim.planetName}')">
-                                UPDATE
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            claimsList.innerHTML = html;
-        }
-
-        // ===== RENDER ACTIVITY =====
-        function renderActivity() {
-            if (activityHistory.length === 0) {
-                activitySection.style.display = 'none';
-                return;
-            }
-            
-            activitySection.style.display = 'block';
-            
-            let html = '';
-            const recentActivity = activityHistory.slice(0, 10); // Show last 10
-            
-            recentActivity.forEach(activity => {
-                const date = new Date(activity.timestamp);
-                const now = new Date();
-                const diffMs = now - date;
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHours = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffMs / 86400000);
-                
-                let timeText;
-                if (diffMins < 1) {
-                    timeText = 'just now';
-                } else if (diffMins < 60) {
-                    timeText = `${diffMins}m ago`;
-                } else if (diffHours < 24) {
-                    timeText = `${diffHours}h ago`;
-                } else {
-                    timeText = `${diffDays}d ago`;
-                }
-                
-                html += `
-                    <div class="activity-item">
-                        <div class="activity-left">
-                            <div class="activity-icon">💰</div>
-                            <div class="activity-details">
-                                <div class="activity-planet">${activity.planetName}</div>
-                                <div class="activity-miner">Miner: ${activity.minerId ? activity.minerId.substring(0, 8) + '...' : 'Unknown'}</div>
-                            </div>
-                        </div>
-                        <div class="activity-right">
-                            <div class="activity-amount">+${activity.feeValue}⭐</div>
-                            <div class="activity-time">${timeText}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            activityList.innerHTML = html;
-        }
-
-        // ===== UPDATE FEE DISPLAY =====
-        function updateFeeDisplay(value) {
-            selectedFeeValue = parseInt(value);
-            currentGlobalFeeSpan.textContent = selectedFeeValue + '%';
-            
-            // Update warning message based on fee
-            if (selectedFeeValue < 3) {
-                feeWarning.textContent = 'Very low fee - you will earn very little from mining.';
-                feeWarning.style.color = '#4affaa';
-            } else if (selectedFeeValue > 15) {
-                feeWarning.textContent = 'High fee may discourage miners from extracting on your planets.';
-                feeWarning.style.color = '#ffaa4a';
-            } else {
-                feeWarning.textContent = 'Recommended fee range. Balanced earnings and miner activity.';
-                feeWarning.style.color = '#ffaa4a';
-            }
-        }
-
-        // ===== UPDATE ALL FEES =====
-        async function updateAllFees() {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'updating fees...';
-            
-            try {
-                let successCount = 0;
-                
-                for (const claim of playerClaims) {
-                    const result = await updatePlanetFee(claim.planetName, selectedFeeValue);
-                    if (result) {
-                        successCount++;
-                        // Update the displayed fee for this planet
-                        const feeElement = document.getElementById(`fee-${claim.planetName}`);
-                        if (feeElement) {
-                            feeElement.textContent = selectedFeeValue + '%';
-                        }
-                        const inputElement = document.getElementById(`input-${claim.planetName}`);
-                        if (inputElement) {
-                            inputElement.value = selectedFeeValue;
-                        }
-                    }
-                }
+                await loadActivityHistory();
                 
                 loadingOverlay.classList.remove('active');
                 
-                if (successCount === playerClaims.length) {
-                    showNotification('success', `Updated all ${successCount} claims to ${selectedFeeValue}%`);
+            } catch (error) {
+                console.error('Error loading claims:', error);
+                loadingOverlay.classList.remove('active');
+            }
+        }
+        
+        // ===== RENDER CLAIMS =====
+        function renderClaims() {
+            if (claims.length === 0) {
+                claimsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🌍</div>
+                        <div class="empty-text">No Claims Yet</div>
+                        <div class="empty-hint">Discover all elements on a planet with a Very Rare or Legendary find to claim it!</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            for (const claim of claims) {
+                let statusClass = '';
+                let statusText = '';
+                let statusBadgeClass = '';
+                
+                if (claim.rightsStatus === 'active') {
+                    statusClass = '';
+                    statusText = `${claim.daysRemaining} days left`;
+                    statusBadgeClass = 'status-active';
+                } else if (claim.rightsStatus === 'expiring_soon') {
+                    statusClass = 'expiring';
+                    statusText = `⚠️ ${claim.daysRemaining} days left - EXPIRING SOON`;
+                    statusBadgeClass = 'status-expiring';
+                } else if (claim.rightsStatus === 'expired') {
+                    statusClass = 'expired';
+                    statusText = '🔒 EXPIRED - Planet hidden';
+                    statusBadgeClass = 'status-expired';
                 } else {
-                    showNotification('warning', `Updated ${successCount}/${playerClaims.length} claims`);
+                    statusClass = '';
+                    statusText = 'Available to claim';
+                    statusBadgeClass = 'status-active';
                 }
+                
+                const rarityDisplay = claim.highestRarity ? claim.highestRarity.toUpperCase() : 'COMMON';
+                const rarityColor = claim.highestRarity === 'legendary' ? '#ffd700' : 
+                                   claim.highestRarity === 'very-rare' ? '#e0b0ff' :
+                                   claim.highestRarity === 'rare' ? '#4169E1' :
+                                   claim.highestRarity === 'uncommon' ? '#b0ffb0' : '#ffffff';
+                
+                html += `
+                    <div class="claim-item ${statusClass}">
+                        <div class="claim-header">
+                            <span class="claim-name" style="color: ${rarityColor}">${claim.planetName}</span>
+                            <span class="claim-status ${statusBadgeClass}">${statusText}</span>
+                        </div>
+                        <div class="claim-details">
+                            <div class="claim-detail">🏆 Rarity: <span class="claim-value" style="color: ${rarityColor}">${rarityDisplay}</span></div>
+                            <div class="claim-detail">💰 Fee: <span class="claim-value">${claim.currentFee || 10}%</span></div>
+                            <div class="claim-detail">⭐ Earned: <span class="claim-value">${(claim.totalEarned || 0).toLocaleString()}</span></div>
+                            <div class="claim-detail">⛏️ Miners: <span class="claim-value">${claim.totalMiners || 0}</span></div>
+                        </div>
+                `;
+                
+                if (claim.rightsStatus === 'expiring_soon' && claim.canRenew) {
+                    html += `
+                        <button class="renew-btn" onclick="window.renewRights('${claim.planetName}', ${claim.renewalCost})">
+                            🔁 RENEW NOW - ${Math.floor(claim.renewalCost)}⭐
+                        </button>
+                    `;
+                } else if (claim.rightsStatus === 'expired') {
+                    html += `
+                        <button class="rediscover-btn" onclick="window.rediscoverPlanet('${claim.planetName}')">
+                            🔍 REDISCOVER PLANET
+                        </button>
+                    `;
+                }
+                
+                html += `</div>`;
+            }
+            
+            claimsContainer.innerHTML = html;
+        }
+        
+        // ===== LOAD ACTIVITY HISTORY =====
+        async function loadActivityHistory() {
+            try {
+                const earnings = await getOwnerEarningsHistory(playerId, 20);
+                
+                if (earnings.length === 0) {
+                    activityList.innerHTML = '<div style="text-align: center; color: #a0c0ff; padding: 10px;">No mining activity yet</div>';
+                    return;
+                }
+                
+                let html = '';
+                for (const earning of earnings) {
+                    const date = new Date(earning.timestamp);
+                    const formattedDate = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+                    
+                    html += `
+                        <div class="activity-item">
+                            <div>
+                                <span class="activity-planet">${earning.planetName}</span>
+                                <div class="activity-date">${formattedDate}</div>
+                            </div>
+                            <div class="activity-amount">+${earning.feeValue || 0}⭐</div>
+                        </div>
+                    `;
+                }
+                
+                activityList.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading activity history:', error);
+            }
+        }
+        
+        // ===== RENEW RIGHTS =====
+        let renewPlanetName = '';
+        let renewCost = 0;
+        
+        window.renewRights = function(planetName, cost) {
+            renewPlanetName = planetName;
+            renewCost = cost;
+            document.getElementById('renewPlanetName').textContent = planetName;
+            document.getElementById('renewModalText').innerHTML = `Renew mining rights for <strong>${planetName}</strong> for 30 days?<br><br>Cost: <strong style="color:#ffaa4a">${Math.floor(cost)}⭐</strong>`;
+            document.getElementById('renewModal').classList.add('active');
+        };
+        
+        window.closeRenewModal = function() {
+            document.getElementById('renewModal').classList.remove('active');
+            renewPlanetName = '';
+            renewCost = 0;
+        };
+        
+        window.confirmRenew = async function() {
+            if (!renewPlanetName) return;
+            
+            document.getElementById('renewModal').classList.remove('active');
+            loadingOverlay.classList.add('active');
+            
+            try {
+                const currentCredits = await getCredits(playerId);
+                
+                if (currentCredits < renewCost) {
+                    alert(`Not enough credits! Need ${Math.floor(renewCost)}⭐`);
+                    loadingOverlay.classList.remove('active');
+                    return;
+                }
+                
+                await spendCredits(renewCost, playerId);
+                
+                // Update claim expiration
+                const planetClaims = JSON.parse(localStorage.getItem('voidfarer_planet_claims') || '{}');
+                if (planetClaims[renewPlanetName]) {
+                    planetClaims[renewPlanetName].claimedAt = Date.now();
+                    planetClaims[renewPlanetName].lastRenewed = Date.now();
+                    planetClaims[renewPlanetName].totalRenewals = (planetClaims[renewPlanetName].totalRenewals || 0) + 1;
+                    localStorage.setItem('voidfarer_planet_claims', JSON.stringify(planetClaims));
+                }
+                
+                await updateCreditsDisplay();
+                await loadClaims();
+                
+                alert(`✅ Mining rights for ${renewPlanetName} renewed for 30 days!`);
                 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 
             } catch (error) {
-                console.error('Error updating fees:', error);
+                console.error('Error renewing rights:', error);
+                alert('Failed to renew rights. Please try again.');
+            } finally {
                 loadingOverlay.classList.remove('active');
-                showNotification('error', 'Failed to update fees');
+                renewPlanetName = '';
+                renewCost = 0;
             }
-        }
-
-        // ===== UPDATE SINGLE CLAIM FEE =====
-        window.updateClaimFee = async function(planetName) {
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            const input = document.getElementById(`input-${planetName}`);
-            const newFee = parseInt(input.value);
-            
-            if (isNaN(newFee) || newFee < 1 || newFee > 20) {
-                showNotification('error', 'Fee must be between 1% and 20%');
-                return;
-            }
-            
+        };
+        
+        // ===== REDISCOVER PLANET =====
+        window.rediscoverPlanet = async function(planetName) {
             loadingOverlay.classList.add('active');
-            loadingText.textContent = 'updating fee...';
             
             try {
-                const result = await updatePlanetFee(planetName, newFee);
+                // Reveal the planet
+                const hiddenPlanets = JSON.parse(localStorage.getItem('voidfarer_hidden_planets') || '[]');
+                const updatedHidden = hiddenPlanets.filter(h => h !== planetName);
+                localStorage.setItem('voidfarer_hidden_planets', JSON.stringify(updatedHidden));
                 
+                // Add to discovery history
+                const discoveryHistory = JSON.parse(localStorage.getItem(`voidfarer_discovery_history_${planetName}`) || '[]');
+                discoveryHistory.push({
+                    playerId: playerId,
+                    playerName: playerName,
+                    timestamp: Date.now(),
+                    date: new Date().toISOString(),
+                    isFirstDiscovery: false
+                });
+                localStorage.setItem(`voidfarer_discovery_history_${planetName}`, JSON.stringify(discoveryHistory));
+                
+                alert(`🔓 Planet ${planetName} has been rediscovered! It will now appear on the galaxy map again.`);
+                
+                await loadClaims();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                
+            } catch (error) {
+                console.error('Error rediscovering planet:', error);
+                alert('Failed to rediscover planet.');
+            } finally {
                 loadingOverlay.classList.remove('active');
-                
-                if (result) {
-                    // Update the displayed fee
-                    const feeElement = document.getElementById(`fee-${planetName}`);
-                    if (feeElement) {
-                        feeElement.textContent = newFee + '%';
-                    }
-                    
-                    showNotification('success', `Fee updated to ${newFee}%`);
-                    
-                    // Recalculate average for global display
-                    const claims = await getPlayerClaims(currentPlayerId);
-                    const avgFee = claims.reduce((sum, claim) => sum + (claim.currentFee || 10), 0) / claims.length;
-                    currentGlobalFeeSpan.textContent = Math.round(avgFee) + '%';
-                    feeSlider.value = Math.round(avgFee);
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                } else {
-                    showNotification('error', 'Failed to update fee');
+            }
+        };
+        
+        // ===== UPDATE FEE =====
+        async function updateFee(feePercent) {
+            try {
+                // Update all claims with the new fee
+                for (const claim of claims) {
+                    await updatePlanetFee(claim.planetName, feePercent);
                 }
+                currentFee = feePercent;
+                
+                // Update UI
+                document.querySelectorAll('.fee-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (parseInt(btn.dataset.fee) === feePercent) {
+                        btn.classList.add('active');
+                    }
+                });
+                
+                await loadClaims();
+                
+                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
                 
             } catch (error) {
                 console.error('Error updating fee:', error);
-                loadingOverlay.classList.remove('active');
-                showNotification('error', 'Failed to update fee');
             }
+        }
+        
+        // ===== SETUP FEE BUTTONS =====
+        function setupFeeButtons() {
+            const buttons = document.querySelectorAll('.fee-btn');
+            buttons.forEach(btn => {
+                btn.onclick = () => {
+                    const fee = parseInt(btn.dataset.fee);
+                    updateFee(fee);
+                };
+            });
+        }
+        
+        // ===== LOAD CURRENT LOCATION =====
+        function loadCurrentLocation() {
+            let planet = localStorage.getItem('voidfarer_current_planet');
+            if (!planet) planet = 'Earth';
+            document.getElementById('currentPlanet').textContent = planet;
+        }
+        
+        // ===== GO BACK =====
+        window.goBack = function() {
+            window.location.href = 'ship-bridge.html';
         };
-
-        // ===== RESET FEE SLIDER =====
-        function resetFeeSlider() {
-            if (playerClaims.length > 0) {
-                const avgFee = playerClaims.reduce((sum, claim) => sum + (claim.currentFee || 10), 0) / playerClaims.length;
-                const roundedAvg = Math.round(avgFee);
-                feeSlider.value = roundedAvg;
-                updateFeeDisplay(roundedAvg);
-            }
-        }
-
-        // ===== SHOW NOTIFICATION =====
-        function showNotification(type, message) {
-            // Simple alert for now - could be enhanced with a toast notification
-            alert(message);
-        }
-
-        // ===== SHOW EMPTY STATE =====
-        function showEmptyState(title, message) {
-            claimsList.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">👑</div>
-                    <div class="empty-title">${title}</div>
-                    <div class="empty-message">${message}</div>
-                    <button class="claim-now-btn" onclick="window.goToGalaxyMap()">🚀 EXPLORE</button>
-                </div>
-            `;
-        }
-
-        // ===== GO TO GALAXY MAP =====
-        function goToGalaxyMap() {
-            window.location.href = 'galaxy-map.html';
-        }
-
-        // ===== RETURN TO PREVIOUS PAGE =====
-        function returnToPrevious() {
-            // Try to determine where we came from
-            const referrer = document.referrer;
-            
-            if (referrer.includes('earth-hub.html')) {
-                window.location.href = 'earth-hub.html';
-            } else if (referrer.includes('ship-bridge.html')) {
-                window.location.href = 'ship-bridge.html';
-            } else {
-                // Default fallback
-                window.location.href = 'ship-bridge.html';
-            }
-        }
-
+        
         // ===== INITIALIZE =====
         async function init() {
-            try {
-                loadingOverlay.classList.add('active');
-                loadingText.textContent = 'accessing your claims...';
-                
-                // Load all data
-                await loadCredits();
+            playerId = getPlayerId();
+            playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+            
+            loadingOverlay.classList.add('active');
+            
+            await updateCreditsDisplay();
+            loadCurrentLocation();
+            setupFeeButtons();
+            await loadClaims();
+            
+            loadingOverlay.classList.remove('active');
+            
+            // Auto-refresh every 30 seconds
+            setInterval(async () => {
+                await updateCreditsDisplay();
                 await loadClaims();
-                
-                // Hide loading
-                setTimeout(() => {
-                    loadingOverlay.classList.remove('active');
-                }, 500);
-                
-            } catch (error) {
-                console.error('Init error:', error);
-                loadingText.textContent = 'error - redirecting...';
-                setTimeout(() => {
-                    window.location.href = 'ship-bridge.html';
-                }, 2000);
-            }
+            }, 30000);
         }
-
-        // ===== START =====
+        
         init();
     </script>
 </body>
