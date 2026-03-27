@@ -702,7 +702,7 @@
         import { generatePlanetName } from './js/planet-names.js';
         import { generatePlanetResources, PLANET_TYPE_DATA } from './js/planet-utils.js';
         import { getPlanetStatus, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
-        import { getHiddenPlanets, revealPlanet, getScannedStars, markStarScanned, getCurrentPlanetTier } from './js/storage.js';
+        import { getHiddenPlanets, revealPlanet, getScannedStars, markStarScanned, getCurrentPlanetTier, getJournal } from './js/storage.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -943,16 +943,19 @@
             }
         }
 
-        // ===== LOAD EXPLORED PLANETS =====
+        // ===== LOAD EXPLORED PLANETS - FIXED =====
         async function loadExploredPlanets() {
             try {
-                const locations = await window.getPlayerLocations();
-                locations.forEach(loc => {
-                    if (loc.planet) {
-                        exploredPlanetsCache.add(loc.planet);
-                    }
-                });
-                console.log(`Loaded ${exploredPlanetsCache.size} explored planets`);
+                // Use the existing getJournal() function to retrieve extraction history
+                const journal = await getJournal();
+                if (journal && journal.entries) {
+                    journal.entries.forEach(entry => {
+                        if (entry.location && entry.location.planet) {
+                            exploredPlanetsCache.add(entry.location.planet);
+                        }
+                    });
+                }
+                console.log(`Loaded ${exploredPlanetsCache.size} explored planets from journal`);
             } catch (error) {
                 console.error('Error loading explored planets:', error);
             }
