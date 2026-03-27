@@ -162,12 +162,12 @@
             transform: scale(0.97);
         }
         
-        /* Certificate Card */
+        /* Certificate Card - Always Expanded */
         .cert-card {
             background: rgba(20, 30, 45, 0.9);
             backdrop-filter: blur(10px);
             border-radius: 30px 15px 30px 15px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             overflow: hidden;
             border-left: 4px solid;
             transition: all 0.2s;
@@ -179,7 +179,6 @@
         
         .cert-card.available {
             border-left-color: #8a6aff;
-            animation: pulse-glow 2s infinite;
         }
         
         .cert-card.locked {
@@ -192,17 +191,11 @@
             background: rgba(255,215,0,0.1);
         }
         
-        @keyframes pulse-glow {
-            0%, 100% { border-left-color: #8a6aff; box-shadow: 0 0 5px #8a6aff; }
-            50% { border-left-color: #b8a6ff; box-shadow: 0 0 15px #8a6aff; }
-        }
-        
         .cert-header {
             padding: 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: pointer;
             background: rgba(0,0,0,0.2);
         }
         
@@ -214,13 +207,13 @@
         }
         
         .cert-icon {
-            font-size: 28px;
-            width: 44px;
+            font-size: 32px;
+            width: 48px;
             text-align: center;
         }
         
         .cert-name {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
             font-family: 'Exo 2', sans-serif;
             color: white;
@@ -237,7 +230,7 @@
         }
         
         .level-number {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             color: #ffd966;
         }
@@ -252,27 +245,17 @@
             color: #4affaa;
         }
         
-        .expand-icon {
-            font-size: 14px;
-            color: #6a8ac0;
-        }
-        
-        /* Expanded Content */
+        /* Content - Always Visible */
         .cert-content {
-            padding: 0 14px 14px 14px;
-            display: none;
+            padding: 0 14px 16px 14px;
             border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .cert-card.expanded .cert-content {
-            display: block;
         }
         
         .gain-preview {
             background: rgba(74, 255, 170, 0.1);
             border-radius: 20px;
             padding: 10px;
-            margin: 10px 0;
+            margin: 12px 0;
             text-align: center;
         }
         
@@ -296,9 +279,9 @@
         }
         
         .progress-bar {
-            height: 8px;
+            height: 12px;
             background: rgba(0,0,0,0.3);
-            border-radius: 4px;
+            border-radius: 6px;
             overflow: hidden;
             margin-bottom: 8px;
         }
@@ -306,8 +289,9 @@
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #8a6aff, #b8a6ff);
-            border-radius: 4px;
+            border-radius: 6px;
             width: 0%;
+            transition: width 0.3s;
         }
         
         .donation-section {
@@ -342,8 +326,8 @@
             background: rgba(138, 106, 255, 0.3);
             border: 1px solid #8a6aff;
             border-radius: 30px;
-            padding: 6px 14px;
-            font-size: 11px;
+            padding: 8px 16px;
+            font-size: 12px;
             font-weight: 600;
             color: #8a6aff;
             cursor: pointer;
@@ -356,9 +340,9 @@
         }
         
         .inventory-text {
-            font-size: 10px;
+            font-size: 11px;
             color: #a0c0ff;
-            margin-top: 8px;
+            margin-top: 10px;
             text-align: center;
         }
         
@@ -367,7 +351,7 @@
             border-radius: 20px;
             padding: 10px;
             text-align: center;
-            margin: 10px 0;
+            margin: 12px 0;
         }
         
         /* Back Button */
@@ -493,10 +477,9 @@
     <div class="tooltip" id="tooltip"></div>
     
     <script type="module">
-        import { getCredits, addCredits, spendCredits } from './js/storage.js';
+        import { getCredits } from './js/storage.js';
         import { 
             getCertificates, 
-            saveCertificates,
             getCertificateStatus,
             getXpNeeded,
             getDonationsNeeded,
@@ -505,15 +488,12 @@
             calculateUpgradeGain,
             calculateUnlockGain,
             addDonationXP,
-            CERTIFICATE_TIERS,
-            formatShare
+            CERTIFICATE_TIERS
         } from './js/certificates.js';
         import { 
             getLaborPoolStats,
             getPlayerEarnings,
-            claimLaborEarnings,
-            distributeLaborPool,
-            formatEarnings
+            claimLaborEarnings
         } from './js/labor-pool.js';
 
         // ===== TELEGRAM INIT =====
@@ -526,13 +506,11 @@
         
         // ===== STATE =====
         let playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-        let playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
         let playerCredits = 0;
         let certificates = [];
         let laborPool = 10000;
         let activeWorkers = 847;
         let totalPlayerShares = 8450;
-        let expandedIndex = null;
         
         // Player inventory
         let playerInventory = {
@@ -549,7 +527,6 @@
                 loadingOverlay.classList.add('active');
                 
                 playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-                
                 certificates = await getCertificates(playerId);
                 
                 playerCredits = await getCredits(playerId);
@@ -581,7 +558,7 @@
             }
         }
         
-        // ===== RENDER CERTIFICATES =====
+        // ===== RENDER CERTIFICATES (ALWAYS EXPANDED) =====
         function renderCertificates() {
             const container = document.getElementById('certificatesContainer');
             let html = '';
@@ -607,9 +584,15 @@
                 else if (status === 'available') statusClass = 'available';
                 else statusClass = 'locked';
                 
+                const nextLevelXp = currentLevel * cert.xpPerLevel;
+                const currentXp = prog?.xp || 0;
+                const xpProgress = currentXp - nextLevelXp;
+                const xpToNext = cert.xpPerLevel - xpProgress;
+                const percentComplete = (xpProgress / cert.xpPerLevel) * 100;
+                
                 html += `
-                    <div class="cert-card ${statusClass} ${expandedIndex === i ? 'expanded' : ''}" data-index="${i}">
-                        <div class="cert-header" onclick="window.toggleCard(${i})">
+                    <div class="cert-card ${statusClass}">
+                        <div class="cert-header">
                             <div class="cert-info">
                                 <div class="cert-icon">${cert.icon}</div>
                                 <div>
@@ -622,24 +605,45 @@
                 
                 if (status === 'maxed') {
                     html += `<div class="level-number">MAX</div>`;
-                } else if (status === 'earned' || status === 'available') {
+                } else {
                     html += `<div class="level-number">${currentLevel}/${cert.totalLevels}</div>`;
                     if (gainPreview > 0) {
-                        html += `<div class="next-gain">+${gainPreview}⭐</div>`;
+                        html += `<div class="next-gain">+${gainPreview}⭐/day</div>`;
                     }
-                } else {
-                    html += `<div class="level-number">🔒</div>`;
                 }
                 
                 html += `
                             </div>
-                            <div class="expand-icon">${expandedIndex === i ? '▼' : '▶'}</div>
                         </div>
                         
                         <div class="cert-content">
                 `;
                 
-                if (gainPreview > 0) {
+                // Progress Bar - Always Visible
+                if (status !== 'locked' && status !== 'maxed') {
+                    html += `
+                        <div class="progress-header">
+                            <span>${currentLevel + 1 === 1 ? 'FIRST LEVEL' : `LEVEL ${currentLevel + 1}`}</span>
+                            <span>${Math.floor(xpToNext).toLocaleString()} XP needed</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(100, percentComplete)}%"></div>
+                        </div>
+                        <div style="font-size: 10px; color: #a0c0ff; text-align: right; margin-top: 4px;">
+                            ${Math.floor(xpProgress).toLocaleString()} / ${cert.xpPerLevel.toLocaleString()} XP
+                        </div>
+                    `;
+                } else if (status === 'maxed') {
+                    html += `
+                        <div class="gain-preview">
+                            <div class="gain-amount">✓ COMPLETED</div>
+                            <div class="gain-label">Mastered this certificate</div>
+                        </div>
+                    `;
+                }
+                
+                // Gain Preview - Always Visible
+                if (gainPreview > 0 && status !== 'maxed') {
                     const actionText = status === 'available' ? `Unlock ${cert.name}` : `Level ${currentLevel + 1}`;
                     html += `
                         <div class="gain-preview">
@@ -649,18 +653,7 @@
                     `;
                 }
                 
-                if (status === 'earned' && currentLevel < cert.totalLevels) {
-                    html += `
-                        <div class="progress-header">
-                            <span>PROGRESS TO LEVEL ${currentLevel + 1}</span>
-                            <span>${Math.floor(xpNeeded)} XP needed</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
-                        </div>
-                    `;
-                }
-                
+                // Donation Section - Always Visible for available/earned certificates
                 if (status !== 'locked' && status !== 'maxed') {
                     const rarityClass = `rarity-${cert.rarity}`;
                     html += `
@@ -671,8 +664,8 @@
                                     <span>+${cert.xpPerDonation} XP per ${cert.unitsPerDonation} units</span>
                                 </div>
                                 <div>
-                                    <button class="donate-btn" onclick="event.stopPropagation(); window.donate(${i}, ${cert.unitsPerDonation})">DONATE ${cert.unitsPerDonation}</button>
-                                    <button class="donate-btn" onclick="event.stopPropagation(); window.donate(${i}, ${cert.unitsPerDonation * 10})">×10</button>
+                                    <button class="donate-btn" onclick="window.donate(${i}, ${cert.unitsPerDonation})">DONATE ${cert.unitsPerDonation}</button>
+                                    <button class="donate-btn" onclick="window.donate(${i}, ${cert.unitsPerDonation * 10})">×10</button>
                                 </div>
                             </div>
                             <div class="inventory-text">
@@ -683,6 +676,7 @@
                     `;
                 }
                 
+                // Unlock requirement for locked certificates
                 if (status === 'locked' && i > 0) {
                     const prevCert = CERTIFICATE_TIERS[i-1];
                     html += `
@@ -699,20 +693,8 @@
             container.innerHTML = html;
         }
         
-        // ===== TOGGLE CARD =====
-        window.toggleCard = function(index) {
-            if (expandedIndex === index) {
-                expandedIndex = null;
-            } else {
-                expandedIndex = index;
-            }
-            renderCertificates();
-        };
-        
         // ===== DONATE =====
         window.donate = async function(certIndex, quantity) {
-            console.log('Donate clicked:', certIndex, quantity);
-            
             const cert = CERTIFICATE_TIERS[certIndex];
             const status = getCertificateStatus(certificates, certIndex);
             
@@ -739,12 +721,10 @@
             
             // Add XP
             const result = await addDonationXP(playerId, certIndex, quantity);
-            console.log('Donation result:', result);
             
             if (result.success) {
-                // RELOAD certificates after donation
+                // Reload certificates
                 certificates = await getCertificates(playerId);
-                console.log('Updated certificates:', certificates[certIndex]);
                 
                 if (result.leveledUp) {
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
