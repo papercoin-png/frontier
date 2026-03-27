@@ -1212,9 +1212,17 @@
                 // DIRECT CHECK - show claim button immediately when all elements are explored
                 const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
                 if (allExplored) {
-                    claimBtn.classList.add('visible');
-                    claimBtn.disabled = false;
-                    claimBtn.textContent = '✨ CLAIM PLANET';
+                    // Only show claim button if planet is Very Rare or Legendary
+                    const status = await getPlanetStatus(currentPlanet.name);
+                    const claimableRarities = ['very-rare', 'legendary'];
+                    const isClaimable = claimableRarities.includes(status.highestRarity);
+                    
+                    if (isClaimable) {
+                        claimBtn.classList.add('visible');
+                        claimBtn.disabled = false;
+                        claimBtn.textContent = '✨ CLAIM PLANET';
+                    }
+                    
                     showExtractionNotification({
                         success: true,
                         resource: 'All Elements',
@@ -1412,7 +1420,11 @@
             try {
                 const status = await getPlanetStatus(currentPlanet.name);
                 if (status) {
-                    if (status.fullyExplored && !status.claimed) {
+                    // Only Very Rare or Legendary planets can be claimed
+                    const claimableRarities = ['very-rare', 'legendary'];
+                    const isClaimable = status.fullyExplored && !status.claimed && claimableRarities.includes(status.highestRarity);
+                    
+                    if (isClaimable) {
                         claimBtn.classList.add('visible');
                         claimBtn.disabled = false;
                         claimBtn.textContent = '✨ CLAIM PLANET';
