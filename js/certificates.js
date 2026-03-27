@@ -29,9 +29,6 @@ export const CERTIFICATE_TIERS = [
       unitsPerDonation: 1, xpPerDonation: 500, xpPerLevel: 2560000, totalLevels: 10 }
 ];
 
-// Storage key prefix
-const STORAGE_PREFIX = 'voidfarer_certificate_';
-
 // ===== GET CERTIFICATE PROGRESS =====
 export async function getCertificates(playerId) {
     try {
@@ -178,7 +175,11 @@ export function calculateUnlockGain(progress, index, laborPool, totalPlayerShare
 // ===== DONATION XP =====
 export async function addDonationXP(playerId, index, quantity) {
     try {
+        console.log('addDonationXP called:', { playerId, index, quantity });
+        
         const progress = await getCertificates(playerId);
+        console.log('Current progress before:', progress[index]);
+        
         const cert = CERTIFICATE_TIERS[index];
         
         const status = getCertificateStatus(progress, index);
@@ -194,7 +195,11 @@ export async function addDonationXP(playerId, index, quantity) {
         
         // Calculate XP gain
         const xpGain = (quantity / cert.unitsPerDonation) * cert.xpPerDonation;
+        console.log('XP Gain:', xpGain);
+        
         let newXp = prog.xp + xpGain;
+        console.log('New XP before level check:', newXp);
+        
         let leveledUp = false;
         let newLevel = prog.level;
         
@@ -203,14 +208,21 @@ export async function addDonationXP(playerId, index, quantity) {
         while (newXp >= (newLevel + 1) * xpPerLevel && newLevel < cert.totalLevels) {
             newLevel++;
             leveledUp = true;
+            console.log('Leveled up to:', newLevel);
         }
         
-        // Update XP (cap at max)
-        prog.xp = Math.min(newLevel * xpPerLevel, newXp);
+        // Update progress
         prog.level = newLevel;
+        prog.xp = newXp;
         prog.earned = true;
         
+        console.log('Updated progress:', { level: prog.level, xp: prog.xp });
+        
         await saveCertificates(playerId, progress);
+        
+        // Verify save
+        const verify = await getCertificates(playerId);
+        console.log('Verified after save:', verify[index]);
         
         return {
             success: true,
