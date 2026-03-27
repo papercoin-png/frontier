@@ -11,6 +11,7 @@
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
 // FIXED: Database version updated to 4 with all required stores created in upgrade
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
+// ADDED: getElementRarity function for University cargo system
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -189,6 +190,48 @@ export function getElementMass(elementName) {
 
 function getCargoMassLimit() {
     return typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
+}
+
+// ===== ELEMENT RARITY CLASSIFICATION (for University cargo system) =====
+export function getElementRarity(elementName) {
+    const commonElements = [
+        'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 'Nitrogen', 'Oxygen',
+        'Fluorine', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine',
+        'Argon', 'Potassium', 'Calcium'
+    ];
+    
+    const uncommonElements = [
+        'Magnesium', 'Iron', 'Nickel', 'Copper', 'Zinc', 'Gallium', 'Germanium', 'Arsenic',
+        'Selenium', 'Bromine', 'Krypton', 'Rubidium', 'Strontium', 'Yttrium', 'Zirconium',
+        'Niobium', 'Molybdenum', 'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver',
+        'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon', 'Cesium',
+        'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium', 'Samarium', 'Europium',
+        'Gadolinium', 'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium'
+    ];
+    
+    const rareElements = [
+        'Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Gold', 'Platinum',
+        'Iridium', 'Osmium', 'Rhenium'
+    ];
+    
+    const veryRareElements = [
+        'Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'
+    ];
+    
+    const legendaryElements = [
+        'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium',
+        'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium',
+        'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium', 'Nihonium', 'Flerovium',
+        'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'
+    ];
+    
+    if (commonElements.includes(elementName)) return 'common';
+    if (uncommonElements.includes(elementName)) return 'uncommon';
+    if (rareElements.includes(elementName)) return 'rare';
+    if (veryRareElements.includes(elementName)) return 'very-rare';
+    if (legendaryElements.includes(elementName)) return 'legendary';
+    
+    return 'common';
 }
 
 // ============================================================================
@@ -1552,6 +1595,7 @@ window.getRemainingHubStorage = getRemainingHubStorage;
 window.getRemainingShipStorage = getRemainingShipStorage;
 window.isAtEarth = isAtEarth;
 window.getElementMass = getElementMass;
+window.getElementRarity = getElementRarity;
 window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
