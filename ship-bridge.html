@@ -10,7 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-        /* All your existing CSS styles - kept exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -454,7 +453,7 @@
             transform: scale(0.96);
         }
         
-        /* NEW: Rights Marketplace Card */
+        /* Rights Marketplace Card */
         .rights-card {
             background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
@@ -527,7 +526,7 @@
             font-weight: 600;
         }
         
-        /* NEW: Scan History Card */
+        /* Scan History Card */
         .scan-card {
             background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
@@ -655,7 +654,6 @@
             display: none;
         }
         
-        /* NEW: Expiration Warning Banner */
         .expiry-warning {
             background: rgba(255, 170, 74, 0.2);
             border: 2px solid #ffaa4a;
@@ -683,6 +681,38 @@
             color: white;
             font-size: 10px;
         }
+        
+        .active-ship-card {
+            background: rgba(74, 255, 170, 0.1);
+            border: 1px solid #4affaa;
+            border-radius: 30px;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .active-ship-name {
+            color: #4affaa;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .fleet-btn {
+            background: rgba(74, 138, 192, 0.3);
+            border: 1px solid #6a8ac0;
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            color: #a0c0ff;
+        }
+        
+        .fleet-btn:active {
+            background: #6a8ac0;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -697,7 +727,7 @@
                 </button>
             </div>
             
-            <!-- NEW: Expiration Warning Banner -->
+            <!-- Expiration Warning Banner -->
             <div class="expiry-warning" id="expiryWarning">
                 <div class="expiry-warning-title">⚠️ RIGHTS EXPIRING SOON</div>
                 <div class="expiry-warning-text" id="expiryWarningText">Your mining rights on some planets will expire soon!</div>
@@ -710,6 +740,15 @@
                 <div class="location" id="locationDisplay">
                     <span id="currentPlanet">Loading...</span>
                 </div>
+            </div>
+            
+            <!-- Active Ship Display -->
+            <div class="active-ship-card" id="activeShipCard">
+                <div>
+                    <span style="font-size: 11px; color: #a0c0ff;">ACTIVE VESSEL</span>
+                    <div class="active-ship-name" id="activeShipName">--</div>
+                </div>
+                <div class="fleet-btn" onclick="goToFleet()">⚓ MANAGE FLEET</div>
             </div>
             
             <div class="claim-badge" id="claimBadge" style="display: none;">
@@ -761,6 +800,13 @@
                     <div class="nav-label">CARGO</div>
                     <div class="nav-desc">Inventory</div>
                 </div>
+                
+                <!-- NEW: FLEET MANAGEMENT BUTTON -->
+                <div class="nav-card" onclick="goToFleet()">
+                    <div class="nav-icon">⚓</div>
+                    <div class="nav-label">FLEET</div>
+                    <div class="nav-desc">Manage your ships</div>
+                </div>
             </div>
             
             <div class="status-card">
@@ -804,7 +850,7 @@
                 </div>
             </div>
             
-            <!-- NEW: Rights Marketplace Card -->
+            <!-- Rights Marketplace Card -->
             <div class="rights-card" id="rightsCard" style="display: none;">
                 <div class="rights-title">👑 YOUR MINING RIGHTS</div>
                 <div class="rights-list" id="rightsList">
@@ -812,7 +858,7 @@
                 </div>
             </div>
             
-            <!-- NEW: Scan History Card -->
+            <!-- Scan History Card -->
             <div class="scan-card" id="scanCard" style="display: none;">
                 <div class="scan-title">🔍 SCAN HISTORY</div>
                 <div class="scan-stats">
@@ -854,7 +900,7 @@
 
     <script type="module">
         import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars } from './js/storage.js';
-        import { getPlanetClaim, getPlanetRightsStatus, getPlanetDiscoveryHistory, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
+        import { getPlanetClaim, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -875,7 +921,7 @@
         const claimFee = document.getElementById('claimFee');
         const planetLabel = document.getElementById('planetLabel');
         
-        // NEW: Rights and Scan Elements
+        // Rights and Scan Elements
         const rightsCard = document.getElementById('rightsCard');
         const rightsList = document.getElementById('rightsList');
         const scanCard = document.getElementById('scanCard');
@@ -886,6 +932,28 @@
         // ===== GET PLAYER ID =====
         function getPlayerId() {
             return localStorage.getItem('voidfarer_player_id') || 'main';
+        }
+
+        // ===== UPDATE ACTIVE SHIP DISPLAY =====
+        function updateActiveShipDisplay() {
+            try {
+                const activeShip = localStorage.getItem('voidfarer_active_ship');
+                const activeShipStats = JSON.parse(localStorage.getItem('voidfarer_active_ship_stats') || '{}');
+                
+                if (activeShip) {
+                    const shipName = activeShip.split(' (')[0];
+                    document.getElementById('activeShipName').textContent = shipName;
+                    
+                    // Update cargo limit based on active ship
+                    if (activeShipStats.cargo) {
+                        document.getElementById('cargoLimit').textContent = activeShipStats.cargo.toLocaleString();
+                    }
+                } else {
+                    document.getElementById('activeShipName').textContent = 'No Ship';
+                }
+            } catch (error) {
+                console.error('Error updating active ship display:', error);
+            }
         }
 
         // ===== UPDATE CREDITS USING STORAGE.JS =====
@@ -904,7 +972,6 @@
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
             try {
-                // Update credits using storage.js
                 await updateCreditsDisplay();
                 
                 // Get ship fuel
@@ -925,7 +992,9 @@
                     cargoMass += count * 10; // Simplified mass
                 }
                 document.getElementById('cargoValue').textContent = cargoMass.toFixed(1);
-                document.getElementById('cargoLimit').textContent = CARGO_MASS_LIMIT;
+                
+                // Update active ship display
+                updateActiveShipDisplay();
                 
             } catch (error) {
                 console.error('Error loading ship data:', error);
@@ -980,7 +1049,7 @@
             }
         }
 
-        // ===== LOAD RIGHTS MARKETPLACE (NEW) =====
+        // ===== LOAD RIGHTS MARKETPLACE =====
         async function loadRightsMarketplace() {
             try {
                 const playerId = getPlayerId();
@@ -998,7 +1067,6 @@
                 
                 for (const claim of claims) {
                     const rights = await getPlanetRightsStatus(claim.planetName);
-                    const expiresAt = rights.expiresAt;
                     const daysRemaining = rights.daysRemaining;
                     
                     const isExpiring = daysRemaining <= 3 && daysRemaining > 0;
@@ -1008,14 +1076,11 @@
                     item.className = 'rights-item';
                     if (isExpiring) item.classList.add('expiring');
                     
-                    let expiryClass = '';
                     let expiryText = '';
                     if (daysRemaining <= 0) {
                         expiryText = 'EXPIRED';
-                        expiryClass = 'danger';
                     } else if (daysRemaining <= 3) {
                         expiryText = `${daysRemaining} days left - EXPIRING SOON!`;
-                        expiryClass = 'warning';
                     } else {
                         expiryText = `${daysRemaining} days left`;
                     }
@@ -1024,9 +1089,9 @@
                         <div class="rights-item-name">${claim.planetName} (Tier ${claim.highestRarity ? claim.highestRarity.toUpperCase() : '?'})</div>
                         <div class="rights-item-details">
                             <span>👑 ${claim.ownerName}</span>
-                            <span class="rights-expiry ${expiryClass}">⏳ ${expiryText}</span>
+                            <span class="rights-expiry ${daysRemaining <= 3 ? 'warning' : ''}">⏳ ${expiryText}</span>
                         </div>
-                        ${daysRemaining > 0 && daysRemaining <= 3 ? `<button class="rights-renew-btn" onclick="renewRights('${claim.planetName}', ${claim.baseFee * 0.5})">🔁 RENEW (${Math.floor(claim.baseFee * 0.5)}⭐)</button>` : ''}
+                        ${daysRemaining > 0 && daysRemaining <= 3 ? `<button class="rights-renew-btn" onclick="renewRights('${claim.planetName}', ${Math.floor(claim.baseFee * 0.5)})">🔁 RENEW (${Math.floor(claim.baseFee * 0.5)}⭐)</button>` : ''}
                     `;
                     rightsList.appendChild(item);
                 }
@@ -1044,7 +1109,7 @@
             }
         }
 
-        // ===== LOAD SCAN HISTORY (NEW) =====
+        // ===== LOAD SCAN HISTORY =====
         async function loadScanHistory() {
             try {
                 const playerId = getPlayerId();
@@ -1087,7 +1152,7 @@
             }
         }
 
-        // ===== RENEW RIGHTS (NEW) =====
+        // ===== RENEW RIGHTS =====
         window.renewRights = async function(planetName, cost) {
             try {
                 const playerId = getPlayerId();
@@ -1100,7 +1165,6 @@
                 
                 const success = await spendCredits(cost, playerId);
                 if (success) {
-                    // Update claim expiration
                     const planetClaims = JSON.parse(localStorage.getItem('voidfarer_planet_claims') || '{}');
                     if (planetClaims[planetName]) {
                         planetClaims[planetName].claimedAt = Date.now();
@@ -1177,6 +1241,11 @@
         window.goToLaborExchange = function() {
             safeHaptic();
             window.location.href = 'labor-exchange.html';
+        };
+
+        window.goToFleet = function() {
+            safeHaptic();
+            window.location.href = 'fleet-management.html';
         };
 
         // ===== QUICK ACTIONS =====
@@ -1256,6 +1325,7 @@
             loadLaborEarnings();
             await loadRightsMarketplace();
             await loadScanHistory();
+            updateActiveShipDisplay();
             
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
@@ -1267,6 +1337,7 @@
                 loadClaimData();
                 await loadRightsMarketplace();
                 await loadScanHistory();
+                updateActiveShipDisplay();
             }, 30000);
         }
 
@@ -1277,6 +1348,7 @@
         window.goToJournal = goToJournal;
         window.goToEarthHub = goToEarthHub;
         window.goToLaborExchange = goToLaborExchange;
+        window.goToFleet = goToFleet;
         window.quickRefuel = quickRefuel;
         window.quickRepair = quickRepair;
         window.renewRights = renewRights;
