@@ -191,7 +191,7 @@ function getCargoMassLimit() {
 }
 
 // ============================================================================
-// INDEXEDDB HELPER FUNCTIONS (NEW for certificate and labor pool)
+// INDEXEDDB HELPER FUNCTIONS
 // ============================================================================
 
 export async function getItem(storeName, id = 'main') {
@@ -293,6 +293,22 @@ export async function clearStore(storeName) {
         return true;
     } catch (error) {
         console.error(`Error clearing store ${storeName}:`, error);
+        return false;
+    }
+}
+
+export async function addTransaction(storeName, data) {
+    try {
+        const id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const item = {
+            id,
+            ...data,
+            timestamp: data.timestamp || Date.now(),
+            date: data.date || new Date().toISOString()
+        };
+        return await setItem(storeName, item, id);
+    } catch (error) {
+        console.error(`Error adding transaction to ${storeName}:`, error);
         return false;
     }
 }
@@ -1507,5 +1523,9 @@ window.savePortfolio = savePortfolio;
 window.loadPortfolio = loadPortfolio;
 window.saveTradeHistory = saveTradeHistory;
 window.loadTradeHistory = loadTradeHistory;
+window.getItem = getItem;
+window.setItem = setItem;
+window.getAll = getAll;
+window.addTransaction = addTransaction;
 
 console.log('✅ storage.js loaded with certificate and labor pool support');
