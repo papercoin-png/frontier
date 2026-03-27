@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Fleet Management</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+        }
+        
+        .fleet-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a1a2a 0%, #051015 100%);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 20px 100px 20px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #4a8ac0;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #e0f0ff;
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            text-shadow: 0 0 30px #4a8ac0;
+            animation: pulse 1.5s infinite;
+            font-weight: 500;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Header */
+        .fleet-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .back-button-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(74, 138, 192, 0.3);
+            border: 1px solid #4a8ac0;
+            border-radius: 30px;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #a0c0ff;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .back-button-header:active {
+            background: #4a8ac0;
+            color: white;
+            transform: scale(0.95);
+        }
+        
+        .fleet-title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 32px;
+            color: #4a8ac0;
+            text-shadow: 0 0 20px #4a8ac0;
+            margin-bottom: 5px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+        
+        .fleet-subtitle {
+            color: #a0c0ff;
+            font-size: 12px;
+            letter-spacing: 2px;
+        }
+        
+        .docked-warning {
+            background: rgba(74, 255, 170, 0.15);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .docked-icon {
+            font-size: 24px;
+        }
+        
+        .docked-text {
+            flex: 1;
+            color: #4affaa;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 22px;
+        }
+        
+        .active-ship-badge {
+            background: rgba(74, 255, 170, 0.2);
+            border: 1px solid #4affaa;
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #4affaa;
+        }
+        
+        /* Fleet Stats Card */
+        .fleet-stats {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .stats-title {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px;
+        }
+        
+        .stat-value {
+            color: #ffd966;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            color: #a0c0ff;
+            font-size: 10px;
+        }
+        
+        /* Ships Grid */
+        .ships-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .ship-card {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #4a8ac0;
+            border-radius: 40px 15px 40px 15px;
+            padding: 15px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .ship-card.active {
+            border-color: #4affaa;
+            background: rgba(74, 255, 170, 0.1);
+            box-shadow: 0 0 20px rgba(74, 255, 170, 0.3);
+        }
+        
+        .ship-card:active {
+            transform: scale(0.98);
+        }
+        
+        .ship-card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+        
+        .ship-icon {
+            font-size: 48px;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .ship-info {
+            flex: 1;
+        }
+        
+        .ship-name {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Exo 2', sans-serif;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        
+        .ship-class {
+            font-size: 11px;
+            color: #a0c0ff;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        .active-badge {
+            background: #4affaa;
+            color: #0a0a1a;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .ship-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(74, 138, 192, 0.3);
+        }
+        
+        .ship-stat {
+            text-align: center;
+        }
+        
+        .ship-stat-value {
+            color: #ffd966;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .ship-stat-label {
+            color: #a0c0ff;
+            font-size: 9px;
+        }
+        
+        .switch-btn {
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 1px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 8px 16px;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .switch-btn:active {
+            transform: scale(0.96);
+            background: #4affaa;
+            color: #0a0a1a;
+        }
+        
+        .switch-btn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            border-color: #4a8ac0;
+        }
+        
+        .empty-ships {
+            text-align: center;
+            padding: 40px;
+            color: #a0c0ff;
+            background: rgba(30, 45, 70, 0.4);
+            border-radius: 60px 20px 60px 20px;
+            border: 2px dashed #4a8ac0;
+        }
+        
+        .empty-ships .shipyard-link {
+            color: #4affaa;
+            text-decoration: underline;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .earth-btn {
+            flex: 1;
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 2px solid #ffaa4a;
+            color: #ffffff;
+            padding: 14px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .earth-btn:active {
+            transform: scale(0.97);
+            background: #3a5a8a;
+        }
+        
+        .shipyard-btn {
+            flex: 1;
+            background: rgba(74, 138, 192, 0.2);
+            border: 2px solid #4a8ac0;
+            color: #ffffff;
+            padding: 14px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            text-align: center;
+            transition: all 0.1s;
+        }
+        
+        .shipyard-btn:active {
+            transform: scale(0.97);
+            background: #4a8ac0;
+        }
+        
+        /* Info Note */
+        .info-note {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 10px;
+            color: #a0c0ff;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 30px;
+        }
+        
+        .info-note span {
+            color: #ffaa4a;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="fleet-view" id="fleetView">
+            <!-- Header with Back Button -->
+            <div class="back-button-header" onclick="returnToBridge()">
+                <span>←</span> BACK TO BRIDGE
+            </div>
+            
+            <div class="fleet-header">
+                <div class="fleet-title">⚓ FLEET</div>
+                <div class="fleet-subtitle">✦ manage your vessels ✦</div>
+            </div>
+            
+            <!-- Docked Check -->
+            <div class="docked-warning" id="dockedWarning">
+                <div class="docked-icon">🛸</div>
+                <div class="docked-text">Docked at Earth Orbital • Safe to switch ships</div>
+                <div class="docked-icon">✓</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> --
+                </div>
+                <div class="active-ship-badge" id="activeShipBadge">Active: --</div>
+            </div>
+            
+            <!-- Fleet Stats Card -->
+            <div class="fleet-stats">
+                <div class="stats-header">
+                    <div class="stats-title">
+                        <span>🚀</span> Fleet Overview
+                    </div>
+                    <div class="stats-title">
+                        <span id="shipCount">0</span> vessels
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="frigateCount">0</div>
+                        <div class="stat-label">Frigates</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="destroyerCount">0</div>
+                        <div class="stat-label">Destroyers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="cruiserCount">0</div>
+                        <div class="stat-label">Cruisers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="capitalCount">0</div>
+                        <div class="stat-label">Capital</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ships Grid -->
+            <div class="ships-grid" id="shipsGrid">
+                <!-- Ships will be populated here -->
+                <div class="empty-ships">
+                    No ships in your fleet.<br>
+                    <span class="shipyard-link" onclick="goToShipyard()">Visit the Shipyard to build your first vessel →</span>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="shipyard-btn" onclick="goToShipyard()">🏭 SHIPYARD</button>
+                <button class="earth-btn" onclick="returnToBridge()">🌍 RETURN TO BRIDGE</button>
+            </div>
+            
+            <div class="info-note">
+                <span>⚠️ NOTE:</span> Ship switching only available while docked at Earth. Active ship determines your mining capabilities and cargo capacity.
+            </div>
+            
+            <!-- Loading Overlay -->
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text" id="loadingText">loading fleet...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script src="js/storage.js"></script>
+
+    <script>
+        // ===== TELEGRAM INITIALIZATION =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== SHIP DATA =====
+        const SHIP_STATS = {
+            'Prospector': { class: 'Frigate', miningBonus: 0, cargo: 3700, hull: 100, icon: '🛸' },
+            'Deep Miner': { class: 'Frigate', miningBonus: 20, cargo: 4200, hull: 110, icon: '⛏️' },
+            'Excavator': { class: 'Destroyer', miningBonus: 40, cargo: 4800, hull: 120, icon: '⚙️' },
+            'Borealis': { class: 'Destroyer', miningBonus: 60, cargo: 5500, hull: 130, icon: '🔷' },
+            'Core Digger': { class: 'Cruiser', miningBonus: 80, cargo: 6300, hull: 140, icon: '💎' },
+            'Abyss Miner': { class: 'Cruiser', miningBonus: 100, cargo: 7200, hull: 150, icon: '🌑' },
+            'Void Excavator': { class: 'Cruiser', miningBonus: 120, cargo: 8200, hull: 160, icon: '🌀' },
+            'Singularity Miner': { class: 'Capital', miningBonus: 140, cargo: 9300, hull: 170, icon: '⚫' },
+            'Quasar Drill': { class: 'Capital', miningBonus: 160, cargo: 10500, hull: 180, icon: '💫' },
+            'Event Horizon': { class: 'Capital', miningBonus: 180, cargo: 11800, hull: 200, icon: '🌌' }
+        };
+
+        // Variant bonuses
+        const VARIANT_STATS = {
+            'pulse_drill': { miningBonus: 80, cargo: 6300, hull: 140, name: 'Pulse Drill' },
+            'ore_hauler': { miningBonus: 40, cargo: 12600, hull: 140, name: 'Ore Hauler' },
+            'deep_core': { miningBonus: 80, cargo: 6300, hull: 196, name: 'Deep Core' },
+            'razor_drill': { miningBonus: 100, cargo: 7200, hull: 150, name: 'Razor Drill' },
+            'void_hauler': { miningBonus: 50, cargo: 14400, hull: 150, name: 'Void Hauler' },
+            'abyss_walker': { miningBonus: 100, cargo: 7200, hull: 240, name: 'Abyss Walker' },
+            'quantum_drill': { miningBonus: 120, cargo: 8200, hull: 160, name: 'Quantum Drill' },
+            'void_carrier': { miningBonus: 60, cargo: 16400, hull: 160, name: 'Void Carrier' },
+            'umbral_core': { miningBonus: 120, cargo: 8200, hull: 288, name: 'Umbral Core' },
+            'singularity_drill': { miningBonus: 140, cargo: 9300, hull: 170, name: 'Singularity Drill' },
+            'mass_hauler': { miningBonus: 70, cargo: 18600, hull: 170, name: 'Mass Hauler' },
+            'event_shield': { miningBonus: 140, cargo: 9300, hull: 340, name: 'Event Shield' },
+            'quasar_beam': { miningBonus: 160, cargo: 10500, hull: 180, name: 'Quasar Beam' },
+            'void_freighter': { miningBonus: 80, cargo: 21000, hull: 180, name: 'Void Freighter' },
+            'quasar_armor': { miningBonus: 160, cargo: 10500, hull: 396, name: 'Quasar Armor' },
+            'horizon_drill': { miningBonus: 180, cargo: 11800, hull: 200, name: 'Horizon Drill' },
+            'singularity_barge': { miningBonus: 90, cargo: 23600, hull: 200, name: 'Singularity Barge' },
+            'absolute_core': { miningBonus: 180, cargo: 11800, hull: 500, name: 'Absolute Core' }
+        };
+
+        // ===== GET PLAYER ID =====
+        function getPlayerId() {
+            return localStorage.getItem('voidfarer_player_id') || 'player_default';
+        }
+
+        // ===== LOAD CREDITS =====
+        async function loadCredits() {
+            try {
+                if (window.getCredits) {
+                    const credits = await window.getCredits(getPlayerId());
+                    document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                } else {
+                    const credits = parseInt(localStorage.getItem('voidfarer_credits')) || 5000;
+                    document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                }
+            } catch (error) {
+                console.error('Error loading credits:', error);
+            }
+        }
+
+        // ===== LOAD FLEET DATA =====
+        function loadFleetData() {
+            try {
+                const playerId = getPlayerId();
+                const ownedShips = JSON.parse(localStorage.getItem(`voidfarer_owned_ships_${playerId}`)) || [];
+                const activeShip = localStorage.getItem('voidfarer_active_ship') || (ownedShips[0] || null);
+                
+                // Update ship count
+                document.getElementById('shipCount').textContent = ownedShips.length;
+                
+                // Count by class
+                let frigates = 0, destroyers = 0, cruisers = 0, capitals = 0;
+                
+                ownedShips.forEach(ship => {
+                    const baseName = ship.split(' (')[0];
+                    const stats = SHIP_STATS[baseName];
+                    if (stats) {
+                        if (stats.class === 'Frigate') frigates++;
+                        else if (stats.class === 'Destroyer') destroyers++;
+                        else if (stats.class === 'Cruiser') cruisers++;
+                        else if (stats.class === 'Capital') capitals++;
+                    }
+                });
+                
+                document.getElementById('frigateCount').textContent = frigates;
+                document.getElementById('destroyerCount').textContent = destroyers;
+                document.getElementById('cruiserCount').textContent = cruisers;
+                document.getElementById('capitalCount').textContent = capitals;
+                
+                // Update active ship badge
+                if (activeShip) {
+                    const activeName = activeShip.split(' (')[0];
+                    document.getElementById('activeShipBadge').textContent = `Active: ${activeName}`;
+                } else {
+                    document.getElementById('activeShipBadge').textContent = 'Active: None';
+                }
+                
+                return { ownedShips, activeShip };
+            } catch (error) {
+                console.error('Error loading fleet data:', error);
+                return { ownedShips: [], activeShip: null };
+            }
+        }
+
+        // ===== RENDER SHIP LIST =====
+        function renderShipList(ships, activeShip) {
+            const shipsGrid = document.getElementById('shipsGrid');
+            
+            if (ships.length === 0) {
+                shipsGrid.innerHTML = `
+                    <div class="empty-ships">
+                        No ships in your fleet.<br>
+                        <span class="shipyard-link" onclick="goToShipyard()">Visit the Shipyard to build your first vessel →</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            ships.forEach(ship => {
+                // Parse ship name and variant
+                let shipName = ship;
+                let variantId = null;
+                let variantBonus = null;
+                
+                if (ship.includes(' (')) {
+                    const parts = ship.split(' (');
+                    shipName = parts[0];
+                    variantId = parts[1].replace(')', '');
+                    variantBonus = VARIANT_STATS[variantId];
+                }
+                
+                const stats = SHIP_STATS[shipName] || { class: 'Unknown', miningBonus: 0, cargo: 0, hull: 0, icon: '🚀' };
+                const isActive = (activeShip === ship);
+                
+                // Apply variant bonuses if present
+                let miningBonus = stats.miningBonus;
+                let cargo = stats.cargo;
+                let hull = stats.hull;
+                let variantName = '';
+                
+                if (variantBonus) {
+                    miningBonus = variantBonus.miningBonus;
+                    cargo = variantBonus.cargo;
+                    hull = variantBonus.hull;
+                    variantName = ` (${variantBonus.name})`;
+                }
+                
+                const icon = stats.icon;
+                const shipClass = stats.class;
+                
+                html += `
+                    <div class="ship-card ${isActive ? 'active' : ''}" onclick="selectShip('${ship.replace(/'/g, "\\'")}')">
+                        <div class="ship-card-header">
+                            <div class="ship-icon">${icon}</div>
+                            <div class="ship-info">
+                                <div class="ship-name">
+                                    ${shipName}${variantName}
+                                    ${isActive ? '<span class="active-badge" style="margin-left: 8px;">ACTIVE</span>' : ''}
+                                </div>
+                                <span class="ship-class">${shipClass}</span>
+                            </div>
+                        </div>
+                        <div class="ship-stats">
+                            <div class="ship-stat">
+                                <div class="ship-stat-value">+${miningBonus}%</div>
+                                <div class="ship-stat-label">MINING</div>
+                            </div>
+                            <div class="ship-stat">
+                                <div class="ship-stat-value">${cargo.toLocaleString()}</div>
+                                <div class="ship-stat-label">CARGO</div>
+                            </div>
+                            <div class="ship-stat">
+                                <div class="ship-stat-value">${hull}</div>
+                                <div class="ship-stat-label">HULL</div>
+                            </div>
+                        </div>
+                        ${!isActive ? `
+                            <div class="switch-btn" onclick="event.stopPropagation(); switchActiveShip('${ship.replace(/'/g, "\\'")}')">
+                                🚀 SWITCH TO THIS SHIP
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            shipsGrid.innerHTML = html;
+        }
+
+        // ===== SELECT SHIP (highlight card) =====
+        window.selectShip = function(shipName) {
+            safeHaptic();
+            // Just visual feedback, actual switching requires button click
+        };
+
+        // ===== SWITCH ACTIVE SHIP =====
+        window.switchActiveShip = async function(shipName) {
+            safeHaptic();
+            
+            // Check if docked at Earth
+            const currentLocation = localStorage.getItem('voidfarer_current_planet') || 'Earth';
+            if (currentLocation !== 'Earth') {
+                alert(`⚠️ Cannot switch ships while in deep space!\n\nYou are currently at ${currentLocation}. Return to Earth Orbital to change your active vessel.`);
+                return;
+            }
+            
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'preparing ship...';
+            
+            setTimeout(() => {
+                try {
+                    // Set active ship
+                    localStorage.setItem('voidfarer_active_ship', shipName);
+                    
+                    // Parse ship name for stats
+                    let baseName = shipName;
+                    let variantId = null;
+                    
+                    if (shipName.includes(' (')) {
+                        const parts = shipName.split(' (');
+                        baseName = parts[0];
+                        variantId = parts[1].replace(')', '');
+                    }
+                    
+                    const stats = SHIP_STATS[baseName];
+                    let variantBonus = variantId ? VARIANT_STATS[variantId] : null;
+                    
+                    // Store active ship stats for quick access
+                    localStorage.setItem('voidfarer_active_ship_stats', JSON.stringify({
+                        name: baseName,
+                        variant: variantId,
+                        miningBonus: variantBonus ? variantBonus.miningBonus : stats?.miningBonus || 0,
+                        cargo: variantBonus ? variantBonus.cargo : stats?.cargo || 3700,
+                        hull: variantBonus ? variantBonus.hull : stats?.hull || 100,
+                        class: stats?.class || 'Frigate'
+                    }));
+                    
+                    // Haptic feedback
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
+                    
+                    loadingOverlay.classList.remove('active');
+                    alert(`✅ Ship switched successfully!\n\nNow piloting: ${shipName}`);
+                    
+                    // Refresh the view
+                    const { ownedShips, activeShip } = loadFleetData();
+                    renderShipList(ownedShips, activeShip);
+                    
+                } catch (error) {
+                    console.error('Error switching ship:', error);
+                    loadingOverlay.classList.remove('active');
+                    alert('Failed to switch ships: ' + error.message);
+                }
+            }, 300);
+        };
+
+        // ===== NAVIGATION =====
+        window.returnToBridge = function() {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'returning to bridge...';
+            setTimeout(() => {
+                window.location.href = 'ship-bridge.html';
+            }, 300);
+        };
+        
+        window.goToShipyard = function() {
+            safeHaptic();
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'opening shipyard...';
+            setTimeout(() => {
+                window.location.href = 'shipyard.html';
+            }, 300);
+        };
+        
+        // ===== SAFE HAPTIC =====
+        function safeHaptic() {
+            if (tg?.HapticFeedback) {
+                try {
+                    tg.HapticFeedback.impactOccurred('light');
+                } catch (e) {}
+            }
+        }
+
+        // ===== INITIALIZE =====
+        async function init() {
+            loadingOverlay.classList.add('active');
+            loadingText.textContent = 'loading fleet manifest...';
+            
+            await loadCredits();
+            const { ownedShips, activeShip } = loadFleetData();
+            renderShipList(ownedShips, activeShip);
+            
+            setTimeout(() => {
+                loadingOverlay.classList.remove('active');
+            }, 500);
+        }
+        
+        // Attach functions to window for onclick handlers
+        window.returnToBridge = returnToBridge;
+        window.goToShipyard = goToShipyard;
+        window.switchActiveShip = switchActiveShip;
+        window.selectShip = selectShip;
+        
+        init();
+    </script>
+</body>
+</html>
