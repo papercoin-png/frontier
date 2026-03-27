@@ -1381,9 +1381,22 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
-                const tierInfo = TIERS.find(t => t.tier === currentPlanetTier) || TIERS[0];
-                planetTierBadge.textContent = `Tier ${currentPlanetTier} • ${tierInfo?.rarity || 'Common'}`;
-                planetTierBadge.style.backgroundColor = tierInfo?.color || '#4affaa';
+                // ===== UPDATED: Tier badge based on highest rarity found =====
+                const status = await getPlanetStatus(currentPlanet.name);
+                const highestRarity = status.highestRarity || 'common';
+                
+                // Map rarity to tier display
+                const rarityToTier = {
+                    'common': { tier: 1, name: 'Common', color: '#4affaa' },
+                    'uncommon': { tier: 2, name: 'Uncommon', color: '#88ff88' },
+                    'rare': { tier: 3, name: 'Rare', color: '#ccff88' },
+                    'very-rare': { tier: 4, name: 'Very Rare', color: '#ffcc66' },
+                    'legendary': { tier: 5, name: 'Legendary', color: '#ffaa44' }
+                };
+                
+                const tierDisplay = rarityToTier[highestRarity] || rarityToTier['common'];
+                planetTierBadge.textContent = `Tier ${tierDisplay.tier} • ${tierDisplay.name}`;
+                planetTierBadge.style.backgroundColor = tierDisplay.color;
                 
                 await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
