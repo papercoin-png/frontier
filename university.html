@@ -742,7 +742,6 @@
                 return;
             }
             
-            // Show loading feedback
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             // Deduct inventory
@@ -752,19 +751,25 @@
             const result = await addDonationXP(playerId, certIndex, quantity);
             
             if (result.success) {
-                // Reload certificates
+                // RELOAD certificates after donation - THIS IS THE FIX
                 certificates = await getCertificates(playerId);
                 
                 if (result.leveledUp) {
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    // Show tooltip
                     showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
                 } else {
                     showTooltip(`+${Math.floor(result.xpGained)} XP to ${cert.name}`, 1000);
                 }
                 
+                // Update share preview
+                const totalShare = getTotalLaborShare(certificates);
+                const sharePercent = (totalShare / 100).toFixed(2);
+                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+                
                 renderCertificates();
             } else {
+                // Re-add inventory if failed
+                playerInventory[cert.rarity] += quantity;
                 alert(result.error || 'Failed to add XP');
             }
         };
