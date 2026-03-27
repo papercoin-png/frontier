@@ -495,7 +495,7 @@
     <div class="tooltip" id="tooltip"></div>
     
     <script type="module">
-        import { getCredits } from './js/storage.js';
+        import { getCredits, getCollection, removeElementFromCollection } from './js/storage.js';
         import { 
             getCertificates, 
             getCertificateStatus,
@@ -530,14 +530,99 @@
         let activeWorkers = 847;
         let totalPlayerShares = 8450;
         
-        // Player inventory
-        let playerInventory = {
-            common: 125000,
-            uncommon: 45000,
-            rare: 12000,
-            'very-rare': 3200,
-            legendary: 85
+        // Cargo counts by rarity
+        let cargoCounts = {
+            common: 0,
+            uncommon: 0,
+            rare: 0,
+            'very-rare': 0,
+            legendary: 0
         };
+        
+        // Element rarity mapping helper
+        function getElementRarity(elementName) {
+            const commonElements = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'];
+            const uncommonElements = ['Magnesium', 'Iron', 'Nickel', 'Copper', 'Zinc', 'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton', 'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum', 'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver', 'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon', 'Cesium', 'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium', 'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium'];
+            const rareElements = ['Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium'];
+            const veryRareElements = ['Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'];
+            const legendaryElements = ['Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium', 'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium', 'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'];
+            
+            if (commonElements.includes(elementName)) return 'common';
+            if (uncommonElements.includes(elementName)) return 'uncommon';
+            if (rareElements.includes(elementName)) return 'rare';
+            if (veryRareElements.includes(elementName)) return 'very-rare';
+            if (legendaryElements.includes(elementName)) return 'legendary';
+            return 'common';
+        }
+        
+        // Load cargo from storage
+        async function loadCargo() {
+            try {
+                const collection = await getCollection();
+                
+                // Reset counts
+                cargoCounts = {
+                    common: 0,
+                    uncommon: 0,
+                    rare: 0,
+                    'very-rare': 0,
+                    legendary: 0
+                };
+                
+                for (const [elementName, data] of Object.entries(collection)) {
+                    const count = typeof data === 'object' ? data.count : data;
+                    const rarity = getElementRarity(elementName);
+                    cargoCounts[rarity] += count;
+                }
+                
+                console.log('Cargo loaded:', cargoCounts);
+                
+            } catch (error) {
+                console.error('Error loading cargo:', error);
+            }
+        }
+        
+        // Donate elements from cargo
+        async function donateFromCargo(certIndex, quantity) {
+            const cert = CERTIFICATE_TIERS[certIndex];
+            const requiredRarity = cert.rarity;
+            
+            // Check if player has enough
+            if (cargoCounts[requiredRarity] < quantity) {
+                alert(`Not enough ${requiredRarity.toUpperCase()} elements! Need ${quantity - cargoCounts[requiredRarity]} more.`);
+                return false;
+            }
+            
+            // Need to find actual elements of this rarity to remove
+            const collection = await getCollection();
+            let remainingToRemove = quantity;
+            
+            for (const [elementName, data] of Object.entries(collection)) {
+                if (remainingToRemove <= 0) break;
+                
+                const rarity = getElementRarity(elementName);
+                if (rarity !== requiredRarity) continue;
+                
+                const currentCount = typeof data === 'object' ? data.count : data;
+                const toRemove = Math.min(remainingToRemove, currentCount);
+                
+                if (toRemove > 0) {
+                    const result = await removeElementFromCollection(elementName, toRemove);
+                    if (result.success) {
+                        remainingToRemove -= toRemove;
+                    }
+                }
+            }
+            
+            if (remainingToRemove > 0) {
+                alert(`Failed to remove ${remainingToRemove} ${requiredRarity} elements.`);
+                return false;
+            }
+            
+            // Reload cargo counts
+            await loadCargo();
+            return true;
+        }
         
         // ===== LOAD DATA =====
         async function loadData() {
@@ -546,6 +631,9 @@
                 
                 playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
                 certificates = await getCertificates(playerId);
+                
+                // Load cargo from storage
+                await loadCargo();
                 
                 playerCredits = await getCredits(playerId);
                 document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
@@ -608,17 +696,19 @@
                 const xpToNext = cert.xpPerLevel - xpProgress;
                 const percentComplete = (xpProgress / cert.xpPerLevel) * 100;
                 
-                // Determine which donation buttons to show based on inventory
+                // Determine which donation buttons to show
                 const unitAmounts = [cert.unitsPerDonation, cert.unitsPerDonation * 10, 100, 500, 1000];
                 const filteredAmounts = unitAmounts.filter(amount => amount <= 10000);
                 
                 let buttonsHtml = '';
                 filteredAmounts.forEach(amount => {
                     let btnClass = '';
-                    let btnText = amount;
                     if (amount === 1000) btnClass = 'primary';
                     buttonsHtml += `<button class="donate-btn ${btnClass}" onclick="window.donate(${i}, ${amount})">${amount}</button>`;
                 });
+                
+                // Get available count for this rarity
+                const availableCount = cargoCounts[cert.rarity] || 0;
                 
                 html += `
                     <div class="cert-card ${statusClass}">
@@ -698,7 +788,7 @@
                                 ${buttonsHtml}
                             </div>
                             <div class="inventory-text">
-                                📦 You have: ${playerInventory[cert.rarity]?.toLocaleString() || 0} ${cert.rarity.toUpperCase()} units
+                                📦 You have: ${availableCount.toLocaleString()} ${cert.rarity.toUpperCase()} units in cargo
                                 ${donationsNeeded > 0 ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
                             </div>
                         </div>
@@ -737,16 +827,18 @@
                 return;
             }
             
-            const available = playerInventory[cert.rarity] || 0;
+            // Check if player has enough cargo
+            const available = cargoCounts[cert.rarity] || 0;
             if (available < quantity) {
-                alert(`Not enough ${cert.rarity.toUpperCase()}! Need ${quantity - available} more.`);
+                alert(`Not enough ${cert.rarity.toUpperCase()} elements! Need ${quantity - available} more.`);
                 return;
             }
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            // Deduct inventory
-            playerInventory[cert.rarity] -= quantity;
+            // Remove from cargo
+            const success = await donateFromCargo(certIndex, quantity);
+            if (!success) return;
             
             // Add XP
             const result = await addDonationXP(playerId, certIndex, quantity);
@@ -769,8 +861,6 @@
                 
                 renderCertificates();
             } else {
-                // Re-add inventory if failed
-                playerInventory[cert.rarity] += quantity;
                 alert(result.error || 'Failed to add XP');
                 renderCertificates();
             }
@@ -817,31 +907,6 @@
                 alert('Failed to claim earnings. Please try again.');
             }
         };
-        
-        // ===== DEMO INVENTORY BUTTON =====
-        const demoBtn = document.createElement('button');
-        demoBtn.textContent = '+ DEMO INVENTORY';
-        demoBtn.style.position = 'fixed';
-        demoBtn.style.bottom = '100px';
-        demoBtn.style.right = '10px';
-        demoBtn.style.background = '#8a6aff';
-        demoBtn.style.border = 'none';
-        demoBtn.style.borderRadius = '30px';
-        demoBtn.style.padding = '6px 12px';
-        demoBtn.style.fontSize = '10px';
-        demoBtn.style.color = 'white';
-        demoBtn.style.zIndex = '200';
-        demoBtn.style.cursor = 'pointer';
-        demoBtn.onclick = () => {
-            playerInventory.common += 50000;
-            playerInventory.uncommon += 20000;
-            playerInventory.rare += 5000;
-            playerInventory['very-rare'] += 1000;
-            playerInventory.legendary += 50;
-            renderCertificates();
-            showTooltip('Demo inventory added!', 1500);
-        };
-        document.body.appendChild(demoBtn);
         
         // ===== INIT =====
         async function init() {
