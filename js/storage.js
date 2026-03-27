@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Updated IndexedDB version from 1 to 3 to match existing database
+// FIXED: IndexedDB helpers now automatically create missing object stores
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 
 // ===== CONSTANTS =====
@@ -192,9 +192,12 @@ function getCargoMassLimit() {
 }
 
 // ============================================================================
-// INDEXEDDB HELPER FUNCTIONS (UPDATED TO VERSION 3)
+// INDEXEDDB HELPER FUNCTIONS (Auto-create missing stores)
 // ============================================================================
 
+/**
+ * Get a single item from IndexedDB, auto-creating store if needed
+ */
 export async function getItem(storeName, id = 'main') {
     try {
         if (!window.idb) {
@@ -202,13 +205,16 @@ export async function getItem(storeName, id = 'main') {
             const saved = localStorage.getItem(key);
             return saved ? JSON.parse(saved) : null;
         }
+        
         const db = await window.idb.openDB('VoidfarerDB', 3, {
             upgrade(db) {
+                // Create the store if it doesn't exist
                 if (!db.objectStoreNames.contains(storeName)) {
                     db.createObjectStore(storeName);
                 }
             }
         });
+        
         return await db.get(storeName, id);
     } catch (error) {
         console.error(`Error getting item from ${storeName}:`, error);
@@ -216,6 +222,9 @@ export async function getItem(storeName, id = 'main') {
     }
 }
 
+/**
+ * Set an item in IndexedDB, auto-creating store if needed
+ */
 export async function setItem(storeName, value, id = 'main') {
     try {
         if (!window.idb) {
@@ -223,13 +232,16 @@ export async function setItem(storeName, value, id = 'main') {
             localStorage.setItem(key, JSON.stringify(value));
             return true;
         }
+        
         const db = await window.idb.openDB('VoidfarerDB', 3, {
             upgrade(db) {
+                // Create the store if it doesn't exist
                 if (!db.objectStoreNames.contains(storeName)) {
                     db.createObjectStore(storeName);
                 }
             }
         });
+        
         await db.put(storeName, value, id);
         return true;
     } catch (error) {
@@ -238,6 +250,9 @@ export async function setItem(storeName, value, id = 'main') {
     }
 }
 
+/**
+ * Get all items from a store, auto-creating store if needed
+ */
 export async function getAll(storeName) {
     try {
         if (!window.idb) {
@@ -253,8 +268,15 @@ export async function getAll(storeName) {
             }
             return items;
         }
-        const db = await window.idb.openDB('VoidfarerDB', 3);
-        if (!db.objectStoreNames.contains(storeName)) return [];
+        
+        const db = await window.idb.openDB('VoidfarerDB', 3, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName);
+                }
+            }
+        });
+        
         return await db.getAll(storeName);
     } catch (error) {
         console.error(`Error getting all items from ${storeName}:`, error);
@@ -262,13 +284,24 @@ export async function getAll(storeName) {
     }
 }
 
+/**
+ * Delete an item from IndexedDB, auto-creating store if needed
+ */
 export async function deleteItem(storeName, id) {
     try {
         if (!window.idb) {
             localStorage.removeItem(`voidfarer_${storeName}_${id}`);
             return true;
         }
-        const db = await window.idb.openDB('VoidfarerDB', 3);
+        
+        const db = await window.idb.openDB('VoidfarerDB', 3, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName);
+                }
+            }
+        });
+        
         await db.delete(storeName, id);
         return true;
     } catch (error) {
@@ -277,6 +310,9 @@ export async function deleteItem(storeName, id) {
     }
 }
 
+/**
+ * Clear all items from a store, auto-creating store if needed
+ */
 export async function clearStore(storeName) {
     try {
         if (!window.idb) {
@@ -289,7 +325,15 @@ export async function clearStore(storeName) {
             }
             return true;
         }
-        const db = await window.idb.openDB('VoidfarerDB', 3);
+        
+        const db = await window.idb.openDB('VoidfarerDB', 3, {
+            upgrade(db) {
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName);
+                }
+            }
+        });
+        
         await db.clear(storeName);
         return true;
     } catch (error) {
@@ -298,6 +342,9 @@ export async function clearStore(storeName) {
     }
 }
 
+/**
+ * Add a transaction to a store (for logging)
+ */
 export async function addTransaction(storeName, data) {
     try {
         const id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
