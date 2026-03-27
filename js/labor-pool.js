@@ -1,636 +1,580 @@
-// js/labor-pool.js - Simplified Labor Pool Distribution System
-// Distributes labor credits to certificate holders based on mastery levels
-// No dependencies on alchemy.js - uses certificate-based system only
+// js/labor-pool.js
+// Labor Pool system for Voidfarer University
+// Manages daily distribution of labor earnings based on certificate shares
+// Players earn a share of the pool based on their certificate levels
 
-// ===== CONFIGURATION =====
-const LABOR_POOL_CONFIG = {
-    DISTRIBUTION_INTERVAL: 3600000, // 1 hour in milliseconds
-    MINIMUM_DISTRIBUTION: 100,       // Minimum credits to trigger distribution
-    MAX_HISTORY_ENTRIES: 100,        // Keep last 100 history entries
-    LABOR_SHARE_MULTIPLIER: 1.0      // Base multiplier for labor shares
-};
+import { getItem, setItem, getAll, addTransaction } from './storage.js';
+import { getCertificates, getTotalLaborShare, formatShare } from './certificates.js';
 
-// ===== STORAGE KEYS =====
+// ===== CONSTANTS =====
 const STORAGE_KEYS = {
-    LABOR_POOL_TOTAL: 'voidfarer_labor_pool_total',
-    LABOR_POOL_DISTRIBUTED: 'voidfarer_labor_pool_distributed',
-    LABOR_POOL_HISTORY: 'voidfarer_labor_pool_history',
-    PLAYER_LABOR_EARNINGS: 'voidfarer_player_labor_earnings',
-    CERTIFICATE_HOLDERS: 'voidfarer_certificate_holders',
+    LABOR_POOL: 'voidfarer_labor_pool',
+    LABOR_EARNINGS: 'voidfarer_labor_earnings',
+    DISTRIBUTION_HISTORY: 'voidfarer_distribution_history',
     LAST_DISTRIBUTION: 'voidfarer_last_distribution',
-    PENDING_DISTRIBUTIONS: 'voidfarer_pending_distributions'
+    POOL_CONTRIBUTIONS: 'voidfarer_pool_contributions'
 };
 
-// ===== CERTIFICATE REQUIREMENTS MAPPING =====
-// Maps item IDs to the certificate required to earn labor from them
-const CERTIFICATE_REQUIREMENTS = {
-    // Ships
-    'prospector': 'excavator',
-    'courier': 'trader',
-    'surveyor': 'analyst',
-    'tug': 'engineer',
-    'pathfinder': 'pioneer',
-    
-    // Equipment (for future use)
-    'mining_laser_basic': 'prospector',
-    'mining_laser_mk2': 'geologist',
-    'ore_scanner': 'geologist',
-    'cargo_hold_1': 'merchant',
-    'cargo_hold_2': 'trader',
-    'trade_license_basic': 'merchant',
-    'trade_license_advanced': 'broker'
-};
+// Distribution schedule (daily at 00:00 UTC)
+const DISTRIBUTION_HOUR = 0;
+const DISTRIBUTION_MINUTE = 0;
 
 // ===== INITIALIZATION =====
-function initializeStorage() {
-    const keys = [
-        STORAGE_KEYS.LABOR_POOL_TOTAL,
-        STORAGE_KEYS.LABOR_POOL_DISTRIBUTED,
-        STORAGE_KEYS.LABOR_POOL_HISTORY,
-        STORAGE_KEYS.PLAYER_LABOR_EARNINGS,
-        STORAGE_KEYS.CERTIFICATE_HOLDERS,
-        STORAGE_KEYS.LAST_DISTRIBUTION,
-        STORAGE_KEYS.PENDING_DISTRIBUTIONS
-    ];
-    
-    keys.forEach(key => {
-        if (!localStorage.getItem(key)) {
-            if (key === STORAGE_KEYS.LABOR_POOL_HISTORY || 
-                key === STORAGE_KEYS.PLAYER_LABOR_EARNINGS ||
-                key === STORAGE_KEYS.CERTIFICATE_HOLDERS ||
-                key === STORAGE_KEYS.PENDING_DISTRIBUTIONS) {
-                localStorage.setItem(key, '{}');
-            } else {
-                localStorage.setItem(key, '0');
-            }
-        }
-    });
-}
-
-// Call initialization immediately
-initializeStorage();
-
-// ===== CORE FUNCTIONS =====
-
 /**
- * Add labor credits to the pool from a ship build
- * @param {string} itemId - ID of the item built (e.g., 'prospector')
- * @param {number} laborCost - Labor cost paid by builder
- * @returns {Object} Result of adding to pool
+ * Initialize labor pool system
+ * @returns {Promise<boolean>} Success status
  */
-window.addLaborFromBuild = function(itemId, laborCost) {
+export async function initializeLaborPool() {
     try {
-        // Get required certificate for this item
-        const requiredCert = CERTIFICATE_REQUIREMENTS[itemId];
-        
-        if (!requiredCert) {
-            console.warn(`No certificate requirement defined for item: ${itemId}`);
-            // Still add to general pool? For now, we'll add but mark as uncategorized
+        // Check if labor pool exists
+        let pool = await getItem('laborPool', 'main');
+        if (!pool) {
+            pool = {
+                id: 'main',
+                balance: 0,
+                totalDistributed: 0,
+                totalContributions: 0,
+                lastDistribution: null,
+                activeWorkers: 0,
+                distributionCount: 0,
+                created: Date.now()
+            };
+            await setItem('laborPool', pool);
         }
         
-        // Get current pool total
-        const currentTotal = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL) || '0');
-        const newTotal = currentTotal + laborCost;
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_TOTAL, newTotal.toString());
-        
-        // Record pending distribution for this certificate
-        if (requiredCert) {
-            recordPendingDistribution(laborCost, requiredCert);
-        } else {
-            // Add to general pool (distributed to all certificate holders proportionally)
-            recordPendingDistribution(laborCost, 'general');
+        // Initialize earnings storage
+        let earnings = await getItem('laborEarnings', 'main');
+        if (!earnings) {
+            earnings = {
+                id: 'main',
+                earnings: {}, // playerId -> amount
+                totalClaimed: 0,
+                lastUpdated: Date.now()
+            };
+            await setItem('laborEarnings', earnings);
         }
         
-        // Add to history
-        addToHistory({
-            type: 'addition',
-            itemId: itemId,
-            requiredCert: requiredCert || 'general',
-            amount: laborCost,
-            newTotal: newTotal,
-            timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
-        
-        // Check if we should auto-distribute
-        checkAndDistribute();
-        
-        console.log(`✅ Added ${laborCost}⭐ to labor pool from ${itemId} build. New total: ${newTotal}⭐`);
-        
-        return {
-            success: true,
-            newTotal: newTotal,
-            laborCost: laborCost
-        };
-        
-    } catch (error) {
-        console.error('Error adding labor from build:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-};
-
-/**
- * Record a pending distribution for a specific certificate
- * @param {number} amount - Amount to distribute
- * @param {string} certificateId - Certificate ID
- */
-function recordPendingDistribution(amount, certificateId) {
-    try {
-        const pending = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS) || '{}');
-        
-        if (!pending[certificateId]) {
-            pending[certificateId] = 0;
+        // Initialize distribution history
+        let history = await getItem('distributionHistory', 'main');
+        if (!history) {
+            history = {
+                id: 'main',
+                distributions: [],
+                lastUpdated: Date.now()
+            };
+            await setItem('distributionHistory', history);
         }
         
-        pending[certificateId] += amount;
-        localStorage.setItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS, JSON.stringify(pending));
-        
-    } catch (error) {
-        console.error('Error recording pending distribution:', error);
-    }
-}
-
-/**
- * Get all certificate holders and their mastery levels
- * @param {string} certificateId - Optional specific certificate to filter
- * @returns {Array} Array of certificate holders
- */
-window.getCertificateHolders = function(certificateId = null) {
-    try {
-        const holders = JSON.parse(localStorage.getItem(STORAGE_KEYS.CERTIFICATE_HOLDERS) || '{}');
-        
-        if (certificateId) {
-            return holders[certificateId] || [];
+        // Initialize contributions
+        let contributions = await getItem('poolContributions', 'main');
+        if (!contributions) {
+            contributions = {
+                id: 'main',
+                contributions: [],
+                total: 0,
+                lastUpdated: Date.now()
+            };
+            await setItem('poolContributions', contributions);
         }
         
-        // Return all holders grouped by certificate
-        return holders;
-        
-    } catch (error) {
-        console.error('Error getting certificate holders:', error);
-        return certificateId ? [] : {};
-    }
-};
-
-/**
- * Register or update a certificate holder's mastery
- * @param {string} playerId - Player ID
- * @param {string} playerName - Player name
- * @param {string} certificateId - Certificate ID
- * @param {number} masteryLevel - Mastery level (1-10)
- */
-window.updateCertificateHolder = function(playerId, playerName, certificateId, masteryLevel) {
-    try {
-        const holders = JSON.parse(localStorage.getItem(STORAGE_KEYS.CERTIFICATE_HOLDERS) || '{}');
-        
-        if (!holders[certificateId]) {
-            holders[certificateId] = [];
-        }
-        
-        // Find existing entry for this player
-        const existingIndex = holders[certificateId].findIndex(h => h.playerId === playerId);
-        
-        const holderData = {
-            playerId: playerId,
-            playerName: playerName,
-            masteryLevel: masteryLevel,
-            lastUpdated: Date.now()
-        };
-        
-        if (existingIndex >= 0) {
-            // Update existing
-            holders[certificateId][existingIndex] = holderData;
-        } else {
-            // Add new
-            holders[certificateId].push(holderData);
-        }
-        
-        localStorage.setItem(STORAGE_KEYS.CERTIFICATE_HOLDERS, JSON.stringify(holders));
-        
+        console.log('Labor pool initialized');
         return true;
         
     } catch (error) {
-        console.error('Error updating certificate holder:', error);
+        console.error('Error initializing labor pool:', error);
         return false;
     }
-};
+}
 
+// ===== POOL ACCESSORS =====
 /**
- * Calculate player's share of labor pool based on mastery
- * @param {Array} holders - Array of certificate holders
- * @param {number} totalPool - Total pool amount to distribute
- * @returns {Object} Distribution object
+ * Get current labor pool
+ * @returns {Promise<Object>} Labor pool object
  */
-function calculateDistribution(holders, totalPool) {
-    if (!holders || holders.length === 0) {
-        return {
-            distribution: {},
-            totalMastery: 0
-        };
-    }
-    
-    // Calculate total mastery sum
-    const totalMastery = holders.reduce((sum, h) => sum + h.masteryLevel, 0);
-    
-    if (totalMastery === 0) {
-        return {
-            distribution: {},
-            totalMastery: 0
-        };
-    }
-    
-    // Calculate shares
-    const distribution = {};
-    let distributed = 0;
-    
-    holders.forEach(holder => {
-        const share = holder.masteryLevel / totalMastery;
-        // Use floor to avoid rounding issues, remainder handled separately
-        let amount = Math.floor(totalPool * share);
-        
-        // Ensure minimum 1 credit if they have any mastery
-        if (amount === 0 && holder.masteryLevel > 0) {
-            amount = 1;
+export async function getLaborPool() {
+    try {
+        const pool = await getItem('laborPool', 'main');
+        if (!pool) {
+            await initializeLaborPool();
+            return await getItem('laborPool', 'main');
         }
-        
-        distribution[holder.playerId] = {
-            playerId: holder.playerId,
-            playerName: holder.playerName,
-            masteryLevel: holder.masteryLevel,
-            share: share,
-            amount: amount
-        };
-        
-        distributed += amount;
-    });
-    
-    // Handle remainder (due to flooring)
-    const remainder = totalPool - distributed;
-    if (remainder > 0 && holders.length > 0) {
-        // Give remainder to highest mastery holder
-        const highestMastery = holders.reduce((prev, current) => 
-            (prev.masteryLevel > current.masteryLevel) ? prev : current
-        );
-        
-        if (distribution[highestMastery.playerId]) {
-            distribution[highestMastery.playerId].amount += remainder;
-        }
+        return pool;
+    } catch (error) {
+        console.error('Error getting labor pool:', error);
+        return null;
     }
-    
-    return {
-        distribution: distribution,
-        totalMastery: totalMastery
-    };
 }
 
 /**
- * Distribute labor pool for a specific certificate
- * @param {string} certificateId - Certificate ID to distribute for
- * @returns {Object} Distribution results
+ * Save labor pool
+ * @param {Object} pool - Labor pool object
+ * @returns {Promise<boolean>} Success status
  */
-window.distributeForCertificate = function(certificateId) {
+async function saveLaborPool(pool) {
     try {
-        // Get pending amount for this certificate
-        const pending = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS) || '{}');
-        const amount = pending[certificateId] || 0;
+        await setItem('laborPool', pool);
+        return true;
+    } catch (error) {
+        console.error('Error saving labor pool:', error);
+        return false;
+    }
+}
+
+// ===== ADD TO LABOR POOL =====
+/**
+ * Add funds to the labor pool
+ * @param {number} amount - Amount to add
+ * @param {string} source - Source of funds (e.g., 'ship_purchase', 'fuel', 'repairs')
+ * @param {string} description - Optional description
+ * @returns {Promise<Object>} Result object
+ */
+export async function addToLaborPool(amount, source, description = '') {
+    if (amount <= 0) {
+        return { success: false, reason: 'Amount must be positive' };
+    }
+    
+    try {
+        const pool = await getLaborPool();
+        if (!pool) return { success: false, reason: 'Pool not initialized' };
         
-        if (amount <= 0) {
-            return {
-                success: true,
-                certificateId: certificateId,
-                distributed: 0,
-                message: 'No pending distribution'
-            };
+        // Update pool
+        pool.balance += amount;
+        pool.totalContributions += amount;
+        
+        await saveLaborPool(pool);
+        
+        // Record contribution
+        const contribution = {
+            id: 'contrib_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            amount,
+            source,
+            description,
+            timestamp: Date.now(),
+            date: new Date().toISOString(),
+            newBalance: pool.balance
+        };
+        
+        const contributions = await getItem('poolContributions', 'main');
+        if (contributions) {
+            contributions.contributions.unshift(contribution);
+            contributions.total += amount;
+            contributions.lastUpdated = Date.now();
+            
+            // Keep only last 1000 contributions
+            if (contributions.contributions.length > 1000) {
+                contributions.contributions = contributions.contributions.slice(0, 1000);
+            }
+            
+            await setItem('poolContributions', contributions);
         }
         
-        // Get holders for this certificate
-        const holders = window.getCertificateHolders(certificateId);
+        return {
+            success: true,
+            contribution,
+            newBalance: pool.balance
+        };
         
-        if (!holders || holders.length === 0) {
-            // No holders - move to general pool or hold until someone earns it
-            // For now, we'll keep it pending
-            return {
-                success: true,
-                certificateId: certificateId,
-                distributed: 0,
-                message: 'No certificate holders',
-                pending: amount
-            };
+    } catch (error) {
+        console.error('Error adding to labor pool:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ===== GET TOTAL LABOR SHARE FOR ALL PLAYERS =====
+/**
+ * Get total labor share across all players
+ * @returns {Promise<number>} Total shares
+ */
+export async function getTotalPlayerShares() {
+    try {
+        // Get all players from certificates storage
+        // Since we don't have a players list, we need to calculate from earnings
+        const earnings = await getItem('laborEarnings', 'main');
+        if (!earnings) return 0;
+        
+        // This would ideally query all players' certificates
+        // For now, we'll track total shares in distribution
+        const lastDistribution = await getLastDistribution();
+        return lastDistribution?.totalShares || 0;
+        
+    } catch (error) {
+        console.error('Error getting total player shares:', error);
+        return 0;
+    }
+}
+
+// ===== DISTRIBUTION =====
+/**
+ * Calculate each player's share of the labor pool
+ * @param {Object} pool - Labor pool object
+ * @param {Map} playerShares - Map of playerId -> total shares
+ * @returns {Map} Map of playerId -> earnings
+ */
+function calculateDistribution(pool, playerShares) {
+    const earnings = new Map();
+    const totalShares = Array.from(playerShares.values()).reduce((sum, s) => sum + s, 0);
+    
+    if (totalShares === 0 || pool.balance === 0) return earnings;
+    
+    for (const [playerId, shares] of playerShares) {
+        const playerEarnings = Math.floor(pool.balance * (shares / totalShares));
+        if (playerEarnings > 0) {
+            earnings.set(playerId, playerEarnings);
+        }
+    }
+    
+    return earnings;
+}
+
+/**
+ * Get all players with certificate progress
+ * @returns {Promise<Map>} Map of playerId -> total shares
+ */
+async function getAllPlayerShares() {
+    // This is a challenge without a central player registry
+    // For now, we'll track shares during distribution
+    // In production, you'd want a players collection in IndexedDB
+    
+    const playerShares = new Map();
+    
+    // Get all players from certificates storage keys
+    // Since we can't query all keys easily, we'll rely on the distribution history
+    // to know which players have been active
+    
+    const earnings = await getItem('laborEarnings', 'main');
+    if (earnings && earnings.earnings) {
+        // We have previous earners, we need to recalculate their current shares
+        // This requires loading each player's certificates
+        // For performance, we might want to store shares with earnings
+    }
+    
+    return playerShares;
+}
+
+/**
+ * Perform daily distribution
+ * @returns {Promise<Object>} Distribution result
+ */
+export async function distributeLaborPool() {
+    try {
+        const pool = await getLaborPool();
+        if (!pool) return { success: false, reason: 'Pool not initialized' };
+        
+        if (pool.balance <= 0) {
+            return { success: false, reason: 'No funds to distribute' };
+        }
+        
+        // Check if already distributed today
+        const lastDist = await getLastDistribution();
+        const today = new Date().toDateString();
+        if (lastDist && new Date(lastDist.timestamp).toDateString() === today) {
+            return { success: false, reason: 'Already distributed today' };
+        }
+        
+        // Get all players and their shares
+        // This requires iterating through all players' certificates
+        // For now, we'll use the players who have earnings records
+        
+        const playerShares = new Map();
+        
+        // Get players from earnings storage
+        const earningsStore = await getItem('laborEarnings', 'main');
+        if (earningsStore && earningsStore.earnings) {
+            // For each player with earnings, we need to load their certificates
+            // This is inefficient but works for now
+            for (const playerId of Object.keys(earningsStore.earnings)) {
+                try {
+                    const certificates = await getCertificates(playerId);
+                    const shares = getTotalLaborShare(certificates);
+                    if (shares > 0) {
+                        playerShares.set(playerId, shares);
+                    }
+                } catch (e) {
+                    console.error(`Error loading certificates for ${playerId}:`, e);
+                }
+            }
+        }
+        
+        if (playerShares.size === 0) {
+            return { success: false, reason: 'No active players with certificates' };
         }
         
         // Calculate distribution
-        const { distribution, totalMastery } = calculateDistribution(holders, amount);
+        const totalShares = Array.from(playerShares.values()).reduce((sum, s) => sum + s, 0);
+        const distribution = calculateDistribution(pool, playerShares);
         
-        // Add earnings to players
-        const earnings = {};
-        let totalDistributed = 0;
-        
-        for (const [playerId, data] of Object.entries(distribution)) {
-            if (data.amount > 0) {
-                earnings[playerId] = data.amount;
-                totalDistributed += data.amount;
-            }
+        if (distribution.size === 0) {
+            return { success: false, reason: 'No players eligible for distribution' };
         }
         
-        // Save earnings
-        window.addPlayerEarnings(earnings);
+        // Update earnings
+        const earnings = await getItem('laborEarnings', 'main');
+        if (!earnings) return { success: false, reason: 'Earnings storage missing' };
         
-        // Remove from pending
-        delete pending[certificateId];
-        localStorage.setItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS, JSON.stringify(pending));
+        let distributedTotal = 0;
+        for (const [playerId, amount] of distribution) {
+            earnings.earnings[playerId] = (earnings.earnings[playerId] || 0) + amount;
+            distributedTotal += amount;
+        }
         
-        // Update total distributed
-        const totalDistributedAll = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED) || '0');
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED, (totalDistributedAll + totalDistributed).toString());
+        earnings.lastUpdated = Date.now();
+        await setItem('laborEarnings', earnings);
         
-        // Add to history
-        addToHistory({
-            type: 'distribution',
-            certificateId: certificateId,
-            amount: totalDistributed,
-            holders: holders.length,
-            totalMastery: totalMastery,
+        // Update pool
+        const distributedAmount = pool.balance;
+        pool.balance = 0;
+        pool.totalDistributed += distributedAmount;
+        pool.lastDistribution = Date.now();
+        pool.distributionCount++;
+        pool.activeWorkers = distribution.size;
+        
+        await saveLaborPool(pool);
+        
+        // Record distribution
+        const distributionRecord = {
+            id: 'dist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
-        
-        return {
-            success: true,
-            certificateId: certificateId,
-            distributed: totalDistributed,
-            holders: holders.length,
-            distribution: distribution
+            date: new Date().toISOString(),
+            totalDistributed: distributedAmount,
+            totalShares,
+            playerCount: distribution.size,
+            recipients: Array.from(distribution.entries()).map(([id, amount]) => ({
+                playerId: id,
+                amount
+            }))
         };
         
-    } catch (error) {
-        console.error(`Error distributing for certificate ${certificateId}:`, error);
-        return {
-            success: false,
-            certificateId: certificateId,
-            error: error.message
-        };
-    }
-};
-
-/**
- * Distribute all pending labor pool amounts
- * @returns {Object} Results of distribution
- */
-window.distributeAllLabor = function() {
-    try {
-        const pending = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS) || '{}');
-        const certificates = Object.keys(pending);
-        
-        if (certificates.length === 0) {
-            return {
-                success: true,
-                distributed: 0,
-                message: 'No pending distributions'
-            };
+        const history = await getItem('distributionHistory', 'main');
+        if (history) {
+            history.distributions.unshift(distributionRecord);
+            history.lastUpdated = Date.now();
+            
+            // Keep last 100 distributions
+            if (history.distributions.length > 100) {
+                history.distributions = history.distributions.slice(0, 100);
+            }
+            
+            await setItem('distributionHistory', history);
         }
         
-        const results = {};
-        let totalDistributed = 0;
-        
-        certificates.forEach(certId => {
-            const result = window.distributeForCertificate(certId);
-            results[certId] = result;
-            if (result.success && result.distributed) {
-                totalDistributed += result.distributed;
-            }
-        });
-        
-        // Update last distribution time
-        localStorage.setItem(STORAGE_KEYS.LAST_DISTRIBUTION, Date.now().toString());
-        
         return {
             success: true,
-            totalDistributed: totalDistributed,
-            certificates: certificates.length,
-            results: results
+            distribution: distributionRecord,
+            recipients: distribution.size,
+            totalDistributed: distributedAmount
         };
         
     } catch (error) {
-        console.error('Error distributing all labor:', error);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-};
-
-/**
- * Check if distribution is needed and perform it
- */
-function checkAndDistribute() {
-    const lastDist = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_DISTRIBUTION) || '0');
-    const now = Date.now();
-    const pending = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS) || '{}');
-    
-    // Check if any pending amount exceeds minimum
-    const hasEnoughPending = Object.values(pending).some(amount => amount >= LABOR_POOL_CONFIG.MINIMUM_DISTRIBUTION);
-    
-    // Distribute if:
-    // 1. It's been more than the interval since last distribution, OR
-    // 2. There's a pending amount that exceeds minimum
-    if ((lastDist === 0 || (now - lastDist) >= LABOR_POOL_CONFIG.DISTRIBUTION_INTERVAL) && hasEnoughPending) {
-        window.distributeAllLabor();
+        console.error('Error distributing labor pool:', error);
+        return { success: false, error: error.message };
     }
 }
 
+// ===== PLAYER EARNINGS =====
 /**
- * Add earnings to players
- * @param {Object} earnings - Object with player IDs as keys and amounts as values
- */
-window.addPlayerEarnings = function(earnings) {
-    try {
-        const currentEarnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-        
-        for (const [playerId, amount] of Object.entries(earnings)) {
-            if (!currentEarnings[playerId]) {
-                currentEarnings[playerId] = 0;
-            }
-            currentEarnings[playerId] += amount;
-        }
-        
-        localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, JSON.stringify(currentEarnings));
-        
-        return true;
-        
-    } catch (error) {
-        console.error('Error adding player earnings:', error);
-        return false;
-    }
-};
-
-/**
- * Get player's unclaimed earnings
+ * Get player's unclaimed labor earnings
  * @param {string} playerId - Player ID
- * @returns {number} Unclaimed earnings
+ * @returns {Promise<number>} Unclaimed earnings
  */
-window.getPlayerEarnings = function(playerId) {
+export async function getPlayerEarnings(playerId) {
     try {
-        const earnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-        return earnings[playerId] || 0;
-        
+        const earnings = await getItem('laborEarnings', 'main');
+        if (!earnings) return 0;
+        return earnings.earnings[playerId] || 0;
     } catch (error) {
         console.error('Error getting player earnings:', error);
         return 0;
     }
-};
+}
 
 /**
- * Claim player's earnings
+ * Claim player's labor earnings
  * @param {string} playerId - Player ID
- * @returns {Object} Result with claimed amount
+ * @returns {Promise<Object>} Result with claimed amount
  */
-window.claimEarnings = function(playerId) {
+export async function claimLaborEarnings(playerId) {
     try {
-        const earnings = JSON.parse(localStorage.getItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS) || '{}');
-        const amount = earnings[playerId] || 0;
+        const earnings = await getItem('laborEarnings', 'main');
+        if (!earnings) return { success: false, amount: 0, reason: 'No earnings found' };
         
+        const amount = earnings.earnings[playerId] || 0;
         if (amount <= 0) {
-            return {
-                success: true,
-                claimed: 0,
-                message: 'No earnings to claim'
-            };
+            return { success: false, amount: 0, reason: 'No earnings to claim' };
         }
         
-        // Remove from earnings
-        delete earnings[playerId];
-        localStorage.setItem(STORAGE_KEYS.PLAYER_LABOR_EARNINGS, JSON.stringify(earnings));
-        
         // Add to player credits
-        const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
-        localStorage.setItem('voidfarer_credits', (currentCredits + amount).toString());
+        if (typeof window.addCredits === 'function') {
+            await window.addCredits(amount, playerId);
+        } else {
+            // Fallback to localStorage
+            const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
+            localStorage.setItem('voidfarer_credits', (currentCredits + amount).toString());
+        }
         
-        // Add to history
-        addToHistory({
-            type: 'claim',
-            playerId: playerId,
-            amount: amount,
-            timestamp: Date.now(),
-            date: new Date().toISOString()
-        });
+        // Clear earnings
+        delete earnings.earnings[playerId];
+        earnings.totalClaimed = (earnings.totalClaimed || 0) + amount;
+        earnings.lastUpdated = Date.now();
+        
+        await setItem('laborEarnings', earnings);
         
         return {
             success: true,
-            claimed: amount
+            amount,
+            message: `Claimed ${amount.toLocaleString()}⭐ from labor pool!`
         };
         
     } catch (error) {
-        console.error('Error claiming earnings:', error);
-        return {
-            success: false,
-            error: error.message
-        };
+        console.error('Error claiming labor earnings:', error);
+        return { success: false, amount: 0, error: error.message };
     }
-};
+}
 
+// ===== DISTRIBUTION HISTORY =====
 /**
- * Add entry to labor pool history
- * @param {Object} entry - History entry
+ * Get distribution history
+ * @param {number} limit - Maximum number of records
+ * @returns {Promise<Array>} Distribution history
  */
-function addToHistory(entry) {
+export async function getDistributionHistory(limit = 20) {
     try {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-        
-        history.unshift({
-            id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-            ...entry
-        });
-        
-        // Keep only last MAX_HISTORY_ENTRIES
-        while (history.length > LABOR_POOL_CONFIG.MAX_HISTORY_ENTRIES) {
-            history.pop();
-        }
-        
-        localStorage.setItem(STORAGE_KEYS.LABOR_POOL_HISTORY, JSON.stringify(history));
-        
+        const history = await getItem('distributionHistory', 'main');
+        if (!history) return [];
+        return history.distributions.slice(0, limit);
     } catch (error) {
-        console.error('Error adding to history:', error);
+        console.error('Error getting distribution history:', error);
+        return [];
     }
 }
 
 /**
- * Get labor pool history
- * @param {number} limit - Max entries to return
- * @returns {Array} History entries
+ * Get last distribution record
+ * @returns {Promise<Object|null>} Last distribution or null
  */
-window.getLaborHistory = function(limit = 20) {
+export async function getLastDistribution() {
     try {
-        const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_HISTORY) || '[]');
-        return history.slice(0, limit);
-        
+        const history = await getItem('distributionHistory', 'main');
+        if (!history || history.distributions.length === 0) return null;
+        return history.distributions[0];
     } catch (error) {
-        console.error('Error getting labor history:', error);
+        console.error('Error getting last distribution:', error);
+        return null;
+    }
+}
+
+// ===== POOL CONTRIBUTIONS =====
+/**
+ * Get contribution history
+ * @param {number} limit - Maximum number of records
+ * @returns {Promise<Array>} Contribution history
+ */
+export async function getContributionHistory(limit = 50) {
+    try {
+        const contributions = await getItem('poolContributions', 'main');
+        if (!contributions) return [];
+        return contributions.contributions.slice(0, limit);
+    } catch (error) {
+        console.error('Error getting contribution history:', error);
         return [];
     }
-};
+}
 
 /**
- * Get labor pool statistics
- * @returns {Object} Statistics
+ * Get total contributions
+ * @returns {Promise<number>} Total contributions
  */
-window.getLaborStats = function() {
+export async function getTotalContributions() {
     try {
-        const total = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_TOTAL) || '0');
-        const distributed = parseInt(localStorage.getItem(STORAGE_KEYS.LABOR_POOL_DISTRIBUTED) || '0');
-        const lastDist = parseInt(localStorage.getItem(STORAGE_KEYS.LAST_DISTRIBUTION) || '0');
-        const pending = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_DISTRIBUTIONS) || '{}');
+        const contributions = await getItem('poolContributions', 'main');
+        if (!contributions) return 0;
+        return contributions.total;
+    } catch (error) {
+        console.error('Error getting total contributions:', error);
+        return 0;
+    }
+}
+
+// ===== POOL STATISTICS =====
+/**
+ * Get labor pool statistics
+ * @returns {Promise<Object>} Statistics object
+ */
+export async function getLaborPoolStats() {
+    try {
+        const pool = await getLaborPool();
+        const earnings = await getItem('laborEarnings', 'main');
+        const history = await getItem('distributionHistory', 'main');
         
-        // Calculate total pending
-        const totalPending = Object.values(pending).reduce((sum, val) => sum + val, 0);
+        if (!pool) return null;
         
-        // Get history for averages
-        const history = window.getLaborHistory(100);
-        const distributions = history.filter(h => h.type === 'distribution');
+        // Calculate average distribution
+        let avgDistribution = 0;
+        if (history && history.distributions.length > 0) {
+            const sum = history.distributions.reduce((s, d) => s + d.totalDistributed, 0);
+            avgDistribution = sum / history.distributions.length;
+        }
         
-        const avgDistribution = distributions.length > 0
-            ? distributions.reduce((sum, d) => sum + d.amount, 0) / distributions.length
-            : 0;
+        // Count active players (those with unclaimed earnings)
+        const activePlayers = earnings ? Object.keys(earnings.earnings || {}).length : 0;
         
         return {
-            currentPool: total,
-            totalDistributed: distributed,
-            totalPending: totalPending,
-            pendingByCertificate: pending,
-            lastDistribution: lastDist || null,
-            distributionCount: distributions.length,
-            averageDistribution: Math.floor(avgDistribution),
-            nextDistribution: lastDist ? lastDist + LABOR_POOL_CONFIG.DISTRIBUTION_INTERVAL : Date.now()
+            balance: pool.balance,
+            totalDistributed: pool.totalDistributed,
+            totalContributions: pool.totalContributions,
+            distributionCount: pool.distributionCount,
+            lastDistribution: pool.lastDistribution,
+            activeWorkers: pool.activeWorkers || 0,
+            activePlayersWithEarnings: activePlayers,
+            averageDistribution: avgDistribution,
+            lastUpdated: pool.lastUpdated
         };
         
     } catch (error) {
-        console.error('Error getting labor stats:', error);
-        return {
-            currentPool: 0,
-            totalDistributed: 0,
-            totalPending: 0,
-            pendingByCertificate: {},
-            lastDistribution: null,
-            distributionCount: 0,
-            averageDistribution: 0,
-            nextDistribution: Date.now()
-        };
+        console.error('Error getting labor pool stats:', error);
+        return null;
     }
-};
+}
+
+// ===== UTILITY FUNCTIONS =====
+/**
+ * Check if distribution is due
+ * @returns {Promise<boolean>} True if distribution should run
+ */
+export async function isDistributionDue() {
+    const lastDist = await getLastDistribution();
+    if (!lastDist) return true;
+    
+    const lastDate = new Date(lastDist.timestamp);
+    const now = new Date();
+    
+    // Check if it's a new day
+    return lastDate.toDateString() !== now.toDateString();
+}
 
 /**
- * Get certificate requirements mapping
- * @returns {Object} Certificate requirements
+ * Format earnings for display
+ * @param {number} amount - Earnings amount
+ * @returns {string} Formatted string
  */
-window.getCertificateRequirements = function() {
-    return { ...CERTIFICATE_REQUIREMENTS };
+export function formatEarnings(amount) {
+    if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M⭐';
+    if (amount >= 1000) return (amount / 1000).toFixed(1) + 'K⭐';
+    return amount.toLocaleString() + '⭐';
+}
+
+// ===== EXPORT =====
+export default {
+    initializeLaborPool,
+    getLaborPool,
+    addToLaborPool,
+    getPlayerEarnings,
+    claimLaborEarnings,
+    distributeLaborPool,
+    getDistributionHistory,
+    getLastDistribution,
+    getContributionHistory,
+    getTotalContributions,
+    getLaborPoolStats,
+    isDistributionDue,
+    formatEarnings
 };
-
-// ===== EXPORT TO WINDOW (additional explicit exports) =====
-window.LABOR_POOL_CONFIG = LABOR_POOL_CONFIG;
-window.STORAGE_KEYS = STORAGE_KEYS;
-window.CERTIFICATE_REQUIREMENTS = CERTIFICATE_REQUIREMENTS;
-
-console.log('✅ labor-pool.js loaded - Certificate-based labor distribution ready');
