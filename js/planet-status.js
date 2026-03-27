@@ -597,8 +597,17 @@ export function getPlanetLabel(planetName, status) {
 }
 
 // ===== CHECK IF PLANET IS READY TO CLAIM =====
+// UPDATED: Only Very Rare or Legendary planets can be claimed
 export function isPlanetReadyToClaim(status) {
-    return status.explored && status.fullyExplored && !status.claimed;
+    // Must be fully explored
+    if (!status.fullyExplored) return false;
+    
+    // Must not already be claimed
+    if (status.claimed) return false;
+    
+    // Only Very Rare or Legendary planets can be claimed
+    const claimableRarities = ['very-rare', 'legendary'];
+    return claimableRarities.includes(status.highestRarity);
 }
 
 // ===== CALCULATE MINING FEE =====
