@@ -172,6 +172,17 @@ export function calculateUnlockGain(progress, index, laborPool, totalPlayerShare
     return Math.floor(laborPool * (shareGain / totalPlayerShares));
 }
 
+// ===== FORMAT FUNCTIONS =====
+export function formatShare(share) {
+    return (share / 100).toFixed(2) + '%';
+}
+
+export function formatXP(xp) {
+    if (xp >= 1000000) return (xp / 1000000).toFixed(1) + 'M';
+    if (xp >= 1000) return (xp / 1000).toFixed(1) + 'K';
+    return xp.toString();
+}
+
 // ===== DONATION XP =====
 export async function addDonationXP(playerId, index, quantity) {
     try {
@@ -252,7 +263,9 @@ export default {
     getCertificateShare,
     calculateUpgradeGain,
     calculateUnlockGain,
-    addDonationXP
+    addDonationXP,
+    formatShare,
+    formatXP
 };
 
 // ===== EXPOSE TO WINDOW FOR TESTING =====
