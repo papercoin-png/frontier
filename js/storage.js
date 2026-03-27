@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: IndexedDB helpers now automatically create missing object stores
+// FIXED: Database version updated to 4 with all required stores created in upgrade
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 
 // ===== CONSTANTS =====
@@ -192,11 +192,26 @@ function getCargoMassLimit() {
 }
 
 // ============================================================================
-// INDEXEDDB HELPER FUNCTIONS (Auto-create missing stores)
+// INDEXEDDB HELPER FUNCTIONS (Version 4 with all stores created)
 // ============================================================================
 
+// List of all stores used by the game
+const ALL_STORES = [
+    'certificates',
+    'laborPool',
+    'laborEarnings',
+    'distributionHistory',
+    'poolContributions',
+    'journal',
+    'element_locations',
+    'communityFund',
+    'communityProjects',
+    'communityGrants',
+    'fundHistory'
+];
+
 /**
- * Get a single item from IndexedDB, auto-creating store if needed
+ * Get a single item from IndexedDB
  */
 export async function getItem(storeName, id = 'main') {
     try {
@@ -206,11 +221,13 @@ export async function getItem(storeName, id = 'main') {
             return saved ? JSON.parse(saved) : null;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 3, {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
             upgrade(db) {
-                // Create the store if it doesn't exist
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
+                // Create all required stores when upgrading to version 4
+                for (const store of ALL_STORES) {
+                    if (!db.objectStoreNames.contains(store)) {
+                        db.createObjectStore(store);
+                    }
                 }
             }
         });
@@ -223,7 +240,7 @@ export async function getItem(storeName, id = 'main') {
 }
 
 /**
- * Set an item in IndexedDB, auto-creating store if needed
+ * Set an item in IndexedDB
  */
 export async function setItem(storeName, value, id = 'main') {
     try {
@@ -233,11 +250,12 @@ export async function setItem(storeName, value, id = 'main') {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 3, {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
             upgrade(db) {
-                // Create the store if it doesn't exist
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
+                for (const store of ALL_STORES) {
+                    if (!db.objectStoreNames.contains(store)) {
+                        db.createObjectStore(store);
+                    }
                 }
             }
         });
@@ -251,7 +269,7 @@ export async function setItem(storeName, value, id = 'main') {
 }
 
 /**
- * Get all items from a store, auto-creating store if needed
+ * Get all items from a store
  */
 export async function getAll(storeName) {
     try {
@@ -269,10 +287,12 @@ export async function getAll(storeName) {
             return items;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 3, {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
             upgrade(db) {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
+                for (const store of ALL_STORES) {
+                    if (!db.objectStoreNames.contains(store)) {
+                        db.createObjectStore(store);
+                    }
                 }
             }
         });
@@ -285,7 +305,7 @@ export async function getAll(storeName) {
 }
 
 /**
- * Delete an item from IndexedDB, auto-creating store if needed
+ * Delete an item from IndexedDB
  */
 export async function deleteItem(storeName, id) {
     try {
@@ -294,10 +314,12 @@ export async function deleteItem(storeName, id) {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 3, {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
             upgrade(db) {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
+                for (const store of ALL_STORES) {
+                    if (!db.objectStoreNames.contains(store)) {
+                        db.createObjectStore(store);
+                    }
                 }
             }
         });
@@ -311,7 +333,7 @@ export async function deleteItem(storeName, id) {
 }
 
 /**
- * Clear all items from a store, auto-creating store if needed
+ * Clear all items from a store
  */
 export async function clearStore(storeName) {
     try {
@@ -326,10 +348,12 @@ export async function clearStore(storeName) {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 3, {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
             upgrade(db) {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
+                for (const store of ALL_STORES) {
+                    if (!db.objectStoreNames.contains(store)) {
+                        db.createObjectStore(store);
+                    }
                 }
             }
         });
@@ -885,9 +909,10 @@ export async function getJournal() {
         const journalKey = `voidfarer_journal_${playerId}`;
         const saved = localStorage.getItem(journalKey);
         if (saved) return JSON.parse(saved);
+        
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 3);
+                const db = await window.idb.openDB('VoidfarerDB', 4);
                 if (db.objectStoreNames.contains('journal')) {
                     const entries = await db.getAll('journal');
                     if (entries && entries.length > 0) {
@@ -936,19 +961,10 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
         if (journal.entries.length > 200) journal.entries = journal.entries.slice(0, 200);
         journal.lastUpdated = new Date().toISOString();
         localStorage.setItem(journalKey, JSON.stringify(journal));
+        
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 3, {
-                    upgrade(db) {
-                        if (!db.objectStoreNames.contains('journal')) db.createObjectStore('journal', { keyPath: 'id' });
-                        if (!db.objectStoreNames.contains('element_locations')) {
-                            const locationStore = db.createObjectStore('element_locations', { keyPath: 'id' });
-                            locationStore.createIndex('by_element', 'element');
-                            locationStore.createIndex('by_planet', 'location.planet');
-                            locationStore.createIndex('by_timestamp', 'timestamp');
-                        }
-                    }
-                });
+                const db = await window.idb.openDB('VoidfarerDB', 4);
                 await db.put('journal', entry);
                 await db.put('element_locations', {
                     id: entry.id, element: elementName, planet: planetName,
@@ -969,7 +985,7 @@ export async function getElementLocations(elementName) {
     try {
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 3);
+                const db = await window.idb.openDB('VoidfarerDB', 4);
                 if (db.objectStoreNames.contains('element_locations')) {
                     const index = db.transaction('element_locations').store.index('by_element');
                     const locations = await index.getAll(elementName);
@@ -1009,7 +1025,7 @@ export async function clearJournal() {
         localStorage.removeItem(`voidfarer_journal_${playerId}`);
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 3);
+                const db = await window.idb.openDB('VoidfarerDB', 4);
                 if (db.objectStoreNames.contains('journal')) await db.clear('journal');
                 if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
             } catch (idbError) {}
@@ -1428,6 +1444,24 @@ export async function getScannedStars(playerId) {
 
 export async function initializeStorage(playerId = 'main') {
     console.log('Initializing storage for player:', playerId);
+    
+    // Ensure IndexedDB stores exist by opening the database once
+    if (window.idb) {
+        try {
+            const db = await window.idb.openDB('VoidfarerDB', 4, {
+                upgrade(db) {
+                    for (const store of ALL_STORES) {
+                        if (!db.objectStoreNames.contains(store)) {
+                            db.createObjectStore(store);
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error initializing IndexedDB stores:', error);
+        }
+    }
+    
     const player = await getPlayer(playerId);
     if (!player) await createDefaultPlayer('Voidfarer', playerId);
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_HAPTICS)) localStorage.setItem(STORAGE_KEYS.SETTINGS_HAPTICS, 'true');
@@ -1489,7 +1523,7 @@ export async function resetGame(playerId = 'main') {
     keysToRemove.forEach(key => localStorage.removeItem(key));
     if (window.idb) {
         try {
-            const db = await window.idb.openDB('VoidfarerDB', 3);
+            const db = await window.idb.openDB('VoidfarerDB', 4);
             if (db.objectStoreNames.contains('journal')) await db.clear('journal');
             if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
         } catch (idbError) {}
