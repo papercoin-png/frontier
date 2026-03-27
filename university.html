@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Voidfarer - University</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         * {
             margin: 0;
@@ -66,6 +70,41 @@
             font-size: 11px;
             letter-spacing: 2px;
             margin-top: 4px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #8a6aff;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 20px;
+        }
+        
+        .labor-preview {
+            font-size: 12px;
+            color: #4affaa;
+            background: rgba(74, 255, 170, 0.1);
+            padding: 4px 10px;
+            border-radius: 30px;
         }
         
         /* Earnings Card */
@@ -131,6 +170,7 @@
             margin-bottom: 12px;
             overflow: hidden;
             border-left: 4px solid;
+            transition: all 0.2s;
         }
         
         .cert-card.earned {
@@ -139,6 +179,7 @@
         
         .cert-card.available {
             border-left-color: #8a6aff;
+            animation: pulse-glow 2s infinite;
         }
         
         .cert-card.locked {
@@ -149,6 +190,11 @@
         .cert-card.maxed {
             border-left-color: #ffd700;
             background: rgba(255,215,0,0.1);
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { border-left-color: #8a6aff; box-shadow: 0 0 5px #8a6aff; }
+            50% { border-left-color: #b8a6ff; box-shadow: 0 0 15px #8a6aff; }
         }
         
         .cert-header {
@@ -301,10 +347,12 @@
             font-weight: 600;
             color: #8a6aff;
             cursor: pointer;
+            transition: all 0.1s;
         }
         
         .donate-btn:active {
             transform: scale(0.95);
+            background: rgba(138, 106, 255, 0.5);
         }
         
         .inventory-text {
@@ -347,6 +395,7 @@
             transform: translateX(-50%) scale(0.96);
         }
         
+        /* Loading */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -378,14 +427,39 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: rgba(10,10,26,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #8a6aff;
+            border-radius: 16px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: white;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+            max-width: 200px;
+        }
     </style>
 </head>
 <body>
     <div class="phone-frame">
         <div class="university-view">
+            <!-- Header -->
             <div class="header">
                 <div class="title">✦ UNIVERSITY ✦</div>
                 <div class="subtitle">MASTERY & LABOR SHARE</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> 12,450
+                </div>
+                <div class="labor-preview" id="totalSharePreview">Today: 0⭐</div>
             </div>
             
             <!-- Earnings Card -->
@@ -403,7 +477,7 @@
                 <button class="claim-btn" id="claimBtn">💰 CLAIM EARNINGS</button>
             </div>
             
-            <!-- Certificates Container - All 10 Tiers -->
+            <!-- Certificates Container -->
             <div id="certificatesContainer"></div>
             
             <!-- Back Button -->
@@ -416,49 +490,51 @@
         <div class="loading-text">PROCESSING...</div>
     </div>
     
-    <script>
+    <div class="tooltip" id="tooltip"></div>
+    
+    <script type="module">
+        import { getCredits, addCredits, spendCredits } from './js/storage.js';
+        import { 
+            getCertificates, 
+            saveCertificates,
+            getCertificateStatus,
+            getXpNeeded,
+            getDonationsNeeded,
+            getLevelProgressPercent,
+            getTotalLaborShare,
+            calculateUpgradeGain,
+            calculateUnlockGain,
+            addDonationXP,
+            CERTIFICATE_TIERS,
+            formatShare
+        } from './js/certificates.js';
+        import { 
+            getLaborPoolStats,
+            getPlayerEarnings,
+            claimLaborEarnings,
+            distributeLaborPool,
+            formatEarnings
+        } from './js/labor-pool.js';
+
+        // ===== TELEGRAM INIT =====
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
         
-        // ===== CERTIFICATE DATA - ALL 10 TIERS =====
-        const certificates = [
-            { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, galaxyTier: 1,
-              unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 5000, totalLevels: 10 },
-            { tier: 2, name: 'APPRENTICE', icon: '📘', rarity: 'uncommon', sharePerLevel: 10, galaxyTier: 2,
-              unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 10000, totalLevels: 10 },
-            { tier: 3, name: 'JOURNEYMAN', icon: '⚙️', rarity: 'rare', sharePerLevel: 15, galaxyTier: 3,
-              unitsPerDonation: 10, xpPerDonation: 2, xpPerLevel: 20000, totalLevels: 10 },
-            { tier: 4, name: 'ADEPT', icon: '🔮', rarity: 'very-rare', sharePerLevel: 20, galaxyTier: 4,
-              unitsPerDonation: 10, xpPerDonation: 5, xpPerLevel: 40000, totalLevels: 10 },
-            { tier: 5, name: 'EXPERT', icon: '💎', rarity: 'very-rare', sharePerLevel: 25, galaxyTier: 5,
-              unitsPerDonation: 10, xpPerDonation: 10, xpPerLevel: 80000, totalLevels: 10 },
-            { tier: 6, name: 'MASTER', icon: '🏆', rarity: 'very-rare', sharePerLevel: 30, galaxyTier: 6,
-              unitsPerDonation: 10, xpPerDonation: 20, xpPerLevel: 160000, totalLevels: 10 },
-            { tier: 7, name: 'GRANDMASTER', icon: '👑', rarity: 'very-rare', sharePerLevel: 35, galaxyTier: 7,
-              unitsPerDonation: 5, xpPerDonation: 50, xpPerLevel: 320000, totalLevels: 10 },
-            { tier: 8, name: 'SAGE', icon: '🧠', rarity: 'very-rare', sharePerLevel: 40, galaxyTier: 8,
-              unitsPerDonation: 5, xpPerDonation: 100, xpPerLevel: 640000, totalLevels: 10 },
-            { tier: 9, name: 'ELDER', icon: '🌟', rarity: 'very-rare', sharePerLevel: 45, galaxyTier: 9,
-              unitsPerDonation: 5, xpPerDonation: 200, xpPerLevel: 1280000, totalLevels: 10 },
-            { tier: 10, name: 'VOIDFARER', icon: '🌌', rarity: 'legendary', sharePerLevel: 50, galaxyTier: 10,
-              unitsPerDonation: 1, xpPerDonation: 500, xpPerLevel: 2560000, totalLevels: 10 }
-        ];
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const tooltip = document.getElementById('tooltip');
         
-        // Player Progress: level (1-10) and XP for each certificate
-        let playerProgress = [
-            { level: 5, xp: 12500 },      // Novice Lv 5
-            { level: 3, xp: 15000 },      // Apprentice Lv 3
-            { level: 0, xp: 0 },          // Journeyman locked
-            { level: 0, xp: 0 },          // Adept locked
-            { level: 2, xp: 40000 },      // Expert Lv 2
-            { level: 0, xp: 0 },          // Master locked
-            { level: 0, xp: 0 },          // Grandmaster locked
-            { level: 0, xp: 0 },          // Sage locked
-            { level: 0, xp: 0 },          // Elder locked
-            { level: 0, xp: 0 }           // Voidfarer locked
-        ];
+        // ===== STATE =====
+        let playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        let playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
+        let playerCredits = 0;
+        let certificates = [];
+        let laborPool = 10000; // Default daily pool
+        let activeWorkers = 847; // Default active workers
+        let totalPlayerShares = 8450; // Sum of all players' shares
+        let expandedIndex = null;
         
-        // Player inventory
+        // Player inventory (simulated for demo)
         let playerInventory = {
             common: 125000,
             uncommon: 45000,
@@ -467,130 +543,71 @@
             legendary: 85
         };
         
-        // Global stats
-        let totalPlayerShares = 8450; // Sum of all players' shares
-        let laborPool = 10000;
-        let activeWorkers = 847;
-        
-        let expandedIndex = null;
-        
-        // Calculate player's total share
-        function calculatePlayerShares() {
-            let total = 0;
-            certificates.forEach((cert, i) => {
-                if (playerProgress[i].level > 0) {
-                    total += cert.sharePerLevel * playerProgress[i].level;
+        // ===== LOAD DATA =====
+        async function loadData() {
+            try {
+                loadingOverlay.classList.add('active');
+                
+                // Get player ID
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                
+                // Get certificates
+                certificates = await getCertificates(playerId);
+                
+                // Get credits
+                playerCredits = await getCredits(playerId);
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                
+                // Get labor pool stats
+                const stats = await getLaborPoolStats();
+                if (stats) {
+                    laborPool = stats.balance;
+                    activeWorkers = stats.activeWorkers || activeWorkers;
+                    totalPlayerShares = stats.totalDistributed ? stats.totalDistributed / 100 : totalPlayerShares;
                 }
-            });
-            return total;
+                
+                // Get player earnings
+                const earnings = await getPlayerEarnings(playerId);
+                document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
+                document.getElementById('poolAmount').innerHTML = `${laborPool.toLocaleString()}⭐`;
+                document.getElementById('activeWorkers').innerHTML = activeWorkers.toLocaleString();
+                
+                // Update total share preview
+                const totalShare = getTotalLaborShare(certificates);
+                const sharePercent = (totalShare / 100).toFixed(2);
+                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+                
+                renderCertificates();
+                
+                loadingOverlay.classList.remove('active');
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loadingOverlay.classList.remove('active');
+            }
         }
         
-        // Calculate daily earnings
-        function calculateDailyEarnings() {
-            const playerShares = calculatePlayerShares();
-            if (totalPlayerShares === 0) return 0;
-            return Math.floor(laborPool * (playerShares / totalPlayerShares));
-        }
-        
-        // Calculate gain from next level
-        function calculateNextLevelGain(certIndex) {
-            const cert = certificates[certIndex];
-            const progress = playerProgress[certIndex];
-            if (progress.level >= cert.totalLevels) return 0;
-            
-            const currentShares = cert.sharePerLevel * progress.level;
-            const nextShares = cert.sharePerLevel * (progress.level + 1);
-            const sharesGain = nextShares - currentShares;
-            
-            const playerShares = calculatePlayerShares();
-            const newPlayerShares = playerShares + sharesGain;
-            
-            const currentEarnings = Math.floor(laborPool * (playerShares / totalPlayerShares));
-            const newEarnings = Math.floor(laborPool * (newPlayerShares / totalPlayerShares));
-            
-            return newEarnings - currentEarnings;
-        }
-        
-        // Calculate gain from unlocking a certificate
-        function calculateUnlockGain(certIndex) {
-            const cert = certificates[certIndex];
-            const sharesGain = cert.sharePerLevel * 1;
-            const playerShares = calculatePlayerShares();
-            const newPlayerShares = playerShares + sharesGain;
-            
-            const currentEarnings = Math.floor(laborPool * (playerShares / totalPlayerShares));
-            const newEarnings = Math.floor(laborPool * (newPlayerShares / totalPlayerShares));
-            
-            return newEarnings - currentEarnings;
-        }
-        
-        // Get XP needed for next level
-        function getXpNeeded(certIndex) {
-            const cert = certificates[certIndex];
-            const progress = playerProgress[certIndex];
-            if (progress.level >= cert.totalLevels) return 0;
-            
-            const currentLevelXp = progress.xp % cert.xpPerLevel;
-            return cert.xpPerLevel - currentLevelXp;
-        }
-        
-        // Get donations needed for next level
-        function getDonationsNeeded(certIndex) {
-            const cert = certificates[certIndex];
-            const xpNeeded = getXpNeeded(certIndex);
-            return Math.ceil(xpNeeded / cert.xpPerDonation) * cert.unitsPerDonation;
-        }
-        
-        // Get progress percentage for current level
-        function getProgressPercent(certIndex) {
-            const cert = certificates[certIndex];
-            const progress = playerProgress[certIndex];
-            if (progress.level >= cert.totalLevels) return 100;
-            
-            const currentLevelXp = progress.xp % cert.xpPerLevel;
-            return (currentLevelXp / cert.xpPerLevel) * 100;
-        }
-        
-        // Check if certificate is unlocked (previous tier maxed)
-        function isUnlocked(certIndex) {
-            if (certIndex === 0) return true;
-            const prevProgress = playerProgress[certIndex - 1];
-            return prevProgress.level >= certificates[certIndex - 1].totalLevels;
-        }
-        
-        // Get certificate status
-        function getStatus(certIndex) {
-            const progress = playerProgress[certIndex];
-            if (progress.level >= certificates[certIndex].totalLevels) return 'maxed';
-            if (progress.level > 0) return 'earned';
-            if (isUnlocked(certIndex)) return 'available';
-            return 'locked';
-        }
-        
-        function getRarityClass(rarity) {
-            return `rarity-${rarity}`;
-        }
-        
+        // ===== RENDER CERTIFICATES =====
         function renderCertificates() {
             const container = document.getElementById('certificatesContainer');
-            const dailyEarnings = calculateDailyEarnings();
-            
-            document.getElementById('todayEarnings').innerHTML = `${dailyEarnings}⭐`;
-            document.getElementById('poolAmount').innerHTML = `${laborPool.toLocaleString()}⭐`;
-            document.getElementById('activeWorkers').innerHTML = activeWorkers.toLocaleString();
-            
             let html = '';
             
-            certificates.forEach((cert, i) => {
-                const status = getStatus(i);
-                const progress = playerProgress[i];
-                const isEarned = status === 'earned' || status === 'maxed';
-                const isMaxed = status === 'maxed';
-                const nextLevelGain = isEarned && !isMaxed ? calculateNextLevelGain(i) : 0;
-                const unlockGain = status === 'available' ? calculateUnlockGain(i) : 0;
-                const xpNeeded = isEarned && !isMaxed ? getXpNeeded(i) : 0;
-                const donationsNeeded = isEarned && !isMaxed ? getDonationsNeeded(i) : 0;
-                const progressPercent = isEarned ? getProgressPercent(i) : 0;
+            CERTIFICATE_TIERS.forEach((cert, i) => {
+                const status = getCertificateStatus(certificates, i);
+                const prog = certificates[i];
+                const currentLevel = prog?.level || 0;
+                const currentShare = cert.sharePerLevel * currentLevel;
+                const progressPercent = getLevelProgressPercent(certificates, i);
+                const xpNeeded = getXpNeeded(certificates, i);
+                const donationsNeeded = getDonationsNeeded(certificates, i);
+                
+                // Calculate gain preview
+                let gainPreview = 0;
+                if (status === 'earned' && currentLevel < cert.totalLevels) {
+                    gainPreview = calculateUpgradeGain(certificates, i, laborPool, totalPlayerShares);
+                } else if (status === 'available') {
+                    gainPreview = calculateUnlockGain(certificates, i, laborPool, totalPlayerShares);
+                }
                 
                 let statusClass = '';
                 if (status === 'maxed') statusClass = 'maxed';
@@ -600,7 +617,7 @@
                 
                 html += `
                     <div class="cert-card ${statusClass} ${expandedIndex === i ? 'expanded' : ''}" data-index="${i}">
-                        <div class="cert-header" onclick="toggleCard(${i})">
+                        <div class="cert-header" onclick="window.toggleCard(${i})">
                             <div class="cert-info">
                                 <div class="cert-icon">${cert.icon}</div>
                                 <div>
@@ -611,18 +628,15 @@
                             <div class="cert-level">
                 `;
                 
-                if (isMaxed) {
+                if (status === 'maxed') {
                     html += `<div class="level-number">MAX</div>`;
-                } else if (isEarned) {
-                    html += `<div class="level-number">${progress.level}/10</div>`;
-                    if (nextLevelGain > 0) {
-                        html += `<div class="next-gain">+${nextLevelGain}⭐</div>`;
+                } else if (status === 'earned' || status === 'available') {
+                    html += `<div class="level-number">${currentLevel}/${cert.totalLevels}</div>`;
+                    if (gainPreview > 0) {
+                        html += `<div class="next-gain">+${gainPreview}⭐</div>`;
                     }
                 } else {
                     html += `<div class="level-number">🔒</div>`;
-                    if (status === 'available' && unlockGain > 0) {
-                        html += `<div class="next-gain">+${unlockGain}⭐</div>`;
-                    }
                 }
                 
                 html += `
@@ -634,22 +648,21 @@
                 `;
                 
                 // Gain preview for upgrades
-                if ((isEarned && !isMaxed && nextLevelGain > 0) || (status === 'available' && unlockGain > 0)) {
-                    const gainAmount = isEarned ? nextLevelGain : unlockGain;
-                    const gainText = isEarned ? `Level ${progress.level + 1}` : `Unlock ${cert.name}`;
+                if (gainPreview > 0) {
+                    const actionText = status === 'available' ? `Unlock ${cert.name}` : `Level ${currentLevel + 1}`;
                     html += `
                         <div class="gain-preview">
-                            <div class="gain-amount">+${gainAmount}⭐</div>
-                            <div class="gain-label">per day after ${gainText}</div>
+                            <div class="gain-amount">+${gainPreview}⭐</div>
+                            <div class="gain-label">more per day after ${actionText}</div>
                         </div>
                     `;
                 }
                 
                 // Progress bar for earned certificates
-                if (isEarned && !isMaxed) {
+                if (status === 'earned' && currentLevel < cert.totalLevels) {
                     html += `
                         <div class="progress-header">
-                            <span>PROGRESS TO LEVEL ${progress.level + 1}</span>
+                            <span>PROGRESS TO LEVEL ${currentLevel + 1}</span>
                             <span>${Math.floor(xpNeeded)} XP needed</span>
                         </div>
                         <div class="progress-bar">
@@ -659,22 +672,23 @@
                 }
                 
                 // Donation section for available/earned certificates
-                if (status !== 'locked') {
+                if (status !== 'locked' && status !== 'maxed') {
+                    const rarityClass = `rarity-${cert.rarity}`;
                     html += `
                         <div class="donation-section">
                             <div class="donation-row">
                                 <div class="donation-info">
-                                    <span class="rarity-badge ${getRarityClass(cert.rarity)}">${cert.rarity.toUpperCase()}</span>
+                                    <span class="rarity-badge ${rarityClass}">${cert.rarity.toUpperCase()}</span>
                                     <span>+${cert.xpPerDonation} XP per ${cert.unitsPerDonation} units</span>
                                 </div>
                                 <div>
-                                    <button class="donate-btn" onclick="event.stopPropagation(); donate(${i}, ${cert.unitsPerDonation})">DONATE ${cert.unitsPerDonation}</button>
-                                    <button class="donate-btn" onclick="event.stopPropagation(); donate(${i}, ${cert.unitsPerDonation * 10})">×10</button>
+                                    <button class="donate-btn" onclick="event.stopPropagation(); window.donate(${i}, ${cert.unitsPerDonation})">DONATE ${cert.unitsPerDonation}</button>
+                                    <button class="donate-btn" onclick="event.stopPropagation(); window.donate(${i}, ${cert.unitsPerDonation * 10})">×10</button>
                                 </div>
                             </div>
                             <div class="inventory-text">
                                 📦 You have: ${playerInventory[cert.rarity]?.toLocaleString() || 0} ${cert.rarity.toUpperCase()} units
-                                ${isEarned && !isMaxed ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
+                                ${donationsNeeded > 0 ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
                             </div>
                         </div>
                     `;
@@ -682,7 +696,7 @@
                 
                 // Unlock requirement for locked certificates
                 if (status === 'locked' && i > 0) {
-                    const prevCert = certificates[i-1];
+                    const prevCert = CERTIFICATE_TIERS[i-1];
                     html += `
                         <div class="unlock-requirement">
                             🔒 Requires ${prevCert.name} Level 10
@@ -697,6 +711,7 @@
             container.innerHTML = html;
         }
         
+        // ===== TOGGLE CARD =====
         window.toggleCard = function(index) {
             if (expandedIndex === index) {
                 expandedIndex = null;
@@ -706,13 +721,13 @@
             renderCertificates();
         };
         
-        window.donate = function(certIndex, quantity) {
-            const cert = certificates[certIndex];
-            const progress = playerProgress[certIndex];
-            const status = getStatus(certIndex);
+        // ===== DONATE =====
+        window.donate = async function(certIndex, quantity) {
+            const cert = CERTIFICATE_TIERS[certIndex];
+            const status = getCertificateStatus(certificates, certIndex);
             
             if (status === 'locked') {
-                alert(`Complete ${certificates[certIndex-1].name} Level 10 first.`);
+                alert(`Complete ${CERTIFICATE_TIERS[certIndex-1].name} Level 10 first.`);
                 return;
             }
             
@@ -727,44 +742,78 @@
                 return;
             }
             
+            // Show loading feedback
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
             // Deduct inventory
             playerInventory[cert.rarity] -= quantity;
             
-            // Calculate XP gain
-            const xpGain = (quantity / cert.unitsPerDonation) * cert.xpPerDonation;
-            let newXp = progress.xp + xpGain;
+            // Add XP
+            const result = await addDonationXP(playerId, certIndex, quantity);
             
-            // Check for level ups
-            let leveledUp = false;
-            while (newXp >= (progress.level + 1) * cert.xpPerLevel && progress.level < cert.totalLevels) {
-                progress.level++;
-                leveledUp = true;
-            }
-            progress.xp = Math.min(progress.level * cert.xpPerLevel, newXp);
-            
-            if (leveledUp) {
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                const gain = calculateNextLevelGain(certIndex);
-                alert(`🎉 ${cert.name} reached Level ${progress.level}! +${gain}⭐ more per day!`);
+            if (result.success) {
+                // Reload certificates
+                certificates = await getCertificates(playerId);
+                
+                if (result.leveledUp) {
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    // Show tooltip
+                    showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
+                } else {
+                    showTooltip(`+${Math.floor(result.xpGained)} XP to ${cert.name}`, 1000);
+                }
+                
+                renderCertificates();
             } else {
-                if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                alert(result.error || 'Failed to add XP');
             }
-            
-            renderCertificates();
         };
         
-        // Claim earnings
-        document.getElementById('claimBtn').onclick = () => {
-            const earnings = calculateDailyEarnings();
-            if (earnings <= 0) {
-                alert('No earnings to claim yet. Keep donating to earn!');
-                return;
+        // ===== SHOW TOOLTIP =====
+        function showTooltip(message, duration = 1500) {
+            tooltip.textContent = message;
+            tooltip.style.display = 'block';
+            tooltip.style.left = '50%';
+            tooltip.style.bottom = '100px';
+            tooltip.style.transform = 'translateX(-50%)';
+            setTimeout(() => {
+                tooltip.style.display = 'none';
+            }, duration);
+        }
+        
+        // ===== CLAIM EARNINGS =====
+        document.getElementById('claimBtn').onclick = async () => {
+            try {
+                loadingOverlay.classList.add('active');
+                
+                const result = await claimLaborEarnings(playerId);
+                
+                if (result.success) {
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`✅ ${result.message}`);
+                    
+                    // Update credits display
+                    playerCredits = await getCredits(playerId);
+                    document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                    document.getElementById('todayEarnings').innerHTML = `0⭐`;
+                    
+                    // Reload earnings
+                    const earnings = await getPlayerEarnings(playerId);
+                    document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
+                } else {
+                    alert(result.message || 'No earnings to claim');
+                }
+                
+                loadingOverlay.classList.remove('active');
+                
+            } catch (error) {
+                console.error('Error claiming earnings:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to claim earnings. Please try again.');
             }
-            alert(`✅ Claimed ${earnings}⭐ from labor pool!`);
-            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         };
         
-        // Demo inventory button
+        // ===== DEMO INVENTORY BUTTON =====
         const demoBtn = document.createElement('button');
         demoBtn.textContent = '+ DEMO INVENTORY';
         demoBtn.style.position = 'fixed';
@@ -785,10 +834,16 @@
             playerInventory['very-rare'] += 1000;
             playerInventory.legendary += 50;
             renderCertificates();
+            showTooltip('Demo inventory added!', 1500);
         };
         document.body.appendChild(demoBtn);
         
-        renderCertificates();
+        // ===== INIT =====
+        async function init() {
+            await loadData();
+        }
+        
+        init();
     </script>
 </body>
 </html>
