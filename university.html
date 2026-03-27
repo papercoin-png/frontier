@@ -1,1 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Voidfarer - University</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0a0a1a;
+            font-family: 'Libre Baskerville', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            min-height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            background: #0a0a1a;
+            margin: 0 auto;
+        }
+        
+        .university-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0a1a2a;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px 100px 16px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 28px;
+            color: #e0f0ff;
+            text-shadow: 0 0 20px #8a6aff;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            color: #a0c0ff;
+            font-size: 11px;
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #8a6aff;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .credits {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .credits span {
+            color: #ffd966;
+            font-size: 20px;
+        }
+        
+        .labor-preview {
+            font-size: 12px;
+            color: #4affaa;
+            background: rgba(74, 255, 170, 0.1);
+            padding: 4px 10px;
+            border-radius: 30px;
+        }
+        
+        /* Earnings Card */
+        .earnings-card {
+            background: linear-gradient(135deg, #1a3a4a, #0a2a3a);
+            border: 2px solid #ffaa4a;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .earnings-label {
+            font-size: 12px;
+            color: #a0c0ff;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        
+        .earnings-amount {
+            font-size: 48px;
+            font-weight: 700;
+            color: #ffd966;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .earnings-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,170,74,0.3);
+            font-size: 12px;
+            color: #a0c0ff;
+        }
+        
+        .claim-btn {
+            background: rgba(74, 255, 170, 0.2);
+            border: 2px solid #4affaa;
+            color: #4affaa;
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+            width: 100%;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+        }
+        
+        .claim-btn:active {
+            background: #4affaa;
+            color: #0a0a1a;
+            transform: scale(0.97);
+        }
+        
+        /* Certificate Card - Always Expanded */
+        .cert-card {
+            background: rgba(20, 30, 45, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 30px 15px 30px 15px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            border-left: 4px solid;
+            transition: all 0.2s;
+        }
+        
+        .cert-card.earned {
+            border-left-color: #4affaa;
+        }
+        
+        .cert-card.available {
+            border-left-color: #8a6aff;
+        }
+        
+        .cert-card.locked {
+            border-left-color: #4a4a6a;
+            opacity: 0.8;
+        }
+        
+        .cert-card.maxed {
+            border-left-color: #ffd700;
+            background: rgba(255,215,0,0.1);
+        }
+        
+        .cert-header {
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        .cert-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+        
+        .cert-icon {
+            font-size: 32px;
+            width: 48px;
+            text-align: center;
+        }
+        
+        .cert-name {
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Exo 2', sans-serif;
+            color: white;
+        }
+        
+        .cert-tier {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .cert-level {
+            text-align: right;
+            margin-right: 12px;
+        }
+        
+        .level-number {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ffd966;
+        }
+        
+        .level-max {
+            font-size: 11px;
+            color: #6a8ac0;
+        }
+        
+        .next-gain {
+            font-size: 11px;
+            color: #4affaa;
+        }
+        
+        /* Content - Always Visible */
+        .cert-content {
+            padding: 0 14px 16px 14px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .gain-preview {
+            background: rgba(74, 255, 170, 0.1);
+            border-radius: 20px;
+            padding: 10px;
+            margin: 12px 0;
+            text-align: center;
+        }
+        
+        .gain-amount {
+            font-size: 20px;
+            font-weight: 700;
+            color: #4affaa;
+        }
+        
+        .gain-label {
+            font-size: 10px;
+            color: #a0c0ff;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            margin: 12px 0 6px;
+            color: #a0c0ff;
+        }
+        
+        .progress-bar {
+            height: 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8a6aff, #b8a6ff);
+            border-radius: 6px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .donation-section {
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            padding: 12px;
+            margin: 12px 0;
+        }
+        
+        .donation-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .donation-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .rarity-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .rarity-common { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid #fff; }
+        .rarity-uncommon { background: rgba(176,255,176,0.2); color: #b0ffb0; border: 1px solid #b0ffb0; }
+        .rarity-rare { background: rgba(65,105,225,0.2); color: #4169E1; border: 1px solid #4169E1; }
+        .rarity-very-rare { background: rgba(224,176,255,0.2); color: #e0b0ff; border: 1px solid #e0b0ff; }
+        .rarity-legendary { background: rgba(255,215,0,0.2); color: #ffd700; border: 1px solid #ffd700; }
+        
+        .donate-btn {
+            background: rgba(138, 106, 255, 0.3);
+            border: 1px solid #8a6aff;
+            border-radius: 30px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #8a6aff;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .donate-btn.primary {
+            background: #ffaa4a;
+            border-color: #ffaa4a;
+            color: #0a0a1a;
+        }
+        
+        .donate-btn:active {
+            transform: scale(0.95);
+            background: rgba(138, 106, 255, 0.5);
+        }
+        
+        .donate-btn.primary:active {
+            background: #ffcc66;
+        }
+        
+        .inventory-text {
+            font-size: 11px;
+            color: #a0c0ff;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .unlock-requirement {
+            background: rgba(255,170,74,0.1);
+            border-radius: 20px;
+            padding: 10px;
+            text-align: center;
+            margin: 12px 0;
+        }
+        
+        /* Back Button */
+        .back-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
+            border: 3px solid #ffaa4a;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: fit-content;
+            min-width: 260px;
+            text-align: center;
+            z-index: 100;
+            font-family: 'Exo 2', sans-serif;
+        }
+        
+        .back-btn:active {
+            transform: translateX(-50%) scale(0.96);
+        }
+        
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a1a;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #8a6aff;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: rgba(10,10,26,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #8a6aff;
+            border-radius: 16px;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: white;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="university-view">
+            <!-- Header -->
+            <div class="header">
+                <div class="title">✦ UNIVERSITY ✦</div>
+                <div class="subtitle">MASTERY & LABOR SHARE</div>
+            </div>
+            
+            <!-- Stats Bar -->
+            <div class="stats-bar">
+                <div class="credits" id="creditsDisplay">
+                    <span>⭐</span> 12,450
+                </div>
+                <div class="labor-preview" id="totalSharePreview">Share: 0%</div>
+            </div>
+            
+            <!-- Earnings Card -->
+            <div class="earnings-card">
+                <div class="earnings-label">⭐ YOUR EARNINGS TODAY ⭐</div>
+                <div class="earnings-amount" id="todayEarnings">0⭐</div>
+                <div class="earnings-row">
+                    <span>💰 LABOR POOL</span>
+                    <span id="poolAmount">0⭐</span>
+                </div>
+                <div class="earnings-row">
+                    <span>👥 ACTIVE WORKERS</span>
+                    <span id="activeWorkers">0</span>
+                </div>
+                <button class="claim-btn" id="claimBtn">💰 CLAIM EARNINGS</button>
+            </div>
+            
+            <!-- Certificates Container -->
+            <div id="certificatesContainer"></div>
+            
+            <!-- Back Button -->
+            <div class="back-btn" onclick="window.location.href='earth-hub.html'">← EARTH HUB</div>
+        </div>
+    </div>
+    
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">PROCESSING...</div>
+    </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+    
+    <script type="module">
+        import { getCredits } from './js/storage.js';
+        import { 
+            getCertificates, 
+            getCertificateStatus,
+            getXpNeeded,
+            getDonationsNeeded,
+            getLevelProgressPercent,
+            getTotalLaborShare,
+            calculateUpgradeGain,
+            calculateUnlockGain,
+            addDonationXP,
+            CERTIFICATE_TIERS
+        } from './js/certificates.js';
+        import { 
+            getLaborPoolStats,
+            getPlayerEarnings,
+            claimLaborEarnings
+        } from './js/labor-pool.js';
 
+        // ===== TELEGRAM INIT =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); }
+        
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const tooltip = document.getElementById('tooltip');
+        
+        // ===== STATE =====
+        let playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        let playerCredits = 0;
+        let certificates = [];
+        let laborPool = 10000;
+        let activeWorkers = 847;
+        let totalPlayerShares = 8450;
+        
+        // Player inventory
+        let playerInventory = {
+            common: 125000,
+            uncommon: 45000,
+            rare: 12000,
+            'very-rare': 3200,
+            legendary: 85
+        };
+        
+        // ===== LOAD DATA =====
+        async function loadData() {
+            try {
+                loadingOverlay.classList.add('active');
+                
+                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                certificates = await getCertificates(playerId);
+                
+                playerCredits = await getCredits(playerId);
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                
+                const stats = await getLaborPoolStats();
+                if (stats) {
+                    laborPool = stats.balance;
+                    activeWorkers = stats.activeWorkers || activeWorkers;
+                    totalPlayerShares = stats.totalDistributed ? stats.totalDistributed / 100 : totalPlayerShares;
+                }
+                
+                const earnings = await getPlayerEarnings(playerId);
+                document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
+                document.getElementById('poolAmount').innerHTML = `${laborPool.toLocaleString()}⭐`;
+                document.getElementById('activeWorkers').innerHTML = activeWorkers.toLocaleString();
+                
+                const totalShare = getTotalLaborShare(certificates);
+                const sharePercent = (totalShare / 100).toFixed(2);
+                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+                
+                renderCertificates();
+                
+                loadingOverlay.classList.remove('active');
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loadingOverlay.classList.remove('active');
+            }
+        }
+        
+        // ===== RENDER CERTIFICATES (ALWAYS EXPANDED) =====
+        function renderCertificates() {
+            const container = document.getElementById('certificatesContainer');
+            let html = '';
+            
+            CERTIFICATE_TIERS.forEach((cert, i) => {
+                const status = getCertificateStatus(certificates, i);
+                const prog = certificates[i];
+                const currentLevel = prog?.level || 0;
+                const progressPercent = getLevelProgressPercent(certificates, i);
+                const xpNeeded = getXpNeeded(certificates, i);
+                const donationsNeeded = getDonationsNeeded(certificates, i);
+                
+                let gainPreview = 0;
+                if (status === 'earned' && currentLevel < cert.totalLevels) {
+                    gainPreview = calculateUpgradeGain(certificates, i, laborPool, totalPlayerShares);
+                } else if (status === 'available') {
+                    gainPreview = calculateUnlockGain(certificates, i, laborPool, totalPlayerShares);
+                }
+                
+                let statusClass = '';
+                if (status === 'maxed') statusClass = 'maxed';
+                else if (status === 'earned') statusClass = 'earned';
+                else if (status === 'available') statusClass = 'available';
+                else statusClass = 'locked';
+                
+                const nextLevelXp = currentLevel * cert.xpPerLevel;
+                const currentXp = prog?.xp || 0;
+                const xpProgress = currentXp - nextLevelXp;
+                const xpToNext = cert.xpPerLevel - xpProgress;
+                const percentComplete = (xpProgress / cert.xpPerLevel) * 100;
+                
+                // Determine which donation buttons to show based on inventory
+                const unitAmounts = [cert.unitsPerDonation, cert.unitsPerDonation * 10, 100, 500, 1000];
+                const filteredAmounts = unitAmounts.filter(amount => amount <= 10000);
+                
+                let buttonsHtml = '';
+                filteredAmounts.forEach(amount => {
+                    let btnClass = '';
+                    let btnText = amount;
+                    if (amount === 1000) btnClass = 'primary';
+                    buttonsHtml += `<button class="donate-btn ${btnClass}" onclick="window.donate(${i}, ${amount})">${amount}</button>`;
+                });
+                
+                html += `
+                    <div class="cert-card ${statusClass}">
+                        <div class="cert-header">
+                            <div class="cert-info">
+                                <div class="cert-icon">${cert.icon}</div>
+                                <div>
+                                    <div class="cert-name">${cert.name}</div>
+                                    <div class="cert-tier">Tier ${cert.tier} · ${cert.rarity.toUpperCase()}</div>
+                                </div>
+                            </div>
+                            <div class="cert-level">
+                `;
+                
+                if (status === 'maxed') {
+                    html += `<div class="level-number">MAX</div>`;
+                } else {
+                    html += `<div class="level-number">${currentLevel}/${cert.totalLevels}</div>`;
+                    if (gainPreview > 0) {
+                        html += `<div class="next-gain">+${gainPreview}⭐/day</div>`;
+                    }
+                }
+                
+                html += `
+                            </div>
+                        </div>
+                        
+                        <div class="cert-content">
+                `;
+                
+                // Progress Bar - Always Visible
+                if (status !== 'locked' && status !== 'maxed') {
+                    html += `
+                        <div class="progress-header">
+                            <span>${currentLevel + 1 === 1 ? 'FIRST LEVEL' : `LEVEL ${currentLevel + 1}`}</span>
+                            <span>${Math.floor(xpToNext).toLocaleString()} XP needed</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(100, percentComplete)}%"></div>
+                        </div>
+                        <div style="font-size: 10px; color: #a0c0ff; text-align: right; margin-top: 4px;">
+                            ${Math.floor(xpProgress).toLocaleString()} / ${cert.xpPerLevel.toLocaleString()} XP
+                        </div>
+                    `;
+                } else if (status === 'maxed') {
+                    html += `
+                        <div class="gain-preview">
+                            <div class="gain-amount">✓ COMPLETED</div>
+                            <div class="gain-label">Mastered this certificate</div>
+                        </div>
+                    `;
+                }
+                
+                // Gain Preview - Always Visible
+                if (gainPreview > 0 && status !== 'maxed') {
+                    const actionText = status === 'available' ? `Unlock ${cert.name}` : `Level ${currentLevel + 1}`;
+                    html += `
+                        <div class="gain-preview">
+                            <div class="gain-amount">+${gainPreview}⭐</div>
+                            <div class="gain-label">more per day after ${actionText}</div>
+                        </div>
+                    `;
+                }
+                
+                // Donation Section - Always Visible for available/earned certificates
+                if (status !== 'locked' && status !== 'maxed') {
+                    const rarityClass = `rarity-${cert.rarity}`;
+                    html += `
+                        <div class="donation-section">
+                            <div class="donation-row">
+                                <div class="donation-info">
+                                    <span class="rarity-badge ${rarityClass}">${cert.rarity.toUpperCase()}</span>
+                                    <span>+${cert.xpPerDonation} XP per ${cert.unitsPerDonation} units</span>
+                                </div>
+                            </div>
+                            <div class="donation-buttons">
+                                ${buttonsHtml}
+                            </div>
+                            <div class="inventory-text">
+                                📦 You have: ${playerInventory[cert.rarity]?.toLocaleString() || 0} ${cert.rarity.toUpperCase()} units
+                                ${donationsNeeded > 0 ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Unlock requirement for locked certificates
+                if (status === 'locked' && i > 0) {
+                    const prevCert = CERTIFICATE_TIERS[i-1];
+                    html += `
+                        <div class="unlock-requirement">
+                            🔒 Requires ${prevCert.name} Level 10
+                            <div style="font-size: 11px; margin-top: 4px;">Reach max level in ${prevCert.name} to unlock</div>
+                        </div>
+                    `;
+                }
+                
+                html += `</div></div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // ===== DONATE =====
+        window.donate = async function(certIndex, quantity) {
+            const cert = CERTIFICATE_TIERS[certIndex];
+            const status = getCertificateStatus(certificates, certIndex);
+            
+            if (status === 'locked') {
+                alert(`Complete ${CERTIFICATE_TIERS[certIndex-1].name} Level 10 first.`);
+                return;
+            }
+            
+            if (status === 'maxed') {
+                alert(`${cert.name} is already at max level!`);
+                return;
+            }
+            
+            const available = playerInventory[cert.rarity] || 0;
+            if (available < quantity) {
+                alert(`Not enough ${cert.rarity.toUpperCase()}! Need ${quantity - available} more.`);
+                return;
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            // Deduct inventory
+            playerInventory[cert.rarity] -= quantity;
+            
+            // Add XP
+            const result = await addDonationXP(playerId, certIndex, quantity);
+            
+            if (result.success) {
+                // Reload certificates
+                certificates = await getCertificates(playerId);
+                
+                if (result.leveledUp) {
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
+                } else {
+                    showTooltip(`+${Math.floor(result.xpGained)} XP to ${cert.name}`, 1000);
+                }
+                
+                // Update share preview
+                const totalShare = getTotalLaborShare(certificates);
+                const sharePercent = (totalShare / 100).toFixed(2);
+                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+                
+                renderCertificates();
+            } else {
+                // Re-add inventory if failed
+                playerInventory[cert.rarity] += quantity;
+                alert(result.error || 'Failed to add XP');
+                renderCertificates();
+            }
+        };
+        
+        // ===== SHOW TOOLTIP =====
+        function showTooltip(message, duration = 1500) {
+            tooltip.textContent = message;
+            tooltip.style.display = 'block';
+            tooltip.style.left = '50%';
+            tooltip.style.bottom = '100px';
+            tooltip.style.transform = 'translateX(-50%)';
+            setTimeout(() => {
+                tooltip.style.display = 'none';
+            }, duration);
+        }
+        
+        // ===== CLAIM EARNINGS =====
+        document.getElementById('claimBtn').onclick = async () => {
+            try {
+                loadingOverlay.classList.add('active');
+                
+                const result = await claimLaborEarnings(playerId);
+                
+                if (result.success) {
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`✅ ${result.message}`);
+                    
+                    playerCredits = await getCredits(playerId);
+                    document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
+                    document.getElementById('todayEarnings').innerHTML = `0⭐`;
+                    
+                    const earnings = await getPlayerEarnings(playerId);
+                    document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
+                } else {
+                    alert(result.message || 'No earnings to claim');
+                }
+                
+                loadingOverlay.classList.remove('active');
+                
+            } catch (error) {
+                console.error('Error claiming earnings:', error);
+                loadingOverlay.classList.remove('active');
+                alert('Failed to claim earnings. Please try again.');
+            }
+        };
+        
+        // ===== DEMO INVENTORY BUTTON =====
+        const demoBtn = document.createElement('button');
+        demoBtn.textContent = '+ DEMO INVENTORY';
+        demoBtn.style.position = 'fixed';
+        demoBtn.style.bottom = '100px';
+        demoBtn.style.right = '10px';
+        demoBtn.style.background = '#8a6aff';
+        demoBtn.style.border = 'none';
+        demoBtn.style.borderRadius = '30px';
+        demoBtn.style.padding = '6px 12px';
+        demoBtn.style.fontSize = '10px';
+        demoBtn.style.color = 'white';
+        demoBtn.style.zIndex = '200';
+        demoBtn.style.cursor = 'pointer';
+        demoBtn.onclick = () => {
+            playerInventory.common += 50000;
+            playerInventory.uncommon += 20000;
+            playerInventory.rare += 5000;
+            playerInventory['very-rare'] += 1000;
+            playerInventory.legendary += 50;
+            renderCertificates();
+            showTooltip('Demo inventory added!', 1500);
+        };
+        document.body.appendChild(demoBtn);
+        
+        // ===== INIT =====
+        async function init() {
+            await loadData();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
