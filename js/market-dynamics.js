@@ -4,8 +4,9 @@
 // FIXED: Added storage limits and error handling for supply/demand indices AND price history
 // FIXED: Exposed recordTrade and supply/demand functions to window for shipyard integration
 // FIXED: UPDATE_INTERVAL changed to 1 minute for more dynamic market reactions
+// UPDATED: Now uses elements-data.js as the single source of truth for element data
 
-import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './element-prices.js';
+import { ELEMENTS, getElementByName, getElementsByRarity, getElementVolatility, getElementBaseVolume } from './elements-data.js';
 
 // ===== MARKET CONFIGURATION =====
 
@@ -49,12 +50,28 @@ const STORAGE_KEYS = {
     PRICE_ALERTS: 'voidfarer_price_alerts'
 };
 
-// Ship part patterns for filtering
+// Ship part patterns for filtering (no longer used for element filtering, kept for backward compatibility)
 const SHIP_PART_PATTERNS = [
     'ship_', 'cargo_', 'engine_', 'weapon_', 'module_', 'reactor_',
     'shield_', 'thruster_', 'drive_', 'scanner_', 'mining_', 'crystal_',
     'component_', 'system_', 'cannon_', 'laser_', 'missile_', 'plasma_', 'railgun'
 ];
+
+// Helper function to get element base price from elements-data.js
+function getElementBasePrice(elementName) {
+    const element = getElementByName(elementName);
+    return element ? element.value : 100;
+}
+
+// Helper function to get element volatility from elements-data.js
+function getElementVolatilityValue(elementName) {
+    return getElementVolatility(elementName);
+}
+
+// Helper function to get element base volume from elements-data.js
+function getElementBaseVolumeValue(elementName) {
+    return getElementBaseVolume(elementName);
+}
 
 // ===== INITIALIZATION =====
 
@@ -85,8 +102,11 @@ export function initializeMarket() {
         const initialPrices = {};
         const initialTrends = {};
         
-        Object.entries(ELEMENT_DATABASE).forEach(([elementName, element]) => {
-            const basePrice = element.basePrice || element.value || 100;
+        // Use ELEMENTS array from elements-data.js
+        ELEMENTS.forEach(element => {
+            const elementName = element.name;
+            const basePrice = element.value || 100;
+            const volatility = getElementVolatilityValue(elementName);
             
             initialPrices[elementName] = {
                 current: basePrice,
@@ -94,7 +114,7 @@ export function initializeMarket() {
                 bid: Math.floor(basePrice * (1 - MARKET_CONFIG.SPREAD_PERCENT / 2)),
                 ask: Math.ceil(basePrice * (1 + MARKET_CONFIG.SPREAD_PERCENT / 2)),
                 trend: 0,
-                volatility: element.volatility || MARKET_CONFIG.BASE_VOLATILITY,
+                volatility: volatility,
                 lastUpdated: Date.now(),
                 volume24h: 0,
                 priceChange24h: 0,
@@ -117,7 +137,7 @@ export function initializeMarket() {
         localStorage.setItem(STORAGE_KEYS.DEMAND_INDEX, JSON.stringify({}));
         localStorage.setItem(STORAGE_KEYS.LAST_UPDATE, Date.now().toString());
         
-        console.log('✅ Market initialized with chemical elements only');
+        console.log('✅ Market initialized with chemical elements from elements-data.js');
     } else {
         // Run cleanup on existing data to prevent future issues
         if (MARKET_CONFIG.CLEANUP_ON_STARTUP) {
@@ -132,6 +152,11 @@ export function initializeMarket() {
  * Check if an element is a valid chemical (not a ship part)
  */
 function isValidChemical(elementName) {
+    // First check if it exists in elements-data.js
+    const element = getElementByName(elementName);
+    if (!element) return false;
+    
+    // Also ensure it's not a ship part pattern
     return !SHIP_PART_PATTERNS.some(pattern => elementName.includes(pattern));
 }
 
@@ -164,7 +189,8 @@ export function getElementPrice(elementName) {
         bid: 99,
         ask: 101,
         base: 100,
-        trend: 0
+        trend: 0,
+        volatility: 0.05
     };
 }
 
@@ -199,16 +225,17 @@ export function updatePrices(activeEvents = []) {
     const eventEffects = calculateEventEffects(activeEvents);
     
     Object.entries(prices).forEach(([elementName, priceData]) => {
-        const element = ELEMENT_DATABASE[elementName];
+        const element = getElementByName(elementName);
         if (!element) return;
         
         const trend = trends[elementName] || { shortTerm: 0, mediumTerm: 0, longTerm: 0, strength: 0 };
         const supplyIndex = getSupplyIndex(elementName);
         const demandIndex = getDemandIndex(elementName);
+        const volatility = getElementVolatilityValue(elementName);
         
         // Calculate price factors
         const supplyDemandFactor = (demandIndex - supplyIndex) * MARKET_CONFIG.SUPPLY_DEMAND_FACTOR;
-        const randomFactor = (Math.random() - 0.5) * 2 * priceData.volatility;
+        const randomFactor = (Math.random() - 0.5) * 2 * volatility;
         const volumeTrend = Math.log10(getVolumeLast24h(elementName) + 1) * 0.01;
         const eventMultiplier = eventEffects[element.rarity] || 1.0;
         
@@ -726,27 +753,29 @@ export function getAvailableElements(rarity = null) {
     const elements = [];
     const prices = getCurrentPrices();
     
-    Object.entries(ELEMENT_DATABASE).forEach(([name, element]) => {
-        if (!isValidChemical(name)) return;
-        if (rarity && element.rarity !== rarity) return;
-        
+    // Use ELEMENTS array from elements-data.js
+    ELEMENTS.forEach(element => {
+        const name = element.name;
         const priceData = prices[name] || {
-            current: element.basePrice || element.value || 100,
-            base: element.basePrice || element.value || 100,
-            bid: Math.floor((element.basePrice || 100) * 0.99),
-            ask: Math.ceil((element.basePrice || 100) * 1.01)
+            current: element.value || 100,
+            base: element.value || 100,
+            bid: Math.floor((element.value || 100) * 0.99),
+            ask: Math.ceil((element.value || 100) * 1.01)
         };
         
+        // Filter by rarity if specified
+        if (rarity && element.rarity !== rarity) return;
+        
         elements.push({
-            name,
+            name: name,
             symbol: element.symbol,
-            icon: element.icon,
+            icon: element.icon || getElementIcon(name),
             rarity: element.rarity,
-            basePrice: element.basePrice || element.value || 100,
+            basePrice: element.value || 100,
             currentPrice: Math.round(priceData.current),
             bidPrice: priceData.bid,
             askPrice: priceData.ask,
-            priceMultiplier: priceData.current / (element.basePrice || element.value || 100),
+            priceMultiplier: priceData.current / (element.value || 100),
             volume24h: priceData.volume24h || 0,
             priceChange24h: priceData.priceChange24h || 0,
             priceChangePercent: priceData.priceChangePercent || 0,
@@ -755,6 +784,39 @@ export function getAvailableElements(rarity = null) {
     });
     
     return elements;
+}
+
+/**
+ * Get element icon (fallback)
+ */
+function getElementIcon(elementName) {
+    const icons = {
+        'Gold': '🟡',
+        'Silver': '⚪',
+        'Platinum': '⬜',
+        'Uranium': '🟣',
+        'Promethium': '✨',
+        'Carbon': '⚫',
+        'Iron': '⚙️',
+        'Titanium': '🔷',
+        'Hydrogen': '💧',
+        'Helium': '🎈',
+        'Oxygen': '💨',
+        'Silicon': '💎',
+        'Copper': '🔴',
+        'Lead': '🔘',
+        'Mercury': '💧',
+        'Neptunium': '☢️',
+        'Plutonium': '☢️'
+    };
+    return icons[elementName] || '🔹';
+}
+
+/**
+ * Get elements by rarity with prices
+ */
+export function getElementsByRarity(rarity) {
+    return getAvailableElements(rarity);
 }
 
 /**
@@ -911,6 +973,16 @@ export function checkPriceAlerts(playerId) {
     }
 }
 
+// ===== HELPER FUNCTIONS =====
+
+export function canAffordBuy(elementName, quantity, credits) {
+    return credits >= (getAskPrice(elementName) * quantity);
+}
+
+export function hasEnoughToSell(elementName, quantity, amount) {
+    return amount >= quantity;
+}
+
 // ===== EXPORTS =====
 
 export default {
@@ -928,9 +1000,9 @@ export default {
     getSupplyIndex,
     getDemandIndex,
     getAvailableElements,
-    getElementsByRarityWithPrices: getElementsByRarity,
-    canAffordBuy: (elementName, quantity, credits) => credits >= (getAskPrice(elementName) * quantity),
-    hasEnoughToSell: (elementName, quantity, amount) => amount >= quantity,
+    getElementsByRarity,
+    canAffordBuy,
+    hasEnoughToSell,
     setPriceAlert,
     checkPriceAlerts,
     getMarketSummary,
@@ -952,6 +1024,5 @@ window.cleanupOldMarketData = cleanupOldMarketData;
 window.recordTrade = recordTrade;
 window.getSupplyIndex = getSupplyIndex;
 window.getDemandIndex = getDemandIndex;
-window.updateSupplyDemand = updateSupplyDemand;
 
-console.log('✅ market-dynamics.js loaded - Optimized market system ready with aggressive storage limits (UPDATES EVERY MINUTE)');
+console.log('✅ market-dynamics.js loaded - Optimized market system ready with elements-data.js (UPDATES EVERY MINUTE)');
