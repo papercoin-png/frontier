@@ -39,6 +39,19 @@
             background: #000000;
         }
         
+        .phone-frame::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .phone-frame::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .phone-frame::-webkit-scrollbar-thumb {
+            background: #8a6aff;
+            border-radius: 4px;
+        }
+        
         .phone-frame::before {
             content: '';
             position: fixed;
@@ -239,6 +252,11 @@
             transition: all 0.2s ease;
         }
         
+        .ship-card.free-ship {
+            border-color: #4affaa;
+            background: rgba(74, 255, 170, 0.05);
+        }
+        
         .ship-card:hover {
             border-color: #8a6aff;
         }
@@ -291,6 +309,14 @@
             background: rgba(74, 255, 170, 0.2);
             border-color: #4affaa;
             color: #4affaa;
+        }
+        
+        .free-badge {
+            background: rgba(74, 255, 170, 0.3);
+            border-color: #4affaa;
+            color: #4affaa;
+            margin-left: 8px;
+            font-size: 10px;
         }
         
         .variant-selector {
@@ -591,6 +617,12 @@
             box-shadow: 0 0 20px #4affaa;
         }
         
+        .free-btn {
+            background: rgba(74, 255, 170, 0.3);
+            border-color: #4affaa;
+            color: #4affaa;
+        }
+        
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -718,15 +750,6 @@
             100% { opacity: 0.6; }
         }
         
-        .ordered-badge {
-            background: rgba(74, 255, 170, 0.2);
-            border-radius: 20px;
-            padding: 2px 8px;
-            font-size: 10px;
-            color: #4affaa;
-            display: inline-block;
-        }
-        
         .achievement-badge {
             margin-top: 12px;
             text-align: center;
@@ -812,37 +835,20 @@
             tg.expand();
         }
 
-        // ===== STORAGE KEYS =====
-        const SHIPYARD_ORDERS_KEY = 'voidfarer_shipyard_orders';
-
         // ===== GET PLAYER ID =====
         function getPlayerId() {
             return localStorage.getItem('voidfarer_player_id') || 'main';
         }
 
-        // ===== CREDIT FUNCTIONS =====
-        let currentCredits = 0;
-        
-        async function updateCreditsDisplay() {
-            try {
-                const playerId = getPlayerId();
-                currentCredits = await getCredits(playerId);
-                const creditsElement = document.getElementById('credits');
-                if (creditsElement) {
-                    creditsElement.textContent = currentCredits.toLocaleString() + ' ⭐';
-                }
-                return currentCredits;
-            } catch (error) {
-                console.error('Error loading credits:', error);
-                return 5000;
-            }
+        // ===== PLAYER-SPECIFIC ORDER STORAGE =====
+        function getShipyardOrdersKey() {
+            const playerId = getPlayerId();
+            return `voidfarer_shipyard_orders_${playerId}`;
         }
-
-        // ===== SHIPYARD ORDER MANAGEMENT =====
         
         function getShipyardOrders() {
             try {
-                const orders = localStorage.getItem(SHIPYARD_ORDERS_KEY);
+                const orders = localStorage.getItem(getShipyardOrdersKey());
                 return orders ? JSON.parse(orders) : {};
             } catch (e) {
                 return {};
@@ -850,7 +856,7 @@
         }
         
         function saveShipyardOrders(orders) {
-            localStorage.setItem(SHIPYARD_ORDERS_KEY, JSON.stringify(orders));
+            localStorage.setItem(getShipyardOrdersKey(), JSON.stringify(orders));
         }
         
         function addOrder(element, quantity, pricePerUnit) {
@@ -877,7 +883,7 @@
         }
         
         function clearAllOrders() {
-            localStorage.removeItem(SHIPYARD_ORDERS_KEY);
+            localStorage.removeItem(getShipyardOrdersKey());
         }
         
         function getOrderedQuantity(element) {
@@ -892,6 +898,24 @@
                 total += orders[element].totalCost;
             }
             return total;
+        }
+
+        // ===== CREDIT FUNCTIONS =====
+        let currentCredits = 0;
+        
+        async function updateCreditsDisplay() {
+            try {
+                const playerId = getPlayerId();
+                currentCredits = await getCredits(playerId);
+                const creditsElement = document.getElementById('credits');
+                if (creditsElement) {
+                    creditsElement.textContent = currentCredits.toLocaleString() + ' ⭐';
+                }
+                return currentCredits;
+            } catch (error) {
+                console.error('Error loading credits:', error);
+                return 5000;
+            }
         }
 
         // ===== MARKET PRICE FUNCTIONS =====
@@ -1017,7 +1041,6 @@
                 
                 // Add refund to player credits
                 const playerId = getPlayerId();
-                const currentCredits = await getCredits(playerId);
                 await addCredits(refundTotal, playerId);
                 
                 // Clear orders
@@ -1040,26 +1063,54 @@
             }
         };
         
+        // ===== CHECK IF PLAYER ALREADY OWNS A SHIP =====
+        function getOwnedShips() {
+            try {
+                const playerId = getPlayerId();
+                const ownedShips = JSON.parse(localStorage.getItem(`voidfarer_owned_ships_${playerId}`)) || [];
+                return ownedShips;
+            } catch (error) {
+                console.error('Error getting owned ships:', error);
+                return [];
+            }
+        }
+        
+        function ownsShip(shipName) {
+            const ownedShips = getOwnedShips();
+            return ownedShips.some(ship => ship.startsWith(shipName));
+        }
+
         // ===== BUILD SHIP FUNCTION =====
         window.buildShip = async function(shipName, tier, variantId = null) {
             const ship = getShipStats(shipName);
             if (!ship) return;
             
-            const orders = getShipyardOrders();
+            const isStarter = shipName === 'Prospector' || tier === 1;
             
-            // Check if all required materials are ordered
-            let allOrdered = true;
-            for (const [element, needed] of Object.entries(ship.elements)) {
-                const ordered = orders[element]?.quantity || 0;
-                if (ordered < needed) {
-                    allOrdered = false;
-                    break;
-                }
+            // Check if player already owns this ship
+            if (ownsShip(shipName)) {
+                alert(`⚠️ You already own a ${shipName}! Cannot purchase another.`);
+                return;
             }
             
-            if (!allOrdered) {
-                alert('Not all materials have been ordered! Please order missing materials first.');
-                return;
+            // For non-starter ships, check orders
+            if (!isStarter) {
+                const orders = getShipyardOrders();
+                
+                // Check if all required materials are ordered
+                let allOrdered = true;
+                for (const [element, needed] of Object.entries(ship.elements)) {
+                    const ordered = orders[element]?.quantity || 0;
+                    if (ordered < needed) {
+                        allOrdered = false;
+                        break;
+                    }
+                }
+                
+                if (!allOrdered) {
+                    alert('Not all materials have been ordered! Please order missing materials first.');
+                    return;
+                }
             }
             
             const loadingOverlay = document.getElementById('loadingOverlay');
@@ -1068,10 +1119,41 @@
             loadingText.textContent = `CONSTRUCTING ${shipName.toUpperCase()}...`;
             
             try {
+                const playerId = getPlayerId();
+                
+                // For starter ship, no cost
+                if (isStarter) {
+                    // Format ship string for storage
+                    let shipString = shipName;
+                    if (variantId) {
+                        shipString = `${shipName} (${variantId})`;
+                    }
+                    
+                    // Add ship to fleet
+                    const playerShipsKey = `voidfarer_owned_ships_${playerId}`;
+                    const playerShips = JSON.parse(localStorage.getItem(playerShipsKey) || '[]');
+                    
+                    if (!playerShips.includes(shipString)) {
+                        playerShips.push(shipString);
+                        localStorage.setItem(playerShipsKey, JSON.stringify(playerShips));
+                    }
+                    
+                    if (tg?.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred?.('success');
+                    }
+                    
+                    loadingOverlay.classList.remove('active');
+                    alert(`✅ ${shipName} acquired! It has been added to your fleet.`);
+                    
+                    await updateCreditsDisplay();
+                    await refreshShipCards();
+                    return;
+                }
+                
+                // For regular ships
+                const orders = getShipyardOrders();
                 const materialCost = getTotalMaterialsCost();
                 const laborCost = materialCost;
-                const totalCost = materialCost + laborCost;
-                const playerId = getPlayerId();
                 const currentCredits = await getCredits(playerId);
                 
                 if (currentCredits < laborCost) {
@@ -1117,7 +1199,7 @@
                 let message = `✅ ${shipName} successfully constructed!\n\n`;
                 message += `Materials Cost: ${materialCost.toLocaleString()}⭐\n`;
                 message += `Labor Cost: ${laborCost.toLocaleString()}⭐\n`;
-                message += `Total: ${totalCost.toLocaleString()}⭐\n\n`;
+                message += `Total: ${(materialCost + laborCost).toLocaleString()}⭐\n\n`;
                 message += `Ship added to your fleet.`;
                 alert(message);
                 
@@ -1168,7 +1250,6 @@
         
         // ===== SHIP MATERIAL REQUIREMENTS =====
         const SHIP_MATERIALS = {
-            'Prospector': { 'Iron': 400, 'Copper': 200, 'Titanium': 50, 'Carbon': 100, 'Aluminum': 40, 'Silicon': 20 },
             'Deep Miner': { 'Iron': 800, 'Copper': 400, 'Titanium': 200, 'Nickel': 250, 'Chromium': 180, 'Steel': 150 },
             'Excavator': { 'Titanium': 350, 'Steel': 450, 'Nickel': 350, 'Chromium': 280, 'Zinc': 250, 'Silver': 150, 'Cobalt': 140 },
             'Borealis': { 'Steel': 800, 'Titanium': 600, 'Nickel': 550, 'Silver': 350, 'Iridium': 220, 'Manganese': 350, 'Lead': 300 },
@@ -1184,6 +1265,9 @@
         async function generateShipCard(ship) {
             const stats = getShipStats(ship.name);
             if (!stats) return '';
+            
+            const isStarter = ship.name === 'Prospector' || stats.tier === 1;
+            const alreadyOwned = ownsShip(ship.name);
             
             const variantId = selectedVariants[stats.tier];
             const variant = variantId ? getVariantStats(variantId) : null;
@@ -1213,44 +1297,46 @@
             
             let requirementsHtml = '';
             
-            for (const [element, needed] of Object.entries(shipMaterials)) {
-                const ordered = orders[element]?.quantity || 0;
-                const missing = Math.max(0, needed - ordered);
-                const price = getMarketAskPrice(element);
-                const buyCost = missing * price;
-                
-                const isOrdered = ordered >= needed;
-                
-                requirementsHtml += `
-                    <div class="requirement-item">
-                        <div class="requirement-info">
-                            <span class="requirement-icon">${getElementIcon(element)}</span>
-                            <div>
-                                <div class="requirement-name">${element}</div>
-                                <div class="requirement-need">Need ${needed.toLocaleString()} units</div>
-                            </div>
-                        </div>
-                        <div class="requirement-status">
-                            ${isOrdered ? 
-                                `<div class="requirement-ordered">✓ ORDERED: ${ordered}/${needed}</div>` :
-                                `<div class="requirement-have">Ordered: ${ordered}/${needed}</div>`
-                            }
-                            <div class="requirement-cost">${(needed * price).toLocaleString()}⭐</div>
-                        </div>
-                        <span class="${isOrdered ? 'requirement-met' : 'requirement-unmet'}">${isOrdered ? '✓' : '✗'}</span>
-                    </div>
-                `;
-                
-                if (!isOrdered && missing > 0) {
+            if (!isStarter) {
+                for (const [element, needed] of Object.entries(shipMaterials)) {
+                    const ordered = orders[element]?.quantity || 0;
+                    const missing = Math.max(0, needed - ordered);
+                    const price = getMarketAskPrice(element);
+                    const buyCost = missing * price;
+                    
+                    const isOrdered = ordered >= needed;
+                    
                     requirementsHtml += `
-                        <div class="order-row">
-                            <div class="order-info">
-                                <span class="order-text">Order ${missing.toLocaleString()} ${element}</span>
-                                <span class="order-cost">${buyCost.toLocaleString()}⭐</span>
+                        <div class="requirement-item">
+                            <div class="requirement-info">
+                                <span class="requirement-icon">${getElementIcon(element)}</span>
+                                <div>
+                                    <div class="requirement-name">${element}</div>
+                                    <div class="requirement-need">Need ${needed.toLocaleString()} units</div>
+                                </div>
                             </div>
-                            <button class="order-btn" onclick="orderMaterials('${element}', ${missing})">ORDER</button>
+                            <div class="requirement-status">
+                                ${isOrdered ? 
+                                    `<div class="requirement-ordered">✓ ORDERED: ${ordered}/${needed}</div>` :
+                                    `<div class="requirement-have">Ordered: ${ordered}/${needed}</div>`
+                                }
+                                <div class="requirement-cost">${(needed * price).toLocaleString()}⭐</div>
+                            </div>
+                            <span class="${isOrdered ? 'requirement-met' : 'requirement-unmet'}">${isOrdered ? '✓' : '✗'}</span>
                         </div>
                     `;
+                    
+                    if (!isOrdered && missing > 0) {
+                        requirementsHtml += `
+                            <div class="order-row">
+                                <div class="order-info">
+                                    <span class="order-text">Order ${missing.toLocaleString()} ${element}</span>
+                                    <span class="order-cost">${buyCost.toLocaleString()}⭐</span>
+                                </div>
+                                <button class="order-btn" onclick="orderMaterials('${element}', ${missing})">ORDER</button>
+                            </div>
+                        `;
+                    }
                 }
             }
             
@@ -1258,7 +1344,7 @@
             let variantDescHtml = '';
             const variants = getVariantsForTier(stats.tier);
             
-            if (variants.length > 0 && stats.tier >= 5) {
+            if (variants.length > 0 && stats.tier >= 5 && !isStarter) {
                 variantHtml = `
                     <div class="variant-selector">
                         ${variants.map(v => `
@@ -1270,19 +1356,35 @@
                 if (variant) variantDescHtml = `<div class="variant-desc">✨ ${variant.description}</div>`;
             }
             
-            const canBuild = allOrdered && canAffordLabor;
-            const starterBadge = stats.starter ? '<span class="tier-badge starter-badge">⭐ STARTER SHIP • NO BONUSES</span>' : `<span class="tier-badge">TIER ${stats.tier} MINING VESSEL</span>`;
+            const canBuild = isStarter ? true : (allOrdered && canAffordLabor);
+            const starterBadge = isStarter ? '<span class="tier-badge starter-badge">⭐ STARTER SHIP • FREE</span>' : `<span class="tier-badge">TIER ${stats.tier} MINING VESSEL</span>`;
             const warpSpeed = getWarpSpeed(25, fuelMult);
             const fuelCostPer100LY = getFuelCostPer100LY(fuelMult);
             const hasOrders = Object.keys(orders).length > 0;
             
+            let buildButtonHtml = '';
+            
+            if (alreadyOwned) {
+                buildButtonHtml = `<button class="build-btn disabled" style="background:rgba(74,255,170,0.1);">✓ ALREADY OWNED</button>`;
+            } else if (isStarter) {
+                buildButtonHtml = `<button class="build-btn ready free-btn" onclick="buildShip('${ship.name}', ${stats.tier}, '${variantId || ''}')">🎁 ACQUIRE STARTER SHIP (FREE)</button>`;
+            } else {
+                buildButtonHtml = `
+                    <button class="build-btn ${!canBuild ? 'disabled' : 'ready'}" onclick="${canBuild ? `buildShip('${ship.name}', ${stats.tier}, '${variantId || ''}')` : ''}">
+                        ${canBuild ? '🚀 BUY SHIP' : (allOrdered ? '⚠️ INSUFFICIENT CREDITS' : '⚠️ ORDER MATERIALS FIRST')}
+                    </button>
+                `;
+            }
+            
+            const shipClass = stats.tier === 1 ? 'free-ship' : '';
+            
             return `
-                <div class="ship-card">
+                <div class="ship-card ${shipClass}">
                     ${starterBadge}
                     <div class="ship-header">
                         <div class="ship-icon">${stats.icon}</div>
                         <div class="ship-title">
-                            <div class="ship-name">${ship.name}</div>
+                            <div class="ship-name">${ship.name}${alreadyOwned ? ' <span class="free-badge">✓ OWNED</span>' : ''}</div>
                             <div class="ship-tier">+${miningBonus}% Mining Yield</div>
                         </div>
                     </div>
@@ -1294,23 +1396,23 @@
                         <div class="stat-row"><span class="stat-label">HULL</span><span class="stat-value">${hull}</span></div>
                         <div class="stat-row"><span class="stat-label">WARP SPEED</span><span class="stat-value">${warpSpeed} LY/min</span></div>
                     </div>
-                    <div class="cost-summary">
-                        <div class="cost-row"><span class="cost-label">Materials Ordered:</span><span class="cost-value">${materialCost.toLocaleString()} ⭐</span></div>
-                        <div class="cost-row"><span class="cost-label">Labor Cost:</span><span class="cost-value">${laborCost.toLocaleString()} ⭐</span></div>
-                        <div class="cost-row total-row"><span class="cost-label">TOTAL DUE AT BUILD:</span><span class="cost-total">${laborCost.toLocaleString()} ⭐</span></div>
-                        <div class="labor-note">👷 Labor fees distributed to certificate holders</div>
-                        <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY</div>
-                        <div class="price-note">📊 Market prices update every 60 seconds</div>
-                    </div>
-                    <div class="requirements-section">
-                        <div class="requirements-title">⚒️ MATERIALS REQUIRED</div>
-                        ${requirementsHtml}
-                    </div>
+                    ${!isStarter && !alreadyOwned ? `
+                        <div class="cost-summary">
+                            <div class="cost-row"><span class="cost-label">Materials Ordered:</span><span class="cost-value">${materialCost.toLocaleString()} ⭐</span></div>
+                            <div class="cost-row"><span class="cost-label">Labor Cost:</span><span class="cost-value">${laborCost.toLocaleString()} ⭐</span></div>
+                            <div class="cost-row total-row"><span class="cost-label">TOTAL DUE AT BUILD:</span><span class="cost-total">${laborCost.toLocaleString()} ⭐</span></div>
+                            <div class="labor-note">👷 Labor fees distributed to certificate holders</div>
+                            <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY</div>
+                            <div class="price-note">📊 Market prices update every 60 seconds</div>
+                        </div>
+                        <div class="requirements-section">
+                            <div class="requirements-title">⚒️ MATERIALS REQUIRED</div>
+                            ${requirementsHtml}
+                        </div>
+                    ` : ''}
                     <div class="action-buttons">
-                        ${hasOrders ? `<button class="clear-btn" onclick="clearAllOrders()">🗑️ CLEAR ALL</button>` : ''}
-                        <button class="build-btn ${!canBuild ? 'disabled' : 'ready'}" onclick="${canBuild ? `buildShip('${ship.name}', ${stats.tier}, '${variantId || ''}')` : ''}">
-                            ${canBuild ? '🚀 BUY SHIP' : (allOrdered ? '⚠️ INSUFFICIENT CREDITS' : '⚠️ ORDER MATERIALS FIRST')}
-                        </button>
+                        ${!isStarter && !alreadyOwned && hasOrders ? `<button class="clear-btn" onclick="clearAllOrders()">🗑️ CLEAR ALL</button>` : ''}
+                        ${buildButtonHtml}
                     </div>
                     ${stats.tier === 10 ? '<div class="achievement-badge">🏆 ENDGAME VESSEL</div>' : ''}
                     ${stats.tier === 5 ? '<div class="achievement-badge">⚡ VARIANT SYSTEM UNLOCKED</div>' : ''}
