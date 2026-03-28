@@ -12,6 +12,7 @@
 // FIXED: Database version updated to 4 with all required stores created in upgrade
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
+// FIXED: Added getPlayerLocations function for planet-status.js integration
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -210,8 +211,8 @@ export function getElementRarity(elementName) {
     ];
     
     const rareElements = [
-        'Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Gold', 'Platinum',
-        'Iridium', 'Osmium', 'Rhenium'
+        'Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium',
+        'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium'
     ];
     
     const veryRareElements = [
@@ -219,10 +220,11 @@ export function getElementRarity(elementName) {
     ];
     
     const legendaryElements = [
-        'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium',
-        'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium',
-        'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium', 'Nihonium', 'Flerovium',
-        'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'
+        'Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium',
+        'Nobelium', 'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium',
+        'Bohrium', 'Hassium', 'Meitnerium', 'Darmstadtium', 'Roentgenium',
+        'Copernicium', 'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium',
+        'Tennessine', 'Oganesson'
     ];
     
     if (commonElements.includes(elementName)) return 'common';
@@ -556,6 +558,89 @@ export async function getCollection(playerId = null) {
     }
 }
 
+// ===== ENHANCED: Save location to both journal and element_locations =====
+async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        
+        // 1. Save to localStorage journal
+        const journalKey = `voidfarer_journal_${playerId}`;
+        let journal = await getJournal();
+        if (!journal) {
+            journal = { playerId: playerId, entries: [], lastUpdated: new Date().toISOString() };
+        }
+        
+        const entry = {
+            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            type: 'extraction',
+            element: elementName,
+            quantity: locationData.quantity || 1,
+            location: {
+                planet: planetName,
+                planetType: locationData.planetType || 'unknown',
+                galaxyTier: locationData.galaxyTier || 1,
+                sector: getCurrentSector(),
+                region: getCurrentRegion()
+            },
+            rarity: locationData.rarity || 'common',
+            timestamp: locationData.timestamp || Date.now(),
+            date: new Date().toISOString(),
+            value: locationData.value || 100
+        };
+        
+        journal.entries.unshift(entry);
+        if (journal.entries.length > 200) journal.entries = journal.entries.slice(0, 200);
+        journal.lastUpdated = new Date().toISOString();
+        localStorage.setItem(journalKey, JSON.stringify(journal));
+        
+        // 2. Save to IndexedDB element_locations store
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 4, {
+                    upgrade(db) {
+                        for (const store of ALL_STORES) {
+                            if (!db.objectStoreNames.contains(store)) {
+                                db.createObjectStore(store);
+                            }
+                        }
+                    }
+                });
+                
+                // Save to journal store
+                if (db.objectStoreNames.contains('journal')) {
+                    await db.put('journal', entry);
+                }
+                
+                // Save to element_locations store with index-friendly structure
+                const locationEntry = {
+                    id: entry.id,
+                    elementName: elementName,
+                    planet: planetName,
+                    planetType: locationData.planetType || 'unknown',
+                    quantity: locationData.quantity || 1,
+                    timestamp: locationData.timestamp || Date.now(),
+                    date: entry.date,
+                    rarity: locationData.rarity || 'common',
+                    playerId: playerId,
+                    galaxyTier: locationData.galaxyTier || 1
+                };
+                
+                if (db.objectStoreNames.contains('element_locations')) {
+                    await db.put('element_locations', locationEntry);
+                }
+            } catch (idbError) {
+                console.error('Failed to save to IndexedDB:', idbError);
+            }
+        }
+        
+        window.dispatchEvent(new CustomEvent('journal-updated', { detail: { entry: entry } }));
+        return true;
+    } catch (error) {
+        console.error('Failed to save journal entry:', error);
+        return false;
+    }
+}
+
 export async function addElementToCollection(elementName, quantity = 1, metadata = {}) {
     try {
         const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
@@ -575,19 +660,16 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         
         localStorage.setItem(key, JSON.stringify(collection));
         
+        // Save location data if provided
         if (metadata && metadata.planet) {
-            try {
-                await dbSaveElementLocation(elementName, metadata.planet, {
-                    planetType: metadata.planetType || 'unknown',
-                    galaxyTier: metadata.galaxyTier || 1,
-                    quantity: quantity,
-                    timestamp: metadata.timestamp || Date.now(),
-                    rarity: metadata.rarity || 'common',
-                    value: metadata.value || 100
-                });
-            } catch (error) {
-                console.error('Error saving element location:', error);
-            }
+            await dbSaveElementLocation(elementName, metadata.planet, {
+                planetType: metadata.planetType || 'unknown',
+                galaxyTier: metadata.galaxyTier || 1,
+                quantity: quantity,
+                timestamp: metadata.timestamp || Date.now(),
+                rarity: metadata.rarity || getElementRarity(elementName),
+                value: metadata.value || 100
+            });
         }
         
         return {
@@ -638,6 +720,163 @@ export async function removeElementFromCollection(elementName, quantity = 1) {
     } catch (error) {
         console.error('Error removing element from collection:', error);
         return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// JOURNAL / LOCATION TRACKING FUNCTIONS
+// ============================================================================
+
+export async function getJournal() {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const journalKey = `voidfarer_journal_${playerId}`;
+        const saved = localStorage.getItem(journalKey);
+        if (saved) return JSON.parse(saved);
+        
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 4);
+                if (db.objectStoreNames.contains('journal')) {
+                    const entries = await db.getAll('journal');
+                    if (entries && entries.length > 0) {
+                        return {
+                            playerId: playerId,
+                            entries: entries.sort((a, b) => b.timestamp - a.timestamp),
+                            lastUpdated: new Date().toISOString()
+                        };
+                    }
+                }
+            } catch (idbError) {}
+        }
+        return null;
+    } catch (error) {
+        console.error('Error getting journal:', error);
+        return null;
+    }
+}
+
+// ===== NEW: getPlayerLocations for planet-status.js integration =====
+/**
+ * Get all player locations for planet-status.js
+ * Returns array of location objects with planet, elementName, timestamp, etc.
+ */
+export async function getPlayerLocations() {
+    try {
+        // First try to get from IndexedDB element_locations store
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 4, {
+                    upgrade(db) {
+                        for (const store of ALL_STORES) {
+                            if (!db.objectStoreNames.contains(store)) {
+                                db.createObjectStore(store);
+                            }
+                        }
+                    }
+                });
+                
+                if (db.objectStoreNames.contains('element_locations')) {
+                    const locations = await db.getAll('element_locations');
+                    if (locations && locations.length > 0) {
+                        return locations;
+                    }
+                }
+            } catch (idbError) {
+                console.error('Error reading from element_locations:', idbError);
+            }
+        }
+        
+        // Fallback to journal entries
+        const journal = await getJournal();
+        if (journal && journal.entries) {
+            return journal.entries.map(entry => ({
+                id: entry.id,
+                elementName: entry.element,
+                planet: entry.location?.planet || 'Unknown',
+                planetType: entry.location?.planetType || 'unknown',
+                quantity: entry.quantity || 1,
+                timestamp: entry.timestamp || Date.now(),
+                date: entry.date,
+                rarity: entry.rarity || 'common',
+                playerId: journal.playerId,
+                galaxyTier: entry.location?.galaxyTier || 1
+            }));
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error getting player locations:', error);
+        return [];
+    }
+}
+
+export async function getElementLocations(elementName) {
+    try {
+        // Try IndexedDB first
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 4);
+                if (db.objectStoreNames.contains('element_locations')) {
+                    const allLocations = await db.getAll('element_locations');
+                    const filtered = allLocations.filter(loc => loc.elementName === elementName);
+                    if (filtered && filtered.length > 0) {
+                        return filtered;
+                    }
+                }
+            } catch (idbError) {}
+        }
+        
+        // Fallback to journal
+        const journal = await getJournal();
+        if (journal && journal.entries) {
+            return journal.entries
+                .filter(entry => entry.element === elementName)
+                .map(entry => ({
+                    id: entry.id,
+                    elementName: entry.element,
+                    planet: entry.location?.planet,
+                    planetType: entry.location?.planetType,
+                    quantity: entry.quantity,
+                    timestamp: entry.timestamp,
+                    date: entry.date,
+                    rarity: entry.rarity
+                }));
+        }
+        return [];
+    } catch (error) {
+        console.error('Error getting element locations:', error);
+        return [];
+    }
+}
+
+export async function getRecentJournalEntries(limit = 20) {
+    try {
+        const journal = await getJournal();
+        if (journal && journal.entries) return journal.entries.slice(0, limit);
+        return [];
+    } catch (error) {
+        console.error('Error getting recent journal entries:', error);
+        return [];
+    }
+}
+
+export async function clearJournal() {
+    try {
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        localStorage.removeItem(`voidfarer_journal_${playerId}`);
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB', 4);
+                if (db.objectStoreNames.contains('journal')) await db.clear('journal');
+                if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+            } catch (idbError) {}
+        }
+        console.log('📝 Journal cleared');
+        return true;
+    } catch (error) {
+        console.error('Error clearing journal:', error);
+        return false;
     }
 }
 
@@ -940,145 +1179,6 @@ function getAmbientVolume() {
 
 function setAmbientVolume(volume) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, volume.toString());
-}
-
-// ============================================================================
-// JOURNAL / LOCATION TRACKING FUNCTIONS
-// ============================================================================
-
-export async function getJournal() {
-    try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-        const journalKey = `voidfarer_journal_${playerId}`;
-        const saved = localStorage.getItem(journalKey);
-        if (saved) return JSON.parse(saved);
-        
-        if (window.idb) {
-            try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('journal')) {
-                    const entries = await db.getAll('journal');
-                    if (entries && entries.length > 0) {
-                        return {
-                            playerId: playerId,
-                            entries: entries.sort((a, b) => b.timestamp - a.timestamp),
-                            lastUpdated: new Date().toISOString()
-                        };
-                    }
-                }
-            } catch (idbError) {}
-        }
-        return null;
-    } catch (error) {
-        console.error('Error getting journal:', error);
-        return null;
-    }
-}
-
-async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
-    try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-        const journalKey = `voidfarer_journal_${playerId}`;
-        let journal = await getJournal();
-        if (!journal) {
-            journal = { playerId: playerId, entries: [], lastUpdated: new Date().toISOString() };
-        }
-        const entry = {
-            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            type: 'extraction',
-            element: elementName,
-            quantity: locationData.quantity || 1,
-            location: {
-                planet: planetName,
-                planetType: locationData.planetType || 'unknown',
-                galaxyTier: locationData.galaxyTier || 1,
-                sector: getCurrentSector(),
-                region: getCurrentRegion()
-            },
-            rarity: locationData.rarity || 'common',
-            timestamp: locationData.timestamp || Date.now(),
-            date: new Date().toISOString(),
-            value: locationData.value || 100
-        };
-        journal.entries.unshift(entry);
-        if (journal.entries.length > 200) journal.entries = journal.entries.slice(0, 200);
-        journal.lastUpdated = new Date().toISOString();
-        localStorage.setItem(journalKey, JSON.stringify(journal));
-        
-        if (window.idb) {
-            try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                await db.put('journal', entry);
-                await db.put('element_locations', {
-                    id: entry.id, element: elementName, planet: planetName,
-                    planetType: locationData.planetType || 'unknown', quantity: locationData.quantity || 1,
-                    timestamp: locationData.timestamp || Date.now(), date: entry.date, rarity: locationData.rarity || 'common'
-                });
-            } catch (idbError) {}
-        }
-        window.dispatchEvent(new CustomEvent('journal-updated', { detail: { entry: entry } }));
-        return true;
-    } catch (error) {
-        console.error('Failed to save journal entry:', error);
-        return false;
-    }
-}
-
-export async function getElementLocations(elementName) {
-    try {
-        if (window.idb) {
-            try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('element_locations')) {
-                    const index = db.transaction('element_locations').store.index('by_element');
-                    const locations = await index.getAll(elementName);
-                    if (locations && locations.length > 0) return locations;
-                }
-            } catch (idbError) {}
-        }
-        const journal = await getJournal();
-        if (journal && journal.entries) {
-            return journal.entries.filter(entry => entry.element === elementName).map(entry => ({
-                id: entry.id, element: entry.element, planet: entry.location.planet,
-                planetType: entry.location.planetType, quantity: entry.quantity,
-                timestamp: entry.timestamp, date: entry.date, rarity: entry.rarity
-            }));
-        }
-        return [];
-    } catch (error) {
-        console.error('Error getting element locations:', error);
-        return [];
-    }
-}
-
-export async function getRecentJournalEntries(limit = 20) {
-    try {
-        const journal = await getJournal();
-        if (journal && journal.entries) return journal.entries.slice(0, limit);
-        return [];
-    } catch (error) {
-        console.error('Error getting recent journal entries:', error);
-        return [];
-    }
-}
-
-export async function clearJournal() {
-    try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
-        localStorage.removeItem(`voidfarer_journal_${playerId}`);
-        if (window.idb) {
-            try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('journal')) await db.clear('journal');
-                if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
-            } catch (idbError) {}
-        }
-        console.log('📝 Journal cleared');
-        return true;
-    } catch (error) {
-        console.error('Error clearing journal:', error);
-        return false;
-    }
 }
 
 // ============================================================================
@@ -1632,7 +1732,7 @@ window.getJournal = getJournal;
 window.getElementLocations = getElementLocations;
 window.getRecentJournalEntries = getRecentJournalEntries;
 window.clearJournal = clearJournal;
-window.dbSaveElementLocation = dbSaveElementLocation;
+window.getPlayerLocations = getPlayerLocations;  // NEW: Export for planet-status.js
 window.getDiscoveryHistory = getDiscoveryHistory;
 window.addToDiscoveryHistory = addToDiscoveryHistory;
 window.getHiddenPlanets = getHiddenPlanets;
@@ -1654,4 +1754,4 @@ window.setItem = setItem;
 window.getAll = getAll;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with certificate and labor pool support');
+console.log('✅ storage.js loaded with getPlayerLocations for planet-status.js integration');
