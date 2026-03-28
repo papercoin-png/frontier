@@ -11,7 +11,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        /* ===== ALL EXISTING CSS STYLES - KEPT EXACTLY THE SAME ===== */
         * {
             margin: 0;
             padding: 0;
@@ -495,24 +494,43 @@
         }
         
         .element-name {
-            color: #EAECEF;
             font-weight: 600;
             font-size: 14px;
         }
         
+        /* Rarity color styles for element names */
+        .element-name.common { color: #A0A0A0; }
+        .element-name.uncommon { color: #4affaa; }
+        .element-name.rare { color: #4169E1; }
+        .element-name.very-rare { color: #e0b0ff; }
+        .element-name.legendary { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+        
         .rarity-badge {
             display: inline-block;
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            margin-right: 6px;
+            margin-right: 8px;
+            flex-shrink: 0;
         }
         
-        .rarity-common { background: #A0A0A0; }
-        .rarity-uncommon { background: #4affaa; }
-        .rarity-rare { background: #4169E1; }
-        .rarity-very-rare { background: #e0b0ff; }
-        .rarity-legendary { background: #ffd700; box-shadow: 0 0 8px gold; }
+        .rarity-badge.common { background: #A0A0A0; box-shadow: 0 0 2px #A0A0A0; }
+        .rarity-badge.uncommon { background: #4affaa; box-shadow: 0 0 2px #4affaa; }
+        .rarity-badge.rare { background: #4169E1; box-shadow: 0 0 2px #4169E1; }
+        .rarity-badge.very-rare { background: #e0b0ff; box-shadow: 0 0 4px #e0b0ff; }
+        .rarity-badge.legendary { background: #ffd700; box-shadow: 0 0 8px #ffd700; animation: legendary-pulse 2s infinite; }
+        
+        @keyframes legendary-pulse {
+            0% { box-shadow: 0 0 2px #ffd700; }
+            50% { box-shadow: 0 0 10px #ffd700; }
+            100% { box-shadow: 0 0 2px #ffd700; }
+        }
+        
+        .element-name-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
         
         .sort-indicator {
             position: absolute;
@@ -1277,16 +1295,38 @@
         let orderPrice = 0;
         let orderQuantity = 1;
         let currentCredits = 5000;
-        let previousCredits = 5000; // Track previous balance to only log changes
+        let previousCredits = 5000;
         let currentCollection = {};
         let currentTimeframe = '1h';
         let updateInterval = null;
         let sortColumn = 'element';
         let sortDirection = 'asc';
-        let searchTimeout = null; // For search debouncing
+        let searchTimeout = null;
         
-        // Use the actual player ID from localStorage
         const PLAYER_ID = localStorage.getItem('voidfarer_player_id') || 'main';
+
+        // ===== RARITY COLOR MAPPING =====
+        function getRarityColor(rarity) {
+            const colors = {
+                'common': '#A0A0A0',
+                'uncommon': '#4affaa',
+                'rare': '#4169E1',
+                'very-rare': '#e0b0ff',
+                'legendary': '#ffd700'
+            };
+            return colors[rarity] || '#EAECEF';
+        }
+
+        function getRarityClass(rarity) {
+            const classes = {
+                'common': 'common',
+                'uncommon': 'uncommon',
+                'rare': 'rare',
+                'very-rare': 'very-rare',
+                'legendary': 'legendary'
+            };
+            return classes[rarity] || 'common';
+        }
 
         // ===== HELPER FUNCTIONS =====
         function calculateMaxBuy(credits, price) {
@@ -1347,12 +1387,11 @@
             }
         }
 
-        // ===== BALANCE FUNCTION - UPDATED: Only log when balance changes =====
+        // ===== BALANCE FUNCTION =====
         async function updateBalance() {
             try {
                 const credits = await getCredits(PLAYER_ID);
                 
-                // Only log when balance actually changes
                 if (previousCredits !== credits) {
                     console.log(`💰 Balance for player ${PLAYER_ID}: ${credits}`);
                     previousCredits = credits;
@@ -1416,8 +1455,9 @@
                 const price = el.currentPrice;
                 const change = el.priceChangePercent || 0;
                 const changeClass = change >= 0 ? 'positive' : 'negative';
+                const rarityClass = getRarityClass(el.rarity);
                 return `<div class="ticker-item" onclick="window.openElementModal('${el.name}')">
-                    <span class="ticker-symbol">${el.symbol}</span>
+                    <span class="ticker-symbol" style="color: ${getRarityColor(el.rarity)}">${el.symbol}</span>
                     <span class="ticker-price">${Math.round(price)}⭐</span>
                     <span class="ticker-change ${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span>
                 </div>`;
@@ -1429,17 +1469,20 @@
             tbody.innerHTML = filteredElements.map(el => {
                 const change = el.priceChangePercent || 0;
                 const changeClass = change >= 0 ? 'positive' : 'negative';
-                const rarityClass = `rarity-${el.rarity}`;
+                const rarityClass = getRarityClass(el.rarity);
+                const rarityColor = getRarityColor(el.rarity);
                 return `<tr class="market-row" onclick="window.openElementModal('${el.name}')">
-                    <td><div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="rarity-badge ${rarityClass}"></span>
-                        <span class="element-symbol">${el.symbol}</span>
-                        <span class="element-name">${el.name}</span>
-                    </div>}
-                     <td><span class="bid-price">${el.bidPrice}⭐</span></td>
-                      <td><span class="ask-price">${el.askPrice}⭐</span></td>
-                      <td><span class="element-change ${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span></td>
-                  </tr>`;
+                    <td>
+                        <div class="element-name-container">
+                            <span class="rarity-badge ${rarityClass}"></span>
+                            <span class="element-symbol" style="color: ${rarityColor}">${el.symbol}</span>
+                            <span class="element-name ${rarityClass}">${el.name}</span>
+                        </div>
+                    </td>
+                    <td><span class="bid-price">${el.bidPrice}⭐</span></td>
+                    <td><span class="ask-price">${el.askPrice}⭐</span></td>
+                    <td><span class="element-change ${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span></td>
+                </tr>`;
             }).join('');
         }
 
@@ -1474,7 +1517,6 @@
             spreadDisplay.innerHTML = `▼ SPREAD ${book.spreadPercent?.toFixed(2) || 0}% ▼`;
         }
 
-        // ===== async updateMarketStats =====
         async function updateMarketStats() {
             const prices = getCurrentPrices();
             let marketCap = 0;
@@ -1681,7 +1723,7 @@
             if (total) total.textContent = (orderPrice * orderQuantity).toLocaleString() + '⭐';
         }
 
-        // ===== PLACE ORDER WITH VALIDATION - Removed verbose logging =====
+        // ===== PLACE ORDER =====
         window.placeOrderModal = async function() {
             if (!selectedElement) return;
             
@@ -1724,21 +1766,12 @@
                 
                 if (result.success && result.trade) {
                     const creditAmount = result.totalCost;
-                    if (creditAmount === undefined || creditAmount === null || isNaN(creditAmount) || creditAmount <= 0) {
-                        console.error('❌ Invalid credit amount from order:', creditAmount);
-                        showToast('Order processed but credit calculation error', 'error');
-                        await updateBalance();
-                        closeOrderModal();
-                        showLoading(false);
-                        return;
-                    }
                     
                     if (orderSide === ORDER_SIDES.BUY) {
                         const success = await spendCredits(creditAmount, PLAYER_ID);
                         if (success) {
                             currentCredits = await getCredits(PLAYER_ID);
                         } else {
-                            console.error('❌ spendCredits failed!');
                             showToast('Failed to process credits', 'error');
                             showLoading(false);
                             return;
@@ -1754,7 +1787,6 @@
                         if (newTotal !== undefined && !isNaN(newTotal) && newTotal > 0) {
                             currentCredits = newTotal;
                         } else {
-                            console.error('❌ addCredits failed!');
                             showToast('Failed to process credits', 'error');
                             showLoading(false);
                             return;
@@ -1770,7 +1802,6 @@
                     showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
                     closeOrderModal();
                 } else {
-                    console.error('❌ Order failed:', result);
                     showToast(result.error || 'Order failed', 'error');
                 }
             } catch (error) {
@@ -1803,7 +1834,7 @@
             for (const [name, data] of Object.entries(currentCollection)) {
                 const count = data.count || 0;
                 if (count > 0) {
-                    const element = allElements.find(e => e.name === name) || { name, symbol: '??', icon: '📦', currentPrice: 100 };
+                    const element = allElements.find(e => e.name === name) || { name, symbol: '??', icon: '📦', currentPrice: 100, rarity: 'common' };
                     const value = count * element.currentPrice;
                     totalValue += value;
                     positions.push({ ...element, quantity: count, value });
@@ -1816,11 +1847,13 @@
             if (positions.length === 0) {
                 listEl.innerHTML = '<div class="empty-state">No elements owned</div>';
             } else {
-                listEl.innerHTML = positions.map(pos => `
+                listEl.innerHTML = positions.map(pos => {
+                    const rarityColor = getRarityColor(pos.rarity);
+                    return `
                     <div class="portfolio-item">
                         <div class="portfolio-item-info">
                             <span class="portfolio-item-icon">${pos.icon}</span>
-                            <span class="portfolio-item-name">${pos.name}</span>
+                            <span class="portfolio-item-name" style="color: ${rarityColor}">${pos.name}</span>
                             <span class="portfolio-item-quantity">x${pos.quantity}</span>
                         </div>
                         <div class="portfolio-item-value">
@@ -1832,7 +1865,7 @@
                             <button class="portfolio-action-btn portfolio-sell-btn" onclick="window.sellFromPortfolio('${pos.name}')">SELL</button>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
             }
             
             document.getElementById('portfolioModal').classList.add('active');
@@ -1854,7 +1887,7 @@
             openElementModal(elementName);
         };
 
-        // ===== FILTER FUNCTIONS - UPDATED with debouncing =====
+        // ===== FILTER FUNCTIONS =====
         window.filterMarket = function(rarity) {
             currentFilter = rarity;
             document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
@@ -1902,7 +1935,6 @@
             else overlay.classList.remove('active');
         }
 
-        // ===== UPDATED: Reduced update interval from 2s to 5s =====
         function startRealTimeUpdates() {
             updateInterval = setInterval(async () => {
                 renderMarketTicker();
@@ -1910,7 +1942,7 @@
                 await renderOrderBook();
                 await updateMarketStats();
                 await updateBalance();
-            }, 5000); // Changed from 2000ms to 5000ms for better performance
+            }, 5000);
         }
 
         async function startPeriodicCleanup() {
@@ -1929,7 +1961,6 @@
                 
                 await migrateMarketDataToIndexedDB();
                 
-                // Ensure player exists
                 let mainPlayer = await getPlayer(PLAYER_ID);
                 if (!mainPlayer) {
                     const newPlayer = {
@@ -1985,7 +2016,6 @@
                 startRealTimeUpdates();
                 startPeriodicCleanup();
                 
-                // Keep balance updates but they now only log on change
                 setInterval(async () => await updateBalance(), 5000);
                 
                 showLoading(false);
