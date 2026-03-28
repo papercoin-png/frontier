@@ -1,4 +1,8 @@
 // js/tax-system.js - Progressive taxation system for Voidfarer
+// UPDATED: Fixed IndexedDB calls to use proper db.js functions
+// UPDATED: Uses getDb() for database access
+
+import { getDb, getAll, setItem, getItem, addTransaction } from './db.js';
 
 // ===== TAX TYPES =====
 const TAX_TYPES = {
@@ -210,52 +214,52 @@ function addTaxExemption(playerId, taxType, amount, reason) {
     localStorage.setItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS, JSON.stringify(allExemptions));
 }
 
-// ===== TAX HISTORY =====
+// ===== TAX HISTORY (IndexedDB) =====
 async function getTaxHistory(playerId, limit = 100) {
-    return await storageGetTaxHistory(playerId, limit);
-}
-
-async function storageGetTaxHistory(playerId, limit = 100) {
     try {
-        const allTransactions = await getAllTaxTransactions();
+        const db = await getDb();
+        if (!db) return [];
+        
+        const transaction = db.transaction('taxTransactions', 'readonly');
+        const store = transaction.objectStore('taxTransactions');
+        const allTx = await store.getAll();
+        
+        let filtered = allTx || [];
         
         if (playerId) {
-            const playerTxs = allTransactions.filter(tx => tx.playerId === playerId);
-            return playerTxs.slice(-limit);
+            filtered = filtered.filter(tx => tx.playerId === playerId);
         }
         
-        return allTransactions.slice(-limit);
+        filtered.sort((a, b) => b.timestamp - a.timestamp);
+        return filtered.slice(0, limit);
     } catch (error) {
         console.error('Error getting tax history:', error);
         return [];
     }
 }
 
-// FIXED: Proper IndexedDB transaction handling
-async function getAllTaxTransactions() {
-    try {
-        // Get the database connection
-        const db = window.getDb ? await window.getDb() : await idb.openDB('VoidfarerDB', 1);
-        
-        // Create a transaction and get the store
-        const tx = db.transaction('taxTransactions', 'readonly');
-        const store = tx.objectStore('taxTransactions');
-        
-        // Get all records
-        const allTransactions = await store.getAll();
-        
-        // Complete the transaction
-        await tx.done;
-        
-        return allTransactions || [];
-    } catch (error) {
-        console.error('Error getting all tax transactions:', error);
-        return [];
-    }
-}
-
 async function addTaxRecord(record) {
-    return await window.addTaxTransaction(record);
+    try {
+        const id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const txRecord = {
+            id,
+            ...record,
+            timestamp: record.timestamp || Date.now(),
+            date: record.date || new Date().toISOString()
+        };
+        
+        const db = await getDb();
+        if (!db) return null;
+        
+        const transaction = db.transaction('taxTransactions', 'readwrite');
+        const store = transaction.objectStore('taxTransactions');
+        await store.add(txRecord);
+        
+        return txRecord;
+    } catch (error) {
+        console.error('Error adding tax record:', error);
+        return null;
+    }
 }
 
 async function getPlayerTaxSummary(playerId, playerName, days = 30) {
@@ -340,20 +344,40 @@ async function payTax(playerId, playerName, taxType, baseAmount, description = '
         amount: taxAmount,
         rate,
         baseAmount,
-        description
+        description,
+        timestamp: Date.now()
     });
     
     return {
         paid: taxAmount,
         rate,
-        recordId: record.id,
+        recordId: record?.id,
         exempt: false
     };
 }
 
 // ===== COMMUNITY FUND =====
 async function getCommunityFund() {
-    return await window.getItem('communityFund', 'main');
+    try {
+        const db = await getDb();
+        if (!db) return null;
+        
+        const transaction = db.transaction('communityFund', 'readonly');
+        const store = transaction.objectStore('communityFund');
+        const fund = await store.get('main');
+        
+        return fund || {
+            id: 'main',
+            balance: 0,
+            totalContributions: 0,
+            totalAllocations: 0,
+            lastUpdated: Date.now(),
+            categories: {}
+        };
+    } catch (error) {
+        console.error('Error getting community fund:', error);
+        return null;
+    }
 }
 
 async function addToCommunityFund(amount, taxRecordId) {
@@ -361,15 +385,27 @@ async function addToCommunityFund(amount, taxRecordId) {
     if (!fund) return false;
     
     fund.balance += amount;
+    fund.totalContributions = (fund.totalContributions || 0) + amount;
     fund.contributions = fund.contributions || [];
     fund.contributions.push({
         amount,
         taxRecordId,
         timestamp: Date.now()
     });
+    fund.lastUpdated = Date.now();
     
-    await window.setItem('communityFund', fund);
-    return true;
+    try {
+        const db = await getDb();
+        if (!db) return false;
+        
+        const transaction = db.transaction('communityFund', 'readwrite');
+        const store = transaction.objectStore('communityFund');
+        await store.put(fund);
+        return true;
+    } catch (error) {
+        console.error('Error adding to community fund:', error);
+        return false;
+    }
 }
 
 async function allocateFromCommunityFund(amount, purpose, description) {
@@ -377,6 +413,7 @@ async function allocateFromCommunityFund(amount, purpose, description) {
     if (!fund || fund.balance < amount) return false;
     
     fund.balance -= amount;
+    fund.totalAllocations = (fund.totalAllocations || 0) + amount;
     fund.allocations = fund.allocations || [];
     fund.allocations.push({
         amount,
@@ -384,9 +421,20 @@ async function allocateFromCommunityFund(amount, purpose, description) {
         description,
         timestamp: Date.now()
     });
+    fund.lastUpdated = Date.now();
     
-    await window.setItem('communityFund', fund);
-    return true;
+    try {
+        const db = await getDb();
+        if (!db) return false;
+        
+        const transaction = db.transaction('communityFund', 'readwrite');
+        const store = transaction.objectStore('communityFund');
+        await store.put(fund);
+        return true;
+    } catch (error) {
+        console.error('Error allocating from community fund:', error);
+        return false;
+    }
 }
 
 async function getCommunityFundSummary() {
@@ -401,8 +449,8 @@ async function getCommunityFundSummary() {
     
     return {
         balance: fund.balance,
-        totalContributions: (fund.contributions || []).reduce((sum, c) => sum + c.amount, 0),
-        totalAllocations: (fund.allocations || []).reduce((sum, a) => sum + a.amount, 0),
+        totalContributions: fund.totalContributions || 0,
+        totalAllocations: fund.totalAllocations || 0,
         monthlyContributions: recentContributions.reduce((sum, c) => sum + c.amount, 0),
         monthlyAllocations: recentAllocations.reduce((sum, a) => sum + a.amount, 0),
         contributionCount: (fund.contributions || []).length,
@@ -459,3 +507,64 @@ window.allocateFromCommunityFund = allocateFromCommunityFund;
 window.getCommunityFundSummary = getCommunityFundSummary;
 window.formatTaxRate = formatTaxRate;
 window.getTaxDescription = getTaxDescription;
+
+// ===== EXPORT =====
+export {
+    TAX_TYPES,
+    TAX_BRACKETS,
+    initializeTaxSystem,
+    getCurrentRates,
+    saveCurrentRates,
+    updateTaxRate,
+    adjustAllRates,
+    calculateTransactionTax,
+    calculatePropertyTax,
+    calculateMonthlyPropertyTax,
+    calculateIncomeTax,
+    calculateLuxuryTax,
+    calculateAnnualLuxuryTax,
+    calculateMonthlyLuxuryTax,
+    calculateEstateTax,
+    getRegistrationFee,
+    getTaxExemptions,
+    addTaxExemption,
+    getTaxHistory,
+    getPlayerTaxSummary,
+    payTax,
+    getCommunityFund,
+    addToCommunityFund,
+    allocateFromCommunityFund,
+    getCommunityFundSummary,
+    formatTaxRate,
+    getTaxDescription
+};
+
+export default {
+    TAX_TYPES,
+    TAX_BRACKETS,
+    initializeTaxSystem,
+    getCurrentRates,
+    saveCurrentRates,
+    updateTaxRate,
+    adjustAllRates,
+    calculateTransactionTax,
+    calculatePropertyTax,
+    calculateMonthlyPropertyTax,
+    calculateIncomeTax,
+    calculateLuxuryTax,
+    calculateAnnualLuxuryTax,
+    calculateMonthlyLuxuryTax,
+    calculateEstateTax,
+    getRegistrationFee,
+    getTaxExemptions,
+    addTaxExemption,
+    getTaxHistory,
+    getPlayerTaxSummary,
+    payTax,
+    getCommunityFund,
+    addToCommunityFund,
+    allocateFromCommunityFund,
+    getCommunityFundSummary,
+    formatTaxRate,
+    getTaxDescription
+};
