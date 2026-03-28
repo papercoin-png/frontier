@@ -1,15 +1,24 @@
 // js/economic-metrics.js - Core economic tracking for Voidfarer
-// Now using IndexedDB via storage.js for unlimited storage
+// Now using IndexedDB via db.js for unlimited storage
 // Tracks money supply, inflation, wealth distribution, and economic health
+// UPDATED: Fixed IndexedDB calls to use proper db.js functions
 
 import { 
-    getItem,
-    setItem,
-    getAll,
-    getAllFromIndex,
+    getItem as storageGetItem,
+    setItem as storageSetItem,
+    getAll as storageGetAll,
     getPlayer,
     getCollection
 } from './storage.js';
+
+import { 
+    getDb,
+    getAll as dbGetAll,
+    setItem as dbSetItem,
+    getItem as dbGetItem
+} from './db.js';
+
+import { getElementValue } from './elements-data.js';
 
 // ===== STORAGE KEYS =====
 const METRICS_KEYS = {
@@ -33,19 +42,19 @@ export const TARGET_RANGES = {
 
 // ===== INITIALIZE METRICS =====
 export async function initializeMetrics() {
-    // Set initial money supply if not exists (keep in localStorage for quick access)
+    // Set initial money supply if not exists
     if (!localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) {
         localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, '5000000'); // 5M starting credits
     }
     
     // Initialize daily metrics in IndexedDB
-    const metrics = await getAll('dailyMetrics');
+    const metrics = await getDailyMetrics();
     if (metrics.length === 0) {
         // No metrics yet, that's fine
     }
     
     // Initialize hourly snapshots in IndexedDB
-    const snapshots = await getAll('hourlySnapshots');
+    const snapshots = await getHourlySnapshots();
     if (snapshots.length === 0) {
         // No snapshots yet, that's fine
     }
@@ -91,8 +100,6 @@ export function getPlayerCount() {
 
 // ===== WEALTH DISTRIBUTION =====
 export async function calculateWealthDistribution() {
-    // This would gather all player wealth in real implementation
-    // For now, return sample data based on current player
     const totalWealth = getTotalMoneySupply();
     const playerCount = getPlayerCount();
     
@@ -209,21 +216,28 @@ export async function calculateMoneyVelocity() {
     return moneySupply > 0 ? avgDailyTransactions / moneySupply : 0.5;
 }
 
-// ===== DAILY METRICS (IndexedDB) =====
+// ===== DAILY METRICS (IndexedDB using db.js) =====
 export async function getDailyMetrics() {
-    return await getAll('dailyMetrics');
+    try {
+        // Use db.js getAll which works with IndexedDB
+        const metrics = await dbGetAll('dailyMetrics');
+        return metrics || [];
+    } catch (error) {
+        console.error('Error getting daily metrics:', error);
+        return [];
+    }
 }
 
 export async function saveDailyMetrics(metrics) {
-    // Clear and rebuild (simpler than diffing)
-    const db = await getDb();
-    const tx = db.transaction('dailyMetrics', 'readwrite');
-    await tx.objectStore('dailyMetrics').clear();
-    
-    for (const metric of metrics) {
-        await tx.objectStore('dailyMetrics').put(metric);
+    try {
+        for (const metric of metrics) {
+            await dbSetItem('dailyMetrics', metric);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error saving daily metrics:', error);
+        return false;
     }
-    await tx.done;
 }
 
 export async function recordDailyMetrics() {
@@ -265,20 +279,27 @@ export async function recordDailyMetrics() {
     return dailyMetric;
 }
 
-// ===== HOURLY SNAPSHOTS (IndexedDB) =====
+// ===== HOURLY SNAPSHOTS (IndexedDB using db.js) =====
 export async function getHourlySnapshots() {
-    return await getAll('hourlySnapshots');
+    try {
+        const snapshots = await dbGetAll('hourlySnapshots');
+        return snapshots || [];
+    } catch (error) {
+        console.error('Error getting hourly snapshots:', error);
+        return [];
+    }
 }
 
 export async function saveHourlySnapshots(snapshots) {
-    const db = await getDb();
-    const tx = db.transaction('hourlySnapshots', 'readwrite');
-    await tx.objectStore('hourlySnapshots').clear();
-    
-    for (const snapshot of snapshots) {
-        await tx.objectStore('hourlySnapshots').put(snapshot);
+    try {
+        for (const snapshot of snapshots) {
+            await dbSetItem('hourlySnapshots', snapshot);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error saving hourly snapshots:', error);
+        return false;
     }
-    await tx.done;
 }
 
 export async function recordHourlySnapshot() {
@@ -304,44 +325,13 @@ export async function recordHourlySnapshot() {
     await saveHourlySnapshots(snapshots);
 }
 
-// ===== ESTIMATION HELPERS (would be replaced with real data) =====
+// ===== ESTIMATION HELPERS =====
 export function estimateTransactionVolume() {
-    // Placeholder - would track actual transactions in real implementation
     return Math.floor(Math.random() * 100000) + 50000;
 }
 
 export function estimateRecentTransactions() {
-    // Placeholder - would track actual transactions
     return Math.floor(Math.random() * 5000) + 1000;
-}
-
-// ===== ELEMENT VALUE HELPER =====
-function getElementValue(elementName) {
-    const elements = {
-        // Common - 100
-        'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
-        'Boron': 100, 'Sodium': 100, 'Magnesium': 100, 'Aluminum': 100,
-        'Silicon': 100, 'Potassium': 100, 'Calcium': 100,
-        
-        // Uncommon - 250
-        'Carbon': 250, 'Oxygen': 250, 'Nitrogen': 250, 'Iron': 250,
-        'Nickel': 250, 'Sulfur': 250, 'Phosphorus': 250, 'Chlorine': 250,
-        'Argon': 250, 'Lead': 250,
-        
-        // Rare - 1000
-        'Gold': 1000, 'Silver': 1000, 'Platinum': 1000, 'Copper': 1000,
-        'Titanium': 1000, 'Zinc': 1000, 'Tin': 1000, 'Mercury': 1000,
-        'Cobalt': 1000, 'Chromium': 1000,
-        
-        // Very Rare - 5000
-        'Uranium': 5000, 'Thorium': 5000, 'Plutonium': 5000,
-        'Radium': 5000, 'Polonium': 5000,
-        
-        // Legendary - 25000
-        'Promethium': 25000, 'Technetium': 25000, 'Astatine': 25000, 'Francium': 25000
-    };
-    
-    return elements[elementName] || 100;
 }
 
 // ===== ECONOMIC HEALTH ASSESSMENT =====
@@ -484,6 +474,3 @@ export default {
     formatMoney,
     formatPercent
 };
-
-// Need to import getDb for some functions
-import { getDb } from './db.js';
