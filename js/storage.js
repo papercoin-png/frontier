@@ -1,7 +1,21 @@
 // js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
-// UPDATED: Standardized player ID fallback to 'main' across all functions
-// FIXED: Consistent player ID handling across Ship Bridge, Surface, and Journal pages
+// UPDATED: Added market data persistence for trading system
+// UPDATED: Added certificate holder tracking for labor pool distribution
+// UPDATED: Added NPC trader persistence for marketplace NPCs
+// UPDATED: Added market data cleanup functions to prevent localStorage quota issues
+// UPDATED: Added location saving to IndexedDB when collecting elements
+// FIXED: Added recordTrade call to update market dynamics when elements are added
+// FIXED: Added dbSaveElementLocation function for journal tracking
+// UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
+// UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
+// FIXED: Database version updated to 5 with proper keyPath configurations
+// CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
+// ADDED: getElementRarity function for University cargo system
+// FIXED: Added getPlayerLocations function for planet-status.js integration
+// FIXED: IndexedDB store creation with proper keyPaths to prevent "out-of-line keys" error
+// FIXED: Standardized player ID fallback to 'main' across all functions
+// ADDED: Sector scanning functions (markSectorScanned, markStarSectorScanned, markStarScanned)
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -133,6 +147,8 @@ const STORAGE_KEYS = {
     // ===== DISCOVERY LOCK KEYS =====
     DISCOVERY_HISTORY: 'voidfarer_discovery_history',
     HIDDEN_PLANETS: 'voidfarer_hidden_planets',
+    HIDDEN_SECTORS: 'voidfarer_hidden_sectors',
+    HIDDEN_STAR_SECTORS: 'voidfarer_hidden_star_sectors',
     SCANNED_SECTORS: 'voidfarer_scanned_sectors',
     SCANNED_STAR_SECTORS: 'voidfarer_scanned_star_sectors',
     SCANNED_STARS: 'voidfarer_scanned_stars'
@@ -258,10 +274,8 @@ async function ensureDBStores() {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
-                // For version upgrade from 4 to 5, delete and recreate problem stores
                 if (oldVersion < 5) {
                     const storesToRecreate = ['journal', 'element_locations'];
-                    
                     for (const storeName of storesToRecreate) {
                         if (db.objectStoreNames.contains(storeName)) {
                             db.deleteObjectStore(storeName);
@@ -270,12 +284,10 @@ async function ensureDBStores() {
                     }
                 }
                 
-                // Create all stores with proper keyPaths
                 for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, config);
                         
-                        // Create indexes for element_locations for efficient queries
                         if (storeName === 'element_locations') {
                             store.createIndex('by_element', 'elementName');
                             store.createIndex('by_planet', 'planet');
@@ -283,7 +295,6 @@ async function ensureDBStores() {
                             console.log(`Created store: ${storeName} with indexes (keyPath: id)`);
                         }
                         
-                        // Create index for journal by timestamp
                         if (storeName === 'journal') {
                             store.createIndex('by_timestamp', 'timestamp');
                             console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
@@ -585,7 +596,6 @@ export async function spendCredits(amount, playerId = 'main') {
 
 export async function getCollection(playerId = null) {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${actualPlayerId}`;
         const saved = localStorage.getItem(key);
@@ -599,11 +609,9 @@ export async function getCollection(playerId = null) {
 // ===== ENHANCED: Save location to both journal and element_locations =====
 async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const entryId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
-        // 1. Save to localStorage journal
         const journalKey = `voidfarer_journal_${playerId}`;
         let journal = await getJournal();
         if (!journal) {
@@ -633,7 +641,6 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
         journal.lastUpdated = new Date().toISOString();
         localStorage.setItem(journalKey, JSON.stringify(journal));
         
-        // 2. Save to IndexedDB stores
         if (window.idb) {
             try {
                 const db = await ensureDBStores();
@@ -676,7 +683,6 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
 
 export async function addElementToCollection(elementName, quantity = 1, metadata = {}) {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         
@@ -719,7 +725,6 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
 
 export async function removeElementFromCollection(elementName, quantity = 1) {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         const collection = await getCollection(playerId);
@@ -763,7 +768,6 @@ export async function removeElementFromCollection(elementName, quantity = 1) {
 
 export async function getJournal() {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const journalKey = `voidfarer_journal_${playerId}`;
         const saved = localStorage.getItem(journalKey);
@@ -791,7 +795,6 @@ export async function getJournal() {
     }
 }
 
-// ===== getPlayerLocations for planet-status.js integration =====
 export async function getPlayerLocations() {
     try {
         if (window.idb) {
@@ -877,7 +880,6 @@ export async function getRecentJournalEntries(limit = 20) {
 
 export async function clearJournal() {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         localStorage.removeItem(`voidfarer_journal_${playerId}`);
         if (window.idb) {
@@ -894,6 +896,133 @@ export async function clearJournal() {
     } catch (error) {
         console.error('Error clearing journal:', error);
         return false;
+    }
+}
+
+// ============================================================================
+// SECTOR SCANNING FUNCTIONS (NEW - for galaxy-map.html)
+// ============================================================================
+
+/**
+ * Mark a galactic sector as scanned
+ * @param {string} sectorId - Sector ID (e.g., 'B2', 'EARTH')
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markSectorScanned(sectorId, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_SECTORS}_${actualPlayerId}`;
+        const scanned = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        if (!scanned.includes(sectorId.toString())) {
+            scanned.push(sectorId.toString());
+            localStorage.setItem(key, JSON.stringify(scanned));
+            console.log(`✅ Sector ${sectorId} marked as scanned for player ${actualPlayerId}`);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking sector scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Mark a star sector (nebula) as scanned
+ * @param {string} starSectorId - Star sector name (e.g., 'Orion Molecular Cloud')
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markStarSectorScanned(starSectorId, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_STAR_SECTORS}_${actualPlayerId}`;
+        const scanned = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        if (!scanned.includes(starSectorId)) {
+            scanned.push(starSectorId);
+            localStorage.setItem(key, JSON.stringify(scanned));
+            console.log(`✅ Star sector ${starSectorId} marked as scanned for player ${actualPlayerId}`);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking star sector scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Mark a star system as scanned
+ * @param {string} starId - Star name
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function markStarScanned(starId, playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_STARS}_${actualPlayerId}`;
+        const scanned = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        if (!scanned.includes(starId)) {
+            scanned.push(starId);
+            localStorage.setItem(key, JSON.stringify(scanned));
+            console.log(`✅ Star ${starId} marked as scanned for player ${actualPlayerId}`);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error marking star scanned:', error);
+        return false;
+    }
+}
+
+/**
+ * Get scanned sectors for a player
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<Array>} Array of scanned sector IDs
+ */
+export async function getScannedSectors(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_SECTORS}_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned sectors:', error);
+        return [];
+    }
+}
+
+/**
+ * Get scanned star sectors for a player
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<Array>} Array of scanned star sector names
+ */
+export async function getScannedStarSectors(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_STAR_SECTORS}_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned star sectors:', error);
+        return [];
+    }
+}
+
+/**
+ * Get scanned stars for a player
+ * @param {string|null} playerId - Player ID (optional)
+ * @returns {Promise<Array>} Array of scanned star names
+ */
+export async function getScannedStars(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const key = `${STORAGE_KEYS.SCANNED_STARS}_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting scanned stars:', error);
+        return [];
     }
 }
 
@@ -977,7 +1106,6 @@ export async function getRemainingHubStorage() {
 
 export async function getRemainingShipStorage() {
     try {
-        // FIXED: Use 'main' as fallback to match Ship Bridge
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const collection = await getCollection(playerId);
         const max = getCargoMassLimit();
@@ -1572,30 +1700,69 @@ export async function revealPlanet(planetName) {
     }
 }
 
-export async function getScannedSectors(playerId) {
+export async function getHiddenSectors() {
     try {
-        const saved = localStorage.getItem(`${STORAGE_KEYS.SCANNED_SECTORS}_${playerId}`);
+        const saved = localStorage.getItem(STORAGE_KEYS.HIDDEN_SECTORS);
         return saved ? JSON.parse(saved) : [];
     } catch (error) {
         return [];
     }
 }
 
-export async function getScannedStarSectors(playerId) {
+export async function hideSector(sectorId) {
     try {
-        const saved = localStorage.getItem(`${STORAGE_KEYS.SCANNED_STAR_SECTORS}_${playerId}`);
+        const hidden = await getHiddenSectors();
+        if (!hidden.includes(sectorId)) {
+            hidden.push(sectorId);
+            localStorage.setItem(STORAGE_KEYS.HIDDEN_SECTORS, JSON.stringify(hidden));
+        }
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+export async function revealSector(sectorId) {
+    try {
+        let hidden = await getHiddenSectors();
+        hidden = hidden.filter(id => id !== sectorId);
+        localStorage.setItem(STORAGE_KEYS.HIDDEN_SECTORS, JSON.stringify(hidden));
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+export async function getHiddenStarSectors() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.HIDDEN_STAR_SECTORS);
         return saved ? JSON.parse(saved) : [];
     } catch (error) {
         return [];
     }
 }
 
-export async function getScannedStars(playerId) {
+export async function hideStarSector(starSectorName) {
     try {
-        const saved = localStorage.getItem(`${STORAGE_KEYS.SCANNED_STARS}_${playerId}`);
-        return saved ? JSON.parse(saved) : [];
+        const hidden = await getHiddenStarSectors();
+        if (!hidden.includes(starSectorName)) {
+            hidden.push(starSectorName);
+            localStorage.setItem(STORAGE_KEYS.HIDDEN_STAR_SECTORS, JSON.stringify(hidden));
+        }
+        return true;
     } catch (error) {
-        return [];
+        return false;
+    }
+}
+
+export async function revealStarSector(starSectorName) {
+    try {
+        let hidden = await getHiddenStarSectors();
+        hidden = hidden.filter(name => name !== starSectorName);
+        localStorage.setItem(STORAGE_KEYS.HIDDEN_STAR_SECTORS, JSON.stringify(hidden));
+        return true;
+    } catch (error) {
+        return false;
     }
 }
 
@@ -1743,9 +1910,18 @@ window.addToDiscoveryHistory = addToDiscoveryHistory;
 window.getHiddenPlanets = getHiddenPlanets;
 window.hidePlanet = hidePlanet;
 window.revealPlanet = revealPlanet;
+window.getHiddenSectors = getHiddenSectors;
+window.hideSector = hideSector;
+window.revealSector = revealSector;
+window.getHiddenStarSectors = getHiddenStarSectors;
+window.hideStarSector = hideStarSector;
+window.revealStarSector = revealStarSector;
 window.getScannedSectors = getScannedSectors;
 window.getScannedStarSectors = getScannedStarSectors;
 window.getScannedStars = getScannedStars;
+window.markSectorScanned = markSectorScanned;
+window.markStarSectorScanned = markStarSectorScanned;
+window.markStarScanned = markStarScanned;
 window.saveMarketData = saveMarketData;
 window.loadMarketData = loadMarketData;
 window.saveOrderBook = saveOrderBook;
@@ -1760,4 +1936,4 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with consistent player ID fallback (main)');
+console.log('✅ storage.js loaded with consistent player ID fallback (main) and sector scanning functions');
