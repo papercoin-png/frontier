@@ -6,7 +6,7 @@
 // FIXED: UPDATE_INTERVAL changed to 1 minute for more dynamic market reactions
 // UPDATED: Now uses elements-data.js as the single source of truth for element data
 
-import { ELEMENTS, getElementByName, getElementsByRarity, getElementVolatility, getElementBaseVolume } from './elements-data.js';
+import { ELEMENTS, getElementByName, getElementsByRarity as getElementsByRarityFromData, getElementVolatility, getElementBaseVolume } from './elements-data.js';
 
 // ===== MARKET CONFIGURATION =====
 
@@ -813,7 +813,7 @@ function getElementIcon(elementName) {
 }
 
 /**
- * Get elements by rarity with prices
+ * Get elements by rarity with prices - renamed to avoid conflict with import
  */
 export function getElementsByRarity(rarity) {
     return getAvailableElements(rarity);
