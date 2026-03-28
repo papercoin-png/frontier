@@ -9,8 +9,9 @@
 // UPDATED: Added emergency liquidity fallback when orders are missing
 // UPDATED: Throttled error logging to reduce console spam
 // UPDATED: Added order pruning for non-competitive orders
+// UPDATED: Now uses elements-data.js as the single source of truth for element data
 
-import { ELEMENT_DATABASE, getElementByName } from './element-prices.js';
+import { ELEMENTS, getElementByName, getElementValue, getElementIcon, getElementRarity } from './elements-data.js';
 
 // Import market-dynamics
 import marketDynamics from './market-dynamics.js';
@@ -163,10 +164,10 @@ async function ensureElementLiquidity(element, side) {
         lastErrorLog[logKey] = now;
     }
     
-    const elementData = ELEMENT_DATABASE[element];
+    const elementData = getElementByName(element);
     if (!elementData) return false;
     
-    const basePrice = elementData.basePrice || elementData.value || 100;
+    const basePrice = elementData.value || 100;
     let ordersAdded = false;
     
     // If trying to SELL, need BUY orders (bids) in the market
@@ -246,9 +247,9 @@ async function ensureMarketLiquidity() {
     
     // Check if market already has orders
     let hasOrders = false;
-    for (const element of Object.keys(ELEMENT_DATABASE)) {
-        const sells = sellOrdersCache[element] || [];
-        const buys = buyOrdersCache[element] || [];
+    for (const element of ELEMENTS) {
+        const sells = sellOrdersCache[element.name] || [];
+        const buys = buyOrdersCache[element.name] || [];
         if (sells.length > 0 || buys.length > 0) {
             hasOrders = true;
             break;
@@ -264,8 +265,9 @@ async function ensureMarketLiquidity() {
     
     let ordersAdded = 0;
     
-    for (const [elementName, elementData] of Object.entries(ELEMENT_DATABASE)) {
-        const basePrice = elementData.basePrice || elementData.value || 100;
+    for (const element of ELEMENTS) {
+        const elementName = element.name;
+        const basePrice = element.value || 100;
         
         // Add buy orders (bids) at 20% below market
         const buyPrice = Math.floor(basePrice * (1 - ENGINE_CONFIG.MARKET_MAKER_SPREAD / 2));
