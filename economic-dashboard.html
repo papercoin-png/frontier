@@ -128,6 +128,49 @@
             margin-top: 5px;
         }
         
+        /* Central Bank Section */
+        .central-bank-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .central-bank-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .central-bank-title {
+            color: #ffaa4a;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .policy-badge {
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .policy-stimulus { background: rgba(74, 255, 170, 0.2); color: #4affaa; border: 1px solid #4affaa; }
+        .policy-contraction { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; border: 1px solid #ff6b6b; }
+        .policy-neutral { background: rgba(74, 138, 192, 0.2); color: #4a8ac0; border: 1px solid #4a8ac0; }
+        
+        .policy-detail {
+            font-size: 11px;
+            color: #a0c0ff;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+        }
+        
         .summary-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -247,6 +290,35 @@
         .health-item-status {
             font-size: 10px;
             margin-top: 4px;
+        }
+        
+        .recommendation-section {
+            background: rgba(30, 45, 70, 0.6);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ffaa4a;
+            border-radius: 40px 15px 40px 15px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .recommendation-header {
+            color: #ffaa4a;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .recommendation-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px 8px 30px 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #a0c0ff;
+        }
+        
+        .recommendation-item:last-child {
+            margin-bottom: 0;
         }
         
         .chart-section {
@@ -562,6 +634,17 @@
                 <div class="update-time" id="updateTime">Updating...</div>
             </div>
             
+            <!-- Central Bank Section -->
+            <div class="central-bank-section" id="centralBankSection">
+                <div class="central-bank-header">
+                    <span class="central-bank-title">🏦 CENTRAL BANK</span>
+                    <span class="policy-badge" id="policyBadge">MONITORING</span>
+                </div>
+                <div class="policy-detail" id="policyDetail">
+                    Checking economic conditions...
+                </div>
+            </div>
+            
             <div class="summary-grid">
                 <div class="summary-card">
                     <div class="summary-label">Money Supply</div>
@@ -616,6 +699,14 @@
                         <div class="health-item-value" id="healthReserve">0%</div>
                         <div class="health-item-status" id="healthReserveStatus"></div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Recommendations Section -->
+            <div class="recommendation-section" id="recommendationSection">
+                <div class="recommendation-header">📋 ECONOMIC RECOMMENDATIONS</div>
+                <div id="recommendationList">
+                    <div class="recommendation-item">Analyzing economic data...</div>
                 </div>
             </div>
             
@@ -709,13 +800,15 @@
     <script type="module" src="js/tax-system.js"></script>
     <script type="module" src="js/community-fund.js"></script>
     <script type="module" src="js/economic-events.js"></script>
+    <script type="module" src="js/central-bank.js"></script>
 
     <script type="module">
-        import { initializeMetrics, getTotalMoneySupply, getPlayerCount, calculateGiniCoefficient, getWealthPercentiles, calculateInflationRate, calculateMoneyVelocity, assessEconomicHealth, getDailyMetrics, recordDailyMetrics, formatMoney, formatPercent } from './js/economic-metrics.js';
+        import { initializeMetrics, getTotalMoneySupply, getPlayerCount, calculateGiniCoefficient, getWealthPercentiles, calculateInflationRate, calculateMoneyVelocity, assessEconomicHealth, getDailyMetrics, recordDailyMetrics, formatMoney, formatPercent, refreshMoneySupply } from './js/economic-metrics.js';
         import { initializeTaxSystem, getCurrentRates } from './js/tax-system.js';
         import { initializeCommunityFund, getFundSummary, addToFund } from './js/community-fund.js';
         import { getPlayer } from './js/storage.js';
         import { initDB, dbSaveDailyMetrics, dbGetDailyMetricsRange } from './js/db.js';
+        import { initializeCentralBank, runMonetaryPolicy, getCentralBankStatus, getEconomicCondition } from './js/central-bank.js';
 
         // economic-events.js attaches functions to window
         const Chart = window.Chart;
@@ -807,6 +900,84 @@
             }
         }
 
+        // ===== UPDATE CENTRAL BANK SECTION =====
+        async function updateCentralBankSection() {
+            try {
+                const status = await getCentralBankStatus();
+                const badge = document.getElementById('policyBadge');
+                const detail = document.getElementById('policyDetail');
+                
+                if (status.condition === 'STIMULUS_NEEDED' || status.condition === 'DEFLATION' || status.condition === 'STAGNATION') {
+                    badge.textContent = '📈 STIMULUS MODE';
+                    badge.className = 'policy-badge policy-stimulus';
+                } else if (status.condition === 'COOLING_NEEDED' || status.condition === 'OVERHEATING' || status.condition === 'SPECULATION') {
+                    badge.textContent = '📉 CONTRACTION MODE';
+                    badge.className = 'policy-badge policy-contraction';
+                } else {
+                    badge.textContent = '⚖️ NEUTRAL';
+                    badge.className = 'policy-badge policy-neutral';
+                }
+                
+                detail.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Condition: <strong style="color: #ffaa4a;">${status.condition}</strong></span>
+                        <span>Severity: <strong>${status.severity.toUpperCase()}</strong></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Money Supply: ${status.currentMetrics.moneySupply}</span>
+                        <span>Inflation: ${status.currentMetrics.inflation}</span>
+                        <span>Velocity: ${status.currentMetrics.velocity}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #6a8ac0;">
+                        <span>Interventions this month: ${status.interventionsThisMonth}/${status.interventionsRemaining + status.interventionsThisMonth}</span>
+                        <span>Last action: ${status.lastInterventionDate}</span>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error updating central bank section:', error);
+                document.getElementById('policyDetail').innerHTML = 'Central bank status unavailable';
+            }
+        }
+
+        // ===== GENERATE RECOMMENDATIONS =====
+        async function generateRecommendations() {
+            const inflation = await calculateInflationRate();
+            const velocity = await calculateMoneyVelocity();
+            const gini = await calculateGiniCoefficient();
+            const condition = await getEconomicCondition();
+            
+            const recommendations = [];
+            
+            if (inflation < 0.02) {
+                recommendations.push('⚠️ Inflation is below target. Consider tax cuts or economic stimulus to boost spending.');
+            }
+            if (inflation > 0.05) {
+                recommendations.push('⚠️ Inflation is above target. Consider tax increases or monetary contraction.');
+            }
+            if (velocity < 0.5) {
+                recommendations.push('💰 Money velocity is low. Encourage trading and market activity.');
+            }
+            if (velocity > 1.5) {
+                recommendations.push('📈 Money velocity is high. Watch for speculative bubbles.');
+            }
+            if (gini > 0.45) {
+                recommendations.push('⚖️ Wealth inequality is high. Consider progressive taxation or wealth redistribution.');
+            }
+            if (condition.condition === 'STIMULUS_NEEDED') {
+                recommendations.push('🏦 Central bank recommends stimulus. Lower taxes or increase government spending.');
+            }
+            if (condition.condition === 'COOLING_NEEDED') {
+                recommendations.push('🏦 Central bank recommends cooling. Raise taxes or reduce money supply.');
+            }
+            
+            if (recommendations.length === 0) {
+                recommendations.push('✅ Economy is stable. Current policies are working well.');
+            }
+            
+            const container = document.getElementById('recommendationList');
+            container.innerHTML = recommendations.map(rec => `<div class="recommendation-item">${rec}</div>`).join('');
+        }
+
         // ===== LOAD DASHBOARD DATA =====
         async function loadDashboardData() {
             try {
@@ -815,6 +986,7 @@
                 await initializeMetrics();
                 await initializeTaxSystem();
                 await initializeCommunityFund();
+                await initializeCentralBank();
                 
                 // Initialize event system (attached to window)
                 if (window.initializeEventSystem) {
@@ -831,6 +1003,10 @@
                 
                 // Record today's metrics
                 await recordDailyMetrics();
+                
+                // Run monetary policy
+                const policyResult = await runMonetaryPolicy();
+                console.log('🏦 Monetary policy result:', policyResult);
                 
                 // Get metrics
                 const moneySupply = getTotalMoneySupply();
@@ -893,6 +1069,12 @@
                 
                 // Update money flow
                 updateMoneyFlow(fundSummary);
+                
+                // Update central bank section
+                await updateCentralBankSection();
+                
+                // Generate recommendations
+                await generateRecommendations();
                 
                 // Update update time
                 document.getElementById('updateTime').textContent = 'Updated: ' + new Date().toLocaleTimeString();
