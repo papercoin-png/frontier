@@ -1,8 +1,9 @@
 // js/chart-manager.js - Professional Charting System
 // Creates candlestick charts, depth charts, and technical indicators
 // FIXED: Now uses actual data from market-dynamics.js and market-engine.js
+// UPDATED: Now uses elements-data.js as the single source of truth for element data
 
-import { getElementByName } from './element-prices.js';
+import { getElementByName, getElementIcon, getElementRarity, getElementValue } from './elements-data.js';
 import { getCurrentPrices, getPriceHistory, getVolumeLast24h } from './market-dynamics.js';
 import { getCombinedOrderBook } from './market-engine.js';
 
@@ -233,7 +234,8 @@ export class ChartManager {
     generateMockData(elementName = 'Gold') {
         const mockData = [];
         const now = Date.now();
-        const basePrice = elementName === 'Gold' ? 25 : 100;
+        const element = getElementByName(elementName);
+        const basePrice = element ? element.value : 100;
         
         for (let i = 0; i < CHART_CONFIG.candleCount; i++) {
             const timestamp = now - (i * 60 * 60 * 1000); // 1 hour intervals
