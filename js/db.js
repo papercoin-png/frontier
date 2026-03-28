@@ -1,9 +1,9 @@
 // js/db.js - IndexedDB wrapper for Voidfarer
 // Provides persistent storage with async/await interface
-// UPDATED: Version 6 - Added market stores for trading system
+// UPDATED: Version 7 - Added economic stores for dashboard and community features
 
 const DB_NAME = 'voidfarer_db';
-const DB_VERSION = 6; // Increment from 5 to 6 for market stores
+const DB_VERSION = 7; // Increment from 6 to 7 for economic stores
 
 // Store names
 const STORES = {
@@ -41,15 +41,21 @@ const STORES = {
     NPC_TRADERS: 'npcTraders',
     NPC_TRADER_ORDERS: 'npcTraderOrders',
     NPC_TRADER_HISTORY: 'npcTraderHistory',
-    // ===== NEW MARKET STORES (Version 6) =====
-    MARKET_PRICES: 'marketPrices',      // Current market prices
-    MARKET_ORDERS: 'marketOrders',       // Buy/sell orders (combined)
-    TRADE_HISTORY: 'tradeHistory',       // Record of all trades
-    ORDER_HISTORY: 'orderHistory',       // User order history
-    PRICE_HISTORY: 'priceHistory',       // Historical price data per element
-    SUPPLY_DEMAND: 'supplyDemand',       // Supply and demand indices
-    MARKET_VOLUME: 'marketVolume',       // Volume tracking per element
-    PRICE_ALERTS: 'priceAlerts'          // User price alerts
+    // ===== MARKET STORES (Version 6) =====
+    MARKET_PRICES: 'marketPrices',
+    MARKET_ORDERS: 'marketOrders',
+    TRADE_HISTORY: 'tradeHistory',
+    ORDER_HISTORY: 'orderHistory',
+    PRICE_HISTORY: 'priceHistory',
+    SUPPLY_DEMAND: 'supplyDemand',
+    MARKET_VOLUME: 'marketVolume',
+    PRICE_ALERTS: 'priceAlerts',
+    // ===== ECONOMIC STORES (Version 7) =====
+    DAILY_METRICS: 'dailyMetrics',           // Daily economic metrics for charts
+    HOURLY_SNAPSHOTS: 'hourlySnapshots',     // Hourly snapshots for real-time tracking
+    COMMUNITY_PROJECTS: 'communityProjects', // Player-proposed community projects
+    COMMUNITY_GRANTS: 'communityGrants',     // Grants issued to new/struggling players
+    FUND_HISTORY: 'fundHistory'              // Community fund transaction history
 };
 
 // Database connection
@@ -83,13 +89,16 @@ async function initDB() {
             const oldVersion = event.oldVersion;
             console.log(`Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
             
-            // Create stores if they don't exist
+            // Create all stores if they don't exist
+            
+            // Player store
             if (!db.objectStoreNames.contains(STORES.PLAYER)) {
                 const playerStore = db.createObjectStore(STORES.PLAYER, { keyPath: 'id' });
                 playerStore.createIndex('name', 'name', { unique: false });
                 console.log('Created player store');
             }
             
+            // Collection store
             if (!db.objectStoreNames.contains(STORES.COLLECTION)) {
                 const collectionStore = db.createObjectStore(STORES.COLLECTION, { keyPath: 'elementName' });
                 collectionStore.createIndex('rarity', 'rarity', { unique: false });
@@ -97,6 +106,7 @@ async function initDB() {
                 console.log('Created collection store');
             }
             
+            // Missions stores
             if (!db.objectStoreNames.contains(STORES.MISSIONS)) {
                 const missionsStore = db.createObjectStore(STORES.MISSIONS, { keyPath: 'id', autoIncrement: true });
                 missionsStore.createIndex('status', 'status', { unique: false });
@@ -109,6 +119,7 @@ async function initDB() {
                 console.log('Created completed missions store');
             }
             
+            // Scan history
             if (!db.objectStoreNames.contains(STORES.SCAN_HISTORY)) {
                 const scanStore = db.createObjectStore(STORES.SCAN_HISTORY, { keyPath: 'id', autoIncrement: true });
                 scanStore.createIndex('timestamp', 'timestamp', { unique: false });
@@ -116,6 +127,7 @@ async function initDB() {
                 console.log('Created scan history store');
             }
             
+            // Colonies
             if (!db.objectStoreNames.contains(STORES.COLONIES)) {
                 const coloniesStore = db.createObjectStore(STORES.COLONIES, { keyPath: 'planetName' });
                 coloniesStore.createIndex('founded', 'founded', { unique: false });
@@ -123,6 +135,7 @@ async function initDB() {
                 console.log('Created colonies store');
             }
             
+            // Discovered locations
             if (!db.objectStoreNames.contains(STORES.DISCOVERED_LOCATIONS)) {
                 const locationsStore = db.createObjectStore(STORES.DISCOVERED_LOCATIONS, { keyPath: 'id', autoIncrement: true });
                 locationsStore.createIndex('planet', 'planet', { unique: false });
@@ -131,6 +144,7 @@ async function initDB() {
                 console.log('Created discovered locations store');
             }
             
+            // Bookmarks
             if (!db.objectStoreNames.contains(STORES.BOOKMARKS)) {
                 const bookmarksStore = db.createObjectStore(STORES.BOOKMARKS, { keyPath: 'id', autoIncrement: true });
                 bookmarksStore.createIndex('planet', 'planet', { unique: false });
@@ -138,28 +152,33 @@ async function initDB() {
                 console.log('Created bookmarks store');
             }
             
+            // Recent locations
             if (!db.objectStoreNames.contains(STORES.RECENT_LOCATIONS)) {
                 const recentStore = db.createObjectStore(STORES.RECENT_LOCATIONS, { keyPath: 'id', autoIncrement: true });
                 recentStore.createIndex('timestamp', 'timestamp', { unique: false });
                 console.log('Created recent locations store');
             }
             
+            // Ship upgrades
             if (!db.objectStoreNames.contains(STORES.SHIP_UPGRADES)) {
                 db.createObjectStore(STORES.SHIP_UPGRADES, { keyPath: 'id' });
                 console.log('Created ship upgrades store');
             }
             
+            // Player stats
             if (!db.objectStoreNames.contains(STORES.PLAYER_STATS)) {
                 db.createObjectStore(STORES.PLAYER_STATS, { keyPath: 'id' });
                 console.log('Created player stats store');
             }
             
+            // Achievements
             if (!db.objectStoreNames.contains(STORES.ACHIEVEMENTS)) {
                 const achievementsStore = db.createObjectStore(STORES.ACHIEVEMENTS, { keyPath: 'id' });
                 achievementsStore.createIndex('unlocked', 'unlocked', { unique: false });
                 console.log('Created achievements store');
             }
             
+            // Tax transactions
             if (!db.objectStoreNames.contains(STORES.TAX_TRANSACTIONS)) {
                 const taxStore = db.createObjectStore(STORES.TAX_TRANSACTIONS, { keyPath: 'id', autoIncrement: true });
                 taxStore.createIndex('timestamp', 'timestamp', { unique: false });
@@ -167,6 +186,7 @@ async function initDB() {
                 console.log('Created tax transactions store');
             }
             
+            // Active events
             if (!db.objectStoreNames.contains(STORES.ACTIVE_EVENTS)) {
                 const eventsStore = db.createObjectStore(STORES.ACTIVE_EVENTS, { keyPath: 'id' });
                 eventsStore.createIndex('expiresAt', 'expiresAt', { unique: false });
@@ -174,12 +194,14 @@ async function initDB() {
                 console.log('Created active events store');
             }
             
+            // Event history
             if (!db.objectStoreNames.contains(STORES.EVENT_HISTORY)) {
                 const historyStore = db.createObjectStore(STORES.EVENT_HISTORY, { keyPath: 'id', autoIncrement: true });
                 historyStore.createIndex('timestamp', 'timestamp', { unique: false });
                 console.log('Created event history store');
             }
             
+            // Real estate
             if (!db.objectStoreNames.contains(STORES.REAL_ESTATE)) {
                 const realEstateStore = db.createObjectStore(STORES.REAL_ESTATE, { keyPath: 'id', autoIncrement: true });
                 realEstateStore.createIndex('type', 'type', { unique: false });
@@ -188,6 +210,7 @@ async function initDB() {
                 console.log('Created real estate store');
             }
             
+            // Claimed planets
             if (!db.objectStoreNames.contains(STORES.CLAIMED_PLANETS)) {
                 const claimedStore = db.createObjectStore(STORES.CLAIMED_PLANETS, { keyPath: 'planetName' });
                 claimedStore.createIndex('claimedAt', 'claimedAt', { unique: false });
@@ -195,6 +218,7 @@ async function initDB() {
                 console.log('Created claimed planets store');
             }
             
+            // Alchemy stores
             if (!db.objectStoreNames.contains(STORES.ALCHEMY_PROGRESS)) {
                 const alchemyStore = db.createObjectStore(STORES.ALCHEMY_PROGRESS, { keyPath: 'recipeId' });
                 alchemyStore.createIndex('progress', 'progress', { unique: false });
@@ -217,6 +241,7 @@ async function initDB() {
                 console.log('Created alchemy mastery store');
             }
             
+            // Element locations
             if (!db.objectStoreNames.contains(STORES.ELEMENT_LOCATIONS)) {
                 const elementLocationsStore = db.createObjectStore(STORES.ELEMENT_LOCATIONS, { keyPath: 'id', autoIncrement: true });
                 elementLocationsStore.createIndex('elementName', 'elementName', { unique: false });
@@ -226,6 +251,7 @@ async function initDB() {
                 console.log('Created element locations store');
             }
             
+            // Labor pool stores
             if (!db.objectStoreNames.contains(STORES.LABOR_POOL)) {
                 db.createObjectStore(STORES.LABOR_POOL, { keyPath: 'id' });
                 console.log('Created labor pool store');
@@ -244,7 +270,7 @@ async function initDB() {
                 console.log('Created labor history store');
             }
             
-            // Certificate holders store
+            // Certificate holders
             if (!db.objectStoreNames.contains(STORES.CERTIFICATE_HOLDERS)) {
                 const certHoldersStore = db.createObjectStore(STORES.CERTIFICATE_HOLDERS, { keyPath: 'id', autoIncrement: true });
                 certHoldersStore.createIndex('certificateId', 'certificateId', { unique: false });
@@ -254,7 +280,7 @@ async function initDB() {
                 console.log('Created certificate holders store');
             }
             
-            // NPC TRADER STORES
+            // NPC trader stores
             if (!db.objectStoreNames.contains(STORES.NPC_TRADERS)) {
                 const npcTradersStore = db.createObjectStore(STORES.NPC_TRADERS, { keyPath: 'id' });
                 npcTradersStore.createIndex('type', 'type', { unique: false });
@@ -288,16 +314,13 @@ async function initDB() {
                 console.log('Created NPC trader history store');
             }
             
-            // ===== NEW MARKET STORES (Version 6) =====
-            
-            // Market Prices store
+            // Market stores
             if (!db.objectStoreNames.contains(STORES.MARKET_PRICES)) {
                 const marketPricesStore = db.createObjectStore(STORES.MARKET_PRICES, { keyPath: 'id' });
                 marketPricesStore.createIndex('timestamp', 'timestamp', { unique: false });
                 console.log('Created market prices store');
             }
             
-            // Market Orders store (combined buy/sell orders)
             if (!db.objectStoreNames.contains(STORES.MARKET_ORDERS)) {
                 const marketOrdersStore = db.createObjectStore(STORES.MARKET_ORDERS, { keyPath: 'id' });
                 marketOrdersStore.createIndex('element', 'element', { unique: false });
@@ -309,7 +332,6 @@ async function initDB() {
                 console.log('Created market orders store');
             }
             
-            // Trade History store
             if (!db.objectStoreNames.contains(STORES.TRADE_HISTORY)) {
                 const tradeHistoryStore = db.createObjectStore(STORES.TRADE_HISTORY, { keyPath: 'id', autoIncrement: true });
                 tradeHistoryStore.createIndex('element', 'element', { unique: false });
@@ -319,7 +341,6 @@ async function initDB() {
                 console.log('Created trade history store');
             }
             
-            // Order History store
             if (!db.objectStoreNames.contains(STORES.ORDER_HISTORY)) {
                 const orderHistoryStore = db.createObjectStore(STORES.ORDER_HISTORY, { keyPath: 'id', autoIncrement: true });
                 orderHistoryStore.createIndex('userId', 'userId', { unique: false });
@@ -329,27 +350,23 @@ async function initDB() {
                 console.log('Created order history store');
             }
             
-            // Price History store (per element)
             if (!db.objectStoreNames.contains(STORES.PRICE_HISTORY)) {
                 const priceHistoryStore = db.createObjectStore(STORES.PRICE_HISTORY, { keyPath: 'element' });
                 priceHistoryStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
                 console.log('Created price history store');
             }
             
-            // Supply/Demand store
             if (!db.objectStoreNames.contains(STORES.SUPPLY_DEMAND)) {
                 const supplyDemandStore = db.createObjectStore(STORES.SUPPLY_DEMAND, { keyPath: 'id' });
                 console.log('Created supply/demand store');
             }
             
-            // Market Volume store
             if (!db.objectStoreNames.contains(STORES.MARKET_VOLUME)) {
                 const marketVolumeStore = db.createObjectStore(STORES.MARKET_VOLUME, { keyPath: 'element' });
                 marketVolumeStore.createIndex('date', 'date', { unique: false });
                 console.log('Created market volume store');
             }
             
-            // Price Alerts store
             if (!db.objectStoreNames.contains(STORES.PRICE_ALERTS)) {
                 const priceAlertsStore = db.createObjectStore(STORES.PRICE_ALERTS, { keyPath: 'id', autoIncrement: true });
                 priceAlertsStore.createIndex('playerId', 'playerId', { unique: false });
@@ -357,8 +374,59 @@ async function initDB() {
                 priceAlertsStore.createIndex('triggered', 'triggered', { unique: false });
                 console.log('Created price alerts store');
             }
+            
+            // ===== NEW ECONOMIC STORES (Version 7) =====
+            
+            // Daily metrics store
+            if (!db.objectStoreNames.contains(STORES.DAILY_METRICS)) {
+                const dailyMetricsStore = db.createObjectStore(STORES.DAILY_METRICS, { keyPath: 'date' });
+                dailyMetricsStore.createIndex('timestamp', 'timestamp', { unique: false });
+                console.log('Created daily metrics store');
+            }
+            
+            // Hourly snapshots store
+            if (!db.objectStoreNames.contains(STORES.HOURLY_SNAPSHOTS)) {
+                const hourlySnapshotsStore = db.createObjectStore(STORES.HOURLY_SNAPSHOTS, { keyPath: 'timestamp' });
+                hourlySnapshotsStore.createIndex('hour', 'hour', { unique: false });
+                console.log('Created hourly snapshots store');
+            }
+            
+            // Community projects store
+            if (!db.objectStoreNames.contains(STORES.COMMUNITY_PROJECTS)) {
+                const communityProjectsStore = db.createObjectStore(STORES.COMMUNITY_PROJECTS, { keyPath: 'id' });
+                communityProjectsStore.createIndex('status', 'status', { unique: false });
+                communityProjectsStore.createIndex('category', 'category', { unique: false });
+                communityProjectsStore.createIndex('created', 'created', { unique: false });
+                communityProjectsStore.createIndex('funded', 'funded', { unique: false });
+                console.log('Created community projects store');
+            }
+            
+            // Community grants store
+            if (!db.objectStoreNames.contains(STORES.COMMUNITY_GRANTS)) {
+                const communityGrantsStore = db.createObjectStore(STORES.COMMUNITY_GRANTS, { keyPath: 'id' });
+                communityGrantsStore.createIndex('playerId', 'playerId', { unique: false });
+                communityGrantsStore.createIndex('status', 'status', { unique: false });
+                communityGrantsStore.createIndex('issuedDate', 'issuedDate', { unique: false });
+                console.log('Created community grants store');
+            }
+            
+            // Fund history store
+            if (!db.objectStoreNames.contains(STORES.FUND_HISTORY)) {
+                const fundHistoryStore = db.createObjectStore(STORES.FUND_HISTORY, { keyPath: 'id', autoIncrement: true });
+                fundHistoryStore.createIndex('timestamp', 'timestamp', { unique: false });
+                fundHistoryStore.createIndex('type', 'type', { unique: false });
+                console.log('Created fund history store');
+            }
         };
     });
+}
+
+/**
+ * Get the database instance (exposed for other modules)
+ * @returns {Promise<IDBDatabase>} Database instance
+ */
+async function getDb() {
+    return await initDB();
 }
 
 // ===== GENERIC CRUD OPERATIONS =====
@@ -491,6 +559,29 @@ async function clearStore(storeName) {
     });
 }
 
+/**
+ * Add a transaction to a store (for logging)
+ * @param {string} storeName - Name of the store
+ * @param {Object} data - Transaction data
+ * @returns {Promise<boolean>} Success status
+ */
+async function addTransaction(storeName, data) {
+    try {
+        const id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const item = {
+            id,
+            ...data,
+            timestamp: data.timestamp || Date.now(),
+            date: data.date || new Date().toISOString()
+        };
+        await setItem(storeName, item);
+        return true;
+    } catch (error) {
+        console.error(`Error adding transaction to ${storeName}:`, error);
+        return false;
+    }
+}
+
 // ===== COLLECTION-SPECIFIC FUNCTIONS =====
 
 /**
@@ -531,7 +622,6 @@ async function dbAddElementToCollection(elementName, count = 1, locationData = n
         const locationsStore = transaction.objectStore(STORES.ELEMENT_LOCATIONS);
         
         return new Promise((resolve, reject) => {
-            // Get existing entry
             const getRequest = collectionStore.get(elementName);
             
             getRequest.onsuccess = () => {
@@ -540,14 +630,12 @@ async function dbAddElementToCollection(elementName, count = 1, locationData = n
                 const playerId = localStorage.getItem('voidfarer_player_id') || 'unknown';
                 
                 if (existing) {
-                    // Update existing
                     existing.count = (existing.count || 1) + count;
                     existing.lastFound = now;
                     
                     const updateRequest = collectionStore.put(existing);
                     
                     updateRequest.onsuccess = () => {
-                        // Save location if provided
                         if (locationData) {
                             const locationEntry = {
                                 elementName: elementName,
@@ -559,21 +647,13 @@ async function dbAddElementToCollection(elementName, count = 1, locationData = n
                                 playerId: playerId,
                                 location: locationData
                             };
-                            
                             locationsStore.add(locationEntry);
                         }
-                        
-                        resolve({ 
-                            success: true, 
-                            count: existing.count,
-                            newCount: existing.count
-                        });
+                        resolve({ success: true, count: existing.count, newCount: existing.count });
                     };
-                    
                     updateRequest.onerror = () => reject(updateRequest.error);
                     
                 } else {
-                    // Create new
                     const newEntry = {
                         elementName: elementName,
                         count: count,
@@ -590,7 +670,6 @@ async function dbAddElementToCollection(elementName, count = 1, locationData = n
                     const addRequest = collectionStore.add(newEntry);
                     
                     addRequest.onsuccess = () => {
-                        // Save location if provided
                         if (locationData) {
                             const locationEntry = {
                                 elementName: elementName,
@@ -602,24 +681,15 @@ async function dbAddElementToCollection(elementName, count = 1, locationData = n
                                 playerId: playerId,
                                 location: locationData
                             };
-                            
                             locationsStore.add(locationEntry);
                         }
-                        
-                        resolve({ 
-                            success: true, 
-                            count: newEntry.count,
-                            newCount: newEntry.count
-                        });
+                        resolve({ success: true, count: newEntry.count, newCount: newEntry.count });
                     };
-                    
                     addRequest.onerror = () => reject(addRequest.error);
                 }
             };
-            
             getRequest.onerror = () => reject(getRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbAddElementToCollection:', error);
         return { success: false, error: error.message };
@@ -659,33 +729,19 @@ async function dbRemoveElementFromCollection(elementName, count = 1) {
                 const newCount = currentCount - count;
                 
                 if (newCount <= 0) {
-                    // Delete the entry
                     const deleteRequest = store.delete(elementName);
-                    
-                    deleteRequest.onsuccess = () => {
-                        resolve({ success: true, count: 0, removed: true });
-                    };
-                    
+                    deleteRequest.onsuccess = () => resolve({ success: true, count: 0, removed: true });
                     deleteRequest.onerror = () => reject(deleteRequest.error);
-                    
                 } else {
-                    // Update the count
                     existing.count = newCount;
                     existing.lastRemoved = Date.now();
-                    
                     const updateRequest = store.put(existing);
-                    
-                    updateRequest.onsuccess = () => {
-                        resolve({ success: true, count: newCount, removed: false });
-                    };
-                    
+                    updateRequest.onsuccess = () => resolve({ success: true, count: newCount, removed: false });
                     updateRequest.onerror = () => reject(updateRequest.error);
                 }
             };
-            
             getRequest.onerror = () => reject(getRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbRemoveElementFromCollection:', error);
         return { success: false, error: error.message };
@@ -725,13 +781,9 @@ async function dbSaveElementLocation(elementName, planet, locationData) {
             
             const addRequest = store.add(entry);
             
-            addRequest.onsuccess = () => {
-                resolve({ success: true, id: addRequest.result });
-            };
-            
+            addRequest.onsuccess = () => resolve({ success: true, id: addRequest.result });
             addRequest.onerror = () => reject(addRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbSaveElementLocation:', error);
         return { success: false, error: error.message };
@@ -767,18 +819,11 @@ async function dbSaveAlchemyProgress(recipeId, progress) {
         const store = transaction.objectStore(STORES.ALCHEMY_PROGRESS);
         
         return new Promise((resolve, reject) => {
-            const entry = {
-                recipeId: recipeId,
-                progress: progress,
-                lastCrafted: Date.now()
-            };
-            
+            const entry = { recipeId: recipeId, progress: progress, lastCrafted: Date.now() };
             const request = store.put(entry);
-            
             request.onsuccess = () => resolve({ success: true });
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbSaveAlchemyProgress:', error);
         return { success: false, error: error.message };
@@ -798,14 +843,9 @@ async function dbGetAlchemyProgress(recipeId) {
         
         return new Promise((resolve, reject) => {
             const request = store.get(recipeId);
-            
-            request.onsuccess = () => {
-                resolve(request.result?.progress || 0);
-            };
-            
+            request.onsuccess = () => resolve(request.result?.progress || 0);
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbGetAlchemyProgress:', error);
         return 0;
@@ -837,17 +877,11 @@ async function dbUnlockRecipe(recipeId) {
         const store = transaction.objectStore(STORES.ALCHEMY_RECIPES_UNLOCKED);
         
         return new Promise((resolve, reject) => {
-            const entry = {
-                recipeId: recipeId,
-                unlockedAt: Date.now()
-            };
-            
+            const entry = { recipeId: recipeId, unlockedAt: Date.now() };
             const request = store.put(entry);
-            
             request.onsuccess = () => resolve({ success: true });
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbUnlockRecipe:', error);
         return { success: false, error: error.message };
@@ -867,14 +901,9 @@ async function dbIsRecipeUnlocked(recipeId) {
         
         return new Promise((resolve, reject) => {
             const request = store.get(recipeId);
-            
-            request.onsuccess = () => {
-                resolve(!!request.result);
-            };
-            
+            request.onsuccess = () => resolve(!!request.result);
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbIsRecipeUnlocked:', error);
         return false;
@@ -932,34 +961,18 @@ async function dbAddToLaborPool(amount) {
                 const existing = getRequest.result;
                 const newTotal = (existing?.total || 0) + amount;
                 
-                const poolEntry = {
-                    id: 'current',
-                    total: newTotal,
-                    lastUpdated: Date.now()
-                };
-                
+                const poolEntry = { id: 'current', total: newTotal, lastUpdated: Date.now() };
                 const putRequest = poolStore.put(poolEntry);
                 
                 putRequest.onsuccess = () => {
-                    // Add to history
-                    const historyEntry = {
-                        type: 'addition',
-                        amount: amount,
-                        timestamp: Date.now(),
-                        date: new Date().toISOString()
-                    };
-                    
+                    const historyEntry = { type: 'addition', amount: amount, timestamp: Date.now(), date: new Date().toISOString() };
                     historyStore.add(historyEntry);
-                    
                     resolve({ success: true, newTotal });
                 };
-                
                 putRequest.onerror = () => reject(putRequest.error);
             };
-            
             getRequest.onerror = () => reject(getRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbAddToLaborPool:', error);
         return { success: false, error: error.message };
@@ -978,14 +991,9 @@ async function dbGetLaborPoolTotal() {
         
         return new Promise((resolve, reject) => {
             const request = store.get('current');
-            
-            request.onsuccess = () => {
-                resolve(request.result?.total || 0);
-            };
-            
+            request.onsuccess = () => resolve(request.result?.total || 0);
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbGetLaborPoolTotal:', error);
         return 0;
@@ -1010,25 +1018,13 @@ async function dbAddLaborEarnings(playerId, amount) {
             getRequest.onsuccess = () => {
                 const existing = getRequest.result;
                 const newTotal = (existing?.earnings || 0) + amount;
-                
-                const earningsEntry = {
-                    playerId: playerId,
-                    earnings: newTotal,
-                    lastUpdated: Date.now()
-                };
-                
+                const earningsEntry = { playerId: playerId, earnings: newTotal, lastUpdated: Date.now() };
                 const putRequest = store.put(earningsEntry);
-                
-                putRequest.onsuccess = () => {
-                    resolve({ success: true, newTotal });
-                };
-                
+                putRequest.onsuccess = () => resolve({ success: true, newTotal });
                 putRequest.onerror = () => reject(putRequest.error);
             };
-            
             getRequest.onerror = () => reject(getRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbAddLaborEarnings:', error);
         return { success: false, error: error.message };
@@ -1048,14 +1044,9 @@ async function dbGetLaborEarnings(playerId) {
         
         return new Promise((resolve, reject) => {
             const request = store.get(playerId);
-            
-            request.onsuccess = () => {
-                resolve(request.result?.earnings || 0);
-            };
-            
+            request.onsuccess = () => resolve(request.result?.earnings || 0);
             request.onerror = () => reject(request.error);
         });
-        
     } catch (error) {
         console.error('Error in dbGetLaborEarnings:', error);
         return 0;
@@ -1079,43 +1070,21 @@ async function dbUpdateCertificateHolder(certificateId, playerId, playerName, ma
         const store = transaction.objectStore(STORES.CERTIFICATE_HOLDERS);
         
         return new Promise((resolve, reject) => {
-            // First, try to find existing entry for this player and certificate
             const index = store.index('playerId');
             const getRequest = index.getAll(playerId);
             
             getRequest.onsuccess = () => {
                 const existingEntries = getRequest.result || [];
                 const existingEntry = existingEntries.find(e => e.certificateId === certificateId);
-                
                 const now = Date.now();
-                const entry = {
-                    certificateId: certificateId,
-                    playerId: playerId,
-                    playerName: playerName,
-                    masteryLevel: masteryLevel,
-                    lastUpdated: now
-                };
-                
-                // If entry exists, preserve its ID
-                if (existingEntry && existingEntry.id) {
-                    entry.id = existingEntry.id;
-                }
-                
+                const entry = { certificateId, playerId, playerName, masteryLevel, lastUpdated: now };
+                if (existingEntry && existingEntry.id) entry.id = existingEntry.id;
                 const putRequest = store.put(entry);
-                
-                putRequest.onsuccess = () => {
-                    resolve({ 
-                        success: true, 
-                        id: putRequest.result 
-                    });
-                };
-                
+                putRequest.onsuccess = () => resolve({ success: true, id: putRequest.result });
                 putRequest.onerror = () => reject(putRequest.error);
             };
-            
             getRequest.onerror = () => reject(getRequest.error);
         });
-        
     } catch (error) {
         console.error('Error in dbUpdateCertificateHolder:', error);
         return { success: false, error: error.message };
@@ -1510,47 +1479,23 @@ async function dbGetNPCElementVolume(element, startTime, endTime) {
         const trades = await dbGetNPCElementHistory(element);
         const timeRangeTrades = trades.filter(t => t.timestamp >= startTime && t.timestamp <= endTime);
         
-        let buyVolume = 0;
-        let sellVolume = 0;
-        let totalValue = 0;
+        let buyVolume = 0, sellVolume = 0, totalValue = 0;
         
         timeRangeTrades.forEach(t => {
             const value = t.price * t.quantity;
             totalValue += value;
-            
-            if (t.side === 'buy') {
-                buyVolume += t.quantity;
-            } else {
-                sellVolume += t.quantity;
-            }
+            if (t.side === 'buy') buyVolume += t.quantity;
+            else sellVolume += t.quantity;
         });
         
-        return {
-            element,
-            buyVolume,
-            sellVolume,
-            totalVolume: buyVolume + sellVolume,
-            totalValue,
-            tradeCount: timeRangeTrades.length,
-            startTime,
-            endTime
-        };
+        return { element, buyVolume, sellVolume, totalVolume: buyVolume + sellVolume, totalValue, tradeCount: timeRangeTrades.length, startTime, endTime };
     } catch (error) {
         console.error('Error in dbGetNPCElementVolume:', error);
-        return {
-            element,
-            buyVolume: 0,
-            sellVolume: 0,
-            totalVolume: 0,
-            totalValue: 0,
-            tradeCount: 0,
-            startTime,
-            endTime
-        };
+        return { element, buyVolume: 0, sellVolume: 0, totalVolume: 0, totalValue: 0, tradeCount: 0, startTime, endTime };
     }
 }
 
-// ===== MARKET DATA FUNCTIONS (NEW) =====
+// ===== MARKET DATA FUNCTIONS =====
 
 /**
  * Save market prices to IndexedDB
@@ -1559,11 +1504,7 @@ async function dbGetNPCElementVolume(element, startTime, endTime) {
  */
 async function dbSaveMarketPrices(prices) {
     try {
-        await setItem(STORES.MARKET_PRICES, {
-            id: 'current',
-            data: prices,
-            timestamp: Date.now()
-        });
+        await setItem(STORES.MARKET_PRICES, { id: 'current', data: prices, timestamp: Date.now() });
         return { success: true };
     } catch (error) {
         console.error('Error saving market prices:', error);
@@ -1593,11 +1534,7 @@ async function dbLoadMarketPrices() {
  */
 async function dbSaveMarketOrders(orders, type) {
     try {
-        await setItem(STORES.MARKET_ORDERS, {
-            id: type,
-            data: orders,
-            timestamp: Date.now()
-        });
+        await setItem(STORES.MARKET_ORDERS, { id: type, data: orders, timestamp: Date.now() });
         return { success: true };
     } catch (error) {
         console.error('Error saving market orders:', error);
@@ -1627,10 +1564,7 @@ async function dbLoadMarketOrders(type) {
  */
 async function dbAddTrade(trade) {
     try {
-        const id = await setItem(STORES.TRADE_HISTORY, {
-            ...trade,
-            id: trade.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-        });
+        const id = await setItem(STORES.TRADE_HISTORY, { ...trade, id: trade.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9) });
         return { success: true, id };
     } catch (error) {
         console.error('Error adding trade:', error);
@@ -1661,10 +1595,7 @@ async function dbGetRecentTrades(limit = 500) {
  */
 async function dbAddOrderHistory(entry) {
     try {
-        const id = await setItem(STORES.ORDER_HISTORY, {
-            ...entry,
-            id: entry.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-        });
+        const id = await setItem(STORES.ORDER_HISTORY, { ...entry, id: entry.id || Date.now() + '_' + Math.random().toString(36).substr(2, 9) });
         return { success: true, id };
     } catch (error) {
         console.error('Error adding order history:', error);
@@ -1698,11 +1629,7 @@ async function dbGetUserOrderHistory(userId, limit = 50) {
  */
 async function dbSavePriceHistory(element, history) {
     try {
-        await setItem(STORES.PRICE_HISTORY, {
-            element: element,
-            data: history,
-            lastUpdated: Date.now()
-        });
+        await setItem(STORES.PRICE_HISTORY, { element: element, data: history, lastUpdated: Date.now() });
         return { success: true };
     } catch (error) {
         console.error('Error saving price history:', error);
@@ -1750,10 +1677,7 @@ async function dbLoadSupplyDemand() {
     try {
         const supply = await getItem(STORES.SUPPLY_DEMAND, 'supply');
         const demand = await getItem(STORES.SUPPLY_DEMAND, 'demand');
-        return {
-            supply: supply?.data || {},
-            demand: demand?.data || {}
-        };
+        return { supply: supply?.data || {}, demand: demand?.data || {} };
     } catch (error) {
         console.error('Error loading supply/demand:', error);
         return { supply: {}, demand: {} };
@@ -1767,11 +1691,7 @@ async function dbLoadSupplyDemand() {
  */
 async function dbSaveMarketVolume(volume) {
     try {
-        await setItem(STORES.MARKET_VOLUME, {
-            element: 'all',
-            data: volume,
-            lastUpdated: Date.now()
-        });
+        await setItem(STORES.MARKET_VOLUME, { element: 'all', data: volume, lastUpdated: Date.now() });
         return { success: true };
     } catch (error) {
         console.error('Error saving market volume:', error);
@@ -1802,10 +1722,8 @@ async function dbLoadMarketVolume() {
 async function dbCleanupMarketData() {
     const results = { removed: 0 };
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     
     try {
-        // Clean trade history (keep last 30 days)
         const trades = await getAll(STORES.TRADE_HISTORY);
         const oldTrades = trades.filter(t => t.timestamp < sevenDaysAgo);
         for (const trade of oldTrades) {
@@ -1813,7 +1731,6 @@ async function dbCleanupMarketData() {
             results.removed++;
         }
         
-        // Clean order history (keep last 7 days)
         const orderHistory = await getAll(STORES.ORDER_HISTORY);
         const oldOrders = orderHistory.filter(o => o.timestamp < sevenDaysAgo);
         for (const order of oldOrders) {
@@ -1821,7 +1738,6 @@ async function dbCleanupMarketData() {
             results.removed++;
         }
         
-        // Clean NPC trader history (keep last 7 days)
         const npcHistory = await getAll(STORES.NPC_TRADER_HISTORY);
         const oldNPCHistory = npcHistory.filter(h => h.timestamp < sevenDaysAgo);
         for (const entry of oldNPCHistory) {
@@ -1830,11 +1746,9 @@ async function dbCleanupMarketData() {
         }
         
         console.log(`🧹 Market data cleanup: removed ${results.removed} old records`);
-        
     } catch (error) {
         console.error('Error cleaning market data:', error);
     }
-    
     return results;
 }
 
@@ -1848,14 +1762,11 @@ async function resetAllData() {
     try {
         const db = await initDB();
         const storeNames = Object.values(STORES);
-        
         for (const storeName of storeNames) {
             await clearStore(storeName);
         }
-        
         console.log('All data reset successfully');
         return { success: true };
-        
     } catch (error) {
         console.error('Error resetting all data:', error);
         return { success: false, error: error.message };
@@ -1871,20 +1782,170 @@ async function resetNPCData() {
         await clearStore(STORES.NPC_TRADERS);
         await clearStore(STORES.NPC_TRADER_ORDERS);
         await clearStore(STORES.NPC_TRADER_HISTORY);
-        
         console.log('NPC trader data reset successfully');
         return { success: true };
-        
     } catch (error) {
         console.error('Error resetting NPC data:', error);
         return { success: false, error: error.message };
     }
 }
 
+// ===== ECONOMIC STORE FUNCTIONS =====
+
+/**
+ * Save daily metrics
+ * @param {Object} metrics - Daily metrics object
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveDailyMetrics(metrics) {
+    try {
+        await setItem(STORES.DAILY_METRICS, metrics);
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving daily metrics:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get daily metrics by date range
+ * @param {string} startDate - Start date (YYYY-MM-DD)
+ * @param {string} endDate - End date (YYYY-MM-DD)
+ * @returns {Promise<Array>} Array of metrics
+ */
+async function dbGetDailyMetricsRange(startDate, endDate) {
+    try {
+        const allMetrics = await getAll(STORES.DAILY_METRICS);
+        return allMetrics.filter(m => m.date >= startDate && m.date <= endDate);
+    } catch (error) {
+        console.error('Error getting daily metrics range:', error);
+        return [];
+    }
+}
+
+/**
+ * Save hourly snapshot
+ * @param {Object} snapshot - Hourly snapshot object
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveHourlySnapshot(snapshot) {
+    try {
+        await setItem(STORES.HOURLY_SNAPSHOTS, snapshot);
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving hourly snapshot:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get hourly snapshots by hour
+ * @param {string} hour - Hour (HH)
+ * @returns {Promise<Array>} Array of snapshots
+ */
+async function dbGetHourlySnapshotsByHour(hour) {
+    try {
+        return await getByIndex(STORES.HOURLY_SNAPSHOTS, 'hour', hour);
+    } catch (error) {
+        console.error('Error getting hourly snapshots:', error);
+        return [];
+    }
+}
+
+/**
+ * Save community project
+ * @param {Object} project - Community project object
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveCommunityProject(project) {
+    try {
+        await setItem(STORES.COMMUNITY_PROJECTS, project);
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving community project:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get community projects by status
+ * @param {string} status - Project status
+ * @returns {Promise<Array>} Array of projects
+ */
+async function dbGetCommunityProjectsByStatus(status) {
+    try {
+        return await getByIndex(STORES.COMMUNITY_PROJECTS, 'status', status);
+    } catch (error) {
+        console.error('Error getting community projects:', error);
+        return [];
+    }
+}
+
+/**
+ * Save community grant
+ * @param {Object} grant - Community grant object
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveCommunityGrant(grant) {
+    try {
+        await setItem(STORES.COMMUNITY_GRANTS, grant);
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving community grant:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get community grants by player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Array of grants
+ */
+async function dbGetCommunityGrantsByPlayer(playerId) {
+    try {
+        return await getByIndex(STORES.COMMUNITY_GRANTS, 'playerId', playerId);
+    } catch (error) {
+        console.error('Error getting community grants:', error);
+        return [];
+    }
+}
+
+/**
+ * Save fund history entry
+ * @param {Object} entry - Fund history entry
+ * @returns {Promise<Object>} Result
+ */
+async function dbSaveFundHistory(entry) {
+    try {
+        const id = await setItem(STORES.FUND_HISTORY, entry);
+        return { success: true, id };
+    } catch (error) {
+        console.error('Error saving fund history:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get fund history
+ * @param {number} limit - Max number of records
+ * @returns {Promise<Array>} Array of history entries
+ */
+async function dbGetFundHistory(limit = 100) {
+    try {
+        const allHistory = await getAll(STORES.FUND_HISTORY);
+        allHistory.sort((a, b) => b.timestamp - a.timestamp);
+        return allHistory.slice(0, limit);
+    } catch (error) {
+        console.error('Error getting fund history:', error);
+        return [];
+    }
+}
+
 // ===== EXPORTS =====
 export {
     initDB,
-    getItem, setItem, deleteItem, getAll, getByIndex, getByIndexRange, clearStore,
+    getDb,
+    getItem, setItem, deleteItem, getAll, getByIndex, getByIndexRange, clearStore, addTransaction,
     getCollectionAsObject, dbAddElementToCollection, dbRemoveElementFromCollection,
     dbSaveElementLocation, dbGetElementLocations,
     dbSaveAlchemyProgress, dbGetAlchemyProgress, dbGetAllAlchemyProgress,
@@ -1904,7 +1965,7 @@ export {
     // NPC History Functions
     dbRecordNPCTrade, dbGetNPCTraderHistory, dbGetNPCElementHistory,
     dbGetNPCTradesByTimeRange, dbGetNPCElementVolume,
-    // Market Data Functions (NEW)
+    // Market Data Functions
     dbSaveMarketPrices, dbLoadMarketPrices,
     dbSaveMarketOrders, dbLoadMarketOrders,
     dbAddTrade, dbGetRecentTrades,
@@ -1913,6 +1974,12 @@ export {
     dbSaveSupplyDemand, dbLoadSupplyDemand,
     dbSaveMarketVolume, dbLoadMarketVolume,
     dbCleanupMarketData,
+    // Economic Store Functions
+    dbSaveDailyMetrics, dbGetDailyMetricsRange,
+    dbSaveHourlySnapshot, dbGetHourlySnapshotsByHour,
+    dbSaveCommunityProject, dbGetCommunityProjectsByStatus,
+    dbSaveCommunityGrant, dbGetCommunityGrantsByPlayer,
+    dbSaveFundHistory, dbGetFundHistory,
     resetNPCData, resetAllData
 };
 
@@ -1920,6 +1987,7 @@ export {
 
 // Core functions
 window.initDB = initDB;
+window.getDb = getDb;
 window.getItem = getItem;
 window.setItem = setItem;
 window.deleteItem = deleteItem;
@@ -1927,6 +1995,7 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.getByIndexRange = getByIndexRange;
 window.clearStore = clearStore;
+window.addTransaction = addTransaction;
 window.resetAllData = resetAllData;
 
 // Collection functions
@@ -1991,7 +2060,7 @@ window.dbGetNPCTradesByTimeRange = dbGetNPCTradesByTimeRange;
 window.dbGetNPCElementVolume = dbGetNPCElementVolume;
 window.resetNPCData = resetNPCData;
 
-// Market Data functions (NEW)
+// Market Data functions
 window.dbSaveMarketPrices = dbSaveMarketPrices;
 window.dbLoadMarketPrices = dbLoadMarketPrices;
 window.dbSaveMarketOrders = dbSaveMarketOrders;
@@ -2008,7 +2077,19 @@ window.dbSaveMarketVolume = dbSaveMarketVolume;
 window.dbLoadMarketVolume = dbLoadMarketVolume;
 window.dbCleanupMarketData = dbCleanupMarketData;
 
+// Economic Store Functions
+window.dbSaveDailyMetrics = dbSaveDailyMetrics;
+window.dbGetDailyMetricsRange = dbGetDailyMetricsRange;
+window.dbSaveHourlySnapshot = dbSaveHourlySnapshot;
+window.dbGetHourlySnapshotsByHour = dbGetHourlySnapshotsByHour;
+window.dbSaveCommunityProject = dbSaveCommunityProject;
+window.dbGetCommunityProjectsByStatus = dbGetCommunityProjectsByStatus;
+window.dbSaveCommunityGrant = dbSaveCommunityGrant;
+window.dbGetCommunityGrantsByPlayer = dbGetCommunityGrantsByPlayer;
+window.dbSaveFundHistory = dbSaveFundHistory;
+window.dbGetFundHistory = dbGetFundHistory;
+
 // Export STORES for use in other modules
 window.DB_STORES = STORES;
 
-console.log('✅ db.js initialized - Version 6 with market stores and NPC trader stores');
+console.log('✅ db.js initialized - Version 7 with economic stores (dailyMetrics, hourlySnapshots, communityProjects, communityGrants, fundHistory)');
