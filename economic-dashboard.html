@@ -702,13 +702,23 @@
         </div>
     </div>
 
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/elements-data.js"></script>
+    <script type="module" src="js/economic-metrics.js"></script>
+    <script type="module" src="js/tax-system.js"></script>
+    <script type="module" src="js/community-fund.js"></script>
+    <script type="module" src="js/economic-events.js"></script>
+
     <script type="module">
         import { initializeMetrics, getTotalMoneySupply, getPlayerCount, calculateGiniCoefficient, getWealthPercentiles, calculateInflationRate, calculateMoneyVelocity, assessEconomicHealth, getDailyMetrics, formatMoney, formatPercent } from './js/economic-metrics.js';
-        import { initializeTaxSystem, getCurrentRates, getTaxHistory } from './js/tax-system.js';
-        import { initializeCommunityFund, getCommunityFundSummary, getProjects, getGrants } from './js/community-fund.js';
-        import { initializeEventSystem, getActiveEvents, getEventSettings, runDailyEventMaintenance } from './js/economic-events.js';
-        import { getPlayer, getCredits } from './js/storage.js';
+        import { initializeTaxSystem, getCurrentRates } from './js/tax-system.js';
+        import { initializeCommunityFund, getCommunityFundSummary } from './js/community-fund.js';
+        import { getPlayer } from './js/storage.js';
         import { initDB } from './js/db.js';
+
+        // economic-events.js attaches functions to window, not exports
+        // So we use window.getActiveEvents, window.initializeEventSystem, window.runDailyEventMaintenance
 
         // Chart.js is loaded globally as window.Chart
         const Chart = window.Chart;
@@ -745,10 +755,16 @@
                 await initializeMetrics();
                 await initializeTaxSystem();
                 await initializeCommunityFund();
-                await initializeEventSystem();
+                
+                // Initialize event system (attached to window)
+                if (window.initializeEventSystem) {
+                    await window.initializeEventSystem();
+                }
                 
                 // Run event maintenance
-                await runDailyEventMaintenance();
+                if (window.runDailyEventMaintenance) {
+                    await window.runDailyEventMaintenance();
+                }
                 
                 // Get metrics
                 const moneySupply = getTotalMoneySupply();
@@ -766,12 +782,11 @@
                 // Get community fund summary
                 const fundSummary = await getCommunityFundSummary();
                 
-                // Get active events
-                const activeEvents = await getActiveEvents();
-                
-                // Get player's credits for balance
-                const player = await getPlayer();
-                const playerCredits = player?.credits || 0;
+                // Get active events (from window)
+                let activeEvents = [];
+                if (window.getActiveEvents) {
+                    activeEvents = await window.getActiveEvents();
+                }
                 
                 // Get transaction volume (estimate from recent trades)
                 const recentMetrics = metrics.slice(-30);
