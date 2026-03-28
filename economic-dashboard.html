@@ -710,6 +710,9 @@
         import { getPlayer, getCredits } from './js/storage.js';
         import { initDB } from './js/db.js';
 
+        // Chart.js is loaded globally as window.Chart
+        const Chart = window.Chart;
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -928,7 +931,10 @@
 
         // ===== UPDATE INFLATION CHART =====
         function updateInflationChart(metrics, days) {
-            const ctx = document.getElementById('inflationChart').getContext('2d');
+            const canvas = document.getElementById('inflationChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
             
             const recentMetrics = metrics.slice(-days);
             
@@ -955,7 +961,9 @@
                         tension: 0.4,
                         fill: true,
                         pointRadius: 3,
-                        pointHoverRadius: 5
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: '#4affaa',
+                        pointBorderColor: '#ffffff'
                     }]
                 },
                 options: {
@@ -968,7 +976,12 @@
                             titleColor: '#ffffff',
                             bodyColor: '#a0c0ff',
                             borderColor: '#4a8ac0',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Inflation: ${context.raw.toFixed(2)}%`;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -979,11 +992,23 @@
                                 callback: function(value) {
                                     return value + '%';
                                 }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Inflation Rate (%)',
+                                color: '#a0c0ff',
+                                font: { size: 10 }
                             }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#a0c0ff', maxRotation: 45 }
+                            ticks: { color: '#a0c0ff', maxRotation: 45 },
+                            title: {
+                                display: true,
+                                text: 'Date',
+                                color: '#a0c0ff',
+                                font: { size: 10 }
+                            }
                         }
                     }
                 }
