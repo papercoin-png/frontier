@@ -625,6 +625,11 @@
         let currentWarpTarget = null;
         let locationsCache = {};
 
+        // ===== GET PLAYER ID (consistent with Ship Bridge) =====
+        function getPlayerId() {
+            return localStorage.getItem('voidfarer_player_id') || 'main';
+        }
+
         function getPlanetTypeIcon(planetType) {
             const icons = {
                 'scorched': '🔥', 'barren': '🪨', 'lush': '🌱', 'frozen': '❄️',
@@ -637,10 +642,16 @@
             try {
                 loadingText.textContent = 'loading collection...';
                 
+                // Get player ID consistently with Ship Bridge
+                const playerId = getPlayerId();
+                console.log('📖 Loading journal for player:', playerId);
+                
                 let collection = {};
                 if (window.getCollection) {
-                    collection = await window.getCollection();
+                    collection = await window.getCollection(playerId);
                 }
+                
+                console.log('📦 Collection loaded:', Object.keys(collection).length, 'unique elements');
                 
                 allElements = [];
                 let totalMass = 0;
@@ -678,6 +689,8 @@
                 document.getElementById('uniqueElements').textContent = allElements.length;
                 document.getElementById('totalMass').textContent = Math.round(totalMass);
                 
+                console.log(`📊 Journal stats: ${totalCount} total units, ${allElements.length} unique elements`);
+                
                 // Preload all locations after collection is loaded
                 await preloadAllLocations();
                 
@@ -689,17 +702,24 @@
             }
         }
 
-        // NEW: Preload all locations for all elements
+        // Preload all locations for all elements
         async function preloadAllLocations() {
+            if (allElements.length === 0) {
+                console.log('No elements to preload locations for');
+                return;
+            }
+            
             loadingText.textContent = 'loading location data...';
             
+            let loadedCount = 0;
             for (const element of allElements) {
                 if (!locationsCache[element.name]) {
                     locationsCache[element.name] = await loadLocationsForElement(element.name);
+                    loadedCount++;
                 }
             }
             
-            console.log(`✅ Preloaded locations for ${allElements.length} elements`);
+            console.log(`✅ Preloaded locations for ${loadedCount} elements (total: ${allElements.length})`);
         }
 
         function applyFilters() {
@@ -729,7 +749,9 @@
         async function loadLocationsForElement(elementName) {
             try {
                 if (window.getElementLocations) {
-                    return await window.getElementLocations(elementName);
+                    const locations = await window.getElementLocations(elementName);
+                    console.log(`📍 Loaded ${locations.length} locations for ${elementName}`);
+                    return locations;
                 }
                 return [];
             } catch (error) {
@@ -961,6 +983,10 @@
             try {
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'opening journal...';
+                
+                // Log player ID for debugging
+                const playerId = getPlayerId();
+                console.log('🚀 Journal initializing for player:', playerId);
                 
                 await loadJournalData();
                 
