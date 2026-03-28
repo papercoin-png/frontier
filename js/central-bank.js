@@ -1,6 +1,7 @@
 // js/central-bank.js - Automatic monetary policy for Voidfarer
 // Manages money supply to target inflation and velocity ranges
 // Provides stimulus during stagnation and contraction during overheating
+// UPDATED: Integrated with coordinated tax policy
 
 import { 
     getTotalMoneySupply,
@@ -17,6 +18,7 @@ import {
 import { getCommunityFund, allocateFromFund, addToFund } from './community-fund.js';
 import { getPlayer, addCredits } from './storage.js';
 import { getDb, getAll } from './db.js';
+import { runCoordinatedTaxPolicy, getTaxPolicyStatus } from './tax-system.js';
 
 // ===== CENTRAL BANK CONFIGURATION =====
 export const CENTRAL_BANK_CONFIG = {
@@ -410,6 +412,7 @@ export async function getCentralBankStatus() {
     const velocity = await calculateMoneyVelocity();
     const history = getPolicyHistory(5);
     const players = await getActivePlayers();
+    const taxStatus = getTaxPolicyStatus();
     
     return {
         condition: condition.condition,
@@ -428,6 +431,11 @@ export async function getCentralBankStatus() {
             velocity: velocity.toFixed(2),
             targetInflation: `${formatPercent(CENTRAL_BANK_CONFIG.targetInflation.min)} - ${formatPercent(CENTRAL_BANK_CONFIG.targetInflation.max)}`,
             targetVelocity: `${CENTRAL_BANK_CONFIG.targetVelocity.min} - ${CENTRAL_BANK_CONFIG.targetVelocity.max}`
+        },
+        taxPolicy: {
+            mode: taxStatus.currentPolicyMode,
+            transactionTaxRate: taxStatus.transactionTaxRate,
+            canAdjust: taxStatus.canAdjust
         },
         recentActions: history
     };
@@ -484,9 +492,23 @@ export async function runMonetaryPolicy() {
         action = 'SPECULATION_CONTRACTION';
     }
     
+    // If we took action, coordinate with tax policy
     if (result) {
         console.log(`🏦 Central Bank: ${action} - ${formatMoney(result.amount)}`);
-        return { action, result, condition };
+        
+        // Run coordinated tax policy
+        const taxResult = await runCoordinatedTaxPolicy(condition);
+        
+        if (taxResult.success && taxResult.action === 'ADJUSTED') {
+            console.log(`📊 Tax Policy: Coordinated adjustment - ${taxResult.reason}`);
+        }
+        
+        return { 
+            action, 
+            result, 
+            condition,
+            taxPolicy: taxResult
+        };
     }
     
     console.log('🏦 Central Bank: No action needed - economy stable');
@@ -539,4 +561,4 @@ window.getPolicyHistory = getPolicyHistory;
 window.manualStimulus = manualStimulus;
 window.manualContraction = manualContraction;
 
-console.log('🏦 central-bank.js loaded - Automatic monetary policy active');
+console.log('🏦 central-bank.js loaded - Automatic monetary policy active with tax coordination');
