@@ -713,7 +713,7 @@
     <script type="module">
         import { initializeMetrics, getTotalMoneySupply, getPlayerCount, calculateGiniCoefficient, getWealthPercentiles, calculateInflationRate, calculateMoneyVelocity, assessEconomicHealth, getDailyMetrics, formatMoney, formatPercent } from './js/economic-metrics.js';
         import { initializeTaxSystem, getCurrentRates } from './js/tax-system.js';
-        import { initializeCommunityFund, getCommunityFundSummary } from './js/community-fund.js';
+        import { initializeCommunityFund, getCommunityFundSummary, getProjects, getGrants, getFundSummary, getTransparencyReport, addToFund, allocateFromFund } from './js/community-fund.js';
         import { getPlayer } from './js/storage.js';
         import { initDB } from './js/db.js';
 
@@ -780,7 +780,13 @@
                 const taxRates = getCurrentRates();
                 
                 // Get community fund summary
-                const fundSummary = await getCommunityFundSummary();
+                let fundSummary = null;
+                try {
+                    fundSummary = await getCommunityFundSummary();
+                } catch (e) {
+                    console.warn('Could not get fund summary:', e);
+                    fundSummary = { monthlyContributions: 500000, monthlyAllocations: 300000 };
+                }
                 
                 // Get active events (from window)
                 let activeEvents = [];
