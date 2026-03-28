@@ -16,6 +16,7 @@
 // FIXED: IndexedDB store creation with proper keyPaths to prevent "out-of-line keys" error
 // FIXED: Standardized player ID fallback to 'main' across all functions
 // ADDED: Sector scanning functions (markSectorScanned, markStarSectorScanned, markStarScanned)
+// FIXED: setItem function to properly handle stores with keyPath (in-line keys)
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -338,6 +339,7 @@ export async function getItem(storeName, id = 'main') {
 
 /**
  * Set an item in IndexedDB
+ * FIXED: Properly handles stores with keyPath (in-line keys) vs out-of-line keys
  */
 export async function setItem(storeName, value, id = 'main') {
     try {
@@ -351,12 +353,23 @@ export async function setItem(storeName, value, id = 'main') {
         if (!db) throw new Error('Failed to open IndexedDB');
         
         const config = STORE_CONFIGS[storeName];
+        
+        // Case 1: Store uses autoIncrement and value has no id - let it auto-generate
         if (config && config.autoIncrement && !value.id) {
             await db.add(storeName, value);
-        } else {
+        }
+        // Case 2: Store has a keyPath (in-line keys) - the key is part of the value object
+        else if (config && config.keyPath) {
+            // For stores with keyPath, don't pass a separate key parameter
+            // The key is already in the value object (e.g., { id: 'main', ... })
+            await db.put(storeName, value);
+        }
+        // Case 3: No keyPath or fallback - use provided id or value.id
+        else {
             const key = value.id || id;
             await db.put(storeName, value, key);
         }
+        
         return true;
     } catch (error) {
         console.error(`Error setting item in ${storeName}:`, error);
@@ -1936,4 +1949,4 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with consistent player ID fallback (main) and sector scanning functions');
+console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, and sector scanning functions');
