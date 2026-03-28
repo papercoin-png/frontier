@@ -833,6 +833,66 @@
             transform: scale(0.96);
         }
         
+        /* Warp Modal */
+        .warp-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.96);
+            backdrop-filter: blur(15px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+        
+        .warp-modal.active {
+            display: flex;
+        }
+        
+        .warp-content {
+            background: rgba(10, 20, 40, 0.98);
+            border: 3px solid #4affaa;
+            border-radius: 60px 20px 60px 20px;
+            padding: 20px;
+            text-align: center;
+            width: 280px;
+        }
+        
+        .warp-distance {
+            font-size: 24px;
+            color: #ffaa4a;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
+        .warp-progress {
+            background: #2a2a3a;
+            border-radius: 30px;
+            height: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        
+        .warp-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4affaa, #ffaa4a);
+            width: 0%;
+        }
+        
+        .abort-btn {
+            background: #ff4444;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        
         .warning-text {
             color: #ffaa4a;
             font-size: 11px;
@@ -891,10 +951,7 @@
             <div class="bridge-header">
                 <div class="bridge-title">Ship Bridge</div>
                 <div class="bridge-subtitle">✦ command center ✦</div>
-                <button class="earth-btn" onclick="goToEarthHub()">
-                    <span class="earth-icon">🌍</span>
-                    <span>EARTH HUB</span>
-                </button>
+                <button class="earth-btn" id="earthHubBtn">🌍 EARTH HUB</button>
             </div>
             
             <!-- Expiration Warning Banner -->
@@ -1052,11 +1109,7 @@
                 </div>
             </div>
             
-            <button class="earth-hub-button" onclick="goToEarthHub()">
-                <span class="back-arrow">←</span>
-                <span class="back-text">EARTH HUB</span>
-                <span class="back-icon">🌍</span>
-            </button>
+            <button class="earth-hub-button" id="earthHubBtnBottom">🌍 EARTH HUB</button>
             
             <div class="loading-overlay" id="loadingOverlay">
                 <div class="loading-spinner"></div>
@@ -1075,6 +1128,18 @@
                 </div>
             </div>
             
+            <!-- Warp Modal -->
+            <div class="warp-modal" id="warpModal">
+                <div class="warp-content">
+                    <div style="font-size: 14px;">🚀 RETURNING TO EARTH</div>
+                    <div id="warpDest">Earth Orbital</div>
+                    <div class="warp-distance" id="warpDist">0 LY</div>
+                    <div class="warp-progress"><div class="warp-progress-fill" id="warpFill"></div></div>
+                    <div id="warpRemaining" style="font-size: 10px;">Time remaining: --</div>
+                    <button class="abort-btn" onclick="abortEarthReturn()">⚠️ ABORT</button>
+                </div>
+            </div>
+            
             <div class="migration-status" id="migrationStatus"></div>
         </div>
     </div>
@@ -1084,9 +1149,9 @@
     <script type="module" src="js/ship-data.js"></script>
 
     <script type="module">
-        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName } from './js/storage.js';
+        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
         import { getPlanetClaim, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
-        import { getShipStats, getVariantStats, getFullShipStats, parseShipString, formatShipString, getWarpSpeed, getFuelCostPer100LY } from './js/ship-data.js';
+        import { getShipStats, getFullShipStats, parseShipString, getWarpSpeed, getFuelCostPer100LY } from './js/ship-data.js';
 
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
@@ -1108,6 +1173,7 @@
         const planetLabel = document.getElementById('planetLabel');
         const switchModal = document.getElementById('switchModal');
         const switchShipList = document.getElementById('switchShipList');
+        const warpModal = document.getElementById('warpModal');
         
         // Rights and Scan Elements
         const rightsCard = document.getElementById('rightsCard');
@@ -1116,6 +1182,11 @@
         const scanList = document.getElementById('scanList');
         const expiryWarning = document.getElementById('expiryWarning');
         const expiryWarningText = document.getElementById('expiryWarningText');
+
+        // ===== WARP STATE =====
+        let warpInterval = null;
+        let warpStartTime = 0;
+        let warpDuration = 0;
 
         // ===== GET PLAYER ID =====
         function getPlayerId() {
@@ -1143,7 +1214,6 @@
         function setActiveShip(shipString) {
             localStorage.setItem('voidfarer_active_ship', shipString);
             
-            // Parse ship string to get stats
             const { name, variantId } = parseShipString(shipString);
             const stats = getFullShipStats(name, variantId);
             
@@ -1217,9 +1287,8 @@
                 
                 if (!stats) continue;
                 
-                const variantName = variantId ? ` (${VARIANT_STATS[variantId]?.name || 'Variant'})` : '';
+                const variantName = variantId ? ` (${stats.variant?.name || 'Variant'})` : '';
                 const warpSpeed = getWarpSpeed(25, stats.fuelMult);
-                const fuelCost = getFuelCostPer100LY(stats.fuelMult);
                 
                 html += `
                     <div class="switch-ship-item ${isActive ? 'active' : ''}" onclick="switchToShip('${ship.replace(/'/g, "\\'")}')">
@@ -1300,6 +1369,89 @@
                     alert('Failed to switch ships: ' + error.message);
                 }
             }, 300);
+        };
+
+        // ===== EARTH HUB WARP FUNCTION =====
+        async function warpToEarth() {
+            const currentPlanet = getCurrentPlanetName();
+            
+            // Already at Earth
+            if (currentPlanet === 'Earth') {
+                window.location.href = 'earth-hub.html';
+                return;
+            }
+            
+            // Calculate distance (placeholder - actual distance would come from navigation)
+            const distance = 2.3; // Example distance from current location
+            const shipStats = JSON.parse(localStorage.getItem('voidfarer_active_ship_stats') || '{}');
+            const shipSpeed = 25 / (shipStats.fuelMult || 1.0);
+            const warpTime = Math.max(1, Math.ceil(distance / shipSpeed));
+            const fuelCost = Math.floor(distance * 4 * (shipStats.fuelMult || 1.0));
+            
+            // Check fuel
+            const currentFuel = parseInt(localStorage.getItem('voidfarer_ship_fuel')) || 100;
+            if (currentFuel < fuelCost) {
+                alert(`⚠️ Insufficient fuel for warp!\n\nNeed ${fuelCost} fuel units. Current: ${currentFuel}\n\nRefuel at Earth Hub to continue.`);
+                return;
+            }
+            
+            // Deduct fuel
+            localStorage.setItem('voidfarer_ship_fuel', (currentFuel - fuelCost).toString());
+            
+            // Show warp modal
+            document.getElementById('warpDest').innerHTML = `Destination: Earth Orbital`;
+            document.getElementById('warpDist').innerHTML = `${distance.toFixed(1)} LY`;
+            document.getElementById('warpFill').style.width = '0%';
+            document.getElementById('warpRemaining').innerHTML = `Time remaining: ${warpTime} min`;
+            warpModal.classList.add('active');
+            
+            // Start warp countdown
+            warpStartTime = Date.now();
+            warpDuration = warpTime * 60 * 1000;
+            
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = setInterval(updateWarp, 100);
+        }
+        
+        function updateWarp() {
+            const elapsed = Date.now() - warpStartTime;
+            const progress = Math.min(100, (elapsed / warpDuration) * 100);
+            document.getElementById('warpFill').style.width = `${progress}%`;
+            
+            const remaining = Math.max(0, warpDuration - elapsed);
+            const remainingMin = Math.ceil(remaining / 60000);
+            document.getElementById('warpRemaining').innerHTML = `Time remaining: ${remainingMin} min`;
+            
+            if (progress >= 100) {
+                completeWarpToEarth();
+            }
+        }
+        
+        function completeWarpToEarth() {
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = null;
+            
+            warpModal.classList.remove('active');
+            
+            // Update location to Earth
+            localStorage.setItem('voidfarer_current_planet', 'Earth');
+            localStorage.setItem('voidfarer_current_planet_type', 'lush');
+            localStorage.setItem('voidfarer_current_planet_image', 'earth-view.jpg');
+            
+            // Navigate to Earth Hub
+            window.location.href = 'earth-hub.html';
+        }
+        
+        window.abortEarthReturn = function() {
+            if (warpInterval) clearInterval(warpInterval);
+            warpInterval = null;
+            warpModal.classList.remove('active');
+            alert('Warp aborted. Returning to current location.');
+        };
+        
+        window.goToEarthHub = function() {
+            safeHaptic();
+            warpToEarth();
         };
 
         // ===== UPDATE CREDITS USING STORAGE.JS =====
@@ -1579,11 +1731,6 @@
             window.location.href = 'journal.html';
         };
 
-        window.goToEarthHub = function() {
-            safeHaptic();
-            window.location.href = 'earth-hub.html';
-        };
-
         window.goToLaborExchange = function() {
             safeHaptic();
             window.location.href = 'labor-exchange.html';
@@ -1701,6 +1848,7 @@
         window.openShipSwitchModal = openShipSwitchModal;
         window.closeShipSwitchModal = closeShipSwitchModal;
         window.switchToShip = switchToShip;
+        window.abortEarthReturn = abortEarthReturn;
 
         init();
     </script>
