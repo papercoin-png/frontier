@@ -13,6 +13,7 @@
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
 // FIXED: Added getPlayerLocations function for planet-status.js integration
+// FIXED: IndexedDB store creation with proper keyPaths to prevent "out-of-line keys" error
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -240,20 +241,63 @@ export function getElementRarity(elementName) {
 // INDEXEDDB HELPER FUNCTIONS (Version 4 with all stores created)
 // ============================================================================
 
-// List of all stores used by the game
-const ALL_STORES = [
-    'certificates',
-    'laborPool',
-    'laborEarnings',
-    'distributionHistory',
-    'poolContributions',
-    'journal',
-    'element_locations',
-    'communityFund',
-    'communityProjects',
-    'communityGrants',
-    'fundHistory'
-];
+// List of all stores used by the game with proper keyPath configurations
+const STORE_CONFIGS = {
+    certificates: { keyPath: 'id', autoIncrement: true },
+    laborPool: { keyPath: 'id' },
+    laborEarnings: { keyPath: 'playerId' },
+    distributionHistory: { keyPath: 'id', autoIncrement: true },
+    poolContributions: { keyPath: 'id', autoIncrement: true },
+    journal: { keyPath: 'id' },
+    element_locations: { keyPath: 'id' },
+    communityFund: { keyPath: 'id' },
+    communityProjects: { keyPath: 'id', autoIncrement: true },
+    communityGrants: { keyPath: 'id', autoIncrement: true },
+    fundHistory: { keyPath: 'id', autoIncrement: true }
+};
+
+const ALL_STORES = Object.keys(STORE_CONFIGS);
+
+/**
+ * Ensure IndexedDB stores exist with correct configuration
+ */
+async function ensureDBStores() {
+    if (!window.idb) return null;
+    
+    try {
+        const db = await window.idb.openDB('VoidfarerDB', 4, {
+            upgrade(db, oldVersion, newVersion, transaction) {
+                console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
+                
+                // Create all stores with proper keyPaths
+                for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        const store = db.createObjectStore(storeName, config);
+                        
+                        // Create indexes for element_locations for efficient queries
+                        if (storeName === 'element_locations') {
+                            store.createIndex('by_element', 'elementName');
+                            store.createIndex('by_planet', 'planet');
+                            store.createIndex('by_timestamp', 'timestamp');
+                        }
+                        
+                        // Create index for journal by timestamp
+                        if (storeName === 'journal') {
+                            store.createIndex('by_timestamp', 'timestamp');
+                        }
+                        
+                        console.log(`Created store: ${storeName}`);
+                    }
+                }
+            }
+        });
+        
+        return db;
+    } catch (error) {
+        console.error('Error ensuring IndexedDB stores:', error);
+        return null;
+    }
+}
 
 /**
  * Get a single item from IndexedDB
@@ -266,16 +310,8 @@ export async function getItem(storeName, id = 'main') {
             return saved ? JSON.parse(saved) : null;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
-            upgrade(db) {
-                // Create all required stores when upgrading to version 4
-                for (const store of ALL_STORES) {
-                    if (!db.objectStoreNames.contains(store)) {
-                        db.createObjectStore(store);
-                    }
-                }
-            }
-        });
+        const db = await ensureDBStores();
+        if (!db) throw new Error('Failed to open IndexedDB');
         
         return await db.get(storeName, id);
     } catch (error) {
@@ -295,17 +331,19 @@ export async function setItem(storeName, value, id = 'main') {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
-            upgrade(db) {
-                for (const store of ALL_STORES) {
-                    if (!db.objectStoreNames.contains(store)) {
-                        db.createObjectStore(store);
-                    }
-                }
-            }
-        });
+        const db = await ensureDBStores();
+        if (!db) throw new Error('Failed to open IndexedDB');
         
-        await db.put(storeName, value, id);
+        // If the store uses autoIncrement and no id provided, let it generate
+        const config = STORE_CONFIGS[storeName];
+        if (config && config.autoIncrement && !value.id) {
+            // Don't specify key, let it auto-generate
+            await db.add(storeName, value);
+        } else {
+            // Use put with the id from value or provided id
+            const key = value.id || id;
+            await db.put(storeName, value, key);
+        }
         return true;
     } catch (error) {
         console.error(`Error setting item in ${storeName}:`, error);
@@ -332,19 +370,30 @@ export async function getAll(storeName) {
             return items;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
-            upgrade(db) {
-                for (const store of ALL_STORES) {
-                    if (!db.objectStoreNames.contains(store)) {
-                        db.createObjectStore(store);
-                    }
-                }
-            }
-        });
+        const db = await ensureDBStores();
+        if (!db) throw new Error('Failed to open IndexedDB');
         
         return await db.getAll(storeName);
     } catch (error) {
         console.error(`Error getting all items from ${storeName}:`, error);
+        return [];
+    }
+}
+
+/**
+ * Get items by index
+ */
+export async function getByIndex(storeName, indexName, value) {
+    try {
+        const db = await ensureDBStores();
+        if (!db) return [];
+        
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const index = store.index(indexName);
+        return await index.getAll(value);
+    } catch (error) {
+        console.error(`Error getting by index from ${storeName}:`, error);
         return [];
     }
 }
@@ -359,15 +408,8 @@ export async function deleteItem(storeName, id) {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
-            upgrade(db) {
-                for (const store of ALL_STORES) {
-                    if (!db.objectStoreNames.contains(store)) {
-                        db.createObjectStore(store);
-                    }
-                }
-            }
-        });
+        const db = await ensureDBStores();
+        if (!db) throw new Error('Failed to open IndexedDB');
         
         await db.delete(storeName, id);
         return true;
@@ -393,15 +435,8 @@ export async function clearStore(storeName) {
             return true;
         }
         
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
-            upgrade(db) {
-                for (const store of ALL_STORES) {
-                    if (!db.objectStoreNames.contains(store)) {
-                        db.createObjectStore(store);
-                    }
-                }
-            }
-        });
+        const db = await ensureDBStores();
+        if (!db) throw new Error('Failed to open IndexedDB');
         
         await db.clear(storeName);
         return true;
@@ -562,6 +597,7 @@ export async function getCollection(playerId = null) {
 async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
     try {
         const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const entryId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         // 1. Save to localStorage journal
         const journalKey = `voidfarer_journal_${playerId}`;
@@ -571,7 +607,7 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
         }
         
         const entry = {
-            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            id: entryId,
             type: 'extraction',
             element: elementName,
             quantity: locationData.quantity || 1,
@@ -593,27 +629,20 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
         journal.lastUpdated = new Date().toISOString();
         localStorage.setItem(journalKey, JSON.stringify(journal));
         
-        // 2. Save to IndexedDB element_locations store
+        // 2. Save to IndexedDB stores
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 4, {
-                    upgrade(db) {
-                        for (const store of ALL_STORES) {
-                            if (!db.objectStoreNames.contains(store)) {
-                                db.createObjectStore(store);
-                            }
-                        }
-                    }
-                });
+                const db = await ensureDBStores();
+                if (!db) throw new Error('Failed to open IndexedDB');
                 
                 // Save to journal store
                 if (db.objectStoreNames.contains('journal')) {
                     await db.put('journal', entry);
                 }
                 
-                // Save to element_locations store with index-friendly structure
+                // Save to element_locations store with the same ID as keyPath
                 const locationEntry = {
-                    id: entry.id,
+                    id: entryId,
                     elementName: elementName,
                     planet: planetName,
                     planetType: locationData.planetType || 'unknown',
@@ -628,6 +657,8 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
                 if (db.objectStoreNames.contains('element_locations')) {
                     await db.put('element_locations', locationEntry);
                 }
+                
+                console.log(`✅ Saved location for ${elementName} on ${planetName}`);
             } catch (idbError) {
                 console.error('Failed to save to IndexedDB:', idbError);
             }
@@ -736,8 +767,8 @@ export async function getJournal() {
         
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('journal')) {
+                const db = await ensureDBStores();
+                if (db && db.objectStoreNames.contains('journal')) {
                     const entries = await db.getAll('journal');
                     if (entries && entries.length > 0) {
                         return {
@@ -756,7 +787,7 @@ export async function getJournal() {
     }
 }
 
-// ===== NEW: getPlayerLocations for planet-status.js integration =====
+// ===== getPlayerLocations for planet-status.js integration =====
 /**
  * Get all player locations for planet-status.js
  * Returns array of location objects with planet, elementName, timestamp, etc.
@@ -766,17 +797,8 @@ export async function getPlayerLocations() {
         // First try to get from IndexedDB element_locations store
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 4, {
-                    upgrade(db) {
-                        for (const store of ALL_STORES) {
-                            if (!db.objectStoreNames.contains(store)) {
-                                db.createObjectStore(store);
-                            }
-                        }
-                    }
-                });
-                
-                if (db.objectStoreNames.contains('element_locations')) {
+                const db = await ensureDBStores();
+                if (db && db.objectStoreNames.contains('element_locations')) {
                     const locations = await db.getAll('element_locations');
                     if (locations && locations.length > 0) {
                         return locations;
@@ -816,13 +838,9 @@ export async function getElementLocations(elementName) {
         // Try IndexedDB first
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('element_locations')) {
-                    const allLocations = await db.getAll('element_locations');
-                    const filtered = allLocations.filter(loc => loc.elementName === elementName);
-                    if (filtered && filtered.length > 0) {
-                        return filtered;
-                    }
+                const locations = await getByIndex('element_locations', 'by_element', elementName);
+                if (locations && locations.length > 0) {
+                    return locations;
                 }
             } catch (idbError) {}
         }
@@ -867,9 +885,11 @@ export async function clearJournal() {
         localStorage.removeItem(`voidfarer_journal_${playerId}`);
         if (window.idb) {
             try {
-                const db = await window.idb.openDB('VoidfarerDB', 4);
-                if (db.objectStoreNames.contains('journal')) await db.clear('journal');
-                if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+                const db = await ensureDBStores();
+                if (db) {
+                    if (db.objectStoreNames.contains('journal')) await db.clear('journal');
+                    if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+                }
             } catch (idbError) {}
         }
         console.log('📝 Journal cleared');
@@ -1588,22 +1608,8 @@ export async function getScannedStars(playerId) {
 export async function initializeStorage(playerId = 'main') {
     console.log('Initializing storage for player:', playerId);
     
-    // Ensure IndexedDB stores exist by opening the database once
-    if (window.idb) {
-        try {
-            const db = await window.idb.openDB('VoidfarerDB', 4, {
-                upgrade(db) {
-                    for (const store of ALL_STORES) {
-                        if (!db.objectStoreNames.contains(store)) {
-                            db.createObjectStore(store);
-                        }
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Error initializing IndexedDB stores:', error);
-        }
-    }
+    // Ensure IndexedDB stores exist with proper configuration
+    await ensureDBStores();
     
     const player = await getPlayer(playerId);
     if (!player) await createDefaultPlayer('Voidfarer', playerId);
@@ -1666,9 +1672,11 @@ export async function resetGame(playerId = 'main') {
     keysToRemove.forEach(key => localStorage.removeItem(key));
     if (window.idb) {
         try {
-            const db = await window.idb.openDB('VoidfarerDB', 4);
-            if (db.objectStoreNames.contains('journal')) await db.clear('journal');
-            if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+            const db = await ensureDBStores();
+            if (db) {
+                if (db.objectStoreNames.contains('journal')) await db.clear('journal');
+                if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+            }
         } catch (idbError) {}
     }
     setHapticsEnabled(settings.haptics);
@@ -1732,7 +1740,7 @@ window.getJournal = getJournal;
 window.getElementLocations = getElementLocations;
 window.getRecentJournalEntries = getRecentJournalEntries;
 window.clearJournal = clearJournal;
-window.getPlayerLocations = getPlayerLocations;  // NEW: Export for planet-status.js
+window.getPlayerLocations = getPlayerLocations;
 window.getDiscoveryHistory = getDiscoveryHistory;
 window.addToDiscoveryHistory = addToDiscoveryHistory;
 window.getHiddenPlanets = getHiddenPlanets;
@@ -1752,6 +1760,7 @@ window.loadTradeHistory = loadTradeHistory;
 window.getItem = getItem;
 window.setItem = setItem;
 window.getAll = getAll;
+window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with getPlayerLocations for planet-status.js integration');
+console.log('✅ storage.js loaded with proper IndexedDB key handling and getPlayerLocations integration');
