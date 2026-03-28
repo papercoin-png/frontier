@@ -353,11 +353,11 @@
             font-style: italic;
         }
         
-        .rarity-common { border-color: #ffffff; color: #ffffff; }
-        .rarity-uncommon { border-color: #b0ffb0; color: #b0ffb0; }
-        .rarity-rare { border-color: #b0b0ff; color: #b0b0ff; }
-        .rarity-very-rare { border-color: #e0b0ff; color: #e0b0ff; }
-        .rarity-legendary { border-color: #ffd700; color: #ffd700; }
+        .rarity-common { border-color: #ffffff; }
+        .rarity-uncommon { border-color: #b0ffb0; }
+        .rarity-rare { border-color: #b0b0ff; }
+        .rarity-very-rare { border-color: #e0b0ff; }
+        .rarity-legendary { border-color: #ffd700; }
         
         .modal-overlay {
             position: fixed;
@@ -599,20 +599,17 @@
     </div>
 
     <script>
-        // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
 
-        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const contentContainer = document.getElementById('contentContainer');
         const warpModal = document.getElementById('warpModal');
 
-        // ===== STATE =====
         let allElements = [];
         let filteredElements = [];
         let currentFilter = 'all';
@@ -620,35 +617,6 @@
         let currentWarpTarget = null;
         let locationsCache = {};
 
-        // ===== ELEMENT METADATA =====
-        const elementSymbols = {
-            'Hydrogen': 'H', 'Helium': 'He', 'Lithium': 'Li', 'Beryllium': 'Be',
-            'Boron': 'B', 'Carbon': 'C', 'Nitrogen': 'N', 'Oxygen': 'O',
-            'Fluorine': 'F', 'Neon': 'Ne', 'Sodium': 'Na', 'Magnesium': 'Mg',
-            'Aluminum': 'Al', 'Silicon': 'Si', 'Phosphorus': 'P', 'Sulfur': 'S',
-            'Chlorine': 'Cl', 'Argon': 'Ar', 'Potassium': 'K', 'Calcium': 'Ca',
-            'Iron': 'Fe', 'Copper': 'Cu', 'Silver': 'Ag', 'Gold': 'Au',
-            'Platinum': 'Pt', 'Uranium': 'U', 'Titanium': 'Ti'
-        };
-        
-        function getElementSymbol(name) {
-            return elementSymbols[name] || name.substring(0, 2);
-        }
-        
-        function getElementMassFromStorage(name) {
-            if (window.getElementMass) {
-                return window.getElementMass(name);
-            }
-            return 100;
-        }
-        
-        function getElementRarityFromStorage(name) {
-            if (window.getElementRarity) {
-                return window.getElementRarity(name);
-            }
-            return 'common';
-        }
-        
         function getPlanetTypeIcon(planetType) {
             const icons = {
                 'scorched': '🔥', 'barren': '🪨', 'lush': '🌱', 'frozen': '❄️',
@@ -656,17 +624,24 @@
             };
             return icons[planetType] || '🪐';
         }
-        
-        function getRarityClass(rarity) {
-            return `rarity-${rarity}`;
+
+        function getSymbolFromName(name) {
+            const symbols = {
+                'Hydrogen': 'H', 'Helium': 'He', 'Lithium': 'Li', 'Beryllium': 'Be',
+                'Boron': 'B', 'Carbon': 'C', 'Nitrogen': 'N', 'Oxygen': 'O',
+                'Fluorine': 'F', 'Neon': 'Ne', 'Sodium': 'Na', 'Magnesium': 'Mg',
+                'Aluminum': 'Al', 'Silicon': 'Si', 'Phosphorus': 'P', 'Sulfur': 'S',
+                'Chlorine': 'Cl', 'Argon': 'Ar', 'Potassium': 'K', 'Calcium': 'Ca',
+                'Iron': 'Fe', 'Copper': 'Cu', 'Silver': 'Ag', 'Gold': 'Au',
+                'Platinum': 'Pt', 'Uranium': 'U', 'Titanium': 'Ti'
+            };
+            return symbols[name] || name.substring(0, 2);
         }
 
-        // ===== LOAD DATA FROM STORAGE =====
         async function loadJournalData() {
             try {
                 loadingText.textContent = 'loading collection...';
                 
-                // Get collection from storage.js
                 let collection = {};
                 if (window.getCollection) {
                     collection = await window.getCollection();
@@ -675,7 +650,6 @@
                     collection = saved ? JSON.parse(saved) : {};
                 }
                 
-                // Convert to array - ONLY elements with count > 0
                 allElements = [];
                 let totalMass = 0;
                 let totalCount = 0;
@@ -694,7 +668,16 @@
                     
                     if (count <= 0) continue;
                     
-                    const mass = getElementMassFromStorage(name);
+                    let mass = 100;
+                    let rarity = 'common';
+                    
+                    if (window.getElementMass) {
+                        mass = window.getElementMass(name);
+                    }
+                    if (window.getElementRarity) {
+                        rarity = window.getElementRarity(name);
+                    }
+                    
                     const totalElementMass = count * mass;
                     totalMass += totalElementMass;
                     totalCount += count;
@@ -705,15 +688,13 @@
                         mass: mass,
                         totalMass: totalElementMass,
                         firstFound: firstFound || new Date().toISOString(),
-                        symbol: getElementSymbol(name),
-                        rarity: getElementRarityFromStorage(name)
+                        symbol: getSymbolFromName(name),
+                        rarity: rarity
                     });
                 }
                 
-                // Sort alphabetically
                 allElements.sort((a, b) => a.name.localeCompare(b.name));
                 
-                // Update stats
                 document.getElementById('totalElements').textContent = totalCount;
                 document.getElementById('uniqueElements').textContent = allElements.length;
                 document.getElementById('totalMass').textContent = Math.round(totalMass);
@@ -757,7 +738,6 @@
                 }
                 return [];
             } catch (error) {
-                console.error(`Error loading locations for ${elementName}:`, error);
                 return [];
             }
         }
@@ -826,8 +806,9 @@
                             }
                             const planetData = planetMap.get(planet);
                             planetData.count += (loc.quantity || 1);
-                            if ((loc.timestamp || loc.discoveredAt || 0) > planetData.lastFound) {
-                                planetData.lastFound = loc.timestamp || loc.discoveredAt || Date.now();
+                            const timestamp = loc.timestamp || loc.discoveredAt || 0;
+                            if (timestamp > planetData.lastFound) {
+                                planetData.lastFound = timestamp;
                             }
                         });
                         
@@ -837,9 +818,10 @@
                         sortedPlanets.forEach(([planet, data]) => {
                             const displayDate = new Date(data.lastFound).toLocaleDateString();
                             const typeIcon = getPlanetTypeIcon(data.planetType);
+                            const safePlanet = planet.replace(/'/g, "\\'");
                             
                             locationsHtml += `
-                                <div class="location-item" onclick="window.showWarpModal('${planet.replace(/'/g, "\\'")}', '${data.planetType}')">
+                                <div class="location-item" onclick="window.showWarpModal('${safePlanet}', '${data.planetType}')">
                                     <div>
                                         <div class="location-planet">${typeIcon} ${planet}</div>
                                         <div class="location-date">Extracted: ${data.count} units • Last: ${displayDate}</div>
@@ -885,9 +867,13 @@
             
             contentContainer.innerHTML = html;
         }
+        
+        function getRarityClass(rarity) {
+            return `rarity-${rarity}`;
+        }
 
-        function showWarpModal(planet, planetType = 'unknown') {
-            currentWarpTarget = { planet, planetType };
+        function showWarpModal(planet, planetType) {
+            currentWarpTarget = { planet: planet, planetType: planetType };
             
             const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
             const distance = (currentSector === 'B2') ? 2.3 : 4.6;
@@ -895,7 +881,7 @@
             const fuel = Math.floor(distance * 4) + 5;
             
             document.getElementById('modalPlanet').textContent = planet;
-            let typeDisplay = planetType !== 'unknown' ? planetType.charAt(0).toUpperCase() + planetType.slice(1) + ' Planet' : 'Unknown';
+            let typeDisplay = planetType && planetType !== 'unknown' ? planetType.charAt(0).toUpperCase() + planetType.slice(1) + ' Planet' : 'Unknown';
             document.getElementById('modalPlanetType').textContent = typeDisplay;
             document.getElementById('modalDistance').textContent = distance.toFixed(1) + ' LY';
             document.getElementById('modalCycles').textContent = cycles + ' cycles • ' + fuel + '⭐';
@@ -994,7 +980,6 @@
             }
         }
 
-        // Expose functions globally
         window.filterElements = filterElements;
         window.returnToBridge = returnToBridge;
         window.toggleExpand = toggleExpand;
