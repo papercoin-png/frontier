@@ -678,12 +678,28 @@
                 document.getElementById('uniqueElements').textContent = allElements.length;
                 document.getElementById('totalMass').textContent = Math.round(totalMass);
                 
+                // Preload all locations after collection is loaded
+                await preloadAllLocations();
+                
                 applyFilters();
                 
             } catch (error) {
                 console.error('Error loading journal:', error);
                 contentContainer.innerHTML = '<div class="empty-state">Error loading journal</div>';
             }
+        }
+
+        // NEW: Preload all locations for all elements
+        async function preloadAllLocations() {
+            loadingText.textContent = 'loading location data...';
+            
+            for (const element of allElements) {
+                if (!locationsCache[element.name]) {
+                    locationsCache[element.name] = await loadLocationsForElement(element.name);
+                }
+            }
+            
+            console.log(`✅ Preloaded locations for ${allElements.length} elements`);
         }
 
         function applyFilters() {
@@ -717,6 +733,7 @@
                 }
                 return [];
             } catch (error) {
+                console.error(`Error loading locations for ${elementName}:`, error);
                 return [];
             }
         }
@@ -726,8 +743,9 @@
                 expandedElement = null;
             } else {
                 expandedElement = elementName;
-                if (!locationsCache[elementName]) {
-                    locationsCache[elementName] = await loadLocationsForElement(elementName);
+                // Refresh locations cache for this element in case new discoveries were made
+                if (window.getElementLocations) {
+                    locationsCache[elementName] = await window.getElementLocations(elementName);
                 }
             }
             renderDiscoveries();
@@ -816,7 +834,7 @@
                     } else {
                         locationsHtml = `
                             <div style="color: #a0c0ff; padding: 10px; text-align: center; font-style: italic;">
-                                Location data unavailable
+                                No extraction locations recorded yet
                             </div>
                         `;
                     }
@@ -958,6 +976,14 @@
                 }, 2000);
             }
         }
+        
+        // Make functions globally accessible
+        window.filterElements = filterElements;
+        window.toggleExpand = toggleExpand;
+        window.showWarpModal = showWarpModal;
+        window.closeWarpModal = closeWarpModal;
+        window.confirmWarp = confirmWarp;
+        window.returnToBridge = returnToBridge;
         
         init();
     </script>
