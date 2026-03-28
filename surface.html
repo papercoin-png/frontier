@@ -938,7 +938,7 @@
 
         let pityCounters = {};
         let currentPlanetTier = 1;
-        let activeShipStats = { name: 'Prospector', miningBonus: 0, cargo: 5000 };
+        let activeShipStats = { name: 'Prospector', miningBonus: 0, cargo: 5000, tier: 1 };
 
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -993,16 +993,17 @@
                 if (stats.cargo) {
                     return stats;
                 }
-                return { name: 'Prospector', miningBonus: 0, cargo: 5000 };
+                return { name: 'Prospector', miningBonus: 0, cargo: 5000, tier: 1 };
             } catch (e) {
-                return { name: 'Prospector', miningBonus: 0, cargo: 5000 };
+                return { name: 'Prospector', miningBonus: 0, cargo: 5000, tier: 1 };
             }
         }
         
         // ===== UPDATE SHIP DISPLAY =====
         function updateShipDisplay() {
             activeShipStats = getActiveShipStats();
-            activeShipNameSpan.textContent = activeShipStats.name || 'Prospector';
+            const shipTier = activeShipStats.tier || 1;
+            activeShipNameSpan.textContent = `(T${shipTier}) ${activeShipStats.name || 'Prospector'}`;
             shipBonusSpan.textContent = `+${activeShipStats.miningBonus || 0}% mining`;
             cargoLimitSpan.textContent = activeShipStats.cargo || 5000;
         }
@@ -1438,7 +1439,7 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
-                // Tier badge - plain white text, no background
+                // FIXED: Get planet tier based on the planet's actual rarity
                 const status = await getPlanetStatus(currentPlanet.name);
                 const highestRarity = status.highestRarity || 'common';
                 
