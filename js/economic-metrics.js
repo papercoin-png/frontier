@@ -1,7 +1,7 @@
 // js/economic-metrics.js - Core economic tracking for Voidfarer
 // Now using IndexedDB via db.js for unlimited storage
 // Tracks money supply, inflation, wealth distribution, and economic health
-// UPDATED: Fixed IndexedDB calls to use proper db.js functions
+// UPDATED: Now aggregates real data from player collections and transactions instead of using simulations
 
 import { 
     getItem as storageGetItem,
@@ -40,110 +40,227 @@ export const TARGET_RANGES = {
     WEALTH_CONCENTRATION: { min: 0.3, max: 0.5, ideal: 0.4 } // Top 10% share
 };
 
+// ===== CACHE for performance =====
+let cachedMoneySupply = null;
+let cachedPlayerCount = null;
+let cachedWealthDistribution = null;
+let lastWealthCalculation = 0;
+const WEALTH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // ===== INITIALIZE METRICS =====
 export async function initializeMetrics() {
-    // Set initial money supply if not exists
-    if (!localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) {
-        localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, '5000000'); // 5M starting credits
-    }
+    // Calculate initial money supply from real data
+    const realMoneySupply = await calculateRealMoneySupply();
+    localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, realMoneySupply.toString());
     
     // Initialize daily metrics in IndexedDB
     const metrics = await getDailyMetrics();
     if (metrics.length === 0) {
-        // No metrics yet, that's fine
+        // Create initial metrics entry
+        await recordDailyMetrics();
     }
     
     // Initialize hourly snapshots in IndexedDB
     const snapshots = await getHourlySnapshots();
     if (snapshots.length === 0) {
-        // No snapshots yet, that's fine
+        await recordHourlySnapshot();
     }
     
     // Set initial player count
     await updatePlayerCount();
     
-    console.log('Economic metrics initialized');
+    console.log('Economic metrics initialized with real data aggregation');
 }
 
-// ===== MONEY SUPPLY TRACKING (keep in localStorage for speed) =====
+// ===== REAL MONEY SUPPLY CALCULATION =====
+/**
+ * Calculate total money supply by aggregating:
+ * - All player credits
+ * - All player element collections (valued at market prices)
+ * - Community fund balance
+ */
+async function calculateRealMoneySupply() {
+    let totalMoney = 0;
+    
+    try {
+        // Get all players from IndexedDB
+        const db = await getDb();
+        if (db && db.objectStoreNames.contains('player')) {
+            const players = await dbGetAll('player');
+            
+            for (const player of players) {
+                // Add player credits
+                totalMoney += player.credits || 0;
+                
+                // Add value of player's element collection
+                const collection = await getCollection(player.id);
+                if (collection && typeof collection === 'object') {
+                    for (const [elementName, data] of Object.entries(collection)) {
+                        const count = typeof data === 'object' ? (data.count || 1) : data;
+                        const elementValue = getElementValue(elementName);
+                        totalMoney += count * elementValue;
+                    }
+                }
+            }
+        }
+        
+        // Add community fund balance
+        const fund = await storageGetItem('communityFund', 'main');
+        if (fund && fund.balance) {
+            totalMoney += fund.balance;
+        }
+        
+    } catch (error) {
+        console.error('Error calculating real money supply:', error);
+        // Fallback to stored value
+        return parseInt(localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) || 5000000;
+    }
+    
+    return Math.max(1000, totalMoney); // Minimum 1000
+}
+
+// ===== MONEY SUPPLY TRACKING =====
 export function getTotalMoneySupply() {
+    // Return cached value if recent
+    if (cachedMoneySupply !== null) {
+        return cachedMoneySupply;
+    }
     return parseInt(localStorage.getItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY)) || 5000000;
 }
 
-export function addMoneyToSupply(amount) {
-    const current = getTotalMoneySupply();
+export async function refreshMoneySupply() {
+    const realSupply = await calculateRealMoneySupply();
+    localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, realSupply.toString());
+    cachedMoneySupply = realSupply;
+    return realSupply;
+}
+
+export async function addMoneyToSupply(amount) {
+    const current = await refreshMoneySupply();
     const newTotal = current + amount;
     localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
+    cachedMoneySupply = newTotal;
     return newTotal;
 }
 
-export function removeMoneyFromSupply(amount) {
-    const current = getTotalMoneySupply();
+export async function removeMoneyFromSupply(amount) {
+    const current = await refreshMoneySupply();
     const newTotal = Math.max(0, current - amount);
     localStorage.setItem(METRICS_KEYS.TOTAL_MONEY_SUPPLY, newTotal.toString());
+    cachedMoneySupply = newTotal;
     return newTotal;
 }
 
-// ===== PLAYER COUNT TRACKING =====
+// ===== REAL PLAYER COUNT =====
 export async function updatePlayerCount() {
-    // In a real implementation, this would count all players
-    // For now, estimate based on player data
-    const player = await getPlayer();
-    const count = player ? 1 : 0;
-    localStorage.setItem(METRICS_KEYS.PLAYER_COUNT, count.toString());
-    return count;
+    try {
+        const db = await getDb();
+        let count = 0;
+        
+        if (db && db.objectStoreNames.contains('player')) {
+            const players = await dbGetAll('player');
+            count = players.length;
+        } else {
+            // Fallback: check if current player exists
+            const player = await getPlayer();
+            count = player ? 1 : 0;
+        }
+        
+        localStorage.setItem(METRICS_KEYS.PLAYER_COUNT, count.toString());
+        cachedPlayerCount = count;
+        return count;
+    } catch (error) {
+        console.error('Error updating player count:', error);
+        return 1;
+    }
 }
 
 export function getPlayerCount() {
+    if (cachedPlayerCount !== null) {
+        return cachedPlayerCount;
+    }
     return parseInt(localStorage.getItem(METRICS_KEYS.PLAYER_COUNT)) || 1;
 }
 
-// ===== WEALTH DISTRIBUTION =====
-export async function calculateWealthDistribution() {
-    const totalWealth = getTotalMoneySupply();
-    const playerCount = getPlayerCount();
+// ===== REAL WEALTH DISTRIBUTION =====
+/**
+ * Get all players with their total wealth
+ */
+async function getAllPlayerWealth() {
+    const wealthList = [];
     
-    // Get player's collection value
-    const collection = await getCollection();
-    let playerWealth = 0;
-    for (const [name, data] of Object.entries(collection)) {
-        const value = getElementValue(name);
-        playerWealth += (data.count || 1) * value;
-    }
-    
-    const player = await getPlayer();
-    if (player && player.credits) {
-        playerWealth += player.credits;
-    }
-    
-    // Simulate realistic distribution (Pareto principle)
-    const wealthData = [];
-    let remainingWealth = totalWealth;
-    
-    for (let i = 0; i < playerCount; i++) {
-        // Top 20% own 80% of wealth
-        if (i < playerCount * 0.2) {
-            const wealth = remainingWealth * 0.8 / (playerCount * 0.2);
-            wealthData.push(wealth);
-        } else {
-            const wealth = remainingWealth * 0.2 / (playerCount * 0.8);
-            wealthData.push(wealth);
+    try {
+        const db = await getDb();
+        if (!db || !db.objectStoreNames.contains('player')) {
+            // Fallback to current player only
+            const player = await getPlayer();
+            if (player) {
+                let playerWealth = player.credits || 0;
+                const collection = await getCollection(player.id);
+                if (collection) {
+                    for (const [name, data] of Object.entries(collection)) {
+                        const count = typeof data === 'object' ? (data.count || 1) : data;
+                        playerWealth += count * getElementValue(name);
+                    }
+                }
+                wealthList.push({ id: player.id, name: player.name, wealth: playerWealth });
+            }
+            return wealthList;
         }
+        
+        const players = await dbGetAll('player');
+        
+        for (const player of players) {
+            let playerWealth = player.credits || 0;
+            
+            // Add collection value
+            const collection = await getCollection(player.id);
+            if (collection && typeof collection === 'object') {
+                for (const [elementName, data] of Object.entries(collection)) {
+                    const count = typeof data === 'object' ? (data.count || 1) : data;
+                    const elementValue = getElementValue(elementName);
+                    playerWealth += count * elementValue;
+                }
+            }
+            
+            wealthList.push({
+                id: player.id,
+                name: player.name || 'Unknown',
+                wealth: playerWealth
+            });
+        }
+        
+        // Sort by wealth descending
+        wealthList.sort((a, b) => b.wealth - a.wealth);
+        
+    } catch (error) {
+        console.error('Error calculating player wealth:', error);
     }
     
-    // Insert player at appropriate position (simplified)
-    if (playerCount === 1) {
-        return [playerWealth];
+    return wealthList;
+}
+
+export async function calculateWealthDistribution() {
+    // Check cache
+    const now = Date.now();
+    if (cachedWealthDistribution && (now - lastWealthCalculation) < WEALTH_CACHE_DURATION) {
+        return cachedWealthDistribution;
     }
     
-    return wealthData.sort((a, b) => b - a);
+    const wealthData = await getAllPlayerWealth();
+    const totalWealth = wealthData.reduce((sum, p) => sum + p.wealth, 0);
+    
+    cachedWealthDistribution = wealthData.map(p => p.wealth);
+    lastWealthCalculation = now;
+    
+    return cachedWealthDistribution;
 }
 
 export async function calculateGiniCoefficient() {
     const wealthData = await calculateWealthDistribution();
     const n = wealthData.length;
     
-    if (n === 0) return 0;
+    if (n === 0) return 0.35; // Default if no data
     
     // Sort wealth in ascending order
     const sorted = [...wealthData].sort((a, b) => a - b);
@@ -157,6 +274,8 @@ export async function calculateGiniCoefficient() {
         weightedSum += (i + 1) * sorted[i];
     }
     
+    if (sumWealth === 0) return 0;
+    
     const gini = (2 * weightedSum) / (n * sumWealth) - (n + 1) / n;
     return Math.min(1, Math.max(0, gini));
 }
@@ -166,13 +285,26 @@ export async function getWealthPercentiles() {
     const totalWealth = wealthData.reduce((a, b) => a + b, 0);
     const n = wealthData.length;
     
+    if (n === 0 || totalWealth === 0) {
+        return {
+            top1Percent: 0,
+            top10Percent: 0,
+            bottom50Percent: 0,
+            totalWealth: 0,
+            playerCount: 0
+        };
+    }
+    
+    // Sort descending
+    const sortedDesc = [...wealthData].sort((a, b) => b - a);
+    
     const top1Count = Math.max(1, Math.floor(n * 0.01));
     const top10Count = Math.max(1, Math.floor(n * 0.1));
     const bottom50Count = Math.max(1, Math.floor(n * 0.5));
     
-    const top1Wealth = wealthData.slice(0, top1Count).reduce((a, b) => a + b, 0);
-    const top10Wealth = wealthData.slice(0, top10Count).reduce((a, b) => a + b, 0);
-    const bottom50Wealth = wealthData.slice(-bottom50Count).reduce((a, b) => a + b, 0);
+    const top1Wealth = sortedDesc.slice(0, top1Count).reduce((a, b) => a + b, 0);
+    const top10Wealth = sortedDesc.slice(0, top10Count).reduce((a, b) => a + b, 0);
+    const bottom50Wealth = sortedDesc.slice(-bottom50Count).reduce((a, b) => a + b, 0);
     
     return {
         top1Percent: (top1Wealth / totalWealth) * 100,
@@ -181,6 +313,27 @@ export async function getWealthPercentiles() {
         totalWealth: totalWealth,
         playerCount: n
     };
+}
+
+// ===== REAL TRANSACTION VOLUME =====
+async function getRealTransactionVolume(days = 30) {
+    try {
+        const db = await getDb();
+        if (!db || !db.objectStoreNames.contains('tradeHistory')) {
+            return 50000; // Default
+        }
+        
+        const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+        const trades = await dbGetAll('tradeHistory');
+        
+        const recentTrades = trades.filter(t => t.timestamp > cutoff);
+        const totalVolume = recentTrades.reduce((sum, t) => sum + (t.quantity * t.price), 0);
+        
+        return totalVolume / days; // Average daily volume
+    } catch (error) {
+        console.error('Error getting transaction volume:', error);
+        return 50000;
+    }
 }
 
 // ===== INFLATION CALCULATION =====
@@ -198,30 +351,29 @@ export async function calculateInflationRate() {
     const moneySupplyNow = now.moneySupply;
     const moneySupplyThen = thirtyDaysAgo.moneySupply;
     
+    if (moneySupplyThen === 0) return 0.03;
+    
     const annualizedRate = Math.pow(moneySupplyNow / moneySupplyThen, 365 / 30) - 1;
     return Math.max(0, Math.min(annualizedRate, 0.2)); // Cap at 20%
 }
 
 // ===== MONEY VELOCITY =====
 export async function calculateMoneyVelocity() {
-    // Money velocity = GDP / Money Supply
-    // GDP approximated by total transactions
-    const metrics = await getDailyMetrics();
-    if (metrics.length < 7) return 1.0;
-    
-    const recentMetrics = metrics.slice(-7);
-    const avgDailyTransactions = recentMetrics.reduce((sum, m) => sum + (m.transactionVolume || 0), 0) / 7;
+    // Money velocity = Transaction Volume / Money Supply
+    const transactionVolume = await getRealTransactionVolume(7);
     const moneySupply = getTotalMoneySupply();
     
-    return moneySupply > 0 ? avgDailyTransactions / moneySupply : 0.5;
+    if (moneySupply === 0) return 0.5;
+    
+    return Math.min(3.0, transactionVolume / moneySupply);
 }
 
 // ===== DAILY METRICS (IndexedDB using db.js) =====
 export async function getDailyMetrics() {
     try {
-        // Use db.js getAll which works with IndexedDB
         const metrics = await dbGetAll('dailyMetrics');
-        return metrics || [];
+        // Sort by date ascending
+        return (metrics || []).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     } catch (error) {
         console.error('Error getting daily metrics:', error);
         return [];
@@ -249,27 +401,31 @@ export async function recordDailyMetrics() {
         return metrics[metrics.length - 1];
     }
     
+    // Refresh money supply to get current value
+    const moneySupply = await refreshMoneySupply();
+    const playerCount = await updatePlayerCount();
     const wealthPercentiles = await getWealthPercentiles();
     const gini = await calculateGiniCoefficient();
+    const transactionVolume = await getRealTransactionVolume(1);
     
     const dailyMetric = {
         date: today,
-        moneySupply: getTotalMoneySupply(),
-        playerCount: getPlayerCount(),
+        moneySupply: moneySupply,
+        playerCount: playerCount,
         inflation: await calculateInflationRate(),
         gini: gini,
         wealthTop1: wealthPercentiles.top1Percent,
         wealthTop10: wealthPercentiles.top10Percent,
         wealthBottom50: wealthPercentiles.bottom50Percent,
         moneyVelocity: await calculateMoneyVelocity(),
-        transactionVolume: estimateTransactionVolume(),
+        transactionVolume: transactionVolume,
         timestamp: Date.now()
     };
     
     metrics.push(dailyMetric);
     
     // Keep only last 365 days
-    if (metrics.length > 365) {
+    while (metrics.length > 365) {
         metrics.shift();
     }
     
@@ -283,7 +439,7 @@ export async function recordDailyMetrics() {
 export async function getHourlySnapshots() {
     try {
         const snapshots = await dbGetAll('hourlySnapshots');
-        return snapshots || [];
+        return (snapshots || []).sort((a, b) => a.timestamp - b.timestamp);
     } catch (error) {
         console.error('Error getting hourly snapshots:', error);
         return [];
@@ -306,32 +462,32 @@ export async function recordHourlySnapshot() {
     const snapshots = await getHourlySnapshots();
     const now = Date.now();
     const hour = new Date().toISOString().split('T')[1].split(':')[0];
+    const hourString = `${new Date().toISOString().split('T')[0]}-${hour}`;
+    
+    // Check if we already recorded this hour
+    if (snapshots.length > 0 && snapshots[snapshots.length - 1].hour === hourString) {
+        return snapshots[snapshots.length - 1];
+    }
+    
+    const transactionVolume = await getRealTransactionVolume(1);
     
     const snapshot = {
         timestamp: now,
-        hour: hour,
+        hour: hourString,
         moneySupply: getTotalMoneySupply(),
         playerCount: getPlayerCount(),
-        recentTransactions: estimateRecentTransactions()
+        recentTransactions: transactionVolume / 24 // Average per hour
     };
     
     snapshots.push(snapshot);
     
     // Keep only last 24 hours
-    if (snapshots.length > 24) {
+    while (snapshots.length > 24) {
         snapshots.shift();
     }
     
     await saveHourlySnapshots(snapshots);
-}
-
-// ===== ESTIMATION HELPERS =====
-export function estimateTransactionVolume() {
-    return Math.floor(Math.random() * 100000) + 50000;
-}
-
-export function estimateRecentTransactions() {
-    return Math.floor(Math.random() * 5000) + 1000;
+    return snapshot;
 }
 
 // ===== ECONOMIC HEALTH ASSESSMENT =====
@@ -367,9 +523,9 @@ export async function assessEconomicHealth() {
     
     // Determine overall health
     const statuses = [health.inflation.status, health.inequality.status, health.velocity.status];
-    if (statuses.includes('CRITICAL')) {
+    if (statuses.includes('HIGH') || statuses.includes('CRITICAL')) {
         health.overall = 'CRITICAL';
-    } else if (statuses.includes('WARNING')) {
+    } else if (statuses.includes('WARNING_HIGH') || statuses.includes('WARNING_LOW')) {
         health.overall = 'WARNING';
     } else {
         health.overall = 'HEALTHY';
@@ -379,12 +535,12 @@ export async function assessEconomicHealth() {
 }
 
 function getStatus(value, range) {
-    if (value < range.min * 0.8) return 'LOW';
+    if (value < range.min * 0.5) return 'CRITICAL';
     if (value < range.min) return 'WARNING_LOW';
-    if (value > range.max * 1.2) return 'HIGH';
+    if (value > range.max * 1.5) return 'CRITICAL';
     if (value > range.max) return 'WARNING_HIGH';
     if (value >= range.min && value <= range.max) return 'OPTIMAL';
-    return 'UNKNOWN';
+    return 'NORMAL';
 }
 
 function getInflationMessage(inflation) {
@@ -392,7 +548,8 @@ function getInflationMessage(inflation) {
     if (inflation < 0.02) return 'Low inflation - stable but could use stimulation';
     if (inflation <= 0.05) return 'Healthy inflation - economy growing steadily';
     if (inflation <= 0.08) return 'Elevated inflation - watch for overheating';
-    return 'High inflation - corrective measures recommended';
+    if (inflation <= 0.12) return 'High inflation - corrective measures recommended';
+    return 'Hyperinflation - economic emergency!';
 }
 
 function getInequalityMessage(gini) {
@@ -400,7 +557,8 @@ function getInequalityMessage(gini) {
     if (gini < 0.3) return 'Healthy equality - wealth well distributed';
     if (gini <= 0.4) return 'Normal inequality - typical market economy';
     if (gini <= 0.5) return 'High inequality - wealth concentrated';
-    return 'Extreme inequality - oligarchy forming';
+    if (gini <= 0.6) return 'Severe inequality - oligarchy forming';
+    return 'Extreme inequality - feudalism emerging';
 }
 
 function getConcentrationMessage(percent) {
@@ -408,6 +566,7 @@ function getConcentrationMessage(percent) {
     if (percent < 40) return 'Healthy concentration';
     if (percent < 50) return 'Noticeable concentration';
     if (percent < 60) return 'High concentration';
+    if (percent < 70) return 'Severe concentration';
     return 'Extreme concentration';
 }
 
@@ -416,7 +575,8 @@ function getVelocityMessage(velocity) {
     if (velocity < 0.6) return 'Slow economy - people saving';
     if (velocity <= 1.5) return 'Healthy velocity - money circulating';
     if (velocity <= 2.0) return 'Active economy - rapid trading';
-    return 'Hyperactive - possible speculation';
+    if (velocity <= 2.5) return 'Overheated - speculation risk';
+    return 'Hyperactive - bubble forming';
 }
 
 // ===== HISTORICAL TRENDS =====
@@ -430,12 +590,12 @@ export async function getHistoricalTrend(days = 30) {
     const end = recent[recent.length - 1];
     
     return {
-        moneySupplyChange: ((end.moneySupply - start.moneySupply) / start.moneySupply) * 100,
-        playerCountChange: ((end.playerCount - start.playerCount) / start.playerCount) * 100,
-        inflationTrend: recent.map(m => m.inflation),
-        giniTrend: recent.map(m => m.gini),
-        averageInflation: recent.reduce((sum, m) => sum + m.inflation, 0) / recent.length,
-        averageGini: recent.reduce((sum, m) => sum + m.gini, 0) / recent.length
+        moneySupplyChange: start.moneySupply ? ((end.moneySupply - start.moneySupply) / start.moneySupply) * 100 : 0,
+        playerCountChange: start.playerCount ? ((end.playerCount - start.playerCount) / start.playerCount) * 100 : 0,
+        inflationTrend: recent.map(m => m.inflation || 0),
+        giniTrend: recent.map(m => m.gini || 0.35),
+        averageInflation: recent.reduce((sum, m) => sum + (m.inflation || 0), 0) / recent.length,
+        averageGini: recent.reduce((sum, m) => sum + (m.gini || 0.35), 0) / recent.length
     };
 }
 
@@ -444,7 +604,7 @@ export function formatMoney(amount) {
     if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B⭐';
     if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M⭐';
     if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K⭐';
-    return amount + '⭐';
+    return Math.floor(amount) + '⭐';
 }
 
 export function formatPercent(value) {
@@ -457,6 +617,7 @@ export default {
     TARGET_RANGES,
     initializeMetrics,
     getTotalMoneySupply,
+    refreshMoneySupply,
     addMoneyToSupply,
     removeMoneyFromSupply,
     getPlayerCount,
