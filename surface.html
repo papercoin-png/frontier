@@ -110,9 +110,10 @@
             box-shadow: 0 0 20px #4affaa;
         }
         
-        .planet-name {
+        .planet-info {
             display: flex;
             flex-direction: column;
+            flex: 1;
         }
         
         .planet-name-main {
@@ -131,11 +132,37 @@
         
         .tier-badge {
             font-size: 9px;
-            background: rgba(0,0,0,0.5);
-            padding: 2px 6px;
-            border-radius: 20px;
+            background: transparent;
+            padding: 0;
             margin-top: 2px;
             display: inline-block;
+            color: #ffffff;
+            font-weight: 500;
+        }
+        
+        .ship-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-right: 12px;
+        }
+        
+        .ship-label {
+            font-size: 8px;
+            color: #a0c0ff;
+            letter-spacing: 1px;
+        }
+        
+        .ship-name {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        
+        .ship-bonus {
+            font-size: 8px;
+            color: #ffd966;
         }
         
         .cargo-display {
@@ -431,7 +458,7 @@
             border: 1px solid rgba(74, 255, 170, 0.3);
             border-radius: 60px 20px 60px 20px;
             padding: 15px;
-            margin-top: 280px;
+            margin-top: 200px;
             margin-bottom: 20px;
             width: 100%;
             left: 0;
@@ -662,7 +689,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* NEW: Discovery History Panel Styles */
         .discovery-panel {
             background: rgba(10, 10, 26, 0.5);
             backdrop-filter: blur(5px);
@@ -791,14 +817,19 @@
             
             <div class="content">
                 <div class="status-bar" id="statusBar">
-                    <div class="planet-name">
+                    <div class="planet-info">
                         <span class="planet-name-main" id="planetName">Loading...</span>
                         <span class="planet-name-type" id="planetType">Loading...</span>
                         <span class="tier-badge" id="planetTierBadge">Tier 1</span>
                     </div>
+                    <div class="ship-info" id="shipInfo">
+                        <span class="ship-label">ACTIVE SHIP</span>
+                        <span class="ship-name" id="activeShipName">--</span>
+                        <span class="ship-bonus" id="shipBonus">+0% mining</span>
+                    </div>
                     <div class="cargo-display">
                         <span class="cargo-label">CARGO</span>
-                        <span class="cargo-value" id="cargoMass"><span>0</span>/5000 AMU</span>
+                        <span class="cargo-value" id="cargoMass"><span>0</span>/<span id="cargoLimit">5000</span> AMU</span>
                     </div>
                 </div>
                 
@@ -825,13 +856,11 @@
                     <div class="active-count" id="activeCount">Extracting: 0 resources</div>
                 </div>
                 
-                <!-- NEW: Discovery History Panel -->
                 <div class="discovery-panel" id="discoveryPanel" style="display: none;">
                     <div class="discovery-title">📜 DISCOVERY HISTORY</div>
                     <div class="discovery-list" id="discoveryList"></div>
                 </div>
                 
-                <!-- NEW: Rights Status Panel -->
                 <div class="rights-status" id="rightsStatus" style="display: none;">
                     <span class="rights-label">⚡ MINING RIGHTS</span>
                     <span class="rights-value" id="rightsValue">Loading...</span>
@@ -852,7 +881,6 @@
                 <div class="loading-text" id="loadingText">processing...</div>
             </div>
             
-            <!-- NEW: Rediscovery Notification -->
             <div class="rediscovery-notification" id="rediscoveryNotification"></div>
         </div>
     </div>
@@ -863,7 +891,7 @@
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
 
-        // Expose storage functions to window for non-module code
+        // Expose storage functions to window
         window.getCollection = getCollection;
         window.addElementToCollection = addElementToCollection;
         window.removeElementFromCollection = removeElementFromCollection;
@@ -875,15 +903,14 @@
         }
 
         const EXTRACTION_INTERVAL = 5000;
-        const CARGO_MASS_LIMIT = 5000;
         
         // Rarity configuration with base chances
         const RARITY_CONFIG = {
-            'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', tier: 1 },
-            'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0', tier: 2 },
-            'rare': { baseChance: 25, massTarget: 12, variety: 0.4, icon: '🔵', color: '#4169E1', tier: 3 },
-            'very-rare': { baseChance: 12, massTarget: 7, variety: 0.3, icon: '🟣', color: '#e0b0ff', tier: 4 },
-            'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700', tier: 5 }
+            'common': { baseChance: 65, massTarget: 28, variety: 0.6, icon: '⚪', color: '#ffffff', tier: 1, basePrice: 100 },
+            'uncommon': { baseChance: 45, massTarget: 20, variety: 0.5, icon: '🟢', color: '#b0ffb0', tier: 2, basePrice: 250 },
+            'rare': { baseChance: 25, massTarget: 12, variety: 0.4, icon: '🔵', color: '#4169E1', tier: 3, basePrice: 1000 },
+            'very-rare': { baseChance: 12, massTarget: 7, variety: 0.3, icon: '🟣', color: '#e0b0ff', tier: 4, basePrice: 5000 },
+            'legendary': { baseChance: 4, massTarget: 4, variety: 0.2, icon: '✨', color: '#ffd700', tier: 5, basePrice: 25000 }
         };
 
         // Pity system thresholds
@@ -911,6 +938,7 @@
 
         let pityCounters = {};
         let currentPlanetTier = 1;
+        let activeShipStats = { name: 'Prospector', miningBonus: 0, cargo: 5000 };
 
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -919,11 +947,14 @@
         const planetType = document.getElementById('planetType');
         const planetTierBadge = document.getElementById('planetTierBadge');
         const cargoMass = document.getElementById('cargoMass');
+        const cargoLimitSpan = document.getElementById('cargoLimit');
         const resourceGrid = document.getElementById('resourceGrid');
         const activeCount = document.getElementById('activeCount');
         const extractorText = document.getElementById('extractorText');
         const claimBtn = document.getElementById('claimBtn');
         const statusBar = document.getElementById('statusBar');
+        const activeShipNameSpan = document.getElementById('activeShipName');
+        const shipBonusSpan = document.getElementById('shipBonus');
         
         const extractionNotification = document.getElementById('extractionNotification');
         const notificationIcon = document.getElementById('notificationIcon');
@@ -933,7 +964,6 @@
         const notificationRarity = document.getElementById('notificationRarity');
         const notificationPity = document.getElementById('notificationPity');
         
-        // NEW: Discovery and Rights Elements
         const discoveryPanel = document.getElementById('discoveryPanel');
         const discoveryList = document.getElementById('discoveryList');
         const rightsStatus = document.getElementById('rightsStatus');
@@ -956,7 +986,33 @@
         let exploredElements = {};
         let totalElements = 4;
         
-        // ===== TIER-BASED RARITY FUNCTION (USING IMPORTED TIER DATA) =====
+        // ===== GET ACTIVE SHIP STATS =====
+        function getActiveShipStats() {
+            try {
+                const stats = JSON.parse(localStorage.getItem('voidfarer_active_ship_stats') || '{}');
+                if (stats.cargo) {
+                    return stats;
+                }
+                return { name: 'Prospector', miningBonus: 0, cargo: 5000 };
+            } catch (e) {
+                return { name: 'Prospector', miningBonus: 0, cargo: 5000 };
+            }
+        }
+        
+        // ===== UPDATE SHIP DISPLAY =====
+        function updateShipDisplay() {
+            activeShipStats = getActiveShipStats();
+            activeShipNameSpan.textContent = activeShipStats.name || 'Prospector';
+            shipBonusSpan.textContent = `+${activeShipStats.miningBonus || 0}% mining`;
+            cargoLimitSpan.textContent = activeShipStats.cargo || 5000;
+        }
+        
+        // ===== GET CARGO MASS LIMIT FROM ACTIVE SHIP =====
+        function getCargoMassLimit() {
+            return activeShipStats.cargo || 5000;
+        }
+        
+        // ===== TIER-BASED RARITY FUNCTION =====
         function getElementRarity(elementName, planetTier = currentPlanetTier) {
             if (TIER_1_ELEMENTS.includes(elementName)) return 'common';
             if (TIER_2_ELEMENTS.includes(elementName)) return 'uncommon';
@@ -964,7 +1020,6 @@
             if (TIER_4_ELEMENTS.includes(elementName)) return 'very-rare';
             if (TIER_5_ELEMENTS.includes(elementName)) return 'legendary';
             
-            // For elements from tiers 6-10, they are legendary rarity
             if (planetTier >= 5) {
                 return 'legendary';
             }
@@ -972,13 +1027,17 @@
             return 'common';
         }
         
+        // ===== GET ELEMENT RARITY CHANCE WITH SHIP MINING BONUS =====
         function getElementRarityChance(elementName) {
             const rarity = getElementRarity(elementName, currentPlanetTier);
             const config = RARITY_CONFIG[rarity] || RARITY_CONFIG['common'];
             const boost = TIER_RARITY_BOOST[currentPlanetTier] || TIER_RARITY_BOOST[1];
             const boostMultiplier = boost[rarity] || 1.0;
             
-            let chance = config.baseChance * boostMultiplier;
+            // Apply ship mining bonus to chance (1% bonus = 1% higher chance)
+            const shipBonusMultiplier = 1 + (activeShipStats.miningBonus / 100);
+            
+            let chance = config.baseChance * boostMultiplier * shipBonusMultiplier;
             chance = Math.min(95, Math.max(1, chance));
             
             return Math.round(chance);
@@ -1021,7 +1080,7 @@
             }
         }
 
-        // ===== DISCOVERY HISTORY FUNCTIONS (NEW) =====
+        // ===== DISCOVERY HISTORY FUNCTIONS =====
         async function loadDiscoveryHistory() {
             try {
                 const history = await getFormattedPlanetDiscoveryHistory(currentPlanet.name);
@@ -1049,7 +1108,7 @@
             }
         }
 
-        // ===== RIGHTS STATUS FUNCTIONS (NEW) =====
+        // ===== RIGHTS STATUS FUNCTIONS =====
         async function loadRightsStatus() {
             try {
                 const rights = await getPlanetRightsStatus(currentPlanet.name);
@@ -1090,25 +1149,21 @@
             }
         }
 
-        // ===== RECORD REDISCOVERY (NEW) =====
+        // ===== RECORD REDISCOVERY =====
         async function recordRediscovery() {
             try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 
-                // Check if this planet was hidden (rights expired)
                 const hiddenPlanets = JSON.parse(localStorage.getItem('voidfarer_hidden_planets') || '[]');
                 
                 if (hiddenPlanets.includes(currentPlanet.name)) {
-                    // Record rediscovery
                     await addPlanetDiscoveryRecord(currentPlanet.name, playerId, playerName, currentPlanetTier);
                     
-                    // Reveal the planet
                     if (typeof window.revealPlanet === 'function') {
                         await window.revealPlanet(currentPlanet.name);
                     }
                     
-                    // Show rediscovery notification
                     rediscoveryNotification.textContent = `🔓 REDISCOVERED! ${currentPlanet.name} has been mapped again.`;
                     rediscoveryNotification.style.display = 'block';
                     
@@ -1209,10 +1264,8 @@
                 updateExploredCount();
                 renderResourceToggles();
                 
-                // DIRECT CHECK - show claim button immediately when all elements are explored
                 const allExplored = currentPlanet.resources.every(r => exploredElements[r] === true);
                 if (allExplored) {
-                    // Only show claim button if planet is Very Rare or Legendary
                     const status = await getPlanetStatus(currentPlanet.name);
                     const claimableRarities = ['very-rare', 'legendary'];
                     const isClaimable = claimableRarities.includes(status.highestRarity);
@@ -1310,7 +1363,8 @@
 
         async function updateCargoDisplay() {
             const mass = await getFreshCargoMass();
-            cargoMass.innerHTML = `<span>${Math.round(mass)}</span>/5000 AMU`;
+            const limit = getCargoMassLimit();
+            cargoMass.innerHTML = `<span>${Math.round(mass)}</span>/<span id="cargoLimit">${limit}</span> AMU`;
             return mass;
         }
 
@@ -1332,6 +1386,9 @@
 
         async function loadPlanetData() {
             try {
+                // Update ship display first
+                updateShipDisplay();
+                
                 let planetNameStr = localStorage.getItem('voidfarer_current_planet');
                 let planetTypeStr = localStorage.getItem('voidfarer_current_planet_type');
                 let planetResources = [];
@@ -1381,22 +1438,23 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
-                // ===== UPDATED: Tier badge based on highest rarity found =====
+                // Tier badge - plain white text, no background
                 const status = await getPlanetStatus(currentPlanet.name);
                 const highestRarity = status.highestRarity || 'common';
                 
-                // Map rarity to tier display
                 const rarityToTier = {
-                    'common': { tier: 1, name: 'Common', color: '#4affaa' },
-                    'uncommon': { tier: 2, name: 'Uncommon', color: '#88ff88' },
-                    'rare': { tier: 3, name: 'Rare', color: '#ccff88' },
-                    'very-rare': { tier: 4, name: 'Very Rare', color: '#ffcc66' },
-                    'legendary': { tier: 5, name: 'Legendary', color: '#ffaa44' }
+                    'common': { tier: 1, name: 'Common' },
+                    'uncommon': { tier: 2, name: 'Uncommon' },
+                    'rare': { tier: 3, name: 'Rare' },
+                    'very-rare': { tier: 4, name: 'Very Rare' },
+                    'legendary': { tier: 5, name: 'Legendary' }
                 };
                 
                 const tierDisplay = rarityToTier[highestRarity] || rarityToTier['common'];
                 planetTierBadge.textContent = `Tier ${tierDisplay.tier} • ${tierDisplay.name}`;
-                planetTierBadge.style.backgroundColor = tierDisplay.color;
+                planetTierBadge.style.backgroundColor = 'transparent';
+                planetTierBadge.style.color = '#ffffff';
+                planetTierBadge.style.fontWeight = '500';
                 
                 await loadPlanetSurfaceImage(currentPlanet.name, currentPlanet.type);
                 
@@ -1414,11 +1472,8 @@
                 renderResourceToggles();
                 await updateCargoDisplay();
                 
-                // Load discovery history and rights status
                 await loadDiscoveryHistory();
                 await loadRightsStatus();
-                
-                // Record rediscovery if this planet was hidden
                 await recordRediscovery();
                 
                 return true;
@@ -1433,7 +1488,6 @@
             try {
                 const status = await getPlanetStatus(currentPlanet.name);
                 if (status) {
-                    // Only Very Rare or Legendary planets can be claimed
                     const claimableRarities = ['very-rare', 'legendary'];
                     const isClaimable = status.fullyExplored && !status.claimed && claimableRarities.includes(status.highestRarity);
                     
@@ -1472,7 +1526,7 @@
                 html += `
                     <div class="resource-toggle rarity-${rarity} ${isActive ? 'active' : ''} ${isExplored ? 'explored' : ''}" 
                          onclick="window.toggleResource('${resource}')"
-                         title="Chance: ${chance}%">
+                         title="Chance: ${chance}% (includes ship bonus)">
                         <span class="resource-symbol">${symbol}</span>
                         <span class="resource-name">${resource}</span>
                         <span class="resource-chance">${chance}%</span>
@@ -1505,7 +1559,7 @@
             
             try {
                 const currentMass = await getFreshCargoMass();
-                const cargoLimit = CARGO_MASS_LIMIT;
+                const cargoLimit = getCargoMassLimit();
                 
                 if (currentMass >= cargoLimit) {
                     isExtracting = false;
@@ -1583,7 +1637,7 @@
                             const match = currentDisplay.match(/<span>(\d+)<\/span>/);
                             const currentMassValue = match ? parseInt(match[1]) : 0;
                             const newMass = currentMassValue + totalMass;
-                            cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/5000 AMU`;
+                            cargoMass.innerHTML = `<span>${Math.round(newMass)}</span>/<span id="cargoLimit">${cargoLimit}</span> AMU`;
                             
                             statusBar.classList.add('flash');
                             setTimeout(() => statusBar.classList.remove('flash'), 500);
@@ -1655,7 +1709,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'claiming planet...';
                 
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 const discoveryElement = currentPlanet.resources[0] || 'Unknown';
                 const discoveryRarity = getElementRarity(discoveryElement, currentPlanetTier) || 'common';
