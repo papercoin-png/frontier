@@ -16,6 +16,7 @@ import {
 
 import { getCommunityFund, allocateFromFund, addToFund } from './community-fund.js';
 import { getPlayer, addCredits } from './storage.js';
+import { getDb, getAll } from './db.js';
 
 // ===== CENTRAL BANK CONFIGURATION =====
 export const CENTRAL_BANK_CONFIG = {
@@ -523,18 +524,6 @@ export async function manualContraction(amount, reason) {
     return { success: true, result };
 }
 
-// ===== FORMATTING =====
-function formatMoney(amount) {
-    if (amount >= 1e9) return (amount / 1e9).toFixed(2) + 'B⭐';
-    if (amount >= 1e6) return (amount / 1e6).toFixed(2) + 'M⭐';
-    if (amount >= 1e3) return (amount / 1e3).toFixed(2) + 'K⭐';
-    return amount + '⭐';
-}
-
-function formatPercent(value) {
-    return (value * 100).toFixed(1) + '%';
-}
-
 // ===== EXPORTS =====
 export default {
     CENTRAL_BANK_CONFIG,
@@ -544,9 +533,7 @@ export default {
     getCentralBankStatus,
     getPolicyHistory,
     manualStimulus,
-    manualContraction,
-    formatMoney,
-    formatPercent
+    manualContraction
 };
 
 // ===== WINDOW EXPORTS =====
