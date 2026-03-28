@@ -58,6 +58,9 @@ export const CENTRAL_BANK_CONFIG = {
     // Minimum money supply to intervene
     minMoneySupply: 1000000,  // 1M minimum to avoid negative
     
+    // Active player threshold (days)
+    activePlayerDays: 7,       // Player is active if logged in within 7 days
+    
     // Policy log storage key
     policyLogStore: 'centralBankPolicyLog'
 };
@@ -126,6 +129,31 @@ function canIntervene() {
         return false;
     }
     return true;
+}
+
+// ===== GET ACTIVE PLAYERS =====
+async function getActivePlayers() {
+    try {
+        const db = await getDb();
+        if (db && db.objectStoreNames.contains('player')) {
+            const players = await getAll('player');
+            const sevenDaysAgo = Date.now() - (CENTRAL_BANK_CONFIG.activePlayerDays * 24 * 60 * 60 * 1000);
+            
+            // Filter players who have logged in within the active window
+            const activePlayers = players.filter(player => {
+                const lastPlayed = player.lastPlayed ? new Date(player.lastPlayed).getTime() : player.created ? new Date(player.created).getTime() : 0;
+                return lastPlayed > sevenDaysAgo;
+            });
+            
+            return activePlayers.length > 0 ? activePlayers : players;
+        }
+    } catch (error) {
+        console.error('Error getting active players:', error);
+    }
+    
+    // Fallback: current player only
+    const player = await getPlayer();
+    return player ? [player] : [];
 }
 
 // ===== DETERMINE ECONOMIC CONDITION =====
@@ -220,29 +248,83 @@ function calculateContractionAmount(moneySupply, severity) {
     return Math.floor(moneySupply * percentage);
 }
 
-// ===== APPLY STIMULUS =====
+// ===== APPLY STIMULUS (Equal Distribution to Active Players) =====
 async function applyStimulus(amount, reason, severity) {
     console.log(`🏦 CENTRAL BANK: Applying stimulus of ${formatMoney(amount)} - ${reason}`);
     
-    // Add to money supply
-    const newMoneySupply = await addMoneyToSupply(amount);
+    // Get all active players
+    const players = await getActivePlayers();
+    const playerCount = players.length;
+    
+    if (playerCount === 0) {
+        console.warn('No active players found for stimulus distribution');
+        // Fallback: just add to money supply
+        const newMoneySupply = await addMoneyToSupply(amount);
+        
+        const action = {
+            id: 'stim_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            type: 'STIMULUS_NO_PLAYERS',
+            amount: amount,
+            reason: reason,
+            severity: severity,
+            moneySupplyBefore: newMoneySupply - amount,
+            moneySupplyAfter: newMoneySupply,
+            timestamp: Date.now(),
+            date: new Date().toISOString()
+        };
+        
+        currentPolicyState.policyHistory.unshift(action);
+        currentPolicyState.totalStimulusGiven += amount;
+        currentPolicyState.lastInterventionTime = Date.now();
+        currentPolicyState.lastPolicyAction = action;
+        interventionsThisMonth++;
+        currentPolicyState.interventionsThisMonth = interventionsThisMonth;
+        savePolicyState();
+        addToCentralBankLog(action);
+        
+        return action;
+    }
+    
+    // Calculate equal share per player
+    const perPlayerAmount = Math.floor(amount / playerCount);
+    let totalDistributed = 0;
+    
+    // Distribute to each active player
+    for (const player of players) {
+        await addCredits(perPlayerAmount, player.id);
+        totalDistributed += perPlayerAmount;
+    }
+    
+    // Add any remainder to money supply (if division wasn't perfect)
+    const remainder = amount - totalDistributed;
+    if (remainder > 0) {
+        await addMoneyToSupply(remainder);
+        totalDistributed += remainder;
+    }
+    
+    // Also add total to money supply for accurate tracking
+    await addMoneyToSupply(totalDistributed);
+    
+    console.log(`✅ Distributed ${formatMoney(perPlayerAmount)} to ${playerCount} players (${formatMoney(totalDistributed)} total)`);
     
     // Record the action
     const action = {
         id: 'stim_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         type: 'STIMULUS',
-        amount: amount,
+        amount: totalDistributed,
+        perPlayerAmount: perPlayerAmount,
+        playerCount: playerCount,
         reason: reason,
         severity: severity,
-        moneySupplyBefore: newMoneySupply - amount,
-        moneySupplyAfter: newMoneySupply,
+        moneySupplyBefore: getTotalMoneySupply() - totalDistributed,
+        moneySupplyAfter: getTotalMoneySupply(),
         timestamp: Date.now(),
         date: new Date().toISOString()
     };
     
     // Add to policy history
     currentPolicyState.policyHistory.unshift(action);
-    currentPolicyState.totalStimulusGiven += amount;
+    currentPolicyState.totalStimulusGiven += totalDistributed;
     currentPolicyState.lastInterventionTime = Date.now();
     currentPolicyState.lastPolicyAction = action;
     interventionsThisMonth++;
@@ -255,11 +337,11 @@ async function applyStimulus(amount, reason, severity) {
     return action;
 }
 
-// ===== APPLY CONTRACTION =====
+// ===== APPLY CONTRACTION (No player credits removed) =====
 async function applyContraction(amount, reason, severity) {
     console.log(`🏦 CENTRAL BANK: Applying contraction of ${formatMoney(amount)} - ${reason}`);
     
-    // Remove from money supply
+    // Remove from money supply (no player credits taken)
     const newMoneySupply = await removeMoneyFromSupply(amount);
     
     // Record the action
@@ -288,96 +370,6 @@ async function applyContraction(amount, reason, severity) {
     addToCentralBankLog(action);
     
     return action;
-}
-
-// ===== APPLY STIMULUS VIA COMMUNITY FUND =====
-async function applyStimulusThroughFund(amount, reason) {
-    console.log(`🏦 CENTRAL BANK: Stimulus of ${formatMoney(amount)} allocated via Community Fund - ${reason}`);
-    
-    // Add to community fund first
-    await addToFund(amount, 'central_bank', `Monetary stimulus: ${reason}`, 'reserve');
-    
-    // Then allocate to players via grant system
-    const allocation = await allocateFromFund(
-        amount,
-        'emergency_aid',
-        'Economic Stimulus',
-        `Central bank stimulus: ${reason}`,
-        'central_bank'
-    );
-    
-    if (allocation.success) {
-        console.log(`✅ Stimulus of ${formatMoney(amount)} allocated to community fund`);
-    }
-    
-    // Add to money supply
-    await addMoneyToSupply(amount);
-    
-    const action = {
-        id: 'stim_fund_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        type: 'STIMULUS_THROUGH_FUND',
-        amount: amount,
-        reason: reason,
-        allocationId: allocation.allocation?.id,
-        timestamp: Date.now()
-    };
-    
-    addToCentralBankLog(action);
-    return action;
-}
-
-// ===== DISTRIBUTE STIMULUS DIRECTLY TO PLAYERS =====
-async function distributeStimulusToPlayers(amount, reason) {
-    console.log(`🏦 CENTRAL BANK: Distributing ${formatMoney(amount)} directly to players - ${reason}`);
-    
-    // Get all players
-    const players = await getAllPlayers();
-    if (players.length === 0) {
-        console.warn('No players found for stimulus distribution');
-        return null;
-    }
-    
-    // Distribute equally
-    const perPlayerAmount = Math.floor(amount / players.length);
-    let totalDistributed = 0;
-    
-    for (const player of players) {
-        await addCredits(perPlayerAmount, player.id);
-        totalDistributed += perPlayerAmount;
-    }
-    
-    // Add remainder to money supply
-    await addMoneyToSupply(totalDistributed);
-    
-    const action = {
-        id: 'stim_direct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        type: 'STIMULUS_DIRECT',
-        amount: totalDistributed,
-        perPlayerAmount: perPlayerAmount,
-        playerCount: players.length,
-        reason: reason,
-        timestamp: Date.now()
-    };
-    
-    addToCentralBankLog(action);
-    return action;
-}
-
-// ===== GET ALL PLAYERS HELPER =====
-async function getAllPlayers() {
-    try {
-        const db = await getDb();
-        if (db && db.objectStoreNames.contains('player')) {
-            const players = await getAll('player');
-            return players || [];
-        }
-    } catch (error) {
-        console.error('Error getting players:', error);
-    }
-    
-    // Fallback: current player only
-    const player = await getPlayer();
-    return player ? [player] : [];
 }
 
 // ===== ADD TO CENTRAL BANK LOG =====
@@ -417,6 +409,7 @@ export async function getCentralBankStatus() {
     const inflation = await calculateInflationRate();
     const velocity = await calculateMoneyVelocity();
     const history = getPolicyHistory(5);
+    const players = await getActivePlayers();
     
     return {
         condition: condition.condition,
@@ -428,6 +421,7 @@ export async function getCentralBankStatus() {
         lastInterventionDate: lastInterventionTime ? new Date(lastInterventionTime).toLocaleString() : 'Never',
         totalStimulusGiven: currentPolicyState.totalStimulusGiven,
         totalContractionApplied: currentPolicyState.totalContractionApplied,
+        activePlayerCount: players.length,
         currentMetrics: {
             moneySupply: formatMoney(moneySupply),
             inflation: formatPercent(inflation),
@@ -459,7 +453,7 @@ export async function runMonetaryPolicy() {
     let action = null;
     let result = null;
     
-    // Emergency deflation or stagnation
+    // Emergency deflation or stagnation -> STIMULUS
     if (condition.condition === 'DEFLATION' || condition.condition === 'STAGNATION' || condition.condition === 'EMERGENCY_STIMULUS') {
         const amount = calculateStimulusAmount(moneySupply, 'emergency');
         result = await applyStimulus(amount, `Emergency: ${condition.condition}`, 'emergency');
@@ -471,19 +465,19 @@ export async function runMonetaryPolicy() {
         result = await applyStimulus(amount, `Stimulus needed: inflation ${formatPercent(condition.inflation)}`, 'normal');
         action = 'STIMULUS';
     }
-    // Emergency overheating
+    // Emergency overheating -> CONTRACTION
     else if (condition.condition === 'OVERHEATING') {
         const amount = calculateContractionAmount(moneySupply, 'emergency');
         result = await applyContraction(amount, `Emergency: ${condition.condition}`, 'emergency');
         action = 'EMERGENCY_CONTRACTION';
     }
-    // Normal cooling needed
+    // Normal cooling needed -> CONTRACTION
     else if (condition.condition === 'COOLING_NEEDED') {
         const amount = calculateContractionAmount(moneySupply, 'normal');
         result = await applyContraction(amount, `Cooling needed: inflation ${formatPercent(condition.inflation)}`, 'normal');
         action = 'CONTRACTION';
     }
-    // Speculation
+    // Speculation -> CONTRACTION
     else if (condition.condition === 'SPECULATION') {
         const amount = calculateContractionAmount(moneySupply, 'moderate');
         result = await applyContraction(amount, `Speculation detected: velocity ${condition.velocity.toFixed(2)}`, 'moderate');
