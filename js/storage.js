@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Database version updated to 4 with all required stores created in upgrade
+// FIXED: Database version updated to 5 with proper keyPath configurations
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
 // FIXED: Added getPlayerLocations function for planet-status.js integration
@@ -238,7 +238,7 @@ export function getElementRarity(elementName) {
 }
 
 // ============================================================================
-// INDEXEDDB HELPER FUNCTIONS (Version 4 with all stores created)
+// INDEXEDDB HELPER FUNCTIONS (Version 5 with proper keyPath configurations)
 // ============================================================================
 
 // List of all stores used by the game with proper keyPath configurations
@@ -260,14 +260,29 @@ const ALL_STORES = Object.keys(STORE_CONFIGS);
 
 /**
  * Ensure IndexedDB stores exist with correct configuration
+ * Version 5 - recreates stores with proper keyPaths to fix "out-of-line keys" error
  */
 async function ensureDBStores() {
     if (!window.idb) return null;
     
     try {
-        const db = await window.idb.openDB('VoidfarerDB', 4, {
+        // Increment to version 5 to force schema update
+        const db = await window.idb.openDB('VoidfarerDB', 5, {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
+                
+                // For version upgrade from 4 to 5, delete and recreate problem stores
+                if (oldVersion < 5) {
+                    // Delete existing stores that need proper keyPaths
+                    const storesToRecreate = ['journal', 'element_locations'];
+                    
+                    for (const storeName of storesToRecreate) {
+                        if (db.objectStoreNames.contains(storeName)) {
+                            db.deleteObjectStore(storeName);
+                            console.log(`Deleted old store: ${storeName} for recreation`);
+                        }
+                    }
+                }
                 
                 // Create all stores with proper keyPaths
                 for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
@@ -279,14 +294,18 @@ async function ensureDBStores() {
                             store.createIndex('by_element', 'elementName');
                             store.createIndex('by_planet', 'planet');
                             store.createIndex('by_timestamp', 'timestamp');
+                            console.log(`Created store: ${storeName} with indexes (keyPath: id)`);
                         }
                         
                         // Create index for journal by timestamp
                         if (storeName === 'journal') {
                             store.createIndex('by_timestamp', 'timestamp');
+                            console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
                         }
                         
-                        console.log(`Created store: ${storeName}`);
+                        if (!['element_locations', 'journal'].includes(storeName)) {
+                            console.log(`Created store: ${storeName}`);
+                        }
                     }
                 }
             }
@@ -635,12 +654,12 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
                 const db = await ensureDBStores();
                 if (!db) throw new Error('Failed to open IndexedDB');
                 
-                // Save to journal store
+                // Save to journal store - id is keyPath
                 if (db.objectStoreNames.contains('journal')) {
                     await db.put('journal', entry);
                 }
                 
-                // Save to element_locations store with the same ID as keyPath
+                // Save to element_locations store with id as keyPath
                 const locationEntry = {
                     id: entryId,
                     elementName: elementName,
@@ -1763,4 +1782,4 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with proper IndexedDB key handling and getPlayerLocations integration');
+console.log('✅ storage.js loaded with IndexedDB version 5 (proper keyPaths) and getPlayerLocations integration');
