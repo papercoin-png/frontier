@@ -17,6 +17,7 @@
 // FIXED: Standardized player ID fallback to 'main' across all functions
 // ADDED: Sector scanning functions (markSectorScanned, markStarSectorScanned, markStarScanned)
 // FIXED: setItem function to properly handle stores with keyPath (in-line keys)
+// FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -247,6 +248,7 @@ export function getElementRarity(elementName) {
 // ============================================================================
 
 // List of all stores used by the game with proper keyPath configurations
+// UPDATED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots)
 const STORE_CONFIGS = {
     certificates: { keyPath: 'id', autoIncrement: true },
     laborPool: { keyPath: 'id' },
@@ -258,7 +260,25 @@ const STORE_CONFIGS = {
     communityFund: { keyPath: 'id' },
     communityProjects: { keyPath: 'id', autoIncrement: true },
     communityGrants: { keyPath: 'id', autoIncrement: true },
-    fundHistory: { keyPath: 'id', autoIncrement: true }
+    fundHistory: { keyPath: 'id', autoIncrement: true },
+    // Economic stores from db.js
+    activeEvents: { keyPath: 'id' },
+    eventHistory: { keyPath: 'id' },
+    dailyMetrics: { keyPath: 'date' },
+    hourlySnapshots: { keyPath: 'timestamp' },
+    // NPC Trader stores
+    npcTraders: { keyPath: 'id' },
+    npcTraderOrders: { keyPath: 'id', autoIncrement: true },
+    npcTraderHistory: { keyPath: 'id', autoIncrement: true },
+    // Market stores
+    marketPrices: { keyPath: 'id' },
+    marketOrders: { keyPath: 'id' },
+    tradeHistory: { keyPath: 'id', autoIncrement: true },
+    orderHistory: { keyPath: 'id', autoIncrement: true },
+    priceHistory: { keyPath: 'element' },
+    supplyDemand: { keyPath: 'id' },
+    marketVolume: { keyPath: 'element' },
+    priceAlerts: { keyPath: 'id', autoIncrement: true }
 };
 
 const ALL_STORES = Object.keys(STORE_CONFIGS);
@@ -301,7 +321,28 @@ async function ensureDBStores() {
                             console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
                         }
                         
-                        if (!['element_locations', 'journal'].includes(storeName)) {
+                        if (storeName === 'activeEvents') {
+                            store.createIndex('expiresAt', 'expiresAt');
+                            store.createIndex('severity', 'severity');
+                            console.log(`Created store: ${storeName} with indexes (keyPath: id)`);
+                        }
+                        
+                        if (storeName === 'eventHistory') {
+                            store.createIndex('timestamp', 'timestamp');
+                            console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
+                        }
+                        
+                        if (storeName === 'dailyMetrics') {
+                            store.createIndex('timestamp', 'timestamp');
+                            console.log(`Created store: ${storeName} with timestamp index (keyPath: date)`);
+                        }
+                        
+                        if (storeName === 'hourlySnapshots') {
+                            store.createIndex('hour', 'hour');
+                            console.log(`Created store: ${storeName} with hour index (keyPath: timestamp)`);
+                        }
+                        
+                        if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots'].includes(storeName)) {
                             console.log(`Created store: ${storeName}`);
                         }
                     }
