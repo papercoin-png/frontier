@@ -1,6 +1,7 @@
 // js/tax-system.js - Progressive taxation system for Voidfarer
 // UPDATED: Fixed IndexedDB calls to use proper db.js functions
 // UPDATED: Uses getDb() for database access
+// UPDATED: Added coordinated tax policy with Central Bank
 
 import { getDb, getAll, setItem, getItem, addTransaction } from './db.js';
 
@@ -22,6 +23,16 @@ let CURRENT_TAX_RATES = {
     [TAX_TYPES.LUXURY]: 0.03,
     [TAX_TYPES.ESTATE]: 0.10,
     [TAX_TYPES.REGISTRATION]: 5000
+};
+
+// ===== TAX RATE LIMITS =====
+const TAX_LIMITS = {
+    [TAX_TYPES.TRANSACTION]: { min: 0.01, max: 0.04 },      // 1% to 4%
+    [TAX_TYPES.PROPERTY]: { min: 0.001, max: 0.02 },        // 0.1% to 2%
+    [TAX_TYPES.INCOME]: { min: 0.03, max: 0.25 },           // 3% to 25%
+    [TAX_TYPES.LUXURY]: { min: 0.01, max: 0.15 },           // 1% to 15%
+    [TAX_TYPES.ESTATE]: { min: 0.05, max: 0.20 },           // 5% to 20%
+    [TAX_TYPES.REGISTRATION]: { min: 1000, max: 10000 }     // 1,000 to 10,000
 };
 
 // ===== TAX BRACKETS =====
@@ -47,8 +58,14 @@ const TAX_STORAGE_KEYS = {
     TAX_HISTORY: 'voidfarer_tax_history',
     LUXURY_THRESHOLD: 'voidfarer_luxury_threshold',
     TAX_EXEMPTIONS: 'voidfarer_tax_exemptions',
-    COMMUNITY_FUND: 'voidfarer_community_fund'
+    COMMUNITY_FUND: 'voidfarer_community_fund',
+    TAX_POLICY_HISTORY: 'voidfarer_tax_policy_history'
 };
+
+// ===== COORDINATED TAX POLICY =====
+let lastTaxAdjustment = 0;
+let currentPolicyMode = 'NEUTRAL';
+const TAX_ADJUSTMENT_COOLDOWN = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 // ===== INITIALIZE TAX SYSTEM =====
 async function initializeTaxSystem() {
@@ -61,6 +78,10 @@ async function initializeTaxSystem() {
     
     if (!localStorage.getItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS)) {
         localStorage.setItem(TAX_STORAGE_KEYS.TAX_EXEMPTIONS, JSON.stringify({}));
+    }
+    
+    if (!localStorage.getItem(TAX_STORAGE_KEYS.TAX_POLICY_HISTORY)) {
+        localStorage.setItem(TAX_STORAGE_KEYS.TAX_POLICY_HISTORY, JSON.stringify([]));
     }
     
     console.log('Tax system initialized');
@@ -77,6 +98,11 @@ function saveCurrentRates() {
 
 function updateTaxRate(taxType, newRate) {
     if (CURRENT_TAX_RATES.hasOwnProperty(taxType)) {
+        // Apply limits
+        const limits = TAX_LIMITS[taxType];
+        if (limits) {
+            newRate = Math.max(limits.min, Math.min(limits.max, newRate));
+        }
         CURRENT_TAX_RATES[taxType] = newRate;
         saveCurrentRates();
         return true;
@@ -87,31 +113,172 @@ function updateTaxRate(taxType, newRate) {
 function adjustAllRates(adjustments) {
     Object.keys(adjustments).forEach(taxType => {
         if (CURRENT_TAX_RATES.hasOwnProperty(taxType)) {
-            CURRENT_TAX_RATES[taxType] += adjustments[taxType];
-            if (taxType === TAX_TYPES.TRANSACTION) {
-                CURRENT_TAX_RATES[taxType] = Math.max(0.005, Math.min(0.08, CURRENT_TAX_RATES[taxType]));
+            let newRate = CURRENT_TAX_RATES[taxType] + adjustments[taxType];
+            const limits = TAX_LIMITS[taxType];
+            if (limits) {
+                newRate = Math.max(limits.min, Math.min(limits.max, newRate));
             }
-            if (taxType === TAX_TYPES.PROPERTY) {
-                CURRENT_TAX_RATES[taxType] = Math.max(0.001, Math.min(0.02, CURRENT_TAX_RATES[taxType]));
-            }
-            if (taxType === TAX_TYPES.INCOME) {
-                CURRENT_TAX_RATES[taxType] = Math.max(0.03, Math.min(0.25, CURRENT_TAX_RATES[taxType]));
-            }
-            if (taxType === TAX_TYPES.LUXURY) {
-                CURRENT_TAX_RATES[taxType] = Math.max(0.01, Math.min(0.15, CURRENT_TAX_RATES[taxType]));
-            }
+            CURRENT_TAX_RATES[taxType] = newRate;
         }
     });
     saveCurrentRates();
 }
 
-// ===== TRANSACTION TAX =====
+// ===== COORDINATED TAX POLICY =====
+function canAdjustTax() {
+    const now = Date.now();
+    if (now - lastTaxAdjustment < TAX_ADJUSTMENT_COOLDOWN) {
+        return false;
+    }
+    return true;
+}
+
+function logTaxPolicyAction(action) {
+    const history = localStorage.getItem(TAX_STORAGE_KEYS.TAX_POLICY_HISTORY);
+    const allActions = history ? JSON.parse(history) : [];
+    
+    allActions.unshift({
+        ...action,
+        timestamp: Date.now(),
+        date: new Date().toISOString()
+    });
+    
+    // Keep only last 50 actions
+    while (allActions.length > 50) {
+        allActions.pop();
+    }
+    
+    localStorage.setItem(TAX_STORAGE_KEYS.TAX_POLICY_HISTORY, JSON.stringify(allActions));
+}
+
+function getTaxPolicyHistory(limit = 10) {
+    const history = localStorage.getItem(TAX_STORAGE_KEYS.TAX_POLICY_HISTORY);
+    const allActions = history ? JSON.parse(history) : [];
+    return allActions.slice(0, limit);
+}
+
+function getTaxPolicyStatus() {
+    return {
+        currentPolicyMode: currentPolicyMode,
+        lastAdjustment: lastTaxAdjustment,
+        lastAdjustmentDate: lastTaxAdjustment ? new Date(lastTaxAdjustment).toLocaleString() : 'Never',
+        canAdjust: canAdjustTax(),
+        currentRates: getCurrentRates(),
+        transactionTaxRate: CURRENT_TAX_RATES[TAX_TYPES.TRANSACTION] * 100 + '%',
+        transactionTaxLimit: {
+            min: TAX_LIMITS[TAX_TYPES.TRANSACTION].min * 100 + '%',
+            max: TAX_LIMITS[TAX_TYPES.TRANSACTION].max * 100 + '%'
+        }
+    };
+}
+
+/**
+ * Run coordinated tax policy with Central Bank
+ * @param {Object} centralBankCondition - Condition from Central Bank
+ * @returns {Object} Result of tax adjustments
+ */
+async function runCoordinatedTaxPolicy(centralBankCondition) {
+    if (!centralBankCondition) {
+        console.log('No central bank condition provided');
+        return { success: false, reason: 'No condition data' };
+    }
+    
+    if (!canAdjustTax()) {
+        console.log('Tax policy: Cannot adjust - cooldown active');
+        return { success: false, reason: 'Cooldown active', canAdjust: false };
+    }
+    
+    const condition = centralBankCondition.condition;
+    const severity = centralBankCondition.severity;
+    let adjustment = 0;
+    let reason = '';
+    let newPolicyMode = currentPolicyMode;
+    
+    // Determine transaction tax adjustment based on Central Bank condition
+    if (condition === 'DEFLATION' || condition === 'STAGNATION' || condition === 'EMERGENCY_STIMULUS') {
+        // Emergency stimulus: lower transaction tax significantly
+        adjustment = -0.005;  // -0.5%
+        reason = `Emergency stimulus mode: ${condition}`;
+        newPolicyMode = 'STIMULUS_EMERGENCY';
+    } 
+    else if (condition === 'STIMULUS_NEEDED') {
+        // Normal stimulus: lower transaction tax slightly
+        adjustment = -0.003;  // -0.3%
+        reason = `Stimulus mode: low inflation (${(centralBankCondition.inflation * 100).toFixed(1)}%)`;
+        newPolicyMode = 'STIMULUS';
+    }
+    else if (condition === 'OVERHEATING') {
+        // Emergency contraction: raise transaction tax significantly
+        adjustment = 0.005;  // +0.5%
+        reason = `Emergency cooling: high inflation (${(centralBankCondition.inflation * 100).toFixed(1)}%)`;
+        newPolicyMode = 'CONTRACTION_EMERGENCY';
+    }
+    else if (condition === 'COOLING_NEEDED' || condition === 'SPECULATION') {
+        // Normal contraction: raise transaction tax slightly
+        adjustment = 0.003;  // +0.3%
+        reason = `Cooling mode: ${condition}`;
+        newPolicyMode = 'CONTRACTION';
+    }
+    else {
+        // Neutral: no adjustment
+        console.log('Tax policy: Neutral - no adjustment needed');
+        return { success: true, action: 'NONE', reason: 'Economy stable' };
+    }
+    
+    // Calculate new rate
+    const currentRate = CURRENT_TAX_RATES[TAX_TYPES.TRANSACTION];
+    let newRate = currentRate + adjustment;
+    
+    // Apply limits
+    const limits = TAX_LIMITS[TAX_TYPES.TRANSACTION];
+    newRate = Math.max(limits.min, Math.min(limits.max, newRate));
+    
+    // Check if actual change occurred
+    if (Math.abs(newRate - currentRate) < 0.001) {
+        console.log('Tax policy: Rate at limit, no change');
+        return { success: true, action: 'NONE', reason: 'Rate at limit' };
+    }
+    
+    // Apply the change
+    CURRENT_TAX_RATES[TAX_TYPES.TRANSACTION] = newRate;
+    saveCurrentRates();
+    lastTaxAdjustment = Date.now();
+    currentPolicyMode = newPolicyMode;
+    
+    // Log the action
+    const action = {
+        type: 'TRANSACTION_TAX_ADJUSTMENT',
+        oldRate: currentRate,
+        newRate: newRate,
+        adjustment: adjustment,
+        reason: reason,
+        centralBankCondition: condition,
+        severity: severity,
+        policyMode: newPolicyMode
+    };
+    
+    logTaxPolicyAction(action);
+    
+    console.log(`📊 Tax Policy: Transaction tax ${(currentRate * 100).toFixed(1)}% → ${(newRate * 100).toFixed(1)}% (${adjustment > 0 ? '+' : ''}${(adjustment * 100).toFixed(1)}%) - ${reason}`);
+    
+    return {
+        success: true,
+        action: 'ADJUSTED',
+        taxType: 'transaction',
+        oldRate: currentRate,
+        newRate: newRate,
+        adjustment: adjustment,
+        reason: reason,
+        policyMode: newPolicyMode
+    };
+}
+
+// ===== TAX CALCULATION FUNCTIONS =====
 function calculateTransactionTax(amount) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.TRANSACTION];
     return Math.floor(amount * rate);
 }
 
-// ===== PROPERTY TAX =====
 function calculatePropertyTax(propertyValue) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.PROPERTY];
     return Math.floor(propertyValue * rate);
@@ -125,7 +292,6 @@ async function calculateMonthlyPropertyTax(properties) {
     return totalTax;
 }
 
-// ===== INCOME TAX =====
 function calculateIncomeTax(income) {
     const brackets = TAX_BRACKETS[TAX_TYPES.INCOME];
     let tax = 0;
@@ -143,7 +309,6 @@ function calculateIncomeTax(income) {
     return Math.floor(tax);
 }
 
-// ===== LUXURY TAX =====
 function calculateLuxuryTax(totalWealth) {
     const brackets = TAX_BRACKETS[TAX_TYPES.LUXURY];
     let tax = 0;
@@ -167,13 +332,11 @@ function calculateMonthlyLuxuryTax(totalWealth) {
     return Math.floor(calculateLuxuryTax(totalWealth) / 12);
 }
 
-// ===== ESTATE TAX =====
 function calculateEstateTax(transferAmount) {
     const rate = CURRENT_TAX_RATES[TAX_TYPES.ESTATE];
     return Math.floor(transferAmount * rate);
 }
 
-// ===== REGISTRATION FEE =====
 function getRegistrationFee() {
     return CURRENT_TAX_RATES[TAX_TYPES.REGISTRATION];
 }
@@ -478,36 +641,6 @@ function getTaxDescription(taxType) {
     return descriptions[taxType] || 'Tax payment';
 }
 
-// ===== EXPOSE TO WINDOW =====
-window.TAX_TYPES = TAX_TYPES;
-window.TAX_BRACKETS = TAX_BRACKETS;
-window.CURRENT_TAX_RATES = CURRENT_TAX_RATES;
-window.initializeTaxSystem = initializeTaxSystem;
-window.getCurrentRates = getCurrentRates;
-window.saveCurrentRates = saveCurrentRates;
-window.updateTaxRate = updateTaxRate;
-window.adjustAllRates = adjustAllRates;
-window.calculateTransactionTax = calculateTransactionTax;
-window.calculatePropertyTax = calculatePropertyTax;
-window.calculateMonthlyPropertyTax = calculateMonthlyPropertyTax;
-window.calculateIncomeTax = calculateIncomeTax;
-window.calculateLuxuryTax = calculateLuxuryTax;
-window.calculateAnnualLuxuryTax = calculateAnnualLuxuryTax;
-window.calculateMonthlyLuxuryTax = calculateMonthlyLuxuryTax;
-window.calculateEstateTax = calculateEstateTax;
-window.getRegistrationFee = getRegistrationFee;
-window.getTaxExemptions = getTaxExemptions;
-window.addTaxExemption = addTaxExemption;
-window.getTaxHistory = getTaxHistory;
-window.getPlayerTaxSummary = getPlayerTaxSummary;
-window.payTax = payTax;
-window.getCommunityFund = getCommunityFund;
-window.addToCommunityFund = addToCommunityFund;
-window.allocateFromCommunityFund = allocateFromCommunityFund;
-window.getCommunityFundSummary = getCommunityFundSummary;
-window.formatTaxRate = formatTaxRate;
-window.getTaxDescription = getTaxDescription;
-
 // ===== EXPORT =====
 export {
     TAX_TYPES,
@@ -517,6 +650,9 @@ export {
     saveCurrentRates,
     updateTaxRate,
     adjustAllRates,
+    runCoordinatedTaxPolicy,
+    getTaxPolicyStatus,
+    getTaxPolicyHistory,
     calculateTransactionTax,
     calculatePropertyTax,
     calculateMonthlyPropertyTax,
@@ -539,32 +675,26 @@ export {
     getTaxDescription
 };
 
-export default {
-    TAX_TYPES,
-    TAX_BRACKETS,
-    initializeTaxSystem,
-    getCurrentRates,
-    saveCurrentRates,
-    updateTaxRate,
-    adjustAllRates,
-    calculateTransactionTax,
-    calculatePropertyTax,
-    calculateMonthlyPropertyTax,
-    calculateIncomeTax,
-    calculateLuxuryTax,
-    calculateAnnualLuxuryTax,
-    calculateMonthlyLuxuryTax,
-    calculateEstateTax,
-    getRegistrationFee,
-    getTaxExemptions,
-    addTaxExemption,
-    getTaxHistory,
-    getPlayerTaxSummary,
-    payTax,
-    getCommunityFund,
-    addToCommunityFund,
-    allocateFromCommunityFund,
-    getCommunityFundSummary,
-    formatTaxRate,
-    getTaxDescription
-};
+// ===== WINDOW EXPORTS =====
+window.TAX_TYPES = TAX_TYPES;
+window.TAX_BRACKETS = TAX_BRACKETS;
+window.initializeTaxSystem = initializeTaxSystem;
+window.getCurrentRates = getCurrentRates;
+window.updateTaxRate = updateTaxRate;
+window.adjustAllRates = adjustAllRates;
+window.runCoordinatedTaxPolicy = runCoordinatedTaxPolicy;
+window.getTaxPolicyStatus = getTaxPolicyStatus;
+window.getTaxPolicyHistory = getTaxPolicyHistory;
+window.calculateTransactionTax = calculateTransactionTax;
+window.calculatePropertyTax = calculatePropertyTax;
+window.calculateIncomeTax = calculateIncomeTax;
+window.getRegistrationFee = getRegistrationFee;
+window.getTaxExemptions = getTaxExemptions;
+window.addTaxExemption = addTaxExemption;
+window.getTaxHistory = getTaxHistory;
+window.payTax = payTax;
+window.getCommunityFund = getCommunityFund;
+window.getCommunityFundSummary = getCommunityFundSummary;
+window.formatTaxRate = formatTaxRate;
+
+console.log('📊 tax-system.js loaded - Coordinated tax policy ready');
