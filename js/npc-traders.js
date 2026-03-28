@@ -8,6 +8,7 @@
 // UPDATED: Fixed to only trade chemical elements on VoidEx (no ship parts)
 // UPDATED: Added inventory pruning to prevent excessive storage growth
 // UPDATED: FIXED - Now writes orders to IndexedDB instead of localStorage
+// UPDATED: Now uses elements-data.js as the single source of truth for element data
 
 import { 
     saveNPCTraders, loadNPCTraders,
@@ -31,6 +32,8 @@ import marketDynamics from './market-dynamics.js';
 const { getCurrentPrices, getBidPrice, getAskPrice, updatePrices } = marketDynamics;
 
 import { ORDER_TYPES, ORDER_SIDES, ORDER_STATUS, createOrder } from './market-engine.js';
+
+import { ELEMENTS, getElementByName, getElementRarity, getElementValue, getElementIcon } from './elements-data.js';
 
 // ===== DEBUG FLAG - SET TO FALSE TO REDUCE CONSOLE SPAM =====
 const DEBUG_NPC = false;
@@ -366,45 +369,23 @@ export async function initializeNPCTraders(availableElements = []) {
     const counts = {};
     let nameIndex = 0;
     
-    // ===== FIX: Only use chemical elements (no ship parts) =====
+    // ===== FIX: Only use chemical elements from elements-data.js =====
     let chemicalElements = availableElements.filter(el => {
-        const isChemical = el.symbol && 
-                          el.symbol.length <= 3 && 
-                          el.symbol.match(/^[A-Z][a-z]?$|^[A-Z][a-z]?[a-z]?$/) &&
-                          !el.name.includes('ship_') &&
-                          !el.name.includes('cargo_') &&
-                          !el.name.includes('engine_') &&
-                          !el.name.includes('weapon_') &&
-                          !el.name.includes('module_') &&
-                          !el.name.includes('reactor_') &&
-                          !el.name.includes('shield_') &&
-                          !el.name.includes('thruster_');
-        
-        return isChemical && el.currentPrice && el.currentPrice > 0;
+        const elementData = getElementByName(el.name);
+        return elementData !== null;
     });
     
     if (chemicalElements.length === 0) {
-        console.warn('No chemical elements in availableElements, using built-in element list');
+        console.warn('No chemical elements in availableElements, using elements-data.js');
         
-        const commonElements = [
-            'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 
-            'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Magnesium',
-            'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon',
-            'Potassium', 'Calcium', 'Scandium', 'Titanium', 'Vanadium', 'Chromium',
-            'Manganese', 'Iron', 'Cobalt', 'Nickel', 'Copper', 'Zinc',
-            'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton',
-            'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum',
-            'Silver', 'Tin', 'Iodine', 'Gold', 'Platinum', 'Uranium'
-        ];
-        
-        chemicalElements = commonElements.map(name => ({
-            name,
-            symbol: name.substring(0, 2),
-            currentPrice: 50 + Math.random() * 200,
-            rarity: 'common'
+        chemicalElements = ELEMENTS.map(element => ({
+            name: element.name,
+            symbol: element.symbol,
+            currentPrice: element.value || 100,
+            rarity: element.rarity
         }));
         
-        console.log(`Using ${chemicalElements.length} fallback chemical elements`);
+        console.log(`Using ${chemicalElements.length} chemical elements from elements-data.js`);
     }
     
     console.log(`Found ${chemicalElements.length} chemical elements for VoidEx trading`);
@@ -1502,4 +1483,4 @@ window.getNPCOrders = getNPCOrders;
 window.resetNPCTraders = resetNPCTraders;
 window.updateNPCTraderAfterTrade = updateNPCTraderAfterTrade;
 
-console.log('✅ npc-traders.js loaded - NPC trader system ready with market orders and inventory pruning');
+console.log('✅ npc-traders.js loaded - NPC trader system ready with market orders and inventory pruning (using elements-data.js)');
