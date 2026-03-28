@@ -1,19 +1,7 @@
 // js/storage.js - Save/load player progress for Voidfarer
 // Using IndexedDB via db.js for unlimited storage with mass-based cargo
-// UPDATED: Added market data persistence for trading system
-// UPDATED: Added certificate holder tracking for labor pool distribution
-// UPDATED: Added NPC trader persistence for marketplace NPCs
-// UPDATED: Added market data cleanup functions to prevent localStorage quota issues
-// UPDATED: Added location saving to IndexedDB when collecting elements
-// FIXED: Added recordTrade call to update market dynamics when elements are added
-// FIXED: Added dbSaveElementLocation function for journal tracking
-// UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
-// UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Database version updated to 5 with proper keyPath configurations
-// CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
-// ADDED: getElementRarity function for University cargo system
-// FIXED: Added getPlayerLocations function for planet-status.js integration
-// FIXED: IndexedDB store creation with proper keyPaths to prevent "out-of-line keys" error
+// UPDATED: Standardized player ID fallback to 'main' across all functions
+// FIXED: Consistent player ID handling across Ship Bridge, Surface, and Journal pages
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -194,7 +182,7 @@ function getCargoMassLimit() {
     return typeof window.CARGO_MASS_LIMIT !== 'undefined' ? window.CARGO_MASS_LIMIT : 5000;
 }
 
-// ===== ELEMENT RARITY CLASSIFICATION (for University cargo system) =====
+// ===== ELEMENT RARITY CLASSIFICATION =====
 export function getElementRarity(elementName) {
     const commonElements = [
         'Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 'Nitrogen', 'Oxygen',
@@ -238,7 +226,7 @@ export function getElementRarity(elementName) {
 }
 
 // ============================================================================
-// INDEXEDDB HELPER FUNCTIONS (Version 5 with proper keyPath configurations)
+// INDEXEDDB HELPER FUNCTIONS
 // ============================================================================
 
 // List of all stores used by the game with proper keyPath configurations
@@ -266,14 +254,12 @@ async function ensureDBStores() {
     if (!window.idb) return null;
     
     try {
-        // Increment to version 5 to force schema update
         const db = await window.idb.openDB('VoidfarerDB', 5, {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
                 // For version upgrade from 4 to 5, delete and recreate problem stores
                 if (oldVersion < 5) {
-                    // Delete existing stores that need proper keyPaths
                     const storesToRecreate = ['journal', 'element_locations'];
                     
                     for (const storeName of storesToRecreate) {
@@ -353,13 +339,10 @@ export async function setItem(storeName, value, id = 'main') {
         const db = await ensureDBStores();
         if (!db) throw new Error('Failed to open IndexedDB');
         
-        // If the store uses autoIncrement and no id provided, let it generate
         const config = STORE_CONFIGS[storeName];
         if (config && config.autoIncrement && !value.id) {
-            // Don't specify key, let it auto-generate
             await db.add(storeName, value);
         } else {
-            // Use put with the id from value or provided id
             const key = value.id || id;
             await db.put(storeName, value, key);
         }
@@ -602,7 +585,8 @@ export async function spendCredits(amount, playerId = 'main') {
 
 export async function getCollection(playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${actualPlayerId}`;
         const saved = localStorage.getItem(key);
         return saved ? JSON.parse(saved) : {};
@@ -615,7 +599,8 @@ export async function getCollection(playerId = null) {
 // ===== ENHANCED: Save location to both journal and element_locations =====
 async function dbSaveElementLocation(elementName, planetName, locationData = {}) {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const entryId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
         // 1. Save to localStorage journal
@@ -654,12 +639,10 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
                 const db = await ensureDBStores();
                 if (!db) throw new Error('Failed to open IndexedDB');
                 
-                // Save to journal store - id is keyPath
                 if (db.objectStoreNames.contains('journal')) {
                     await db.put('journal', entry);
                 }
                 
-                // Save to element_locations store with id as keyPath
                 const locationEntry = {
                     id: entryId,
                     elementName: elementName,
@@ -693,7 +676,8 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
 
 export async function addElementToCollection(elementName, quantity = 1, metadata = {}) {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         
         let collection = await getCollection(playerId);
@@ -710,7 +694,6 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         
         localStorage.setItem(key, JSON.stringify(collection));
         
-        // Save location data if provided
         if (metadata && metadata.planet) {
             await dbSaveElementLocation(elementName, metadata.planet, {
                 planetType: metadata.planetType || 'unknown',
@@ -736,7 +719,8 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
 
 export async function removeElementFromCollection(elementName, quantity = 1) {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const key = `${STORAGE_KEYS.COLLECTION}_${playerId}`;
         const collection = await getCollection(playerId);
         
@@ -779,7 +763,8 @@ export async function removeElementFromCollection(elementName, quantity = 1) {
 
 export async function getJournal() {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const journalKey = `voidfarer_journal_${playerId}`;
         const saved = localStorage.getItem(journalKey);
         if (saved) return JSON.parse(saved);
@@ -807,13 +792,8 @@ export async function getJournal() {
 }
 
 // ===== getPlayerLocations for planet-status.js integration =====
-/**
- * Get all player locations for planet-status.js
- * Returns array of location objects with planet, elementName, timestamp, etc.
- */
 export async function getPlayerLocations() {
     try {
-        // First try to get from IndexedDB element_locations store
         if (window.idb) {
             try {
                 const db = await ensureDBStores();
@@ -828,7 +808,6 @@ export async function getPlayerLocations() {
             }
         }
         
-        // Fallback to journal entries
         const journal = await getJournal();
         if (journal && journal.entries) {
             return journal.entries.map(entry => ({
@@ -854,7 +833,6 @@ export async function getPlayerLocations() {
 
 export async function getElementLocations(elementName) {
     try {
-        // Try IndexedDB first
         if (window.idb) {
             try {
                 const locations = await getByIndex('element_locations', 'by_element', elementName);
@@ -864,7 +842,6 @@ export async function getElementLocations(elementName) {
             } catch (idbError) {}
         }
         
-        // Fallback to journal
         const journal = await getJournal();
         if (journal && journal.entries) {
             return journal.entries
@@ -900,7 +877,8 @@ export async function getRecentJournalEntries(limit = 20) {
 
 export async function clearJournal() {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         localStorage.removeItem(`voidfarer_journal_${playerId}`);
         if (window.idb) {
             try {
@@ -999,7 +977,8 @@ export async function getRemainingHubStorage() {
 
 export async function getRemainingShipStorage() {
     try {
-        const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        // FIXED: Use 'main' as fallback to match Ship Bridge
+        const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const collection = await getCollection(playerId);
         const max = getCargoMassLimit();
         let used = 0;
@@ -1162,7 +1141,7 @@ export function clearWarpData() {
 export function getPlayerId() {
     let playerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
     if (!playerId) {
-        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        playerId = 'main';
         localStorage.setItem(STORAGE_KEYS.PLAYER_ID, playerId);
     }
     return playerId;
@@ -1246,7 +1225,7 @@ export async function loadMarketData() {
 
 export async function saveOrderBook(orderBookData, playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         localStorage.setItem(`${STORAGE_KEYS.MARKET_ORDERS}_${actualPlayerId}`, JSON.stringify(orderBookData));
         return true;
     } catch (error) {
@@ -1257,7 +1236,7 @@ export async function saveOrderBook(orderBookData, playerId = null) {
 
 export async function loadOrderBook(playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         const saved = localStorage.getItem(`${STORAGE_KEYS.MARKET_ORDERS}_${actualPlayerId}`);
         return saved ? JSON.parse(saved) : null;
     } catch (error) {
@@ -1268,7 +1247,7 @@ export async function loadOrderBook(playerId = null) {
 
 export async function savePortfolio(portfolioData, playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         localStorage.setItem(`voidfarer_portfolio_${actualPlayerId}`, JSON.stringify(portfolioData));
         return true;
     } catch (error) {
@@ -1279,7 +1258,7 @@ export async function savePortfolio(portfolioData, playerId = null) {
 
 export async function loadPortfolio(playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         const saved = localStorage.getItem(`voidfarer_portfolio_${actualPlayerId}`);
         return saved ? JSON.parse(saved) : null;
     } catch (error) {
@@ -1290,7 +1269,7 @@ export async function loadPortfolio(playerId = null) {
 
 export async function saveTradeHistory(trades, playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         localStorage.setItem(`voidfarer_trades_${actualPlayerId}`, JSON.stringify(trades));
         return true;
     } catch (error) {
@@ -1301,7 +1280,7 @@ export async function saveTradeHistory(trades, playerId = null) {
 
 export async function loadTradeHistory(playerId = null) {
     try {
-        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'player_default';
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
         const saved = localStorage.getItem(`voidfarer_trades_${actualPlayerId}`);
         return saved ? JSON.parse(saved) : [];
     } catch (error) {
@@ -1460,7 +1439,7 @@ export async function updateNPCTraderAfterTrade(traderId, tradeData) {
 }
 
 // ============================================================================
-// CERTIFICATE HOLDER FUNCTIONS (FOR LABOR POOL)
+// CERTIFICATE HOLDER FUNCTIONS
 // ============================================================================
 
 export async function getCertificateHolders(certificateId = null) {
@@ -1627,7 +1606,6 @@ export async function getScannedStars(playerId) {
 export async function initializeStorage(playerId = 'main') {
     console.log('Initializing storage for player:', playerId);
     
-    // Ensure IndexedDB stores exist with proper configuration
     await ensureDBStores();
     
     const player = await getPlayer(playerId);
@@ -1782,4 +1760,4 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with IndexedDB version 5 (proper keyPaths) and getPlayerLocations integration');
+console.log('✅ storage.js loaded with consistent player ID fallback (main)');
