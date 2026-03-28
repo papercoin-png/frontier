@@ -469,6 +469,16 @@
             font-weight: 600;
         }
         
+        .tax-policy-note {
+            font-size: 10px;
+            color: #ffaa4a;
+            margin-top: 8px;
+            text-align: center;
+            padding: 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 30px;
+        }
+        
         .events-section {
             background: rgba(30, 45, 70, 0.6);
             backdrop-filter: blur(10px);
@@ -754,6 +764,7 @@
             <div class="tax-section">
                 <div class="tax-header">Current Tax Rates</div>
                 <div class="tax-grid" id="taxRates"></div>
+                <div class="tax-policy-note" id="taxPolicyNote"></div>
             </div>
             
             <div class="events-section">
@@ -804,7 +815,7 @@
 
     <script type="module">
         import { initializeMetrics, getTotalMoneySupply, getPlayerCount, calculateGiniCoefficient, getWealthPercentiles, calculateInflationRate, calculateMoneyVelocity, assessEconomicHealth, getDailyMetrics, recordDailyMetrics, formatMoney, formatPercent, refreshMoneySupply } from './js/economic-metrics.js';
-        import { initializeTaxSystem, getCurrentRates } from './js/tax-system.js';
+        import { initializeTaxSystem, getCurrentRates, getTaxPolicyStatus, getTaxPolicyHistory } from './js/tax-system.js';
         import { initializeCommunityFund, getFundSummary, addToFund } from './js/community-fund.js';
         import { getPlayer } from './js/storage.js';
         import { initDB, dbSaveDailyMetrics, dbGetDailyMetricsRange } from './js/db.js';
@@ -928,6 +939,10 @@
                         <span>Inflation: ${status.currentMetrics.inflation}</span>
                         <span>Velocity: ${status.currentMetrics.velocity}</span>
                     </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Tax Policy: <strong style="color: #ffaa4a;">${status.taxPolicy.mode}</strong></span>
+                        <span>Transaction Tax: ${status.taxPolicy.transactionTaxRate}</span>
+                    </div>
                     <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #6a8ac0;">
                         <span>Interventions this month: ${status.interventionsThisMonth}/${status.interventionsRemaining + status.interventionsThisMonth}</span>
                         <span>Last action: ${status.lastInterventionDate}</span>
@@ -939,20 +954,47 @@
             }
         }
 
+        // ===== UPDATE TAX POLICY SECTION =====
+        async function updateTaxPolicySection() {
+            try {
+                const taxStatus = getTaxPolicyStatus();
+                const note = document.getElementById('taxPolicyNote');
+                
+                if (taxStatus.currentPolicyMode === 'STIMULUS' || taxStatus.currentPolicyMode === 'STIMULUS_EMERGENCY') {
+                    note.innerHTML = `📊 Coordinated with Central Bank: ${taxStatus.currentPolicyMode} mode - Transaction tax reduced to encourage trading`;
+                } else if (taxStatus.currentPolicyMode === 'CONTRACTION' || taxStatus.currentPolicyMode === 'CONTRACTION_EMERGENCY') {
+                    note.innerHTML = `📊 Coordinated with Central Bank: ${taxStatus.currentPolicyMode} mode - Transaction tax increased to cool speculation`;
+                } else {
+                    note.innerHTML = `📊 Tax policy neutral - Rates stable`;
+                }
+                
+                // Add last adjustment info if available
+                const history = getTaxPolicyHistory(1);
+                if (history.length > 0 && history[0].type === 'TRANSACTION_TAX_ADJUSTMENT') {
+                    const last = history[0];
+                    const direction = last.oldRate < last.newRate ? 'raised' : 'lowered';
+                    note.innerHTML += `<br><span style="font-size: 9px;">Last adjustment: ${direction} from ${(last.oldRate * 100).toFixed(1)}% to ${(last.newRate * 100).toFixed(1)}% - ${last.reason}</span>`;
+                }
+            } catch (error) {
+                console.error('Error updating tax policy section:', error);
+            }
+        }
+
         // ===== GENERATE RECOMMENDATIONS =====
         async function generateRecommendations() {
             const inflation = await calculateInflationRate();
             const velocity = await calculateMoneyVelocity();
             const gini = await calculateGiniCoefficient();
             const condition = await getEconomicCondition();
+            const taxStatus = getTaxPolicyStatus();
             
             const recommendations = [];
             
             if (inflation < 0.02) {
-                recommendations.push('⚠️ Inflation is below target. Consider tax cuts or economic stimulus to boost spending.');
+                recommendations.push('⚠️ Inflation is below target. Central Bank stimulus active, transaction tax reduced to encourage spending.');
             }
             if (inflation > 0.05) {
-                recommendations.push('⚠️ Inflation is above target. Consider tax increases or monetary contraction.');
+                recommendations.push('⚠️ Inflation is above target. Central Bank contraction active, transaction tax increased to cool spending.');
             }
             if (velocity < 0.5) {
                 recommendations.push('💰 Money velocity is low. Encourage trading and market activity.');
@@ -963,11 +1005,11 @@
             if (gini > 0.45) {
                 recommendations.push('⚖️ Wealth inequality is high. Consider progressive taxation or wealth redistribution.');
             }
-            if (condition.condition === 'STIMULUS_NEEDED') {
-                recommendations.push('🏦 Central bank recommends stimulus. Lower taxes or increase government spending.');
+            if (condition.condition === 'STIMULUS_NEEDED' && taxStatus.currentPolicyMode !== 'STIMULUS') {
+                recommendations.push('🏦 Central Bank stimulus active. Transaction tax rate reduced to support economic growth.');
             }
-            if (condition.condition === 'COOLING_NEEDED') {
-                recommendations.push('🏦 Central bank recommends cooling. Raise taxes or reduce money supply.');
+            if (condition.condition === 'COOLING_NEEDED' && taxStatus.currentPolicyMode !== 'CONTRACTION') {
+                recommendations.push('🏦 Central Bank cooling active. Transaction tax rate increased to manage inflation.');
             }
             
             if (recommendations.length === 0) {
@@ -1004,7 +1046,7 @@
                 // Record today's metrics
                 await recordDailyMetrics();
                 
-                // Run monetary policy
+                // Run monetary policy (this also triggers coordinated tax policy)
                 const policyResult = await runMonetaryPolicy();
                 console.log('🏦 Monetary policy result:', policyResult);
                 
@@ -1072,6 +1114,9 @@
                 
                 // Update central bank section
                 await updateCentralBankSection();
+                
+                // Update tax policy section
+                await updateTaxPolicySection();
                 
                 // Generate recommendations
                 await generateRecommendations();
