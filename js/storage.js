@@ -19,6 +19,7 @@
 // FIXED: setItem function to properly handle stores with keyPath (in-line keys)
 // FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
 // ADDED: Forge token storage functions (getForgeBalance, addForgeTokens, spendForgeTokens)
+// ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -680,6 +681,72 @@ export async function getCollection(playerId = null) {
     } catch (error) {
         console.error('Error getting collection:', error);
         return {};
+    }
+}
+
+// ===== REBUILD COLLECTION FROM LOCATIONS =====
+/**
+ * Rebuild the collection from IndexedDB locations when localStorage collection is corrupted or empty
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function rebuildCollectionFromLocations(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        
+        if (!window.idb) {
+            console.warn('IndexedDB not available, cannot rebuild collection');
+            return false;
+        }
+        
+        const db = await ensureDBStores();
+        if (!db) {
+            console.warn('Failed to open IndexedDB');
+            return false;
+        }
+        
+        // Check if element_locations store exists
+        if (!db.objectStoreNames.contains('element_locations')) {
+            console.warn('element_locations store not found');
+            return false;
+        }
+        
+        // Get all locations from IndexedDB
+        const allLocations = await db.getAll('element_locations');
+        
+        if (!allLocations || allLocations.length === 0) {
+            console.log('No locations found in IndexedDB to rebuild from');
+            return false;
+        }
+        
+        console.log(`🔄 Rebuilding collection from ${allLocations.length} locations...`);
+        
+        // Rebuild collection from locations
+        const rebuiltCollection = {};
+        
+        for (const loc of allLocations) {
+            const elementName = loc.elementName;
+            if (!elementName) continue;
+            
+            if (!rebuiltCollection[elementName]) {
+                rebuiltCollection[elementName] = { 
+                    count: 0, 
+                    firstFound: loc.timestamp || loc.discoveredAt || Date.now() 
+                };
+            }
+            rebuiltCollection[elementName].count += (loc.quantity || 1);
+        }
+        
+        // Save to localStorage
+        const key = `${STORAGE_KEYS.COLLECTION}_${actualPlayerId}`;
+        localStorage.setItem(key, JSON.stringify(rebuiltCollection));
+        
+        console.log(`✅ Collection rebuilt successfully! ${Object.keys(rebuiltCollection).length} unique elements, ${allLocations.length} total locations`);
+        return true;
+        
+    } catch (error) {
+        console.error('Error rebuilding collection from locations:', error);
+        return false;
     }
 }
 
@@ -2154,5 +2221,6 @@ window.getForgeBalance = getForgeBalance;
 window.addForgeTokens = addForgeTokens;
 window.spendForgeTokens = spendForgeTokens;
 window.getFullForgeBalance = getFullForgeBalance;
+window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
 
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and forge token functions');
