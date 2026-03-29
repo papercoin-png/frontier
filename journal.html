@@ -638,7 +638,9 @@
             getPlayerId,
             getElementRarity,
             getElementMass,
-            getPlayerLocations
+            getPlayerLocations,
+            rebuildCollectionFromLocations,
+            getItem
         } from './js/storage.js';
         
         // Make them available globally for onclick handlers
@@ -648,6 +650,7 @@
         window.getElementRarity = getElementRarity;
         window.getElementMass = getElementMass;
         window.getPlayerLocations = getPlayerLocations;
+        window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -665,7 +668,7 @@
         let currentFilter = 'all';
         let expandedElement = null;
         let locationsCache = {};
-        let currentWarpTarget = null; // FIXED: declared at module level
+        let currentWarpTarget = null;
 
         // Element symbol mapping
         const elementSymbols = {
@@ -698,7 +701,26 @@
                 const playerId = window.getPlayerId();
                 console.log('📖 Loading journal for player:', playerId);
                 
-                const collection = await window.getCollection(playerId);
+                let collection = await window.getCollection(playerId);
+                
+                // SAFETY CHECK: If collection is empty but player exists, try to rebuild from locations
+                if (Object.keys(collection).length === 0) {
+                    // Check if player has forge data (indicates player exists)
+                    const forgeData = await getItem('forgeData', playerId);
+                    if (forgeData) {
+                        console.log('⚠️ Collection empty but player exists. Attempting to rebuild from locations...');
+                        loadingText.textContent = 'rebuilding collection...';
+                        
+                        const rebuildSuccess = await window.rebuildCollectionFromLocations(playerId);
+                        if (rebuildSuccess) {
+                            // Reload collection after rebuild
+                            collection = await window.getCollection(playerId);
+                            console.log('✅ Collection rebuilt successfully:', Object.keys(collection).length, 'unique elements');
+                        } else {
+                            console.log('No locations found to rebuild from');
+                        }
+                    }
+                }
                 
                 console.log('📦 Collection loaded:', Object.keys(collection).length, 'unique elements');
                 
