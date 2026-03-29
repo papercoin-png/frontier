@@ -252,6 +252,8 @@
             justify-content: space-between;
             align-items: center;
             color: #ffffff;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         .credits {
@@ -265,6 +267,27 @@
         .credits span {
             color: #ffd966;
             font-size: 22px;
+        }
+        
+        .forge-balance {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 215, 0, 0.15);
+            border-radius: 40px;
+            padding: 4px 12px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .forge-balance span:first-child {
+            font-size: 14px;
+        }
+        
+        .forge-balance span:last-child {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffd700;
         }
         
         .location {
@@ -993,6 +1016,10 @@
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
+                <div class="forge-balance" id="forgeBalance">
+                    <span>🔥</span>
+                    <span id="forgeAmount">0</span>
+                </div>
                 <div class="location" id="locationDisplay">
                     <span id="currentPlanet">Loading...</span>
                 </div>
@@ -1175,7 +1202,7 @@
     <script type="module" src="js/ship-data.js"></script>
 
     <script type="module">
-        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
+        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName, getCurrentPlanetType, getForgeBalance } from './js/storage.js';
         import { getPlanetClaim, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
         import { getShipStats, getFullShipStats, parseShipString, getWarpSpeed, getFuelCostPer100LY } from './js/ship-data.js';
 
@@ -1200,6 +1227,9 @@
         const switchModal = document.getElementById('switchModal');
         const switchShipList = document.getElementById('switchShipList');
         const earthReturnModal = document.getElementById('earthReturnModal');
+        
+        // Forge elements
+        const forgeAmountEl = document.getElementById('forgeAmount');
         
         // Rights and Scan Elements
         const rightsCard = document.getElementById('rightsCard');
@@ -1430,11 +1460,24 @@
                 return 5000;
             }
         }
+        
+        // ===== UPDATE FORGE BALANCE DISPLAY =====
+        async function updateForgeBalanceDisplay() {
+            try {
+                const playerId = getPlayerId();
+                const forgeBalance = await getForgeBalance(playerId);
+                forgeAmountEl.textContent = forgeBalance.toFixed(2);
+            } catch (error) {
+                console.error('Error loading forge balance:', error);
+                forgeAmountEl.textContent = '0';
+            }
+        }
 
         // ===== LOAD SHIP DATA =====
         async function loadShipData() {
             try {
                 await updateCreditsDisplay();
+                await updateForgeBalanceDisplay();
                 
                 const fuel = parseInt(localStorage.getItem('voidfarer_ship_fuel')) || 100;
                 document.getElementById('fuelValue').textContent = fuel;
@@ -1787,6 +1830,11 @@
             setTimeout(() => {
                 loadingOverlay.classList.remove('active');
             }, 500);
+            
+            // Periodic updates for forge balance
+            setInterval(async () => {
+                await updateForgeBalanceDisplay();
+            }, 30000);
             
             setInterval(async () => {
                 await loadShipData();
