@@ -188,6 +188,34 @@
             font-size: 12px;
         }
         
+        /* Forge Ticker */
+        .forge-ticker {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 215, 0, 0.15);
+            border-radius: 40px;
+            padding: 4px 12px;
+            margin-left: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .forge-ticker-icon {
+            font-size: 14px;
+        }
+        
+        .forge-ticker-value {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffd700;
+        }
+        
+        .forge-ticker-rate {
+            font-size: 9px;
+            color: #e0b0ff;
+        }
+        
         .extractor-status {
             background: rgba(10, 10, 26, 0.3);
             backdrop-filter: blur(5px);
@@ -831,6 +859,12 @@
                         <span class="cargo-label">CARGO</span>
                         <span class="cargo-value" id="cargoMass"><span>0</span>/<span id="cargoLimit">5000</span> AMU</span>
                     </div>
+                    <!-- Forge Ticker -->
+                    <div class="forge-ticker" id="forgeTicker">
+                        <span class="forge-ticker-icon">🔥</span>
+                        <span class="forge-ticker-value" id="forgeValue">0.0000</span>
+                        <span class="forge-ticker-rate" id="forgeRate">+0.0000/10s</span>
+                    </div>
                 </div>
                 
                 <div class="extractor-status">
@@ -890,6 +924,8 @@
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
+        import { getForgeData, getCurrentForge, getAccrualRateDisplay, startForgeUpdates, stopForgeUpdates } from './js/forge-system.js';
+        import { getCertificates, getTotalLaborShare } from './js/certificates.js';
 
         // Expose storage functions to window
         window.getCollection = getCollection;
@@ -956,6 +992,10 @@
         const activeShipNameSpan = document.getElementById('activeShipName');
         const shipBonusSpan = document.getElementById('shipBonus');
         
+        // Forge elements
+        const forgeValueEl = document.getElementById('forgeValue');
+        const forgeRateEl = document.getElementById('forgeRate');
+        
         const extractionNotification = document.getElementById('extractionNotification');
         const notificationIcon = document.getElementById('notificationIcon');
         const notificationTitle = document.getElementById('notificationTitle');
@@ -985,6 +1025,25 @@
         
         let exploredElements = {};
         let totalElements = 4;
+        
+        // Forge update function
+        let forgeUpdateInterval = null;
+        
+        async function updateForgeDisplay() {
+            try {
+                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
+                const certificates = await getCertificates(playerId);
+                const share = getTotalLaborShare(certificates);
+                const forgeData = await getForgeData(playerId);
+                const currentForge = forgeData?.currentForge || 0;
+                const rateDisplay = getAccrualRateDisplay(share);
+                
+                forgeValueEl.textContent = currentForge.toFixed(4);
+                forgeRateEl.textContent = rateDisplay;
+            } catch (error) {
+                console.error('Error updating forge display:', error);
+            }
+        }
         
         // ===== GET ACTIVE SHIP STATS =====
         function getActiveShipStats() {
@@ -1696,12 +1755,16 @@
         function returnToShip() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
+            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            stopForgeUpdates();
             window.location.href = 'ship-bridge.html';
         }
 
         function returnToSystem() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
+            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            stopForgeUpdates();
             window.location.href = 'system-view.html';
         }
 
@@ -1742,6 +1805,14 @@
                 if (!planetLoaded) throw new Error('Failed to load planet data');
                 
                 startExtraction();
+                
+                // Initialize Forge display
+                await updateForgeDisplay();
+                startForgeUpdates(updateForgeDisplay);
+                
+                // Update Forge every 10 seconds as a backup
+                forgeUpdateInterval = setInterval(updateForgeDisplay, 10000);
+                
                 setTimeout(() => loadingOverlay.classList.remove('active'), 500);
             } catch (error) {
                 console.error('Init error:', error);
@@ -1752,6 +1823,8 @@
 
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) clearInterval(extractionTimer);
+            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            stopForgeUpdates();
         });
 
         init();
