@@ -18,6 +18,7 @@
 // ADDED: Sector scanning functions (markSectorScanned, markStarSectorScanned, markStarScanned)
 // FIXED: setItem function to properly handle stores with keyPath (in-line keys)
 // FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
+// ADDED: Forge token storage functions (getForgeBalance, addForgeTokens, spendForgeTokens)
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -278,7 +279,10 @@ const STORE_CONFIGS = {
     priceHistory: { keyPath: 'element' },
     supplyDemand: { keyPath: 'id' },
     marketVolume: { keyPath: 'element' },
-    priceAlerts: { keyPath: 'id', autoIncrement: true }
+    priceAlerts: { keyPath: 'id', autoIncrement: true },
+    // Forge stores
+    forgeData: { keyPath: 'playerId' },
+    forgeBalance: { keyPath: 'playerId' }
 };
 
 const ALL_STORES = Object.keys(STORE_CONFIGS);
@@ -342,7 +346,17 @@ async function ensureDBStores() {
                             console.log(`Created store: ${storeName} with hour index (keyPath: timestamp)`);
                         }
                         
-                        if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots'].includes(storeName)) {
+                        if (storeName === 'forgeData') {
+                            store.createIndex('by_player', 'playerId');
+                            console.log(`Created store: ${storeName} with playerId keyPath`);
+                        }
+                        
+                        if (storeName === 'forgeBalance') {
+                            store.createIndex('by_player', 'playerId');
+                            console.log(`Created store: ${storeName} with playerId keyPath`);
+                        }
+                        
+                        if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots', 'forgeData', 'forgeBalance'].includes(storeName)) {
                             console.log(`Created store: ${storeName}`);
                         }
                     }
@@ -1821,6 +1835,113 @@ export async function revealStarSector(starSectorName) {
 }
 
 // ============================================================================
+// FORGE TOKEN FUNCTIONS
+// ============================================================================
+
+/**
+ * Get player's Forge balance (spendable Forge tokens)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Forge balance
+ */
+export async function getForgeBalance(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const balance = await getItem('forgeBalance', actualPlayerId);
+        return balance ? balance.amount : 0;
+    } catch (error) {
+        console.error('Error getting forge balance:', error);
+        return 0;
+    }
+}
+
+/**
+ * Add Forge tokens to player's balance
+ * @param {string} playerId - Player ID
+ * @param {number} amount - Amount to add
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addForgeTokens(amount, playerId = null) {
+    try {
+        if (amount <= 0) return false;
+        
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        let balance = await getItem('forgeBalance', actualPlayerId);
+        
+        if (!balance) {
+            balance = { playerId: actualPlayerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
+        }
+        
+        balance.amount = (balance.amount || 0) + amount;
+        balance.totalClaimed = (balance.totalClaimed || 0) + amount;
+        balance.lastClaimDate = Date.now();
+        
+        await setItem('forgeBalance', balance, actualPlayerId);
+        
+        // Dispatch event for UI updates
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
+                detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
+            }));
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error adding forge tokens:', error);
+        return false;
+    }
+}
+
+/**
+ * Spend Forge tokens from player's balance
+ * @param {number} amount - Amount to spend
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status (true if enough balance and spent)
+ */
+export async function spendForgeTokens(amount, playerId = null) {
+    try {
+        if (amount <= 0) return false;
+        
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const balance = await getItem('forgeBalance', actualPlayerId);
+        
+        if (!balance || (balance.amount || 0) < amount) {
+            return false;
+        }
+        
+        balance.amount = (balance.amount || 0) - amount;
+        await setItem('forgeBalance', balance, actualPlayerId);
+        
+        // Dispatch event for UI updates
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-spent', { 
+                detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
+            }));
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error spending forge tokens:', error);
+        return false;
+    }
+}
+
+/**
+ * Get full forge balance object
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Forge balance object
+ */
+export async function getFullForgeBalance(playerId = null) {
+    try {
+        const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
+        const balance = await getItem('forgeBalance', actualPlayerId);
+        return balance || { playerId: actualPlayerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
+    } catch (error) {
+        console.error('Error getting full forge balance:', error);
+        return { playerId: playerId || 'main', amount: 0, totalClaimed: 0, lastClaimDate: null };
+    }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -1837,6 +1958,33 @@ export async function initializeStorage(playerId = 'main') {
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_MUSIC)) localStorage.setItem(STORAGE_KEYS.SETTINGS_MUSIC, '50');
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
+    
+    // Initialize forge stores if needed
+    const forgeDataExists = await getItem('forgeData', playerId);
+    if (!forgeDataExists) {
+        await setItem('forgeData', {
+            playerId: playerId,
+            currentForge: 0,
+            lastAccrualTimestamp: Date.now(),
+            lastResetDate: null,
+            pendingClaim: 0,
+            pendingClaimExpires: null,
+            lastClaimDate: null,
+            totalForgeClaimed: 0,
+            totalForgeBurned: 0
+        }, playerId);
+    }
+    
+    const forgeBalanceExists = await getItem('forgeBalance', playerId);
+    if (!forgeBalanceExists) {
+        await setItem('forgeBalance', {
+            playerId: playerId,
+            amount: 0,
+            totalClaimed: 0,
+            lastClaimDate: null
+        }, playerId);
+    }
+    
     console.log('Storage initialized for player:', playerId);
 }
 
@@ -1894,6 +2042,8 @@ export async function resetGame(playerId = 'main') {
             if (db) {
                 if (db.objectStoreNames.contains('journal')) await db.clear('journal');
                 if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
+                if (db.objectStoreNames.contains('forgeData')) await db.clear('forgeData');
+                if (db.objectStoreNames.contains('forgeBalance')) await db.clear('forgeBalance');
             }
         } catch (idbError) {}
     }
@@ -1990,4 +2140,10 @@ window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
 
-console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, and sector scanning functions');
+// ===== FORGE FUNCTIONS EXPOSED =====
+window.getForgeBalance = getForgeBalance;
+window.addForgeTokens = addForgeTokens;
+window.spendForgeTokens = spendForgeTokens;
+window.getFullForgeBalance = getFullForgeBalance;
+
+console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and forge token functions');
