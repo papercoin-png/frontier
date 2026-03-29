@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Database version updated to 5 with proper keyPath configurations
+// FIXED: Database version updated to 6 with proper keyPath configurations for forge stores
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
 // FIXED: Added getPlayerLocations function for planet-status.js integration
@@ -250,6 +250,7 @@ export function getElementRarity(elementName) {
 
 // List of all stores used by the game with proper keyPath configurations
 // UPDATED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots)
+// UPDATED: Added forge stores (forgeData, forgeBalance)
 const STORE_CONFIGS = {
     certificates: { keyPath: 'id', autoIncrement: true },
     laborPool: { keyPath: 'id' },
@@ -289,16 +290,18 @@ const ALL_STORES = Object.keys(STORE_CONFIGS);
 
 /**
  * Ensure IndexedDB stores exist with correct configuration
- * Version 5 - recreates stores with proper keyPaths to fix "out-of-line keys" error
+ * Version 6 - recreates stores with proper keyPaths to fix "out-of-line keys" error
+ * and adds forge stores
  */
 async function ensureDBStores() {
     if (!window.idb) return null;
     
     try {
-        const db = await window.idb.openDB('VoidfarerDB', 5, {
+        const db = await window.idb.openDB('VoidfarerDB', 6, {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
+                // Handle version 5 upgrades (recreate journal and element_locations)
                 if (oldVersion < 5) {
                     const storesToRecreate = ['journal', 'element_locations'];
                     for (const storeName of storesToRecreate) {
@@ -309,6 +312,12 @@ async function ensureDBStores() {
                     }
                 }
                 
+                // Handle version 6 upgrades (forge stores will be created below)
+                if (oldVersion < 6) {
+                    console.log('Upgrading to version 6 - adding forge stores');
+                }
+                
+                // Create all stores that don't exist yet
                 for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, config);
