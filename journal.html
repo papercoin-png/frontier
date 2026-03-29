@@ -529,6 +529,34 @@
         .back-text {
             flex: 0 1 auto;
         }
+        
+        .tab-bar {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .tab-btn {
+            background: rgba(30, 45, 70, 0.7);
+            border: 2px solid #6a8ac0;
+            color: #e0f0ff;
+            padding: 12px 20px;
+            border-radius: 40px 10px 40px 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Exo 2', sans-serif;
+            transition: all 0.1s;
+            flex: 1;
+            text-align: center;
+        }
+        
+        .tab-btn.active {
+            background: #6a8ac0;
+            color: #ffffff;
+            border-color: #aac8ff;
+            box-shadow: 0 0 15px #3a5a8a;
+        }
     </style>
 </head>
 <body>
@@ -539,7 +567,6 @@
                 <div class="journal-subtitle">✦ extraction archive ✦</div>
             </div>
             
-            <!-- Tab Bar - Only Discoveries Tab -->
             <div class="tab-bar">
                 <button class="tab-btn active" id="discoveriesTab">📖 DISCOVERIES</button>
             </div>
@@ -562,17 +589,17 @@
             </div>
             
             <div class="filter-bar" id="filterBar">
-                <span class="filter-btn active" data-rarity="all" onclick="filterElements('all', this)">ALL</span>
-                <span class="filter-btn" data-rarity="common" onclick="filterElements('common', this)">COMMON</span>
-                <span class="filter-btn" data-rarity="uncommon" onclick="filterElements('uncommon', this)">UNCOMMON</span>
-                <span class="filter-btn" data-rarity="rare" onclick="filterElements('rare', this)">RARE</span>
-                <span class="filter-btn" data-rarity="very-rare" onclick="filterElements('very-rare', this)">VERY RARE</span>
-                <span class="filter-btn" data-rarity="legendary" onclick="filterElements('legendary', this)">LEGENDARY</span>
+                <span class="filter-btn active" data-rarity="all" onclick="window.filterElements('all', this)">ALL</span>
+                <span class="filter-btn" data-rarity="common" onclick="window.filterElements('common', this)">COMMON</span>
+                <span class="filter-btn" data-rarity="uncommon" onclick="window.filterElements('uncommon', this)">UNCOMMON</span>
+                <span class="filter-btn" data-rarity="rare" onclick="window.filterElements('rare', this)">RARE</span>
+                <span class="filter-btn" data-rarity="very-rare" onclick="window.filterElements('very-rare', this)">VERY RARE</span>
+                <span class="filter-btn" data-rarity="legendary" onclick="window.filterElements('legendary', this)">LEGENDARY</span>
             </div>
             
             <div id="contentContainer"></div>
             
-            <button class="back-button" onclick="returnToBridge()">
+            <button class="back-button" onclick="window.returnToBridge()">
                 <span class="back-arrow">←</span>
                 <span class="back-text">SHIP BRIDGE</span>
                 <span class="back-icon">🚀</span>
@@ -591,8 +618,8 @@
                 </div>
                 <p class="warning-text">This will start a warp journey</p>
                 <div class="modal-buttons">
-                    <button class="modal-btn warp" onclick="confirmWarp()">WARP</button>
-                    <button class="modal-btn" onclick="closeWarpModal()">CANCEL</button>
+                    <button class="modal-btn warp" onclick="window.confirmWarp()">WARP</button>
+                    <button class="modal-btn" onclick="window.closeWarpModal()">CANCEL</button>
                 </div>
             </div>
         </div>
@@ -604,9 +631,23 @@
     </div>
 
     <script type="module">
-        // Import storage modules
-        import './js/db.js';
-        import './js/storage.js';
+        // Import storage functions from storage.js
+        import { 
+            getElementLocations, 
+            getCollection, 
+            getPlayerId,
+            getElementRarity,
+            getElementMass,
+            getPlayerLocations
+        } from './js/storage.js';
+        
+        // Make them available globally for onclick handlers
+        window.getElementLocations = getElementLocations;
+        window.getCollection = getCollection;
+        window.getPlayerId = getPlayerId;
+        window.getElementRarity = getElementRarity;
+        window.getElementMass = getElementMass;
+        window.getPlayerLocations = getPlayerLocations;
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -623,18 +664,28 @@
         let filteredElements = [];
         let currentFilter = 'all';
         let expandedElement = null;
-        let currentWarpTarget = null;
         let locationsCache = {};
 
-        // ===== GET PLAYER ID (consistent with Ship Bridge) =====
-        function getPlayerId() {
-            return localStorage.getItem('voidfarer_player_id') || 'main';
+        // Element symbol mapping
+        const elementSymbols = {
+            'Hydrogen': 'H', 'Helium': 'He', 'Lithium': 'Li', 'Beryllium': 'Be',
+            'Boron': 'B', 'Carbon': 'C', 'Nitrogen': 'N', 'Oxygen': 'O',
+            'Fluorine': 'F', 'Neon': 'Ne', 'Sodium': 'Na', 'Magnesium': 'Mg',
+            'Aluminum': 'Al', 'Silicon': 'Si', 'Phosphorus': 'P', 'Sulfur': 'S',
+            'Chlorine': 'Cl', 'Argon': 'Ar', 'Potassium': 'K', 'Calcium': 'Ca',
+            'Iron': 'Fe', 'Copper': 'Cu', 'Zinc': 'Zn', 'Silver': 'Ag',
+            'Gold': 'Au', 'Platinum': 'Pt', 'Titanium': 'Ti', 'Uranium': 'U'
+        };
+        
+        function getElementSymbol(name) {
+            return elementSymbols[name] || name.substring(0, 2);
         }
 
         function getPlanetTypeIcon(planetType) {
             const icons = {
-                'scorched': '🔥', 'barren': '🪨', 'lush': '🌱', 'frozen': '❄️',
-                'gas': '🌪️', 'oceanic': '💧', 'toxic': '☣️', 'asteroid': '🪐'
+                'scorched': '🔥', 'volcanic': '🌋', 'barren': '🪨', 'lush': '🌱', 
+                'frozen': '❄️', 'ice': '🧊', 'gas': '🌪️', 'oceanic': '💧', 
+                'toxic': '☣️', 'asteroid': '🪐', 'unknown': '🪐'
             };
             return icons[planetType] || '🪐';
         }
@@ -643,14 +694,10 @@
             try {
                 loadingText.textContent = 'loading collection...';
                 
-                // Get player ID consistently with Ship Bridge
-                const playerId = getPlayerId();
+                const playerId = window.getPlayerId();
                 console.log('📖 Loading journal for player:', playerId);
                 
-                let collection = {};
-                if (window.getCollection) {
-                    collection = await window.getCollection(playerId);
-                }
+                const collection = await window.getCollection(playerId);
                 
                 console.log('📦 Collection loaded:', Object.keys(collection).length, 'unique elements');
                 
@@ -670,8 +717,7 @@
                     totalMass += totalElementMass;
                     totalCount += count;
                     
-                    let symbol = name.substring(0, 2);
-                    if (window.getElementSymbol) symbol = window.getElementSymbol(name);
+                    let symbol = getElementSymbol(name);
                     
                     allElements.push({
                         name: name,
@@ -703,7 +749,7 @@
             }
         }
 
-        // Preload all locations for all elements
+        // Preload all locations for all elements using the imported getElementLocations function
         async function preloadAllLocations() {
             if (allElements.length === 0) {
                 console.log('No elements to preload locations for');
@@ -715,8 +761,15 @@
             let loadedCount = 0;
             for (const element of allElements) {
                 if (!locationsCache[element.name]) {
-                    locationsCache[element.name] = await loadLocationsForElement(element.name);
-                    loadedCount++;
+                    try {
+                        const locations = await window.getElementLocations(element.name);
+                        locationsCache[element.name] = locations || [];
+                        loadedCount++;
+                        console.log(`📍 Loaded ${locations?.length || 0} locations for ${element.name}`);
+                    } catch (err) {
+                        console.error(`Failed to load locations for ${element.name}:`, err);
+                        locationsCache[element.name] = [];
+                    }
                 }
             }
             
@@ -732,7 +785,7 @@
             renderDiscoveries();
         }
 
-        function filterElements(rarity, btnElement) {
+        window.filterElements = function(rarity, btnElement) {
             currentFilter = rarity;
             
             document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -745,7 +798,7 @@
             applyFilters();
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
+        };
 
         async function loadLocationsForElement(elementName) {
             try {
@@ -761,12 +814,12 @@
             }
         }
 
-        async function toggleExpand(elementName) {
+        window.toggleExpand = async function(elementName) {
             if (expandedElement === elementName) {
                 expandedElement = null;
             } else {
                 expandedElement = elementName;
-                // Refresh locations cache for this element in case new discoveries were made
+                // Refresh locations cache for this element
                 if (window.getElementLocations) {
                     locationsCache[elementName] = await window.getElementLocations(elementName);
                 }
@@ -774,10 +827,20 @@
             renderDiscoveries();
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
+        };
 
         function getRarityClass(rarity) {
             return `rarity-${rarity}`;
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown';
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleDateString();
+            } catch {
+                return 'Unknown';
+            }
         }
 
         function renderDiscoveries() {
@@ -813,19 +876,22 @@
                 
                 elements.forEach(element => {
                     const isExpanded = expandedElement === element.name;
-                    const firstFoundDate = element.firstFound ? new Date(element.firstFound).toLocaleDateString() : 'Unknown';
+                    const firstFoundDate = element.firstFound ? formatDate(element.firstFound) : 'Unknown';
                     const elementLocations = locationsCache[element.name] || [];
                     
                     let locationsHtml = '';
                     if (elementLocations.length > 0) {
+                        // Group locations by planet to show aggregated counts
                         const planetMap = new Map();
                         elementLocations.forEach(loc => {
                             const planet = loc.planet || loc.location?.planet || 'Unknown';
+                            const planetType = loc.planetType || loc.location?.planetType || 'unknown';
                             if (!planetMap.has(planet)) {
                                 planetMap.set(planet, {
                                     count: 0,
-                                    planetType: loc.planetType || loc.location?.planetType || 'unknown',
-                                    lastFound: loc.timestamp || loc.discoveredAt || Date.now()
+                                    planetType: planetType,
+                                    lastFound: loc.timestamp || loc.discoveredAt || Date.now(),
+                                    timestamps: []
                                 });
                             }
                             const planetData = planetMap.get(planet);
@@ -834,18 +900,19 @@
                             if (timestamp > planetData.lastFound) {
                                 planetData.lastFound = timestamp;
                             }
+                            planetData.timestamps.push(timestamp);
                         });
                         
                         const sortedPlanets = Array.from(planetMap.entries())
                             .sort((a, b) => b[1].count - a[1].count);
                         
                         sortedPlanets.forEach(([planet, data]) => {
-                            const displayDate = new Date(data.lastFound).toLocaleDateString();
+                            const displayDate = formatDate(data.lastFound);
                             const typeIcon = getPlanetTypeIcon(data.planetType);
-                            const safePlanet = planet.replace(/'/g, "\\'");
+                            const safePlanet = planet.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                             
                             locationsHtml += `
-                                <div class="location-item" onclick="showWarpModal('${safePlanet}', '${data.planetType}')">
+                                <div class="location-item" onclick="window.showWarpModal('${safePlanet}', '${data.planetType}')">
                                     <div>
                                         <div class="location-planet">${typeIcon} ${planet}</div>
                                         <div class="location-date">Extracted: ${data.count} units • Last: ${displayDate}</div>
@@ -864,7 +931,7 @@
                     
                     html += `
                         <div class="element-card ${getRarityClass(element.rarity)}">
-                            <div class="element-main-row" onclick="toggleExpand('${element.name}')">
+                            <div class="element-main-row" onclick="window.toggleExpand('${element.name.replace(/'/g, "\\'")}')">
                                 <div class="element-symbol">${element.symbol}</div>
                                 <div class="element-info">
                                     <div class="element-name-row">
@@ -892,7 +959,7 @@
             contentContainer.innerHTML = html;
         }
 
-        function showWarpModal(planet, planetType) {
+        window.showWarpModal = function(planet, planetType) {
             currentWarpTarget = { planet: planet, planetType: planetType };
             
             const currentSector = localStorage.getItem('voidfarer_current_sector') || 'B2';
@@ -908,14 +975,14 @@
             
             warpModal.classList.add('active');
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
+        };
 
-        function closeWarpModal() {
+        window.closeWarpModal = function() {
             warpModal.classList.remove('active');
             currentWarpTarget = null;
-        }
+        };
 
-        function confirmWarp() {
+        window.confirmWarp = function() {
             if (!currentWarpTarget) return;
             
             loadingOverlay.classList.add('active');
@@ -973,20 +1040,19 @@
             }
             
             closeWarpModal();
-        }
+        };
 
-        function returnToBridge() {
+        window.returnToBridge = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'ship-bridge.html';
-        }
+        };
 
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'opening journal...';
                 
-                // Log player ID for debugging
-                const playerId = getPlayerId();
+                const playerId = window.getPlayerId();
                 console.log('🚀 Journal initializing for player:', playerId);
                 
                 await loadJournalData();
@@ -1004,13 +1070,13 @@
             }
         }
         
-        // Make functions globally accessible for onclick handlers
-        window.filterElements = filterElements;
-        window.toggleExpand = toggleExpand;
-        window.showWarpModal = showWarpModal;
-        window.closeWarpModal = closeWarpModal;
-        window.confirmWarp = confirmWarp;
-        window.returnToBridge = returnToBridge;
+        // Make sure all functions are globally accessible
+        window.filterElements = window.filterElements;
+        window.toggleExpand = window.toggleExpand;
+        window.showWarpModal = window.showWarpModal;
+        window.closeWarpModal = window.closeWarpModal;
+        window.confirmWarp = window.confirmWarp;
+        window.returnToBridge = window.returnToBridge;
         
         init();
     </script>
