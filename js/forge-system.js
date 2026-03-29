@@ -11,7 +11,7 @@ import { getCertificates, getTotalLaborShare } from './certificates.js';
 const FORGE_CONFIG = {
     DAILY_CAP: 70,                    // Maximum Forge per day
     ACCRUAL_BASE_RATE: 0.0007,        // Base Forge per 10 seconds for share 100
-    ACCRUAL_INTERVAL_MS: 10000,       // 10 seconds
+    ACCRUAL_INTERVAL_MS: 10000,       // 10 seconds (used for rate calculation)
     RESET_HOUR: 0,                    // Midnight UTC
     RESET_MINUTE: 0,
     CLAIM_EXPIRY_HOURS: 24            // Forge must be claimed within 24 hours
@@ -124,9 +124,11 @@ export async function checkAndBurnExpiredClaim(playerId) {
                 console.log(`🔥 ${burnedAmount} Forge burned for ${playerId} (expired)`);
                 
                 // Dispatch event for UI updates
-                window.dispatchEvent(new CustomEvent('forge-burned', { 
-                    detail: { playerId, amount: burnedAmount } 
-                }));
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('forge-burned', { 
+                        detail: { playerId, amount: burnedAmount } 
+                    }));
+                }
                 
                 return burnedAmount;
             }
@@ -154,14 +156,21 @@ export function calculateAccrualRate(share) {
 }
 
 /**
- * Calculate Forge gained over a time period
+ * Calculate Forge gained over a time period (CONTINUOUS - no chunking)
  * @param {number} share - Certificate share
  * @param {number} milliseconds - Time elapsed in milliseconds
  * @returns {number} Forge gained
  */
 export function calculateForgeGained(share, milliseconds) {
-    const ratePerMs = calculateAccrualRate(share) / FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    if (share <= 0 || milliseconds <= 0) return 0;
+    
+    // Rate per millisecond = (rate per 10 seconds) / 10000
+    const ratePer10s = calculateAccrualRate(share);
+    const ratePerMs = ratePer10s / FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    
+    // Continuous calculation - any amount of time yields proportional Forge
     let gained = ratePerMs * milliseconds;
+    
     // Cap at reasonable precision (3 decimal places)
     return Math.floor(gained * 1000) / 1000;
 }
@@ -185,7 +194,7 @@ export async function updateAccrual(playerId) {
         const certificates = await getCertificates(playerId);
         const share = getTotalLaborShare(certificates);
         
-        // Calculate Forge gained
+        // Calculate Forge gained (continuous)
         let gained = calculateForgeGained(share, timeElapsed);
         
         if (gained > 0) {
@@ -327,9 +336,11 @@ export async function claimForge(playerId) {
         await setItem('forgeData', refreshedData, playerId);
         
         // Dispatch event for UI updates
-        window.dispatchEvent(new CustomEvent('forge-claimed', { 
-            detail: { playerId, amount: claimAmount } 
-        }));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-claimed', { 
+                detail: { playerId, amount: claimAmount } 
+            }));
+        }
         
         return { 
             success: true, 
@@ -361,9 +372,11 @@ export async function addForgeToBalance(playerId, amount) {
         balance.amount += amount;
         await setItem('forgeBalance', balance, playerId);
         
-        window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
-            detail: { playerId, amount, newBalance: balance.amount } 
-        }));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
+                detail: { playerId, amount, newBalance: balance.amount } 
+            }));
+        }
         
         return true;
     } catch (error) {
@@ -388,9 +401,11 @@ export async function spendForge(playerId, amount) {
         balance.amount -= amount;
         await setItem('forgeBalance', balance, playerId);
         
-        window.dispatchEvent(new CustomEvent('forge-spent', { 
-            detail: { playerId, amount, newBalance: balance.amount } 
-        }));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-spent', { 
+                detail: { playerId, amount, newBalance: balance.amount } 
+            }));
+        }
         
         return true;
     } catch (error) {
@@ -401,7 +416,7 @@ export async function spendForge(playerId, amount) {
 
 // ===== UI HELPER FUNCTIONS =====
 /**
- * Get formatted time until next accrual increment
+ * Get formatted time until next accrual increment (for display)
  * @returns {number} Seconds until next increment (0-10)
  */
 export function getSecondsUntilNextIncrement() {
@@ -463,6 +478,38 @@ export function getAccrualRateDisplay(share) {
     return `+${rate.toFixed(4)}/${FORGE_CONFIG.ACCRUAL_INTERVAL_MS / 1000}s`;
 }
 
+/**
+ * Get projected Forge for the rest of the day
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Projected Forge by end of day
+ */
+export async function getProjectedForge(playerId) {
+    try {
+        const forgeData = await getForgeData(playerId);
+        if (!forgeData) return 0;
+        
+        const certificates = await getCertificates(playerId);
+        const share = getTotalLaborShare(certificates);
+        
+        const timeUntilReset = getTimeUntilReset();
+        const hoursRemaining = timeUntilReset.hours + (timeUntilReset.minutes / 60);
+        
+        // Rate per hour = (rate per 10 seconds) × 360
+        const ratePerHour = calculateAccrualRate(share) * 360;
+        const projectedGain = ratePerHour * hoursRemaining;
+        
+        let projected = forgeData.currentForge + projectedGain;
+        if (projected > FORGE_CONFIG.DAILY_CAP) {
+            projected = FORGE_CONFIG.DAILY_CAP;
+        }
+        
+        return projected;
+    } catch (error) {
+        console.error('Error getting projected forge:', error);
+        return 0;
+    }
+}
+
 // ===== PERIODIC UPDATE FOR REAL-TIME DISPLAY =====
 let globalUpdateInterval = null;
 let globalUpdateCallbacks = [];
@@ -485,7 +532,7 @@ export function startForgeUpdates(callback) {
                     console.error('Forge update callback error:', e);
                 }
             }
-        }, FORGE_CONFIG.ACCRUAL_INTERVAL_MS);
+        }, 1000); // Update every second for smooth display
     }
 }
 
@@ -531,6 +578,7 @@ export default {
     getTimeUntilReset,
     getTimeUntilExpiry,
     getAccrualRateDisplay,
+    getProjectedForge,
     startForgeUpdates,
     stopForgeUpdates,
     removeForgeUpdateCallback
