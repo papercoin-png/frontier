@@ -604,7 +604,7 @@
     <div class="tooltip" id="tooltip"></div>
     
     <script type="module">
-        import { getCredits, getCollection, removeElementFromCollection, getForgeBalance, addForgeTokens } from './js/storage.js';
+        import { getCredits, getCollection, removeElementFromCollection, getForgeBalance, addForgeTokens, getPlayerId } from './js/storage.js';
         import { 
             getCertificates, 
             getCertificateStatus,
@@ -652,7 +652,7 @@
         const forgeResetTimerEl = document.getElementById('forgeResetTimer');
         
         // ===== STATE =====
-        let playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+        let playerId = null;
         let playerCredits = 0;
         let certificates = [];
         let laborPool = 10000;
@@ -695,7 +695,7 @@
         // Load cargo from storage
         async function loadCargo() {
             try {
-                const collection = await getCollection();
+                const collection = await getCollection(playerId);
                 
                 // Reset counts
                 cargoCounts = {
@@ -731,7 +731,7 @@
             }
             
             // Need to find actual elements of this rarity to remove
-            const collection = await getCollection();
+            const collection = await getCollection(playerId);
             let remainingToRemove = quantity;
             
             for (const [elementName, data] of Object.entries(collection)) {
@@ -842,7 +842,10 @@
             try {
                 loadingOverlay.classList.add('active');
                 
-                playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
+                // Use the same player ID as surface and ship-bridge
+                playerId = getPlayerId();
+                console.log('University loading for player:', playerId);
+                
                 certificates = await getCertificates(playerId);
                 
                 // Load cargo from storage
