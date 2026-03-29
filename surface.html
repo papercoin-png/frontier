@@ -923,8 +923,8 @@
         import { getPlanetStatus, claimPlanet, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
-        import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
-        import { getForgeData, getCurrentForge, getAccrualRateDisplay, startForgeUpdates, stopForgeUpdates } from './js/forge-system.js';
+        import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType, getPlayerId } from './js/storage.js';
+        import { getForgeData, getCurrentForge, getAccrualRateDisplay, updateAccrual } from './js/forge-system.js';
         import { getCertificates, getTotalLaborShare } from './js/certificates.js';
 
         // Expose storage functions to window
@@ -1029,13 +1029,21 @@
         // Forge update function
         let forgeUpdateInterval = null;
         
+        // Get player ID consistently
+        function getCurrentPlayerId() {
+            return getPlayerId();
+        }
+        
         async function updateForgeDisplay() {
             try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
-                const certificates = await getCertificates(playerId);
-                const share = getTotalLaborShare(certificates);
+                const playerId = getCurrentPlayerId();
+                // Force accrual update first
+                await updateAccrual(playerId);
                 const forgeData = await getForgeData(playerId);
                 const currentForge = forgeData?.currentForge || 0;
+                
+                const certificates = await getCertificates(playerId);
+                const share = getTotalLaborShare(certificates);
                 const rateDisplay = getAccrualRateDisplay(share);
                 
                 forgeValueEl.textContent = currentForge.toFixed(4);
@@ -1212,7 +1220,7 @@
         // ===== RECORD REDISCOVERY =====
         async function recordRediscovery() {
             try {
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
+                const playerId = getCurrentPlayerId();
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 
                 const hiddenPlanets = JSON.parse(localStorage.getItem('voidfarer_hidden_planets') || '[]');
@@ -1756,7 +1764,6 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
             if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
-            stopForgeUpdates();
             window.location.href = 'ship-bridge.html';
         }
 
@@ -1764,7 +1771,6 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
             if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
-            stopForgeUpdates();
             window.location.href = 'system-view.html';
         }
 
@@ -1773,7 +1779,7 @@
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'claiming planet...';
                 
-                const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
+                const playerId = getCurrentPlayerId();
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 const discoveryElement = currentPlanet.resources[0] || 'Unknown';
                 const discoveryRarity = getElementRarity(discoveryElement, currentPlanetTier) || 'common';
@@ -1827,7 +1833,6 @@
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) clearInterval(extractionTimer);
             if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
-            stopForgeUpdates();
         });
 
         init();
