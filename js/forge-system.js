@@ -156,7 +156,7 @@ export function calculateAccrualRate(share) {
 }
 
 /**
- * Calculate Forge gained over a time period (CONTINUOUS - no chunking)
+ * Calculate Forge gained over a time period - CONTINUOUS (no chunking)
  * @param {number} share - Certificate share
  * @param {number} milliseconds - Time elapsed in milliseconds
  * @returns {number} Forge gained
@@ -168,11 +168,9 @@ export function calculateForgeGained(share, milliseconds) {
     const ratePer10s = calculateAccrualRate(share);
     const ratePerMs = ratePer10s / FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
     
-    // Continuous calculation - any amount of time yields proportional Forge
-    let gained = ratePerMs * milliseconds;
-    
-    // Cap at reasonable precision (3 decimal places)
-    return Math.floor(gained * 1000) / 1000;
+    // DIRECT CONTINUOUS CALCULATION - NO CHUNKING, NO FLOORING
+    // Any amount of time yields proportional Forge
+    return ratePerMs * milliseconds;
 }
 
 /**
@@ -194,7 +192,7 @@ export async function updateAccrual(playerId) {
         const certificates = await getCertificates(playerId);
         const share = getTotalLaborShare(certificates);
         
-        // Calculate Forge gained (continuous)
+        // Calculate Forge gained using continuous calculation
         let gained = calculateForgeGained(share, timeElapsed);
         
         if (gained > 0) {
