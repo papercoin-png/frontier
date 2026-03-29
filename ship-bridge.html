@@ -277,6 +277,7 @@
             border-radius: 40px;
             padding: 4px 12px;
             border: 1px solid rgba(255, 215, 0, 0.3);
+            cursor: help;
         }
         
         .forge-balance span:first-child {
@@ -1016,9 +1017,9 @@
                 <div class="credits" id="creditsDisplay">
                     <span>⭐</span> --
                 </div>
-                <div class="forge-balance" id="forgeBalance">
+                <div class="forge-balance" id="forgeBalance" title="Forge accruing today (available to claim tomorrow)">
                     <span>🔥</span>
-                    <span id="forgeAmount">0</span>
+                    <span id="forgeAmount">0.0000</span>
                 </div>
                 <div class="location" id="locationDisplay">
                     <span id="currentPlanet">Loading...</span>
@@ -1202,7 +1203,8 @@
     <script type="module" src="js/ship-data.js"></script>
 
     <script type="module">
-        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName, getCurrentPlanetType, getForgeBalance } from './js/storage.js';
+        import { getCredits, getPlayer, getCollection, addCredits, spendCredits, getScannedSectors, getScannedStarSectors, getScannedStars, getCurrentPlanetName, getCurrentPlanetType } from './js/storage.js';
+        import { getForgeData } from './js/forge-system.js';
         import { getPlanetClaim, getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, getPlayerClaims } from './js/planet-status.js';
         import { getShipStats, getFullShipStats, parseShipString, getWarpSpeed, getFuelCostPer100LY } from './js/ship-data.js';
 
@@ -1461,15 +1463,29 @@
             }
         }
         
-        // ===== UPDATE FORGE BALANCE DISPLAY =====
-        async function updateForgeBalanceDisplay() {
+        // ===== UPDATE FORGE DISPLAY (shows current accruing Forge) =====
+        async function updateForgeDisplay() {
             try {
                 const playerId = getPlayerId();
-                const forgeBalance = await getForgeBalance(playerId);
-                forgeAmountEl.textContent = forgeBalance.toFixed(2);
+                const forgeData = await getForgeData(playerId);
+                
+                if (forgeData) {
+                    // Display current accruing Forge (what they'll get tomorrow)
+                    const currentForge = forgeData.currentForge || 0;
+                    forgeAmountEl.textContent = currentForge.toFixed(4);
+                    
+                    // Add tooltip to show pending claim if any
+                    if (forgeData.pendingClaim > 0) {
+                        forgeAmountEl.parentElement.title = `Pending claim: ${forgeData.pendingClaim.toFixed(4)} Forge\nClaim in University`;
+                    } else {
+                        forgeAmountEl.parentElement.title = `Forge accruing today\nAvailable to claim tomorrow at midnight UTC`;
+                    }
+                } else {
+                    forgeAmountEl.textContent = '0.0000';
+                }
             } catch (error) {
-                console.error('Error loading forge balance:', error);
-                forgeAmountEl.textContent = '0';
+                console.error('Error loading forge display:', error);
+                forgeAmountEl.textContent = '0.0000';
             }
         }
 
@@ -1477,7 +1493,7 @@
         async function loadShipData() {
             try {
                 await updateCreditsDisplay();
-                await updateForgeBalanceDisplay();
+                await updateForgeDisplay();
                 
                 const fuel = parseInt(localStorage.getItem('voidfarer_ship_fuel')) || 100;
                 document.getElementById('fuelValue').textContent = fuel;
@@ -1831,9 +1847,9 @@
                 loadingOverlay.classList.remove('active');
             }, 500);
             
-            // Periodic updates for forge balance
+            // Periodic updates for forge display (every 30 seconds)
             setInterval(async () => {
-                await updateForgeBalanceDisplay();
+                await updateForgeDisplay();
             }, 30000);
             
             setInterval(async () => {
