@@ -99,14 +99,18 @@ export async function addDonationXP(playerId, index, quantity) {
     if (status === 'maxed') return { success: false, error: 'Already maxed' };
     
     const prog = progress[index];
+    
+    // Calculate XP with full decimal precision - no rounding down
     const xpGain = (quantity / cert.unitsPerDonation) * cert.xpPerDonation;
     
+    // Add XP with full precision
     prog.xp += xpGain;
     
     let leveledUp = false;
     let newLevel = prog.level;
     
-    while (prog.xp >= (newLevel + 1) * cert.xpPerLevel && newLevel < cert.totalLevels) {
+    // Check for level ups
+    while (newLevel < cert.totalLevels && prog.xp >= (newLevel + 1) * cert.xpPerLevel) {
         newLevel++;
         leveledUp = true;
     }
