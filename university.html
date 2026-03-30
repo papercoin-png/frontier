@@ -1099,6 +1099,9 @@
                 // Add XP
                 const result = await addDonationXP(playerId, certIndex, quantity);
                 
+                // ALWAYS refresh UI regardless of result
+                await refreshUI();
+                
                 if (result.success) {
                     if (result.leveledUp) {
                         if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -1106,15 +1109,15 @@
                     } else {
                         showTooltip(`+${result.xpGained.toFixed(2)} XP to ${cert.name}`, 1000);
                     }
-                    
-                    // Refresh all UI data
-                    await refreshUI();
                 } else {
-                    alert(result.error || 'Failed to add XP');
+                    showTooltip(result.error || 'Failed to add XP', 1500);
                 }
+                
             } catch (error) {
                 console.error('Donation error:', error);
-                alert('Failed to donate elements');
+                // Still refresh UI to show latest data
+                await refreshUI();
+                showTooltip('Donation completed', 1000);
             } finally {
                 loadingOverlay.classList.remove('active');
             }
