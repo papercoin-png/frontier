@@ -25,7 +25,6 @@ export async function getCertificates(playerId) {
 
 export async function saveCertificates(playerId, progress) {
     try {
-        // Open IndexedDB directly - bypass storage.js setItem
         const db = await window.idb.openDB('VoidfarerDB', 6);
         const tx = db.transaction('certificates', 'readwrite');
         const store = tx.objectStore('certificates');
@@ -35,7 +34,6 @@ export async function saveCertificates(playerId, progress) {
             lastUpdated: Date.now()
         });
         await tx.done;
-        console.log(`✅ Certificates saved for ${playerId}`);
     } catch (error) {
         console.error('Error saving certificates:', error);
     }
