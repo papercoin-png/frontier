@@ -1,5 +1,5 @@
 // js/ton-connect.js
-// TON Wallet Integration for Voidfarer - with demo mode fallback
+// TON Wallet Integration for Voidfarer - with USDT support
 
 // ===== CONFIGURATION =====
 const TON_CONFIG = {
@@ -8,8 +8,8 @@ const TON_CONFIG = {
     apiEndpoint: 'https://tonapi.io/v2',
     burnShopContract: '',
     forgeTokenAddress: 'EQBGLUNOnXAp9aEhjpO511FOIRcP9dUKEzVk1ErLSr_B-tzN',
+    usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
     connectionTimeout: 60000,
-    // Demo mode for testing without real wallet
     demoMode: true
 };
 
@@ -18,6 +18,7 @@ let tonConnect = null;
 let walletConnected = false;
 let walletAddress = null;
 let walletBalance = 0;
+let usdtBalance = 0;
 let listeners = [];
 
 // ===== DEMO MODE FUNCTIONS =====
@@ -26,8 +27,8 @@ function enableDemoMode() {
     walletConnected = true;
     walletAddress = 'EQC_demo_wallet_address';
     walletBalance = 10.0;
+    usdtBalance = 50.0;
     
-    // Dispatch events for UI
     setTimeout(() => {
         notifyListeners('connected', { address: walletAddress });
     }, 500);
@@ -36,14 +37,12 @@ function enableDemoMode() {
 // ===== INITIALIZATION =====
 export async function initTonWallet() {
     try {
-        // Check if we should use demo mode
         if (TON_CONFIG.demoMode) {
             console.log('Demo mode enabled - wallet connection simulated');
             enableDemoMode();
             return { success: true, connected: true, address: walletAddress, demo: true };
         }
         
-        // Try to load TonConnect SDK
         if (typeof window.TonConnect === 'undefined') {
             await loadTonConnectSDK();
         }
@@ -55,7 +54,7 @@ export async function initTonWallet() {
             const wallet = tonConnect.wallet;
             walletAddress = wallet?.account?.address;
             walletConnected = true;
-            await updateBalance();
+            await updateBalances();
             notifyListeners('connected', { address: walletAddress });
         }
         
@@ -63,13 +62,14 @@ export async function initTonWallet() {
             if (wallet) {
                 walletAddress = wallet.account.address;
                 walletConnected = true;
-                updateBalance();
+                updateBalances();
                 notifyListeners('connected', { address: walletAddress });
                 console.log('✅ TON Wallet connected:', walletAddress);
             } else {
                 walletConnected = false;
                 walletAddress = null;
                 walletBalance = 0;
+                usdtBalance = 0;
                 notifyListeners('disconnected', {});
                 console.log('❌ TON Wallet disconnected');
             }
@@ -79,7 +79,6 @@ export async function initTonWallet() {
         
     } catch (error) {
         console.error('TON wallet init error:', error);
-        // Fallback to demo mode on error
         if (TON_CONFIG.demoMode) {
             enableDemoMode();
             return { success: true, connected: true, address: walletAddress, demo: true };
@@ -96,7 +95,6 @@ function loadTonConnectSDK() {
         script.onerror = () => reject(new Error('Failed to load TonConnect SDK'));
         document.head.appendChild(script);
         
-        // Timeout fallback
         setTimeout(() => {
             if (typeof window.TonConnect === 'undefined') {
                 console.warn('TonConnect SDK load timeout, using demo mode');
@@ -109,11 +107,11 @@ function loadTonConnectSDK() {
 
 // ===== CONNECT WALLET =====
 export async function connectTonWallet() {
-    // Demo mode - simulate connection
     if (TON_CONFIG.demoMode) {
         walletConnected = true;
         walletAddress = 'EQC_demo_wallet_' + Math.random().toString(36).substr(2, 8);
         walletBalance = 10.0;
+        usdtBalance = 50.0;
         notifyListeners('connected', { address: walletAddress });
         return { success: true, address: walletAddress, demo: true };
     }
@@ -216,6 +214,7 @@ export async function disconnectTonWallet() {
     walletConnected = false;
     walletAddress = null;
     walletBalance = 0;
+    usdtBalance = 0;
     
     if (tonConnect && !TON_CONFIG.demoMode) {
         try {
@@ -227,11 +226,10 @@ export async function disconnectTonWallet() {
     return { success: true };
 }
 
-// ===== GET WALLET BALANCE =====
+// ===== BALANCE FUNCTIONS =====
 export async function getTonBalance() {
     if (!walletConnected) return 0;
     
-    // Demo mode - return fake balance
     if (TON_CONFIG.demoMode) {
         return 10.0;
     }
@@ -247,14 +245,36 @@ export async function getTonBalance() {
     }
 }
 
-async function updateBalance() {
+export async function getUsdtBalance() {
+    if (!walletConnected) return 0;
+    
+    if (TON_CONFIG.demoMode) {
+        return 50.0;
+    }
+    
+    try {
+        const response = await fetch(
+            `${TON_CONFIG.apiEndpoint}/jetton/${TON_CONFIG.usdtAddress}/accounts/${walletAddress}`
+        );
+        if (response.status === 404) return 0;
+        if (!response.ok) return 0;
+        const data = await response.json();
+        usdtBalance = data.balance ? data.balance / 1e6 : 0;
+        return usdtBalance;
+    } catch (error) {
+        console.error('USDT balance fetch error:', error);
+        return 0;
+    }
+}
+
+export async function updateBalances() {
     walletBalance = await getTonBalance();
-    return walletBalance;
+    usdtBalance = await getUsdtBalance();
+    return { ton: walletBalance, usdt: usdtBalance };
 }
 
 // ===== SEND TRANSACTION =====
 export async function sendTransaction(transaction) {
-    // Demo mode - simulate transaction
     if (TON_CONFIG.demoMode) {
         console.log('Demo mode: simulated transaction', transaction);
         await new Promise(r => setTimeout(r, 1000));
@@ -317,6 +337,54 @@ export async function buyCreditsWithTon(playerId, tonAmount) {
     return result;
 }
 
+// ===== BUY CREDITS WITH USDT =====
+export async function buyCreditsWithUsdt(playerId, usdtAmount) {
+    if (!walletConnected) {
+        return { success: false, error: 'Wallet not connected' };
+    }
+    
+    const balance = await getUsdtBalance();
+    if (balance < usdtAmount) {
+        return { success: false, error: `Insufficient USDT. Need ${usdtAmount}, have ${balance.toFixed(2)}` };
+    }
+    
+    const creditsAmount = Math.floor(usdtAmount * 1000);
+    
+    const transaction = {
+        validUntil: Date.now() + 600000,
+        messages: [
+            {
+                address: TON_CONFIG.usdtAddress,
+                amount: 0,
+                payload: JSON.stringify({
+                    type: 'jetton_transfer',
+                    recipient: TON_CONFIG.burnShopContract || 'EQC_burn',
+                    amount: usdtAmount * 1e6,
+                    payload: {
+                        type: 'buy_credits',
+                        playerId: playerId,
+                        credits: creditsAmount,
+                        paymentMethod: 'USDT'
+                    }
+                })
+            }
+        ]
+    };
+    
+    const result = await sendTransaction(transaction);
+    
+    if (result.success) {
+        return {
+            success: true,
+            usdtAmount: usdtAmount,
+            creditsReceived: creditsAmount,
+            txHash: result.txHash
+        };
+    }
+    
+    return result;
+}
+
 // ===== BUY CREDITS WITH FORGE =====
 export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBalance) {
     if (!walletConnected) {
@@ -346,7 +414,8 @@ export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBal
                     payload: {
                         type: 'buy_credits',
                         playerId: playerId,
-                        credits: creditsAmount
+                        credits: creditsAmount,
+                        paymentMethod: 'FORGE'
                     }
                 })
             }
@@ -394,6 +463,10 @@ export function getWalletBalanceDisplay() {
     return walletBalance.toFixed(2);
 }
 
+export function getUsdtBalanceDisplay() {
+    return usdtBalance.toFixed(2);
+}
+
 export function getShortAddress() {
     if (!walletAddress) return '';
     return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
@@ -405,13 +478,17 @@ export default {
     connectTonWallet,
     disconnectTonWallet,
     getTonBalance,
+    getUsdtBalance,
+    updateBalances,
     sendTransaction,
     buyCreditsWithTon,
+    buyCreditsWithUsdt,
     buyCreditsWithForge,
     isWalletConnected,
     getWalletAddress,
     getShortAddress,
     getWalletBalanceDisplay,
+    getUsdtBalanceDisplay,
     onWalletEvent,
     offWalletEvent,
     TON_CONFIG
