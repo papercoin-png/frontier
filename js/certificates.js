@@ -24,32 +24,13 @@ export async function getCertificates(playerId) {
 }
 
 export async function saveCertificates(playerId, progress) {
-    try {
-        // Create item with id property for the store's keyPath
-        const item = {
-            id: playerId,
-            progress: progress,
-            lastUpdated: Date.now()
-        };
-        
-        // Use setItem with the store name and the item (no separate key parameter)
-        await setItem('certificates', item);
-        console.log(`✅ Certificates saved for ${playerId}`);
-    } catch (error) {
-        console.error('Error saving certificates:', error);
-        // Fallback: try saving with explicit key
-        try {
-            const item = {
-                id: playerId,
-                progress: progress,
-                lastUpdated: Date.now()
-            };
-            await setItem('certificates', item, playerId);
-            console.log(`✅ Certificates saved with explicit key for ${playerId}`);
-        } catch (fallbackError) {
-            console.error('Fallback save also failed:', fallbackError);
-        }
-    }
+    const item = {
+        id: playerId,
+        progress: progress,
+        lastUpdated: Date.now()
+    };
+    // Use the explicit key parameter which works
+    await setItem('certificates', item, playerId);
 }
 
 export function getCertificateStatus(progress, index) {
