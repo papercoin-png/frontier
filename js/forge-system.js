@@ -1,1332 +1,583 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Voidfarer - University</title>
-    
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        body {
-            background: #0a0a1a;
-            font-family: 'Libre Baskerville', serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .phone-frame {
-            width: 100%;
-            max-width: 390px;
-            min-height: 844px;
-            position: relative;
-            overflow: hidden;
-            border-radius: 40px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-            background: #0a0a1a;
-            margin: 0 auto;
-        }
-        
-        .university-view {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: #0a1a2a;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 20px 16px 100px 16px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Header */
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .title {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 28px;
-            color: #e0f0ff;
-            text-shadow: 0 0 20px #8a6aff;
-            font-weight: 600;
-        }
-        
-        .subtitle {
-            color: #a0c0ff;
-            font-size: 11px;
-            letter-spacing: 2px;
-            margin-top: 4px;
-        }
-        
-        /* Stats Bar */
-        .stats-bar {
-            background: rgba(30, 45, 70, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid #8a6aff;
-            border-radius: 60px 20px 60px 20px;
-            padding: 12px 16px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .credits {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            color: white;
-        }
-        
-        .credits span {
-            color: #ffd966;
-            font-size: 20px;
-        }
-        
-        .labor-preview {
-            font-size: 12px;
-            color: #4affaa;
-            background: rgba(74, 255, 170, 0.1);
-            padding: 4px 10px;
-            border-radius: 30px;
-        }
-        
-        /* Earnings Card */
-        .earnings-card {
-            background: linear-gradient(135deg, #1a3a4a, #0a2a3a);
-            border: 2px solid #ffaa4a;
-            border-radius: 60px 20px 60px 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .earnings-label {
-            font-size: 12px;
-            color: #a0c0ff;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-        }
-        
-        .earnings-amount {
-            font-size: 48px;
-            font-weight: 700;
-            color: #ffd966;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .earnings-row {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255,170,74,0.3);
-            font-size: 12px;
-            color: #a0c0ff;
-        }
-        
-        .claim-btn {
-            background: rgba(74, 255, 170, 0.2);
-            border: 2px solid #4affaa;
-            color: #4affaa;
-            padding: 12px 24px;
-            border-radius: 60px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 16px;
-            width: 100%;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.1s;
-        }
-        
-        .claim-btn:active {
-            background: #4affaa;
-            color: #0a0a1a;
-            transform: scale(0.97);
-        }
-        
-        /* Forge Card */
-        .forge-card {
-            background: linear-gradient(135deg, #2a1a3a, #1a0a2a);
-            border: 2px solid #ffd700;
-            border-radius: 60px 20px 60px 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .forge-card::before {
-            content: "🔥";
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            font-size: 60px;
-            opacity: 0.1;
-            pointer-events: none;
-        }
-        
-        .forge-label {
-            font-size: 12px;
-            color: #ffd700;
-            letter-spacing: 2px;
-            margin-bottom: 12px;
-            font-weight: 600;
-        }
-        
-        .forge-balance-box {
-            background: rgba(255, 215, 0, 0.1);
-            border-radius: 20px;
-            padding: 10px;
-            margin-bottom: 16px;
-            border: 1px solid rgba(255, 215, 0, 0.3);
-        }
-        
-        .forge-balance-label {
-            font-size: 10px;
-            color: #ffd966;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-        }
-        
-        .forge-balance-amount {
-            font-size: 32px;
-            font-weight: 700;
-            color: #ffd700;
-            font-family: 'Exo 2', sans-serif;
-            text-shadow: 0 0 10px rgba(255,215,0,0.3);
-        }
-        
-        .forge-accruing-label {
-            font-size: 11px;
-            color: #e0b0ff;
-            margin-top: 8px;
-            margin-bottom: 4px;
-        }
-        
-        .forge-amount {
-            font-size: 28px;
-            font-weight: 700;
-            color: #ffaa66;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .forge-rate {
-            font-size: 11px;
-            color: #e0b0ff;
-            margin-top: 5px;
-        }
-        
-        .forge-pending {
-            background: rgba(255,215,0,0.1);
-            border-radius: 40px;
-            padding: 8px 12px;
-            margin: 12px 0;
-            font-size: 12px;
-            color: #ffd700;
-        }
-        
-        .forge-pending.warning {
-            background: rgba(255,100,100,0.2);
-            color: #ffaa66;
-            animation: pulse-warning 1s infinite;
-        }
-        
-        @keyframes pulse-warning {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; background: rgba(255,100,100,0.3); }
-        }
-        
-        .forge-claim-btn {
-            background: rgba(255, 215, 0, 0.2);
-            border: 2px solid #ffd700;
-            color: #ffd700;
-            padding: 12px 24px;
-            border-radius: 60px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 12px;
-            width: 100%;
-            font-family: 'Exo 2', sans-serif;
-            transition: all 0.1s;
-        }
-        
-        .forge-claim-btn:active {
-            background: #ffd700;
-            color: #0a0a1a;
-            transform: scale(0.97);
-        }
-        
-        .forge-claim-btn.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        
-        .forge-reset-timer {
-            font-size: 10px;
-            color: #a0c0ff;
-            margin-top: 10px;
-        }
-        
-        /* Certificate Card - Always Expanded */
-        .cert-card {
-            background: rgba(20, 30, 45, 0.9);
-            backdrop-filter: blur(10px);
-            border-radius: 30px 15px 30px 15px;
-            margin-bottom: 16px;
-            overflow: hidden;
-            border-left: 4px solid;
-            transition: all 0.2s;
-        }
-        
-        .cert-card.earned {
-            border-left-color: #4affaa;
-        }
-        
-        .cert-card.available {
-            border-left-color: #8a6aff;
-        }
-        
-        .cert-card.locked {
-            border-left-color: #4a4a6a;
-            opacity: 0.8;
-        }
-        
-        .cert-card.maxed {
-            border-left-color: #ffd700;
-            background: rgba(255,215,0,0.1);
-        }
-        
-        .cert-header {
-            padding: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0,0,0,0.2);
-        }
-        
-        .cert-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex: 1;
-        }
-        
-        .cert-icon {
-            font-size: 32px;
-            width: 48px;
-            text-align: center;
-        }
-        
-        .cert-name {
-            font-size: 18px;
-            font-weight: 700;
-            font-family: 'Exo 2', sans-serif;
-            color: white;
-        }
-        
-        .cert-tier {
-            font-size: 10px;
-            color: #a0c0ff;
-        }
-        
-        .cert-level {
-            text-align: right;
-            margin-right: 12px;
-        }
-        
-        .level-number {
-            font-size: 22px;
-            font-weight: 700;
-            color: #ffd966;
-        }
-        
-        .level-max {
-            font-size: 11px;
-            color: #6a8ac0;
-        }
-        
-        .next-gain {
-            font-size: 11px;
-            color: #4affaa;
-        }
-        
-        /* Content - Always Visible */
-        .cert-content {
-            padding: 0 14px 16px 14px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .gain-preview {
-            background: rgba(74, 255, 170, 0.1);
-            border-radius: 20px;
-            padding: 10px;
-            margin: 12px 0;
-            text-align: center;
-        }
-        
-        .gain-amount {
-            font-size: 20px;
-            font-weight: 700;
-            color: #4affaa;
-        }
-        
-        .gain-label {
-            font-size: 10px;
-            color: #a0c0ff;
-        }
-        
-        .progress-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            margin: 12px 0 6px;
-            color: #a0c0ff;
-        }
-        
-        .progress-bar {
-            height: 12px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 6px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #8a6aff, #b8a6ff);
-            border-radius: 6px;
-            width: 0%;
-            transition: width 0.3s;
-        }
-        
-        .donation-section {
-            background: rgba(0,0,0,0.3);
-            border-radius: 20px;
-            padding: 12px;
-            margin: 12px 0;
-        }
-        
-        .donation-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        
-        .donation-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-        }
-        
-        .rarity-badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 600;
-        }
-        
-        .rarity-common { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid #fff; }
-        .rarity-uncommon { background: rgba(176,255,176,0.2); color: #b0ffb0; border: 1px solid #b0ffb0; }
-        .rarity-rare { background: rgba(65,105,225,0.2); color: #4169E1; border: 1px solid #4169E1; }
-        .rarity-very-rare { background: rgba(224,176,255,0.2); color: #e0b0ff; border: 1px solid #e0b0ff; }
-        .rarity-legendary { background: rgba(255,215,0,0.2); color: #ffd700; border: 1px solid #ffd700; }
-        
-        .donate-btn {
-            background: rgba(138, 106, 255, 0.3);
-            border: 1px solid #8a6aff;
-            border-radius: 30px;
-            padding: 8px 14px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #8a6aff;
-            cursor: pointer;
-            transition: all 0.1s;
-        }
-        
-        .donate-btn.primary {
-            background: #ffaa4a;
-            border-color: #ffaa4a;
-            color: #0a0a1a;
-        }
-        
-        .donate-btn:active {
-            transform: scale(0.95);
-            background: rgba(138, 106, 255, 0.5);
-        }
-        
-        .donate-btn.primary:active {
-            background: #ffcc66;
-        }
-        
-        .donate-btn.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        
-        .inventory-text {
-            font-size: 11px;
-            color: #a0c0ff;
-            margin-top: 10px;
-            text-align: center;
-        }
-        
-        .unlock-requirement {
-            background: rgba(255,170,74,0.1);
-            border-radius: 20px;
-            padding: 10px;
-            text-align: center;
-            margin: 12px 0;
-        }
-        
-        /* Back Button */
-        .back-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #2a4a7a, #1a3a5a);
-            border: 3px solid #ffaa4a;
-            color: white;
-            padding: 14px 28px;
-            border-radius: 60px 20px 60px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            width: fit-content;
-            min-width: 260px;
-            text-align: center;
-            z-index: 100;
-            font-family: 'Exo 2', sans-serif;
-        }
-        
-        .back-btn:active {
-            transform: translateX(-50%) scale(0.96);
-        }
-        
-        /* Loading */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a0a1a;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .loading-overlay.active {
-            display: flex;
-        }
-        
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #8a6aff;
-            border-top: 4px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* Tooltip */
-        .tooltip {
-            position: fixed;
-            background: rgba(10,10,26,0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid #8a6aff;
-            border-radius: 16px;
-            padding: 8px 12px;
-            font-size: 11px;
-            color: white;
-            z-index: 1000;
-            pointer-events: none;
-            display: none;
-            max-width: 200px;
-        }
-        
-        /* Error Message */
-        .error-message {
-            background: rgba(255,100,100,0.2);
-            border: 1px solid #ff6666;
-            border-radius: 20px;
-            padding: 10px;
-            margin: 10px 0;
-            text-align: center;
-            color: #ffaa66;
-            font-size: 12px;
-            display: none;
-        }
-        
-        .error-message.show {
-            display: block;
-        }
-    </style>
-</head>
-<body>
-    <div class="phone-frame">
-        <div class="university-view">
-            <!-- Header -->
-            <div class="header">
-                <div class="title">✦ UNIVERSITY ✦</div>
-                <div class="subtitle">MASTERY & LABOR SHARE</div>
-            </div>
-            
-            <!-- Stats Bar -->
-            <div class="stats-bar">
-                <div class="credits" id="creditsDisplay">
-                    <span>⭐</span> 12,450
-                </div>
-                <div class="labor-preview" id="totalSharePreview">Share: 0%</div>
-            </div>
-            
-            <!-- Error Message -->
-            <div class="error-message" id="errorMessage"></div>
-            
-            <!-- Earnings Card -->
-            <div class="earnings-card">
-                <div class="earnings-label">⭐ YOUR EARNINGS TODAY ⭐</div>
-                <div class="earnings-amount" id="todayEarnings">0⭐</div>
-                <div class="earnings-row">
-                    <span>💰 LABOR POOL</span>
-                    <span id="poolAmount">0⭐</span>
-                </div>
-                <div class="earnings-row">
-                    <span>👥 ACTIVE WORKERS</span>
-                    <span id="activeWorkers">0</span>
-                </div>
-                <button class="claim-btn" id="claimBtn">💰 CLAIM EARNINGS</button>
-            </div>
-            
-            <!-- Forge Card -->
-            <div class="forge-card" id="forgeCard">
-                <div class="forge-label">🔥 FORGE TOKENS 🔥</div>
-                
-                <!-- Claimed Balance (Spendable) -->
-                <div class="forge-balance-box">
-                    <div class="forge-balance-label">💰 SPENDABLE BALANCE</div>
-                    <div class="forge-balance-amount" id="forgeBalanceAmount">0.0000</div>
-                </div>
-                
-                <!-- Accruing (Unclaimed) -->
-                <div class="forge-accruing-label">⚡ ACCRUING (Unclaimed)</div>
-                <div class="forge-amount" id="forgeAmount">0.0000</div>
-                <div class="forge-rate" id="forgeRate">+0.0000/10s</div>
-                
-                <div class="forge-pending" id="forgePending" style="display: none;">
-                    <span id="pendingAmount">0</span> Forge available to claim!
-                    <br><small id="pendingExpiry">Expires in: --</small>
-                </div>
-                <button class="forge-claim-btn" id="forgeClaimBtn" style="display: none;">🔥 CLAIM FORGE</button>
-                <div class="forge-reset-timer" id="forgeResetTimer">Reset in: --</div>
-            </div>
-            
-            <!-- Certificates Container -->
-            <div id="certificatesContainer"></div>
-            
-            <!-- Back Button -->
-            <div class="back-btn" onclick="window.location.href='earth-hub.html'">← EARTH HUB</div>
-        </div>
-    </div>
-    
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">PROCESSING...</div>
-    </div>
-    
-    <div class="tooltip" id="tooltip"></div>
-    
-    <script type="module">
-        import { getCredits, getCollection, removeElementFromCollection, getForgeBalance, addForgeTokens, getPlayerId } from './js/storage.js';
-        import { 
-            getCertificates, 
-            getCertificateStatus,
-            getXpNeeded,
-            getDonationsNeeded,
-            getLevelProgressPercent,
-            getTotalLaborShare,
-            calculateUpgradeGain,
-            calculateUnlockGain,
-            addDonationXP,
-            repairCertificates,
-            CERTIFICATE_TIERS
-        } from './js/certificates.js';
-        import { 
-            getLaborPoolStats,
-            getPlayerEarnings,
-            claimLaborEarnings
-        } from './js/labor-pool.js';
-        import {
-            getForgeData,
-            getCurrentForge,
-            getPendingForgeClaim,
-            claimForge,
-            getAccrualRateDisplay,
-            getTimeUntilReset,
-            getTimeUntilExpiry,
-            startForgeUpdates,
-            stopForgeUpdates
-        } from './js/forge-system.js';
+// js/forge-system.js
+// Forge token system - Real-time accrual based on certificate level
+// Players earn Forge passively while playing (and offline)
+// Daily cap of 70 Forge, resets at midnight UTC
+// Unclaimed Forge burns if not claimed within 24 hours
 
-        // ===== TELEGRAM INIT =====
-        const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); }
+import { getItem, setItem } from './storage.js';
+import { getCertificates, getTotalLaborShare } from './certificates.js';
+
+// ===== CONSTANTS =====
+const FORGE_CONFIG = {
+    DAILY_CAP: 70,                    // Maximum Forge per day
+    ACCRUAL_BASE_RATE: 0.0007,        // Base Forge per 10 seconds for share 100
+    ACCRUAL_INTERVAL_MS: 10000,       // 10 seconds (used for rate calculation)
+    RESET_HOUR: 0,                    // Midnight UTC
+    RESET_MINUTE: 0,
+    CLAIM_EXPIRY_HOURS: 24            // Forge must be claimed within 24 hours
+};
+
+// Storage keys (using IndexedDB via storage.js)
+const STORAGE_KEYS = {
+    FORGE_DATA: 'forgeData',           // Main forge data store
+    FORGE_BALANCE: 'forgeBalance'      // Player's Forge balance (spendable)
+};
+
+// ===== INITIALIZATION =====
+/**
+ * Initialize forge system for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Forge data object
+ */
+export async function initializeForge(playerId) {
+    try {
+        let forgeData = await getItem('forgeData', playerId);
         
-        // ===== DOM ELEMENTS =====
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const tooltip = document.getElementById('tooltip');
-        const errorMessageEl = document.getElementById('errorMessage');
-        
-        // Forge elements
-        const forgeAmountEl = document.getElementById('forgeAmount');
-        const forgeBalanceAmountEl = document.getElementById('forgeBalanceAmount');
-        const forgeRateEl = document.getElementById('forgeRate');
-        const forgePendingEl = document.getElementById('forgePending');
-        const pendingAmountEl = document.getElementById('pendingAmount');
-        const pendingExpiryEl = document.getElementById('pendingExpiry');
-        const forgeClaimBtn = document.getElementById('forgeClaimBtn');
-        const forgeResetTimerEl = document.getElementById('forgeResetTimer');
-        
-        // ===== STATE =====
-        let playerId = null;
-        let playerCredits = 0;
-        let certificates = [];
-        let laborPool = 10000;
-        let activeWorkers = 847;
-        let totalPlayerShares = 8450;
-        
-        // Forge state
-        let currentForge = 0;
-        let pendingForge = 0;
-        let pendingExpiresAt = null;
-        let forgeBalance = 0;
-        let currentShare = 0;
-        let updateInterval = null;
-        
-        // Donation lock to prevent multiple simultaneous donations
-        let donationInProgress = false;
-        
-        // Cargo counts by rarity
-        let cargoCounts = {
-            common: 0,
-            uncommon: 0,
-            rare: 0,
-            'very-rare': 0,
-            legendary: 0
-        };
-        
-        // Element rarity mapping helper
-        function getElementRarity(elementName) {
-            const commonElements = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'];
-            const uncommonElements = ['Magnesium', 'Iron', 'Nickel', 'Copper', 'Zinc', 'Gallium', 'Germanium', 'Arsenic', 'Selenium', 'Bromine', 'Krypton', 'Rubidium', 'Strontium', 'Yttrium', 'Zirconium', 'Niobium', 'Molybdenum', 'Technetium', 'Ruthenium', 'Rhodium', 'Palladium', 'Silver', 'Cadmium', 'Indium', 'Tin', 'Antimony', 'Tellurium', 'Iodine', 'Xenon', 'Cesium', 'Barium', 'Lanthanum', 'Cerium', 'Praseodymium', 'Neodymium', 'Samarium', 'Europium', 'Gadolinium', 'Terbium', 'Dysprosium', 'Holmium', 'Erbium', 'Thulium', 'Ytterbium', 'Lutetium'];
-            const rareElements = ['Titanium', 'Chromium', 'Manganese', 'Cobalt', 'Vanadium', 'Gold', 'Platinum', 'Iridium', 'Osmium', 'Rhenium'];
-            const veryRareElements = ['Uranium', 'Thorium', 'Plutonium', 'Neptunium', 'Americium', 'Curium'];
-            const legendaryElements = ['Berkelium', 'Californium', 'Einsteinium', 'Fermium', 'Mendelevium', 'Nobelium', 'Lawrencium', 'Rutherfordium', 'Dubnium', 'Seaborgium', 'Bohrium', 'Hassium', 'Meitnerium', 'Darmstadtium', 'Roentgenium', 'Copernicium', 'Nihonium', 'Flerovium', 'Moscovium', 'Livermorium', 'Tennessine', 'Oganesson'];
-            
-            if (commonElements.includes(elementName)) return 'common';
-            if (uncommonElements.includes(elementName)) return 'uncommon';
-            if (rareElements.includes(elementName)) return 'rare';
-            if (veryRareElements.includes(elementName)) return 'very-rare';
-            if (legendaryElements.includes(elementName)) return 'legendary';
-            return 'common';
+        if (!forgeData) {
+            forgeData = {
+                playerId: playerId,
+                currentForge: 0,           // Forge accrued today (resets daily)
+                lastAccrualTimestamp: Date.now(),
+                lastResetDate: null,
+                pendingClaim: 0,            // Forge available to claim (from previous day)
+                pendingClaimExpires: null,  // Timestamp when pending claim expires
+                lastClaimDate: null,        // Date when last claimed
+                totalForgeClaimed: 0,       // Lifetime Forge claimed
+                totalForgeBurned: 0         // Lifetime Forge burned
+            };
+            await setItem('forgeData', forgeData, playerId);
         }
         
-        // Show error message
-        function showError(message, duration = 3000) {
-            errorMessageEl.textContent = message;
-            errorMessageEl.classList.add('show');
-            setTimeout(() => {
-                errorMessageEl.classList.remove('show');
-            }, duration);
-        }
+        // Check and perform daily reset
+        await checkAndResetDaily(playerId);
         
-        // Load cargo from storage
-        async function loadCargo() {
-            try {
-                const collection = await getCollection(playerId);
-                
-                // Reset counts
-                cargoCounts = {
-                    common: 0,
-                    uncommon: 0,
-                    rare: 0,
-                    'very-rare': 0,
-                    legendary: 0
-                };
-                
-                for (const [elementName, data] of Object.entries(collection)) {
-                    const count = typeof data === 'object' ? data.count : data;
-                    const rarity = getElementRarity(elementName);
-                    cargoCounts[rarity] += count;
-                }
-                
-                console.log('Cargo loaded:', cargoCounts);
-                
-            } catch (error) {
-                console.error('Error loading cargo:', error);
-                cargoCounts = {
-                    common: 0,
-                    uncommon: 0,
-                    rare: 0,
-                    'very-rare': 0,
-                    legendary: 0
-                };
-            }
-        }
+        // Check for expired pending claims
+        await checkAndBurnExpiredClaim(playerId);
         
-        // Donate elements from cargo
-        async function donateFromCargo(certIndex, quantity) {
-            const cert = CERTIFICATE_TIERS[certIndex];
-            const requiredRarity = cert.rarity;
-            
-            // Check if player has enough
-            if (cargoCounts[requiredRarity] < quantity) {
-                showError(`Not enough ${requiredRarity.toUpperCase()} elements! Need ${quantity - cargoCounts[requiredRarity]} more.`);
-                return false;
+        // Update accrual based on time passed
+        await updateAccrual(playerId);
+        
+        return forgeData;
+    } catch (error) {
+        console.error('Error initializing forge:', error);
+        return null;
+    }
+}
+
+// ===== DAILY RESET =====
+/**
+ * Check if daily reset is needed and perform it
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} True if reset occurred
+ */
+export async function checkAndResetDaily(playerId) {
+    try {
+        const forgeData = await getItem('forgeData', playerId);
+        if (!forgeData) return false;
+        
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        
+        // Check if we need to reset
+        if (forgeData.lastResetDate !== today) {
+            // Move current Forge to pending claim (if any)
+            if (forgeData.currentForge > 0) {
+                forgeData.pendingClaim = forgeData.currentForge;
+                forgeData.pendingClaimExpires = Date.now() + (FORGE_CONFIG.CLAIM_EXPIRY_HOURS * 60 * 60 * 1000);
             }
             
-            // Need to find actual elements of this rarity to remove
-            const collection = await getCollection(playerId);
-            let remainingToRemove = quantity;
+            // Reset current Forge
+            forgeData.currentForge = 0;
+            forgeData.lastResetDate = today;
+            forgeData.lastAccrualTimestamp = Date.now();
             
-            for (const [elementName, data] of Object.entries(collection)) {
-                if (remainingToRemove <= 0) break;
-                
-                const rarity = getElementRarity(elementName);
-                if (rarity !== requiredRarity) continue;
-                
-                const currentCount = typeof data === 'object' ? data.count : data;
-                const toRemove = Math.min(remainingToRemove, currentCount);
-                
-                if (toRemove > 0) {
-                    const result = await removeElementFromCollection(elementName, toRemove);
-                    if (result.success) {
-                        remainingToRemove -= toRemove;
-                    }
-                }
-            }
-            
-            if (remainingToRemove > 0) {
-                showError(`Failed to remove ${remainingToRemove} ${requiredRarity} elements.`);
-                return false;
-            }
-            
-            // Reload cargo counts
-            await loadCargo();
+            await setItem('forgeData', forgeData, playerId);
+            console.log(`🔄 Forge daily reset for ${playerId}: ${forgeData.pendingClaim} Forge moved to pending`);
             return true;
         }
         
-        // ===== FORGE UI UPDATE =====
-        async function updateForgeUI() {
-            try {
-                // Get claimed Forge balance (spendable)
-                forgeBalance = await getForgeBalance(playerId);
-                if (forgeBalanceAmountEl) {
-                    forgeBalanceAmountEl.textContent = forgeBalance.toFixed(4);
+        return false;
+    } catch (error) {
+        console.error('Error checking daily reset:', error);
+        return false;
+    }
+}
+
+/**
+ * Check and burn expired pending claim
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Amount burned (0 if none)
+ */
+export async function checkAndBurnExpiredClaim(playerId) {
+    try {
+        const forgeData = await getItem('forgeData', playerId);
+        if (!forgeData) return 0;
+        
+        if (forgeData.pendingClaim > 0 && forgeData.pendingClaimExpires) {
+            if (Date.now() > forgeData.pendingClaimExpires) {
+                const burnedAmount = forgeData.pendingClaim;
+                forgeData.totalForgeBurned += burnedAmount;
+                forgeData.pendingClaim = 0;
+                forgeData.pendingClaimExpires = null;
+                
+                await setItem('forgeData', forgeData, playerId);
+                console.log(`🔥 ${burnedAmount} Forge burned for ${playerId} (expired)`);
+                
+                // Dispatch event for UI updates
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('forge-burned', { 
+                        detail: { playerId, amount: burnedAmount } 
+                    }));
                 }
                 
-                // Get current Forge data (accruing)
-                const forgeData = await getForgeData(playerId);
-                if (forgeData) {
-                    currentForge = forgeData.currentForge || 0;
-                    forgeAmountEl.textContent = currentForge.toFixed(4);
-                }
-                
-                // Get pending claim
-                const pending = await getPendingForgeClaim(playerId);
-                pendingForge = pending.amount;
-                pendingExpiresAt = pending.expiresAt;
-                
-                if (pendingForge > 0 && pendingExpiresAt) {
-                    forgePendingEl.style.display = 'block';
-                    pendingAmountEl.textContent = pendingForge.toFixed(4);
-                    const timeLeft = getTimeUntilExpiry(pendingExpiresAt);
-                    pendingExpiryEl.textContent = `Expires in: ${timeLeft}`;
-                    
-                    // Add warning class if less than 1 hour
-                    const hoursLeft = (pendingExpiresAt - Date.now()) / (1000 * 60 * 60);
-                    if (hoursLeft < 1) {
-                        forgePendingEl.classList.add('warning');
-                    } else {
-                        forgePendingEl.classList.remove('warning');
-                    }
-                    
-                    forgeClaimBtn.style.display = 'block';
-                } else {
-                    forgePendingEl.style.display = 'none';
-                    forgeClaimBtn.style.display = 'none';
-                    forgePendingEl.classList.remove('warning');
-                }
-                
-                // Update accrual rate display
-                const certificatesData = await getCertificates(playerId);
-                currentShare = getTotalLaborShare(certificatesData);
-                const rateDisplay = getAccrualRateDisplay(currentShare);
-                forgeRateEl.textContent = rateDisplay;
-                
-                // Update reset timer
-                const resetTime = getTimeUntilReset();
-                forgeResetTimerEl.textContent = `Reset in: ${resetTime.hours}h ${resetTime.minutes}m ${resetTime.seconds}s`;
-                
-            } catch (error) {
-                console.error('Error updating forge UI:', error);
+                return burnedAmount;
             }
         }
         
-        // ===== CLAIM FORGE =====
-        async function handleClaimForge() {
-            try {
-                loadingOverlay.classList.add('active');
-                const result = await claimForge(playerId);
-                
-                if (result.success) {
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    showTooltip(`🔥 ${result.message}`, 2000);
-                    await updateForgeUI();
-                } else {
-                    showTooltip(result.message, 1500);
-                }
-                
-                loadingOverlay.classList.remove('active');
-            } catch (error) {
-                console.error('Error claiming forge:', error);
-                loadingOverlay.classList.remove('active');
-                showTooltip('Failed to claim Forge', 1500);
+        return 0;
+    } catch (error) {
+        console.error('Error checking expired claim:', error);
+        return 0;
+    }
+}
+
+// ===== ACCRUAL CALCULATION =====
+/**
+ * Calculate accrual rate based on certificate share
+ * Rate = (Share / 100) × 0.0007 Forge per 10 seconds
+ * @param {number} share - Total certificate share
+ * @returns {number} Forge per 10 seconds
+ */
+export function calculateAccrualRate(share) {
+    if (share <= 0) return 0;
+    // Base rate 0.0007 per 10 seconds for share 100
+    // Share 500 = 0.0035, Share 1000 = 0.007, Share 2000 = 0.014
+    return (share / 100) * FORGE_CONFIG.ACCRUAL_BASE_RATE;
+}
+
+/**
+ * Calculate Forge gained over a time period - CONTINUOUS (no chunking)
+ * @param {number} share - Certificate share
+ * @param {number} milliseconds - Time elapsed in milliseconds
+ * @returns {number} Forge gained
+ */
+export function calculateForgeGained(share, milliseconds) {
+    if (share <= 0 || milliseconds <= 0) return 0;
+    
+    // Rate per millisecond = (rate per 10 seconds) / 10000
+    const ratePer10s = calculateAccrualRate(share);
+    const ratePerMs = ratePer10s / FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    
+    // DIRECT CONTINUOUS CALCULATION - NO CHUNKING, NO FLOORING
+    // Any amount of time yields proportional Forge
+    return ratePerMs * milliseconds;
+}
+
+/**
+ * Update Forge accrual based on time passed since last update
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} New current Forge amount
+ */
+export async function updateAccrual(playerId) {
+    try {
+        const forgeData = await getItem('forgeData', playerId);
+        if (!forgeData) return 0;
+        
+        const now = Date.now();
+        const timeElapsed = now - (forgeData.lastAccrualTimestamp || now);
+        
+        if (timeElapsed <= 0) return forgeData.currentForge;
+        
+        // Get player's certificate share
+        const certificates = await getCertificates(playerId);
+        const share = getTotalLaborShare(certificates);
+        
+        // Calculate Forge gained using continuous calculation
+        let gained = calculateForgeGained(share, timeElapsed);
+        
+        if (gained > 0) {
+            let newForge = forgeData.currentForge + gained;
+            
+            // Cap at daily maximum
+            if (newForge > FORGE_CONFIG.DAILY_CAP) {
+                newForge = FORGE_CONFIG.DAILY_CAP;
             }
+            
+            forgeData.currentForge = newForge;
         }
         
-        // ===== REFRESH UI AFTER DONATION =====
-        async function refreshUI() {
-            try {
-                // Reload certificates with repair attempt if needed
-                certificates = await getCertificates(playerId);
-                
-                // Validate certificates and repair if corrupted
-                if (!certificates || certificates.length !== CERTIFICATE_TIERS.length) {
-                    console.warn('Certificate data appears corrupted, attempting repair...');
-                    certificates = await repairCertificates(playerId);
-                }
-                
-                // Update share preview
-                const totalShare = getTotalLaborShare(certificates);
-                const sharePercent = (totalShare / 100).toFixed(2);
-                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
-                
-                // Re-render certificates
-                renderCertificates();
-                
-                // Update Forge UI (share changed)
-                await updateForgeUI();
-            } catch (error) {
-                console.error('Error refreshing UI:', error);
-                showError('Failed to refresh UI. Please reload the page.');
-            }
+        forgeData.lastAccrualTimestamp = now;
+        await setItem('forgeData', forgeData, playerId);
+        
+        return forgeData.currentForge;
+    } catch (error) {
+        console.error('Error updating accrual:', error);
+        return 0;
+    }
+}
+
+// ===== GETTERS =====
+/**
+ * Get current Forge data for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Forge data object
+ */
+export async function getForgeData(playerId) {
+    try {
+        let forgeData = await getItem('forgeData', playerId);
+        if (!forgeData) {
+            forgeData = await initializeForge(playerId);
+        } else {
+            // Check for reset and update accrual
+            await checkAndResetDaily(playerId);
+            await updateAccrual(playerId);
+            forgeData = await getItem('forgeData', playerId);
+        }
+        return forgeData;
+    } catch (error) {
+        console.error('Error getting forge data:', error);
+        return null;
+    }
+}
+
+/**
+ * Get current Forge amount (accrued today)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Current Forge amount
+ */
+export async function getCurrentForge(playerId) {
+    const forgeData = await getForgeData(playerId);
+    return forgeData ? forgeData.currentForge : 0;
+}
+
+/**
+ * Get pending Forge claim (from previous day)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<{amount: number, expiresAt: number|null}>} Pending claim info
+ */
+export async function getPendingForgeClaim(playerId) {
+    const forgeData = await getForgeData(playerId);
+    if (!forgeData) return { amount: 0, expiresAt: null };
+    
+    // Check if expired
+    if (forgeData.pendingClaim > 0 && forgeData.pendingClaimExpires) {
+        if (Date.now() > forgeData.pendingClaimExpires) {
+            await checkAndBurnExpiredClaim(playerId);
+            return { amount: 0, expiresAt: null };
+        }
+        return { 
+            amount: forgeData.pendingClaim, 
+            expiresAt: forgeData.pendingClaimExpires 
+        };
+    }
+    
+    return { amount: 0, expiresAt: null };
+}
+
+/**
+ * Get total Forge balance (spendable - claimed Forge)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Forge balance
+ */
+export async function getForgeBalance(playerId) {
+    try {
+        const balance = await getItem('forgeBalance', playerId);
+        return balance ? balance.amount : 0;
+    } catch (error) {
+        console.error('Error getting forge balance:', error);
+        return 0;
+    }
+}
+
+// ===== CLAIM AND BALANCE MANAGEMENT =====
+/**
+ * Claim pending Forge (add to spendable balance)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<{success: boolean, amount: number, message: string}>} Result
+ */
+export async function claimForge(playerId) {
+    try {
+        const forgeData = await getForgeData(playerId);
+        if (!forgeData) {
+            return { success: false, amount: 0, message: 'Forge system not initialized' };
         }
         
-        // ===== LOAD DATA =====
-        async function loadData() {
-            try {
-                loadingOverlay.classList.add('active');
-                
-                // Use the same player ID as surface and ship-bridge
-                playerId = getPlayerId();
-                console.log('University loading for player:', playerId);
-                
-                // Load certificates with repair
-                certificates = await getCertificates(playerId);
-                if (!certificates || certificates.length !== CERTIFICATE_TIERS.length) {
-                    console.warn('Initial certificate data invalid, repairing...');
-                    certificates = await repairCertificates(playerId);
-                }
-                
-                // Load cargo from storage
-                await loadCargo();
-                
-                playerCredits = await getCredits(playerId);
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
-                
-                const stats = await getLaborPoolStats();
-                if (stats) {
-                    laborPool = stats.balance;
-                    activeWorkers = stats.activeWorkers || activeWorkers;
-                    totalPlayerShares = stats.totalDistributed ? stats.totalDistributed / 100 : totalPlayerShares;
-                }
-                
-                const earnings = await getPlayerEarnings(playerId);
-                document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
-                document.getElementById('poolAmount').innerHTML = `${laborPool.toLocaleString()}⭐`;
-                document.getElementById('activeWorkers').innerHTML = activeWorkers.toLocaleString();
-                
-                const totalShare = getTotalLaborShare(certificates);
-                const sharePercent = (totalShare / 100).toFixed(2);
-                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
-                
-                // Update Forge UI
-                await updateForgeUI();
-                
-                renderCertificates();
-                
-                loadingOverlay.classList.remove('active');
-                
-            } catch (error) {
-                console.error('Error loading data:', error);
-                loadingOverlay.classList.remove('active');
-                showError('Failed to load data. Please refresh the page.');
-            }
+        // Check for expired claim first
+        await checkAndBurnExpiredClaim(playerId);
+        
+        // Refresh data after potential burn
+        const refreshedData = await getItem('forgeData', playerId);
+        if (!refreshedData || refreshedData.pendingClaim <= 0) {
+            return { success: false, amount: 0, message: 'No Forge available to claim' };
         }
         
-        // ===== RENDER CERTIFICATES (ALWAYS EXPANDED) =====
-        function renderCertificates() {
-            const container = document.getElementById('certificatesContainer');
-            if (!container) return;
-            
-            let html = '';
-            
-            for (let i = 0; i < CERTIFICATE_TIERS.length; i++) {
-                const cert = CERTIFICATE_TIERS[i];
-                const status = getCertificateStatus(certificates, i);
-                const prog = certificates[i];
-                const currentLevel = prog?.level || 0;
-                const xpNeeded = getXpNeeded(certificates, i);
-                const donationsNeeded = getDonationsNeeded(certificates, i);
-                
-                let gainPreview = 0;
-                if (status === 'earned' && currentLevel < cert.totalLevels) {
-                    gainPreview = calculateUpgradeGain(certificates, i, laborPool, totalPlayerShares);
-                } else if (status === 'available') {
-                    gainPreview = calculateUnlockGain(certificates, i, laborPool, totalPlayerShares);
-                }
-                
-                let statusClass = '';
-                if (status === 'maxed') statusClass = 'maxed';
-                else if (status === 'earned') statusClass = 'earned';
-                else if (status === 'available') statusClass = 'available';
-                else statusClass = 'locked';
-                
-                const nextLevelXp = currentLevel * cert.xpPerLevel;
-                const currentXp = prog?.xp || 0;
-                const xpProgress = currentXp - nextLevelXp;
-                const percentComplete = (xpProgress / cert.xpPerLevel) * 100;
-                
-                // Fixed donation buttons: 10, 100, 500, 1000
-                const unitAmounts = [10, 100, 500, 1000];
-                const filteredAmounts = unitAmounts.filter(amount => amount <= 10000);
-                
-                let buttonsHtml = '';
-                filteredAmounts.forEach(amount => {
-                    let btnClass = '';
-                    if (amount === 1000) btnClass = 'primary';
-                    const availableCount = cargoCounts[cert.rarity] || 0;
-                    const isDisabled = availableCount < amount;
-                    buttonsHtml += `<button class="donate-btn ${btnClass} ${isDisabled ? 'disabled' : ''}" onclick="window.donate(${i}, ${amount})" ${isDisabled ? 'disabled' : ''}>${amount}</button>`;
-                });
-                
-                // Get available count for this rarity
-                const availableCount = cargoCounts[cert.rarity] || 0;
-                
-                html += `
-                    <div class="cert-card ${statusClass}">
-                        <div class="cert-header">
-                            <div class="cert-info">
-                                <div class="cert-icon">${cert.icon}</div>
-                                <div>
-                                    <div class="cert-name">${cert.name}</div>
-                                    <div class="cert-tier">Tier ${cert.tier} · ${cert.rarity.toUpperCase()}</div>
-                                </div>
-                            </div>
-                            <div class="cert-level">
-                `;
-                
-                if (status === 'maxed') {
-                    html += `<div class="level-number">MAX</div>`;
-                } else {
-                    html += `<div class="level-number">${currentLevel}/${cert.totalLevels}</div>`;
-                    if (gainPreview > 0) {
-                        html += `<div class="next-gain">+${gainPreview}⭐/day</div>`;
-                    }
-                }
-                
-                html += `
-                            </div>
-                        </div>
-                        
-                        <div class="cert-content">
-                `;
-                
-                // Progress Bar - Always Visible (only show if not maxed)
-                if (status !== 'locked' && status !== 'maxed') {
-                    const fillWidth = Math.min(100, Math.max(0, percentComplete));
-                    html += `
-                        <div class="progress-header">
-                            <span>${currentLevel + 1 === 1 ? 'FIRST LEVEL' : `LEVEL ${currentLevel + 1}`}</span>
-                            <span>${Math.floor(xpNeeded).toLocaleString()} XP needed</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${fillWidth}%"></div>
-                        </div>
-                        <div style="font-size: 10px; color: #a0c0ff; text-align: right; margin-top: 4px;">
-                            ${Math.floor(xpProgress).toLocaleString()} / ${cert.xpPerLevel.toLocaleString()} XP
-                        </div>
-                    `;
-                } else if (status === 'maxed') {
-                    html += `
-                        <div class="gain-preview">
-                            <div class="gain-amount">✓ COMPLETED</div>
-                            <div class="gain-label">Mastered this certificate</div>
-                        </div>
-                    `;
-                }
-                
-                // Gain Preview - Always Visible
-                if (gainPreview > 0 && status !== 'maxed') {
-                    const actionText = status === 'available' ? `Unlock ${cert.name}` : `Level ${currentLevel + 1}`;
-                    html += `
-                        <div class="gain-preview">
-                            <div class="gain-amount">+${gainPreview}⭐</div>
-                            <div class="gain-label">more per day after ${actionText}</div>
-                        </div>
-                    `;
-                }
-                
-                // Donation Section - Always Visible for available/earned certificates (not maxed)
-                if (status !== 'locked' && status !== 'maxed') {
-                    const rarityClass = `rarity-${cert.rarity}`;
-                    html += `
-                        <div class="donation-section">
-                            <div class="donation-row">
-                                <div class="donation-info">
-                                    <span class="rarity-badge ${rarityClass}">${cert.rarity.toUpperCase()}</span>
-                                    <span>+${cert.xpPerDonation} XP per ${cert.unitsPerDonation} units</span>
-                                </div>
-                            </div>
-                            <div class="donation-buttons">
-                                ${buttonsHtml}
-                            </div>
-                            <div class="inventory-text">
-                                📦 You have: ${availableCount.toLocaleString()} ${cert.rarity.toUpperCase()} units in cargo
-                                ${donationsNeeded > 0 ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
-                            </div>
-                        </div>
-                    `;
-                } else if (status === 'maxed') {
-                    // Show that certificate is maxed
-                    html += `
-                        <div class="donation-section" style="opacity: 0.6;">
-                            <div class="donation-row">
-                                <div class="donation-info">
-                                    <span class="rarity-badge rarity-${cert.rarity}">${cert.rarity.toUpperCase()}</span>
-                                    <span>Certificate already at max level</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Unlock requirement for locked certificates
-                if (status === 'locked' && i > 0) {
-                    const prevCert = CERTIFICATE_TIERS[i-1];
-                    html += `
-                        <div class="unlock-requirement">
-                            🔒 Requires ${prevCert.name} Level 10
-                            <div style="font-size: 11px; margin-top: 4px;">Reach max level in ${prevCert.name} to unlock</div>
-                        </div>
-                    `;
-                }
-                
-                html += `</div></div>`;
-            }
-            
-            container.innerHTML = html;
+        const claimAmount = refreshedData.pendingClaim;
+        
+        // Get or create balance
+        let balance = await getItem('forgeBalance', playerId);
+        if (!balance) {
+            balance = { playerId: playerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
         }
         
-        // ===== DONATE =====
-        window.donate = async function(certIndex, quantity) {
-            // Prevent multiple simultaneous donations
-            if (donationInProgress) {
-                showTooltip('Please wait, donation in progress...', 1000);
-                return;
-            }
-            
-            const cert = CERTIFICATE_TIERS[certIndex];
-            const status = getCertificateStatus(certificates, certIndex);
-            
-            if (status === 'locked') {
-                showError(`Complete ${CERTIFICATE_TIERS[certIndex-1].name} Level 10 first.`);
-                return;
-            }
-            
-            if (status === 'maxed') {
-                showError(`${cert.name} is already at max level!`);
-                return;
-            }
-            
-            // Check if player has enough cargo
-            const available = cargoCounts[cert.rarity] || 0;
-            if (available < quantity) {
-                showError(`Not enough ${cert.rarity.toUpperCase()} elements! Need ${quantity - available} more.`);
-                return;
-            }
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
-            // Show loading indicator
-            loadingOverlay.classList.add('active');
-            donationInProgress = true;
-            
-            try {
-                // Remove from cargo
-                const success = await donateFromCargo(certIndex, quantity);
-                if (!success) {
-                    donationInProgress = false;
-                    loadingOverlay.classList.remove('active');
-                    return;
-                }
-                
-                // Add XP with retry
-                let result = null;
-                let retryCount = 0;
-                const maxRetries = 3;
-                
-                while (retryCount < maxRetries && !result?.success) {
-                    result = await addDonationXP(playerId, certIndex, quantity);
-                    if (!result.success && retryCount < maxRetries - 1) {
-                        console.log(`Donation failed, retrying (${retryCount + 1}/${maxRetries})...`);
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                    retryCount++;
-                }
-                
-                // ALWAYS refresh UI regardless of result
-                await refreshUI();
-                
-                if (result?.success) {
-                    if (result.leveledUp) {
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                        showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
-                    } else {
-                        showTooltip(`+${result.xpGained.toFixed(2)} XP to ${cert.name}`, 1000);
-                    }
-                } else {
-                    // Even if XP addition failed, cargo was removed - refresh to show updated cargo
-                    showTooltip('Donation processed', 1000);
-                    if (result?.error) {
-                        console.warn('Donation XP error:', result.error);
-                    }
-                }
-                
-            } catch (error) {
-                console.error('Donation error:', error);
-                // Refresh UI to show latest data
-                await refreshUI();
-                showError('Donation completed with issues. Please check your progress.');
-            } finally {
-                donationInProgress = false;
-                loadingOverlay.classList.remove('active');
-            }
+        // Add to balance
+        balance.amount += claimAmount;
+        balance.totalClaimed = (balance.totalClaimed || 0) + claimAmount;
+        balance.lastClaimDate = Date.now();
+        
+        // Clear pending claim
+        refreshedData.pendingClaim = 0;
+        refreshedData.pendingClaimExpires = null;
+        refreshedData.lastClaimDate = Date.now();
+        refreshedData.totalForgeClaimed = (refreshedData.totalForgeClaimed || 0) + claimAmount;
+        
+        await setItem('forgeBalance', balance, playerId);
+        await setItem('forgeData', refreshedData, playerId);
+        
+        // Dispatch event for UI updates
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-claimed', { 
+                detail: { playerId, amount: claimAmount } 
+            }));
+        }
+        
+        return { 
+            success: true, 
+            amount: claimAmount, 
+            message: `Claimed ${claimAmount.toFixed(3)} Forge!` 
         };
         
-        // ===== SHOW TOOLTIP =====
-        function showTooltip(message, duration = 1500) {
-            tooltip.textContent = message;
-            tooltip.style.display = 'block';
-            tooltip.style.left = '50%';
-            tooltip.style.bottom = '100px';
-            tooltip.style.transform = 'translateX(-50%)';
-            setTimeout(() => {
-                tooltip.style.display = 'none';
-            }, duration);
+    } catch (error) {
+        console.error('Error claiming forge:', error);
+        return { success: false, amount: 0, message: 'Failed to claim Forge' };
+    }
+}
+
+/**
+ * Add Forge tokens to player's spendable balance (for rewards/purchases)
+ * @param {string} playerId - Player ID
+ * @param {number} amount - Amount to add
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addForgeToBalance(playerId, amount) {
+    try {
+        if (amount <= 0) return false;
+        
+        let balance = await getItem('forgeBalance', playerId);
+        if (!balance) {
+            balance = { playerId: playerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
         }
         
-        // ===== CLAIM EARNINGS =====
-        document.getElementById('claimBtn').onclick = async () => {
-            try {
-                loadingOverlay.classList.add('active');
-                
-                const result = await claimLaborEarnings(playerId);
-                
-                if (result.success) {
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    showTooltip(`✅ ${result.message}`, 2000);
-                    
-                    playerCredits = await getCredits(playerId);
-                    document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${playerCredits.toLocaleString()}`;
-                    
-                    const earnings = await getPlayerEarnings(playerId);
-                    document.getElementById('todayEarnings').innerHTML = `${earnings.toLocaleString()}⭐`;
-                } else {
-                    showError(result.message || 'No earnings to claim');
+        balance.amount += amount;
+        await setItem('forgeBalance', balance, playerId);
+        
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
+                detail: { playerId, amount, newBalance: balance.amount } 
+            }));
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error adding forge to balance:', error);
+        return false;
+    }
+}
+
+/**
+ * Spend Forge tokens
+ * @param {string} playerId - Player ID
+ * @param {number} amount - Amount to spend
+ * @returns {Promise<boolean>} Success status
+ */
+export async function spendForge(playerId, amount) {
+    try {
+        if (amount <= 0) return false;
+        
+        const balance = await getItem('forgeBalance', playerId);
+        if (!balance || balance.amount < amount) return false;
+        
+        balance.amount -= amount;
+        await setItem('forgeBalance', balance, playerId);
+        
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('forge-spent', { 
+                detail: { playerId, amount, newBalance: balance.amount } 
+            }));
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error spending forge:', error);
+        return false;
+    }
+}
+
+// ===== UI HELPER FUNCTIONS =====
+/**
+ * Get formatted time until next accrual increment (for display)
+ * @returns {number} Seconds until next increment (0-10)
+ */
+export function getSecondsUntilNextIncrement() {
+    const now = Date.now();
+    const intervalMs = FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    const elapsed = now % intervalMs;
+    const remaining = intervalMs - elapsed;
+    return Math.ceil(remaining / 1000);
+}
+
+/**
+ * Get time until daily reset
+ * @returns {Object} Hours, minutes, seconds until reset
+ */
+export function getTimeUntilReset() {
+    const now = new Date();
+    const reset = new Date(now);
+    reset.setUTCHours(FORGE_CONFIG.RESET_HOUR, FORGE_CONFIG.RESET_MINUTE, 0, 0);
+    
+    if (now >= reset) {
+        reset.setUTCDate(reset.getUTCDate() + 1);
+    }
+    
+    const diffMs = reset - now;
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+    
+    return { hours, minutes, seconds, totalMs: diffMs };
+}
+
+/**
+ * Get formatted time until pending claim expires
+ * @param {number} expiresAt - Expiration timestamp
+ * @returns {string} Formatted time string
+ */
+export function getTimeUntilExpiry(expiresAt) {
+    if (!expiresAt) return 'Expired';
+    
+    const diffMs = expiresAt - Date.now();
+    if (diffMs <= 0) return 'Expired';
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+}
+
+/**
+ * Get accrual rate display string
+ * @param {number} share - Certificate share
+ * @returns {string} Formatted rate string
+ */
+export function getAccrualRateDisplay(share) {
+    const rate = calculateAccrualRate(share);
+    return `+${rate.toFixed(4)}/${FORGE_CONFIG.ACCRUAL_INTERVAL_MS / 1000}s`;
+}
+
+/**
+ * Get projected Forge for the rest of the day
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Projected Forge by end of day
+ */
+export async function getProjectedForge(playerId) {
+    try {
+        const forgeData = await getForgeData(playerId);
+        if (!forgeData) return 0;
+        
+        const certificates = await getCertificates(playerId);
+        const share = getTotalLaborShare(certificates);
+        
+        const timeUntilReset = getTimeUntilReset();
+        const hoursRemaining = timeUntilReset.hours + (timeUntilReset.minutes / 60);
+        
+        // Rate per hour = (rate per 10 seconds) × 360
+        const ratePerHour = calculateAccrualRate(share) * 360;
+        const projectedGain = ratePerHour * hoursRemaining;
+        
+        let projected = forgeData.currentForge + projectedGain;
+        if (projected > FORGE_CONFIG.DAILY_CAP) {
+            projected = FORGE_CONFIG.DAILY_CAP;
+        }
+        
+        return projected;
+    } catch (error) {
+        console.error('Error getting projected forge:', error);
+        return 0;
+    }
+}
+
+// ===== PERIODIC UPDATE FOR REAL-TIME DISPLAY =====
+let globalUpdateInterval = null;
+let globalUpdateCallbacks = [];
+
+/**
+ * Start global Forge update timer for real-time UI updates
+ * @param {Function} callback - Function to call on each update
+ */
+export function startForgeUpdates(callback) {
+    if (typeof callback === 'function') {
+        globalUpdateCallbacks.push(callback);
+    }
+    
+    if (!globalUpdateInterval) {
+        globalUpdateInterval = setInterval(async () => {
+            for (const cb of globalUpdateCallbacks) {
+                try {
+                    await cb();
+                } catch (e) {
+                    console.error('Forge update callback error:', e);
                 }
-                
-                loadingOverlay.classList.remove('active');
-                
-            } catch (error) {
-                console.error('Error claiming earnings:', error);
-                loadingOverlay.classList.remove('active');
-                showError('Failed to claim earnings. Please try again.');
             }
-        };
-        
-        // ===== FORGE CLAIM BUTTON =====
-        forgeClaimBtn.onclick = handleClaimForge;
-        
-        // ===== PERIODIC UPDATE =====
-        async function periodicUpdate() {
-            await updateForgeUI();
-        }
-        
-        // ===== INIT =====
-        async function init() {
-            await loadData();
-            
-            // Start periodic updates for Forge
-            startForgeUpdates(periodicUpdate);
-            
-            // Also update every second for the reset timer AND Forge display
-            const timerInterval = setInterval(async () => {
-                const resetTime = getTimeUntilReset();
-                forgeResetTimerEl.textContent = `Reset in: ${resetTime.hours}h ${resetTime.minutes}m ${resetTime.seconds}s`;
-                await updateForgeUI(); // Update Forge display in real-time
-            }, 1000);
-            
-            // Clean up on page unload
-            window.addEventListener('beforeunload', () => {
-                stopForgeUpdates();
-                clearInterval(timerInterval);
-            });
-        }
-        
-        init();
-    </script>
-</body>
-</html>
+        }, 1000); // Update every second for smooth display
+    }
+}
+
+/**
+ * Stop global Forge updates
+ */
+export function stopForgeUpdates() {
+    if (globalUpdateInterval) {
+        clearInterval(globalUpdateInterval);
+        globalUpdateInterval = null;
+    }
+    globalUpdateCallbacks = [];
+}
+
+/**
+ * Remove a specific callback
+ * @param {Function} callback - Callback to remove
+ */
+export function removeForgeUpdateCallback(callback) {
+    const index = globalUpdateCallbacks.indexOf(callback);
+    if (index > -1) {
+        globalUpdateCallbacks.splice(index, 1);
+    }
+}
+
+// ===== EXPORT =====
+export default {
+    FORGE_CONFIG,
+    initializeForge,
+    checkAndResetDaily,
+    checkAndBurnExpiredClaim,
+    calculateAccrualRate,
+    calculateForgeGained,
+    updateAccrual,
+    getForgeData,
+    getCurrentForge,
+    getPendingForgeClaim,
+    getForgeBalance,
+    claimForge,
+    addForgeToBalance,
+    spendForge,
+    getSecondsUntilNextIncrement,
+    getTimeUntilReset,
+    getTimeUntilExpiry,
+    getAccrualRateDisplay,
+    getProjectedForge,
+    startForgeUpdates,
+    stopForgeUpdates,
+    removeForgeUpdateCallback
+};
