@@ -28,11 +28,26 @@ export async function saveCertificates(playerId, progress) {
         const db = await window.idb.openDB('VoidfarerDB', 6);
         const tx = db.transaction('certificates', 'readwrite');
         const store = tx.objectStore('certificates');
-        await store.put({
-            id: playerId,
-            progress: progress,
-            lastUpdated: Date.now()
-        });
+        
+        // Check if record exists
+        const existing = await store.get(playerId);
+        
+        if (existing) {
+            // Update existing
+            await store.put({
+                id: playerId,
+                progress: progress,
+                lastUpdated: Date.now()
+            });
+        } else {
+            // Create new - let autoIncrement generate id, but store playerId separately
+            await store.add({
+                playerId: playerId,
+                progress: progress,
+                lastUpdated: Date.now()
+            });
+        }
+        
         await tx.done;
     } catch (error) {
         console.error('Error saving certificates:', error);
