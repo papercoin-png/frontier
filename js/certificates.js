@@ -306,7 +306,7 @@ export async function addDonationXP(playerId, index, quantity) {
             success: true,
             leveledUp,
             newLevel,
-            xpGained,
+            xpGained: xpGain,
             newXp: prog.xp
         };
         
