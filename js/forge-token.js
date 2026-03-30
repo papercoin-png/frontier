@@ -28,6 +28,10 @@ export async function getForgeBalance(walletAddress) {
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/accounts/${walletAddress}`
         );
         
+        if (response.status === 404) {
+            console.log('No FORGE balance found for this address');
+            return 0;
+        }
         if (!response.ok) return 0;
         
         const data = await response.json();
@@ -78,6 +82,17 @@ export async function getForgeMetadata() {
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}`
         );
         
+        if (response.status === 404) {
+            console.log('FORGE token metadata not found');
+            return {
+                name: 'SpellForge',
+                symbol: 'FORGE',
+                decimals: FORGE_CONFIG.decimals,
+                totalSupply: 0,
+                holders: 0
+            };
+        }
+        
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
@@ -106,6 +121,7 @@ export async function getTotalSupply() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}`
         );
+        if (response.status === 404) return 0;
         if (!response.ok) return 0;
         const data = await response.json();
         return data.total_supply ? data.total_supply / Math.pow(10, FORGE_CONFIG.decimals) : 0;
@@ -121,6 +137,10 @@ export async function getBurnedSupply() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/accounts/${FORGE_CONFIG.burnAddress}`
         );
+        if (response.status === 404) {
+            console.log('No burned supply data available yet');
+            return 0;
+        }
         if (!response.ok) return 0;
         const data = await response.json();
         return data.balance ? data.balance / Math.pow(10, FORGE_CONFIG.decimals) : 0;
@@ -184,6 +204,10 @@ export async function verifyForgeTransaction(txHash, expectedAmount) {
     try {
         const response = await fetch(`${FORGE_CONFIG.apiEndpoint}/transactions/${txHash}`);
         
+        if (response.status === 404) {
+            return { success: false, error: 'Transaction not found' };
+        }
+        
         if (!response.ok) return { success: false, error: 'Transaction not found' };
         
         const tx = await response.json();
@@ -220,6 +244,7 @@ export async function getRecentBurns(limit = 20) {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/transfers?destination=${FORGE_CONFIG.burnAddress}&limit=${limit}`
         );
+        if (response.status === 404) return [];
         if (!response.ok) return [];
         const data = await response.json();
         return data.transfers || [];
@@ -235,6 +260,7 @@ export async function getHolderCount() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/holders`
         );
+        if (response.status === 404) return 0;
         if (!response.ok) return 0;
         const data = await response.json();
         return data.holders?.length || 0;
