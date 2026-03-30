@@ -837,6 +837,23 @@
             }
         }
         
+        // ===== REFRESH UI AFTER DONATION =====
+        async function refreshUI() {
+            // Reload certificates
+            certificates = await getCertificates(playerId);
+            
+            // Update share preview
+            const totalShare = getTotalLaborShare(certificates);
+            const sharePercent = (totalShare / 100).toFixed(2);
+            document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+            
+            // Re-render certificates
+            renderCertificates();
+            
+            // Update Forge UI (share changed)
+            await updateForgeUI();
+        }
+        
         // ===== LOAD DATA =====
         async function loadData() {
             try {
@@ -958,15 +975,16 @@
                         <div class="cert-content">
                 `;
                 
-                // Progress Bar - Always Visible
+                // Progress Bar - Always Visible (only show if not maxed)
                 if (status !== 'locked' && status !== 'maxed') {
+                    const fillWidth = Math.min(100, Math.max(0, percentComplete));
                     html += `
                         <div class="progress-header">
                             <span>${currentLevel + 1 === 1 ? 'FIRST LEVEL' : `LEVEL ${currentLevel + 1}`}</span>
                             <span>${Math.floor(xpToNext).toLocaleString()} XP needed</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(100, percentComplete)}%"></div>
+                            <div class="progress-fill" style="width: ${fillWidth}%"></div>
                         </div>
                         <div style="font-size: 10px; color: #a0c0ff; text-align: right; margin-top: 4px;">
                             ${Math.floor(xpProgress).toLocaleString()} / ${cert.xpPerLevel.toLocaleString()} XP
@@ -992,7 +1010,7 @@
                     `;
                 }
                 
-                // Donation Section - Always Visible for available/earned certificates
+                // Donation Section - Always Visible for available/earned certificates (not maxed)
                 if (status !== 'locked' && status !== 'maxed') {
                     const rarityClass = `rarity-${cert.rarity}`;
                     html += `
@@ -1009,6 +1027,18 @@
                             <div class="inventory-text">
                                 📦 You have: ${availableCount.toLocaleString()} ${cert.rarity.toUpperCase()} units in cargo
                                 ${donationsNeeded > 0 ? `<br>🎯 Need: ${donationsNeeded.toLocaleString()} more units to level up` : ''}
+                            </div>
+                        </div>
+                    `;
+                } else if (status === 'maxed') {
+                    // Show that certificate is maxed
+                    html += `
+                        <div class="donation-section" style="opacity: 0.6;">
+                            <div class="donation-row">
+                                <div class="donation-info">
+                                    <span class="rarity-badge rarity-${cert.rarity}">${cert.rarity.toUpperCase()}</span>
+                                    <span>Certificate already at max level</span>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -1055,35 +1085,38 @@
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            // Remove from cargo
-            const success = await donateFromCargo(certIndex, quantity);
-            if (!success) return;
+            // Show loading indicator
+            loadingOverlay.classList.add('active');
             
-            // Add XP
-            const result = await addDonationXP(playerId, certIndex, quantity);
-            
-            if (result.success) {
-                // Reload certificates
-                certificates = await getCertificates(playerId);
-                
-                if (result.leveledUp) {
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
-                    // Update Forge UI after level up (share changed)
-                    await updateForgeUI();
-                } else {
-                    showTooltip(`+${result.xpGained.toFixed(2)} XP to ${cert.name}`, 1000);
+            try {
+                // Remove from cargo
+                const success = await donateFromCargo(certIndex, quantity);
+                if (!success) {
+                    loadingOverlay.classList.remove('active');
+                    return;
                 }
                 
-                // Update share preview
-                const totalShare = getTotalLaborShare(certificates);
-                const sharePercent = (totalShare / 100).toFixed(2);
-                document.getElementById('totalSharePreview').innerHTML = `Share: ${sharePercent}%`;
+                // Add XP
+                const result = await addDonationXP(playerId, certIndex, quantity);
                 
-                renderCertificates();
-            } else {
-                alert(result.error || 'Failed to add XP');
-                renderCertificates();
+                if (result.success) {
+                    if (result.leveledUp) {
+                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                        showTooltip(`🎉 ${cert.name} reached Level ${result.newLevel}!`, 2000);
+                    } else {
+                        showTooltip(`+${result.xpGained.toFixed(2)} XP to ${cert.name}`, 1000);
+                    }
+                    
+                    // Refresh all UI data
+                    await refreshUI();
+                } else {
+                    alert(result.error || 'Failed to add XP');
+                }
+            } catch (error) {
+                console.error('Donation error:', error);
+                alert('Failed to donate elements');
+            } finally {
+                loadingOverlay.classList.remove('active');
             }
         };
         
