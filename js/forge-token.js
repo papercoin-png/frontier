@@ -2,24 +2,15 @@
 // FORGE Token Integration for Voidfarer
 // Token Contract: EQBGLUNOnXAp9aEhjpO511FOIRcP9dUKEzVk1ErLSr_B-tzN
 
+import { sendTransaction, isWalletConnected as getWalletConnected } from './ton-connect.js';
+
 // ===== CONFIGURATION =====
 const FORGE_CONFIG = {
-    // Mainnet contract address
     contractAddress: 'EQBGLUNOnXAp9aEhjpO511FOIRcP9dUKEzVk1ErLSr_B-tzN',
-    
-    // Burn address (TON zero address in base64 format)
     burnAddress: 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ',
-    
-    // API endpoint for balance checks
     apiEndpoint: 'https://tonapi.io/v2',
-    
-    // STON.fi DEX router address for swaps
-    dexRouter: '0:...', // To be added after contract deployment
-    
-    // Exchange rates (1 FORGE = ? credits)
+    dexRouter: '0:...',
     forgeToCreditsRate: 100,
-    
-    // Forge decimals (TON jettons typically use 9)
     decimals: 9
 };
 
@@ -37,15 +28,11 @@ export async function getForgeBalance(walletAddress) {
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/accounts/${walletAddress}`
         );
         
-        if (!response.ok) {
-            console.warn('Balance fetch failed:', response.status);
-            return 0;
-        }
+        if (!response.ok) return 0;
         
         const data = await response.json();
         forgeBalance = data.balance ? data.balance / Math.pow(10, FORGE_CONFIG.decimals) : 0;
         return forgeBalance;
-        
     } catch (error) {
         console.error('Error fetching FORGE balance:', error);
         return 0;
@@ -55,7 +42,6 @@ export async function getForgeBalance(walletAddress) {
 // ===== GET FORGE PRICE =====
 export async function getForgePrice() {
     try {
-        // Try to get price from STON.fi
         const response = await fetch(
             `https://api.ston.fi/v1/assets/${FORGE_CONFIG.contractAddress}/price`
         );
@@ -67,7 +53,6 @@ export async function getForgePrice() {
             return forgePrice;
         }
         
-        // Fallback to TonAPI
         const fallbackResponse = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/price`
         );
@@ -79,9 +64,7 @@ export async function getForgePrice() {
             return forgePrice;
         }
         
-        console.warn('Could not fetch FORGE price, using default');
-        return 0.01; // Default fallback price
-        
+        return 0.01;
     } catch (error) {
         console.error('Error fetching FORGE price:', error);
         return forgePrice || 0.01;
@@ -95,9 +78,7 @@ export async function getForgeMetadata() {
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}`
         );
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
         return {
@@ -107,7 +88,6 @@ export async function getForgeMetadata() {
             totalSupply: data.total_supply ? data.total_supply / Math.pow(10, FORGE_CONFIG.decimals) : 0,
             holders: data.holders_count || 0
         };
-        
     } catch (error) {
         console.error('Error fetching FORGE metadata:', error);
         return {
@@ -126,12 +106,9 @@ export async function getTotalSupply() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}`
         );
-        
         if (!response.ok) return 0;
-        
         const data = await response.json();
         return data.total_supply ? data.total_supply / Math.pow(10, FORGE_CONFIG.decimals) : 0;
-        
     } catch (error) {
         console.error('Error fetching total supply:', error);
         return 0;
@@ -144,12 +121,9 @@ export async function getBurnedSupply() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/accounts/${FORGE_CONFIG.burnAddress}`
         );
-        
         if (!response.ok) return 0;
-        
         const data = await response.json();
         return data.balance ? data.balance / Math.pow(10, FORGE_CONFIG.decimals) : 0;
-        
     } catch (error) {
         console.error('Error fetching burned supply:', error);
         return 0;
@@ -214,7 +188,6 @@ export async function verifyForgeTransaction(txHash, expectedAmount) {
         
         const tx = await response.json();
         
-        // Check if transaction burned FORGE (sent to burn address)
         const isBurn = tx.messages?.some(msg => 
             msg.destination === FORGE_CONFIG.burnAddress &&
             msg.jetton?.address === FORGE_CONFIG.contractAddress
@@ -224,7 +197,6 @@ export async function verifyForgeTransaction(txHash, expectedAmount) {
             return { success: false, error: 'Not a valid burn transaction' };
         }
         
-        // Verify amount if provided
         if (expectedAmount) {
             const burnedAmount = tx.messages
                 .filter(msg => msg.destination === FORGE_CONFIG.burnAddress)
@@ -236,7 +208,6 @@ export async function verifyForgeTransaction(txHash, expectedAmount) {
         }
         
         return { success: true, tx: tx };
-        
     } catch (error) {
         console.error('Error verifying transaction:', error);
         return { success: false, error: error.message };
@@ -249,12 +220,9 @@ export async function getRecentBurns(limit = 20) {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/transfers?destination=${FORGE_CONFIG.burnAddress}&limit=${limit}`
         );
-        
         if (!response.ok) return [];
-        
         const data = await response.json();
         return data.transfers || [];
-        
     } catch (error) {
         console.error('Error fetching recent burns:', error);
         return [];
@@ -267,15 +235,63 @@ export async function getHolderCount() {
         const response = await fetch(
             `${FORGE_CONFIG.apiEndpoint}/jetton/${FORGE_CONFIG.contractAddress}/holders`
         );
-        
         if (!response.ok) return 0;
-        
         const data = await response.json();
         return data.holders?.length || 0;
-        
     } catch (error) {
         console.error('Error fetching holder count:', error);
         return 0;
+    }
+}
+
+// ===== BUY CREDITS WITH FORGE (DIRECT BURN) =====
+/**
+ * Buy game credits using FORGE tokens (direct burn)
+ * @param {string} playerId - Player ID
+ * @param {number} forgeAmount - Amount of FORGE to burn
+ * @param {number} currentForgeBalance - Current FORGE balance (for verification)
+ * @returns {Promise<Object>} Result with success, credits, txHash
+ */
+export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBalance) {
+    const walletConnected = getWalletConnected();
+    
+    if (!walletConnected) {
+        return { success: false, error: 'Wallet not connected' };
+    }
+    
+    if (forgeAmount <= 0) {
+        return { success: false, error: 'Invalid amount' };
+    }
+    
+    if (currentForgeBalance < forgeAmount) {
+        return { success: false, error: `Insufficient FORGE. Need ${forgeAmount}, have ${currentForgeBalance}` };
+    }
+    
+    const creditsAmount = forgeToCredits(forgeAmount);
+    const transaction = createBurnTransaction(forgeAmount, playerId, creditsAmount);
+    
+    try {
+        const result = await sendTransaction(transaction);
+        
+        if (result.success) {
+            const verified = await verifyForgeTransaction(result.txHash, forgeAmount);
+            
+            if (verified.success) {
+                return {
+                    success: true,
+                    forgeAmount: forgeAmount,
+                    creditsReceived: creditsAmount,
+                    txHash: result.txHash
+                };
+            } else {
+                return { success: false, error: 'Burn verification failed' };
+            }
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('Forge purchase error:', error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -292,7 +308,6 @@ export function startForgePriceUpdates(intervalMs = 30000, callback = null) {
         }
     }, intervalMs);
     
-    // Initial fetch
     getForgePrice().then(price => {
         if (callback) callback(price);
     });
@@ -321,6 +336,7 @@ export default {
     verifyForgeTransaction,
     getRecentBurns,
     getHolderCount,
+    buyCreditsWithForge,
     startForgePriceUpdates,
     stopForgePriceUpdates
 };
