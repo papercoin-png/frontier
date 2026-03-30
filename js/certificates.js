@@ -1,5 +1,5 @@
 // js/certificates.js
-import { getItem, ensureDBStores } from './storage.js';
+import { getItem } from './storage.js';
 
 export const CERTIFICATE_TIERS = [
     { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 5000, totalLevels: 10 },
@@ -25,24 +25,16 @@ export async function getCertificates(playerId) {
 
 export async function saveCertificates(playerId, progress) {
     try {
-        // Direct IndexedDB access to bypass setItem issues
-        const db = await ensureDBStores();
-        if (!db) {
-            console.error('Failed to open IndexedDB');
-            return;
-        }
-        
-        const item = {
+        // Open IndexedDB directly - bypass storage.js setItem
+        const db = await window.idb.openDB('VoidfarerDB', 6);
+        const tx = db.transaction('certificates', 'readwrite');
+        const store = tx.objectStore('certificates');
+        await store.put({
             id: playerId,
             progress: progress,
             lastUpdated: Date.now()
-        };
-        
-        const tx = db.transaction('certificates', 'readwrite');
-        const store = tx.objectStore('certificates');
-        await store.put(item);
+        });
         await tx.done;
-        
         console.log(`✅ Certificates saved for ${playerId}`);
     } catch (error) {
         console.error('Error saving certificates:', error);
@@ -80,8 +72,7 @@ export function getLevelProgressPercent(progress, index) {
     const cert = CERTIFICATE_TIERS[index];
     if (!prog || prog.level >= cert.totalLevels) return 100;
     const currentLevelXp = prog.xp - (prog.level * cert.xpPerLevel);
-    const percent = (currentLevelXp / cert.xpPerLevel) * 100;
-    return Math.min(100, Math.max(0, percent));
+    return (currentLevelXp / cert.xpPerLevel) * 100;
 }
 
 export function getTotalLaborShare(progress) {
@@ -123,16 +114,12 @@ export async function addDonationXP(playerId, index, quantity) {
     
     const prog = progress[index];
     
-    // Calculate XP with full decimal precision
     const xpGain = (quantity / cert.unitsPerDonation) * cert.xpPerDonation;
-    
-    // Add XP
     prog.xp += xpGain;
     
     let leveledUp = false;
     let newLevel = prog.level;
     
-    // Check for level ups
     while (newLevel < cert.totalLevels && prog.xp >= (newLevel + 1) * cert.xpPerLevel) {
         newLevel++;
         leveledUp = true;
