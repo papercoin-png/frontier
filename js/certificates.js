@@ -1,5 +1,5 @@
 // js/certificates.js
-import { getItem, setItem, ensureDBStores } from './storage.js';
+import { getItem, setItem } from './storage.js';
 
 export const CERTIFICATE_TIERS = [
     { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 5000, totalLevels: 10 },
@@ -25,32 +25,30 @@ export async function getCertificates(playerId) {
 
 export async function saveCertificates(playerId, progress) {
     try {
-        // Direct IndexedDB access to avoid setItem issues with the certificates store
-        if (!window.idb) {
-            console.warn('IndexedDB not available, cannot save certificates');
-            return;
-        }
-        
-        const db = await ensureDBStores();
-        if (!db) {
-            console.warn('Failed to open IndexedDB');
-            return;
-        }
-        
+        // Create item with id property for the store's keyPath
         const item = {
             id: playerId,
             progress: progress,
             lastUpdated: Date.now()
         };
         
-        const tx = db.transaction('certificates', 'readwrite');
-        const store = tx.objectStore('certificates');
-        await store.put(item);
-        await tx.done;
-        
+        // Use setItem with the store name and the item (no separate key parameter)
+        await setItem('certificates', item);
         console.log(`✅ Certificates saved for ${playerId}`);
     } catch (error) {
         console.error('Error saving certificates:', error);
+        // Fallback: try saving with explicit key
+        try {
+            const item = {
+                id: playerId,
+                progress: progress,
+                lastUpdated: Date.now()
+            };
+            await setItem('certificates', item, playerId);
+            console.log(`✅ Certificates saved with explicit key for ${playerId}`);
+        } catch (fallbackError) {
+            console.error('Fallback save also failed:', fallbackError);
+        }
     }
 }
 
