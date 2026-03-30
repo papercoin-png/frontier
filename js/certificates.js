@@ -1,5 +1,5 @@
 // js/certificates.js
-import { getItem } from './storage.js';
+import { getItem, setItem } from './storage.js';
 
 export const CERTIFICATE_TIERS = [
     { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 5000, totalLevels: 10 },
@@ -24,34 +24,11 @@ export async function getCertificates(playerId) {
 }
 
 export async function saveCertificates(playerId, progress) {
-    try {
-        const db = await window.idb.openDB('VoidfarerDB', 6);
-        const tx = db.transaction('certificates', 'readwrite');
-        const store = tx.objectStore('certificates');
-        
-        // Check if record exists
-        const existing = await store.get(playerId);
-        
-        if (existing) {
-            // Update existing
-            await store.put({
-                id: playerId,
-                progress: progress,
-                lastUpdated: Date.now()
-            });
-        } else {
-            // Create new - let autoIncrement generate id, but store playerId separately
-            await store.add({
-                playerId: playerId,
-                progress: progress,
-                lastUpdated: Date.now()
-            });
-        }
-        
-        await tx.done;
-    } catch (error) {
-        console.error('Error saving certificates:', error);
-    }
+    await setItem('certificates', {
+        id: playerId,
+        progress: progress,
+        lastUpdated: Date.now()
+    });
 }
 
 export function getCertificateStatus(progress, index) {
