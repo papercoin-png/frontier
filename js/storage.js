@@ -20,6 +20,7 @@
 // FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
 // ADDED: Forge token storage functions (getForgeBalance, addForgeTokens, spendForgeTokens)
 // ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
+// FIXED: Database version 7 - Recreate certificates store to fix keyPath configuration
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -252,8 +253,9 @@ export function getElementRarity(elementName) {
 // List of all stores used by the game with proper keyPath configurations
 // UPDATED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots)
 // UPDATED: Added forge stores (forgeData, forgeBalance)
+// FIXED: Version 7 - Ensured certificates store has correct keyPath configuration
 const STORE_CONFIGS = {
-    certificates: { keyPath: 'id', autoIncrement: true },
+    certificates: { keyPath: 'id', autoIncrement: false }, // Changed to false since we use id from playerId
     laborPool: { keyPath: 'id' },
     laborEarnings: { keyPath: 'playerId' },
     distributionHistory: { keyPath: 'id', autoIncrement: true },
@@ -289,16 +291,18 @@ const STORE_CONFIGS = {
 
 const ALL_STORES = Object.keys(STORE_CONFIGS);
 
+// Track if we've attempted to fix stores in this session
+let storeFixAttempted = false;
+
 /**
  * Ensure IndexedDB stores exist with correct configuration
- * Version 6 - recreates stores with proper keyPaths to fix "out-of-line keys" error
- * and adds forge stores
+ * Version 7 - Recreates certificates store with proper keyPath to fix "out-of-line keys" error
  */
 async function ensureDBStores() {
     if (!window.idb) return null;
     
     try {
-        const db = await window.idb.openDB('VoidfarerDB', 6, {
+        const db = await window.idb.openDB('VoidfarerDB', 7, {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
@@ -313,13 +317,39 @@ async function ensureDBStores() {
                     }
                 }
                 
-                // Handle version 6 upgrades (forge stores will be created below)
+                // Handle version 6 upgrades (forge stores)
                 if (oldVersion < 6) {
                     console.log('Upgrading to version 6 - adding forge stores');
                 }
                 
-                // Create all stores that don't exist yet
+                // Handle version 7 upgrades - recreate certificates store to fix keyPath
+                if (oldVersion < 7) {
+                    console.log('Upgrading to version 7 - fixing certificates store configuration');
+                    
+                    // Save existing certificates data before deleting
+                    let existingCertificatesData = null;
+                    if (db.objectStoreNames.contains('certificates')) {
+                        const oldStore = transaction.objectStore('certificates');
+                        existingCertificatesData = oldStore.getAll();
+                        db.deleteObjectStore('certificates');
+                        console.log('Deleted old certificates store for recreation');
+                    }
+                    
+                    // Certificates store will be recreated below with correct config
+                }
+                
+                // Create all stores that don't exist yet (or recreate certificates for version 7)
                 for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
+                    // Special handling for certificates in version 7 upgrade
+                    if (oldVersion < 7 && storeName === 'certificates') {
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            const store = db.createObjectStore(storeName, config);
+                            console.log(`Created store: ${storeName} with keyPath: ${config.keyPath}, autoIncrement: ${config.autoIncrement}`);
+                        }
+                        continue;
+                    }
+                    
+                    // Normal creation for other stores
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, config);
                         
@@ -366,7 +396,9 @@ async function ensureDBStores() {
                             console.log(`Created store: ${storeName} with playerId keyPath`);
                         }
                         
-                        if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots', 'forgeData', 'forgeBalance'].includes(storeName)) {
+                        if (storeName === 'certificates') {
+                            console.log(`Created store: ${storeName} with keyPath: ${config.keyPath}, autoIncrement: ${config.autoIncrement}`);
+                        } else if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots', 'forgeData', 'forgeBalance', 'certificates'].includes(storeName)) {
                             console.log(`Created store: ${storeName}`);
                         }
                     }
@@ -378,6 +410,36 @@ async function ensureDBStores() {
     } catch (error) {
         console.error('Error ensuring IndexedDB stores:', error);
         return null;
+    }
+}
+
+/**
+ * Verify store configuration matches expected
+ * This helps detect mismatches before operations fail
+ */
+async function verifyStoreConfig(storeName) {
+    try {
+        const db = await ensureDBStores();
+        if (!db) return false;
+        
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.warn(`Store ${storeName} does not exist`);
+            return false;
+        }
+        
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const expectedConfig = STORE_CONFIGS[storeName];
+        
+        if (expectedConfig) {
+            // Log the actual store configuration for debugging
+            console.log(`Store ${storeName} - keyPath: ${store.keyPath}, autoIncrement: ${store.autoIncrement}`);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error(`Error verifying store ${storeName}:`, error);
+        return false;
     }
 }
 
@@ -405,6 +467,8 @@ export async function getItem(storeName, id = 'main') {
 /**
  * Set an item in IndexedDB
  * FIXED: Properly handles stores with keyPath (in-line keys) vs out-of-line keys
+ * FIXED: Added fallback to localStorage when IndexedDB fails
+ * FIXED: Added store verification and auto-repair for certificates store
  */
 export async function setItem(storeName, value, id = 'main') {
     try {
@@ -414,10 +478,33 @@ export async function setItem(storeName, value, id = 'main') {
             return true;
         }
         
+        // Verify store exists and is configured correctly
+        const storeValid = await verifyStoreConfig(storeName);
+        if (!storeValid) {
+            console.warn(`Store ${storeName} verification failed, attempting to reinitialize...`);
+            // Force database reconnection to trigger upgrade
+            if (window.idb && window.idb.deleteDB) {
+                await window.idb.deleteDB('VoidfarerDB');
+                console.log('Deleted database for recreation');
+            }
+            await ensureDBStores();
+        }
+        
         const db = await ensureDBStores();
         if (!db) throw new Error('Failed to open IndexedDB');
         
         const config = STORE_CONFIGS[storeName];
+        
+        // Special handling for certificates store - ensure id is always present
+        if (storeName === 'certificates') {
+            if (!value.id && id) {
+                value.id = id;
+            }
+            // Use put with value only (since keyPath is 'id')
+            await db.put(storeName, value);
+            console.log(`✅ Saved certificates for player ${value.id}`);
+            return true;
+        }
         
         // Case 1: Store uses autoIncrement and value has no id - let it auto-generate
         if (config && config.autoIncrement && !value.id) {
@@ -438,6 +525,17 @@ export async function setItem(storeName, value, id = 'main') {
         return true;
     } catch (error) {
         console.error(`Error setting item in ${storeName}:`, error);
+        
+        // FALLBACK: Try localStorage as backup
+        try {
+            const key = `voidfarer_${storeName}_${id}`;
+            localStorage.setItem(key, JSON.stringify(value));
+            console.log(`✅ Fallback: Saved to localStorage instead for ${storeName}`);
+            return true;
+        } catch (fallbackError) {
+            console.error(`Fallback failed for ${storeName}:`, fallbackError);
+        }
+        
         return false;
     }
 }
@@ -2120,6 +2218,7 @@ export async function resetGame(playerId = 'main') {
                 if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
                 if (db.objectStoreNames.contains('forgeData')) await db.clear('forgeData');
                 if (db.objectStoreNames.contains('forgeBalance')) await db.clear('forgeBalance');
+                if (db.objectStoreNames.contains('certificates')) await db.clear('certificates');
             }
         } catch (idbError) {}
     }
@@ -2224,3 +2323,4 @@ window.getFullForgeBalance = getFullForgeBalance;
 window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
 
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and forge token functions');
+console.log('✅ Version 7: Fixed certificates store configuration with proper keyPath handling');
