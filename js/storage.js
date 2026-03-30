@@ -21,6 +21,7 @@
 // ADDED: Forge token storage functions (getForgeBalance, addForgeTokens, spendForgeTokens)
 // ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
 // FIXED: Database version 7 - Recreate certificates store to fix keyPath configuration
+// ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -156,7 +157,11 @@ const STORAGE_KEYS = {
     HIDDEN_STAR_SECTORS: 'voidfarer_hidden_star_sectors',
     SCANNED_SECTORS: 'voidfarer_scanned_sectors',
     SCANNED_STAR_SECTORS: 'voidfarer_scanned_star_sectors',
-    SCANNED_STARS: 'voidfarer_scanned_stars'
+    SCANNED_STARS: 'voidfarer_scanned_stars',
+    
+    // ===== SHOP & PURCHASE HISTORY =====
+    PURCHASE_HISTORY: 'voidfarer_purchase_history',
+    TOTAL_SPENT: 'voidfarer_total_spent'
 };
 
 // ===== COMPLETE ELEMENT MASS DATABASE =====
@@ -251,11 +256,8 @@ export function getElementRarity(elementName) {
 // ============================================================================
 
 // List of all stores used by the game with proper keyPath configurations
-// UPDATED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots)
-// UPDATED: Added forge stores (forgeData, forgeBalance)
-// FIXED: Version 7 - Ensured certificates store has correct keyPath configuration
 const STORE_CONFIGS = {
-    certificates: { keyPath: 'id', autoIncrement: false }, // Changed to false since we use id from playerId
+    certificates: { keyPath: 'id', autoIncrement: false },
     laborPool: { keyPath: 'id' },
     laborEarnings: { keyPath: 'playerId' },
     distributionHistory: { keyPath: 'id', autoIncrement: true },
@@ -266,16 +268,13 @@ const STORE_CONFIGS = {
     communityProjects: { keyPath: 'id', autoIncrement: true },
     communityGrants: { keyPath: 'id', autoIncrement: true },
     fundHistory: { keyPath: 'id', autoIncrement: true },
-    // Economic stores from db.js
     activeEvents: { keyPath: 'id' },
     eventHistory: { keyPath: 'id' },
     dailyMetrics: { keyPath: 'date' },
     hourlySnapshots: { keyPath: 'timestamp' },
-    // NPC Trader stores
     npcTraders: { keyPath: 'id' },
     npcTraderOrders: { keyPath: 'id', autoIncrement: true },
     npcTraderHistory: { keyPath: 'id', autoIncrement: true },
-    // Market stores
     marketPrices: { keyPath: 'id' },
     marketOrders: { keyPath: 'id' },
     tradeHistory: { keyPath: 'id', autoIncrement: true },
@@ -284,19 +283,17 @@ const STORE_CONFIGS = {
     supplyDemand: { keyPath: 'id' },
     marketVolume: { keyPath: 'element' },
     priceAlerts: { keyPath: 'id', autoIncrement: true },
-    // Forge stores
     forgeData: { keyPath: 'playerId' },
     forgeBalance: { keyPath: 'playerId' }
 };
 
 const ALL_STORES = Object.keys(STORE_CONFIGS);
 
-// Track if we've attempted to fix stores in this session
 let storeFixAttempted = false;
 
 /**
  * Ensure IndexedDB stores exist with correct configuration
- * Version 7 - Recreates certificates store with proper keyPath to fix "out-of-line keys" error
+ * Version 7 - Recreates certificates store with proper keyPath
  */
 async function ensureDBStores() {
     if (!window.idb) return null;
@@ -306,7 +303,6 @@ async function ensureDBStores() {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
-                // Handle version 5 upgrades (recreate journal and element_locations)
                 if (oldVersion < 5) {
                     const storesToRecreate = ['journal', 'element_locations'];
                     for (const storeName of storesToRecreate) {
@@ -317,30 +313,21 @@ async function ensureDBStores() {
                     }
                 }
                 
-                // Handle version 6 upgrades (forge stores)
                 if (oldVersion < 6) {
                     console.log('Upgrading to version 6 - adding forge stores');
                 }
                 
-                // Handle version 7 upgrades - recreate certificates store to fix keyPath
                 if (oldVersion < 7) {
                     console.log('Upgrading to version 7 - fixing certificates store configuration');
                     
-                    // Save existing certificates data before deleting
-                    let existingCertificatesData = null;
                     if (db.objectStoreNames.contains('certificates')) {
                         const oldStore = transaction.objectStore('certificates');
-                        existingCertificatesData = oldStore.getAll();
                         db.deleteObjectStore('certificates');
                         console.log('Deleted old certificates store for recreation');
                     }
-                    
-                    // Certificates store will be recreated below with correct config
                 }
                 
-                // Create all stores that don't exist yet (or recreate certificates for version 7)
                 for (const [storeName, config] of Object.entries(STORE_CONFIGS)) {
-                    // Special handling for certificates in version 7 upgrade
                     if (oldVersion < 7 && storeName === 'certificates') {
                         if (!db.objectStoreNames.contains(storeName)) {
                             const store = db.createObjectStore(storeName, config);
@@ -349,7 +336,6 @@ async function ensureDBStores() {
                         continue;
                     }
                     
-                    // Normal creation for other stores
                     if (!db.objectStoreNames.contains(storeName)) {
                         const store = db.createObjectStore(storeName, config);
                         
@@ -357,33 +343,33 @@ async function ensureDBStores() {
                             store.createIndex('by_element', 'elementName');
                             store.createIndex('by_planet', 'planet');
                             store.createIndex('by_timestamp', 'timestamp');
-                            console.log(`Created store: ${storeName} with indexes (keyPath: id)`);
+                            console.log(`Created store: ${storeName} with indexes`);
                         }
                         
                         if (storeName === 'journal') {
                             store.createIndex('by_timestamp', 'timestamp');
-                            console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
+                            console.log(`Created store: ${storeName} with timestamp index`);
                         }
                         
                         if (storeName === 'activeEvents') {
                             store.createIndex('expiresAt', 'expiresAt');
                             store.createIndex('severity', 'severity');
-                            console.log(`Created store: ${storeName} with indexes (keyPath: id)`);
+                            console.log(`Created store: ${storeName} with indexes`);
                         }
                         
                         if (storeName === 'eventHistory') {
                             store.createIndex('timestamp', 'timestamp');
-                            console.log(`Created store: ${storeName} with timestamp index (keyPath: id)`);
+                            console.log(`Created store: ${storeName} with timestamp index`);
                         }
                         
                         if (storeName === 'dailyMetrics') {
                             store.createIndex('timestamp', 'timestamp');
-                            console.log(`Created store: ${storeName} with timestamp index (keyPath: date)`);
+                            console.log(`Created store: ${storeName} with timestamp index`);
                         }
                         
                         if (storeName === 'hourlySnapshots') {
                             store.createIndex('hour', 'hour');
-                            console.log(`Created store: ${storeName} with hour index (keyPath: timestamp)`);
+                            console.log(`Created store: ${storeName} with hour index`);
                         }
                         
                         if (storeName === 'forgeData') {
@@ -413,10 +399,6 @@ async function ensureDBStores() {
     }
 }
 
-/**
- * Verify store configuration matches expected
- * This helps detect mismatches before operations fail
- */
 async function verifyStoreConfig(storeName) {
     try {
         const db = await ensureDBStores();
@@ -432,7 +414,6 @@ async function verifyStoreConfig(storeName) {
         const expectedConfig = STORE_CONFIGS[storeName];
         
         if (expectedConfig) {
-            // Log the actual store configuration for debugging
             console.log(`Store ${storeName} - keyPath: ${store.keyPath}, autoIncrement: ${store.autoIncrement}`);
         }
         
@@ -443,9 +424,6 @@ async function verifyStoreConfig(storeName) {
     }
 }
 
-/**
- * Get a single item from IndexedDB
- */
 export async function getItem(storeName, id = 'main') {
     try {
         if (!window.idb) {
@@ -464,12 +442,6 @@ export async function getItem(storeName, id = 'main') {
     }
 }
 
-/**
- * Set an item in IndexedDB
- * FIXED: Properly handles stores with keyPath (in-line keys) vs out-of-line keys
- * FIXED: Added fallback to localStorage when IndexedDB fails
- * FIXED: Added store verification and auto-repair for certificates store
- */
 export async function setItem(storeName, value, id = 'main') {
     try {
         if (!window.idb) {
@@ -478,11 +450,9 @@ export async function setItem(storeName, value, id = 'main') {
             return true;
         }
         
-        // Verify store exists and is configured correctly
         const storeValid = await verifyStoreConfig(storeName);
         if (!storeValid) {
             console.warn(`Store ${storeName} verification failed, attempting to reinitialize...`);
-            // Force database reconnection to trigger upgrade
             if (window.idb && window.idb.deleteDB) {
                 await window.idb.deleteDB('VoidfarerDB');
                 console.log('Deleted database for recreation');
@@ -495,29 +465,20 @@ export async function setItem(storeName, value, id = 'main') {
         
         const config = STORE_CONFIGS[storeName];
         
-        // Special handling for certificates store - ensure id is always present
         if (storeName === 'certificates') {
             if (!value.id && id) {
                 value.id = id;
             }
-            // Use put with value only (since keyPath is 'id')
             await db.put(storeName, value);
             console.log(`✅ Saved certificates for player ${value.id}`);
             return true;
         }
         
-        // Case 1: Store uses autoIncrement and value has no id - let it auto-generate
         if (config && config.autoIncrement && !value.id) {
             await db.add(storeName, value);
-        }
-        // Case 2: Store has a keyPath (in-line keys) - the key is part of the value object
-        else if (config && config.keyPath) {
-            // For stores with keyPath, don't pass a separate key parameter
-            // The key is already in the value object (e.g., { id: 'main', ... })
+        } else if (config && config.keyPath) {
             await db.put(storeName, value);
-        }
-        // Case 3: No keyPath or fallback - use provided id or value.id
-        else {
+        } else {
             const key = value.id || id;
             await db.put(storeName, value, key);
         }
@@ -526,7 +487,6 @@ export async function setItem(storeName, value, id = 'main') {
     } catch (error) {
         console.error(`Error setting item in ${storeName}:`, error);
         
-        // FALLBACK: Try localStorage as backup
         try {
             const key = `voidfarer_${storeName}_${id}`;
             localStorage.setItem(key, JSON.stringify(value));
@@ -540,9 +500,6 @@ export async function setItem(storeName, value, id = 'main') {
     }
 }
 
-/**
- * Get all items from a store
- */
 export async function getAll(storeName) {
     try {
         if (!window.idb) {
@@ -569,9 +526,6 @@ export async function getAll(storeName) {
     }
 }
 
-/**
- * Get items by index
- */
 export async function getByIndex(storeName, indexName, value) {
     try {
         const db = await ensureDBStores();
@@ -587,9 +541,6 @@ export async function getByIndex(storeName, indexName, value) {
     }
 }
 
-/**
- * Delete an item from IndexedDB
- */
 export async function deleteItem(storeName, id) {
     try {
         if (!window.idb) {
@@ -608,9 +559,6 @@ export async function deleteItem(storeName, id) {
     }
 }
 
-/**
- * Clear all items from a store
- */
 export async function clearStore(storeName) {
     try {
         if (!window.idb) {
@@ -635,9 +583,6 @@ export async function clearStore(storeName) {
     }
 }
 
-/**
- * Add a transaction to a store (for logging)
- */
 export async function addTransaction(storeName, data) {
     try {
         const id = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -695,7 +640,8 @@ export async function createDefaultPlayer(name = 'Voidfarer', playerId = 'main')
             totalCreditsEarned: 5000,
             credits: 5000,
             cargoMassLimit: getCargoMassLimit(),
-            planetsOwned: 0
+            planetsOwned: 0,
+            totalSpent: 0
         };
         await savePlayer(player, playerId);
         console.log('Created default player:', playerId);
@@ -767,6 +713,131 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
+// SHOP PURCHASE HISTORY (NEW)
+// ============================================================================
+
+/**
+ * Record a shop purchase
+ * @param {string} playerId - Player ID
+ * @param {number} tonAmount - Amount paid in TON (or USDT/Forge equivalent)
+ * @param {number} creditsAmount - Credits received
+ * @param {string} paymentMethod - 'TON', 'USDT', or 'FORGE'
+ * @param {string} txHash - Transaction hash (optional)
+ * @returns {Promise<boolean>} Success status
+ */
+export async function recordPurchase(playerId, tonAmount, creditsAmount, paymentMethod, txHash = null) {
+    try {
+        const history = await getPurchaseHistory(playerId);
+        
+        const purchase = {
+            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            playerId: playerId,
+            tonAmount: tonAmount,
+            creditsAmount: creditsAmount,
+            paymentMethod: paymentMethod,
+            txHash: txHash,
+            timestamp: Date.now(),
+            date: new Date().toISOString()
+        };
+        
+        history.push(purchase);
+        
+        // Keep only last 100 purchases
+        while (history.length > 100) {
+            history.shift();
+        }
+        
+        localStorage.setItem(`${STORAGE_KEYS.PURCHASE_HISTORY}_${playerId}`, JSON.stringify(history));
+        
+        // Update total spent
+        const player = await getPlayer(playerId);
+        if (player) {
+            player.totalSpent = (player.totalSpent || 0) + tonAmount;
+            await savePlayer(player, playerId);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error recording purchase:', error);
+        return false;
+    }
+}
+
+/**
+ * Get purchase history for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Array>} Purchase history array
+ */
+export async function getPurchaseHistory(playerId) {
+    try {
+        const saved = localStorage.getItem(`${STORAGE_KEYS.PURCHASE_HISTORY}_${playerId}`);
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.error('Error getting purchase history:', error);
+        return [];
+    }
+}
+
+/**
+ * Get total amount spent by a player (in TON equivalent)
+ * @param {string} playerId - Player ID
+ * @returns {Promise<number>} Total spent
+ */
+export async function getTotalSpent(playerId) {
+    try {
+        const player = await getPlayer(playerId);
+        return player?.totalSpent || 0;
+    } catch (error) {
+        console.error('Error getting total spent:', error);
+        return 0;
+    }
+}
+
+/**
+ * Get all purchases across all players (for admin dashboard)
+ * @returns {Promise<Array>} All purchases
+ */
+export async function getAllPurchases() {
+    try {
+        const allPurchases = [];
+        const players = await getAllPlayers();
+        
+        for (const player of players) {
+            const purchases = await getPurchaseHistory(player.id);
+            allPurchases.push(...purchases);
+        }
+        
+        allPurchases.sort((a, b) => b.timestamp - a.timestamp);
+        return allPurchases;
+    } catch (error) {
+        console.error('Error getting all purchases:', error);
+        return [];
+    }
+}
+
+async function getAllPlayers() {
+    const playersList = [];
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('voidfarer_player_')) {
+            const playerId = key.replace('voidfarer_player_', '');
+            playersList.push(playerId);
+        }
+    }
+    
+    const playersData = [];
+    for (const playerId of playersList) {
+        const player = await getPlayer(playerId);
+        if (player) {
+            playersData.push({ id: playerId, ...player });
+        }
+    }
+    
+    return playersData;
+}
+
+// ============================================================================
 // COLLECTION FUNCTIONS (Ship Cargo)
 // ============================================================================
 
@@ -783,11 +854,6 @@ export async function getCollection(playerId = null) {
 }
 
 // ===== REBUILD COLLECTION FROM LOCATIONS =====
-/**
- * Rebuild the collection from IndexedDB locations when localStorage collection is corrupted or empty
- * @param {string} playerId - Player ID
- * @returns {Promise<boolean>} Success status
- */
 export async function rebuildCollectionFromLocations(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -803,13 +869,11 @@ export async function rebuildCollectionFromLocations(playerId = null) {
             return false;
         }
         
-        // Check if element_locations store exists
         if (!db.objectStoreNames.contains('element_locations')) {
             console.warn('element_locations store not found');
             return false;
         }
         
-        // Get all locations from IndexedDB
         const allLocations = await db.getAll('element_locations');
         
         if (!allLocations || allLocations.length === 0) {
@@ -819,7 +883,6 @@ export async function rebuildCollectionFromLocations(playerId = null) {
         
         console.log(`🔄 Rebuilding collection from ${allLocations.length} locations...`);
         
-        // Rebuild collection from locations
         const rebuiltCollection = {};
         
         for (const loc of allLocations) {
@@ -835,7 +898,6 @@ export async function rebuildCollectionFromLocations(playerId = null) {
             rebuiltCollection[elementName].count += (loc.quantity || 1);
         }
         
-        // Save to localStorage
         const key = `${STORAGE_KEYS.COLLECTION}_${actualPlayerId}`;
         localStorage.setItem(key, JSON.stringify(rebuiltCollection));
         
@@ -1142,15 +1204,9 @@ export async function clearJournal() {
 }
 
 // ============================================================================
-// SECTOR SCANNING FUNCTIONS (NEW - for galaxy-map.html)
+// SECTOR SCANNING FUNCTIONS
 // ============================================================================
 
-/**
- * Mark a galactic sector as scanned
- * @param {string} sectorId - Sector ID (e.g., 'B2', 'EARTH')
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<boolean>} Success status
- */
 export async function markSectorScanned(sectorId, playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -1169,12 +1225,6 @@ export async function markSectorScanned(sectorId, playerId = null) {
     }
 }
 
-/**
- * Mark a star sector (nebula) as scanned
- * @param {string} starSectorId - Star sector name (e.g., 'Orion Molecular Cloud')
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<boolean>} Success status
- */
 export async function markStarSectorScanned(starSectorId, playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -1193,12 +1243,6 @@ export async function markStarSectorScanned(starSectorId, playerId = null) {
     }
 }
 
-/**
- * Mark a star system as scanned
- * @param {string} starId - Star name
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<boolean>} Success status
- */
 export async function markStarScanned(starId, playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -1217,11 +1261,6 @@ export async function markStarScanned(starId, playerId = null) {
     }
 }
 
-/**
- * Get scanned sectors for a player
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<Array>} Array of scanned sector IDs
- */
 export async function getScannedSectors(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -1234,11 +1273,6 @@ export async function getScannedSectors(playerId = null) {
     }
 }
 
-/**
- * Get scanned star sectors for a player
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<Array>} Array of scanned star sector names
- */
 export async function getScannedStarSectors(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -1251,11 +1285,6 @@ export async function getScannedStarSectors(playerId = null) {
     }
 }
 
-/**
- * Get scanned stars for a player
- * @param {string|null} playerId - Player ID (optional)
- * @returns {Promise<Array>} Array of scanned star names
- */
 export async function getScannedStars(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -2012,11 +2041,6 @@ export async function revealStarSector(starSectorName) {
 // FORGE TOKEN FUNCTIONS
 // ============================================================================
 
-/**
- * Get player's Forge balance (spendable Forge tokens)
- * @param {string} playerId - Player ID
- * @returns {Promise<number>} Forge balance
- */
 export async function getForgeBalance(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -2028,12 +2052,6 @@ export async function getForgeBalance(playerId = null) {
     }
 }
 
-/**
- * Add Forge tokens to player's balance
- * @param {string} playerId - Player ID
- * @param {number} amount - Amount to add
- * @returns {Promise<boolean>} Success status
- */
 export async function addForgeTokens(amount, playerId = null) {
     try {
         if (amount <= 0) return false;
@@ -2051,7 +2069,6 @@ export async function addForgeTokens(amount, playerId = null) {
         
         await setItem('forgeBalance', balance, actualPlayerId);
         
-        // Dispatch event for UI updates
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
                 detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
@@ -2065,12 +2082,6 @@ export async function addForgeTokens(amount, playerId = null) {
     }
 }
 
-/**
- * Spend Forge tokens from player's balance
- * @param {number} amount - Amount to spend
- * @param {string} playerId - Player ID
- * @returns {Promise<boolean>} Success status (true if enough balance and spent)
- */
 export async function spendForgeTokens(amount, playerId = null) {
     try {
         if (amount <= 0) return false;
@@ -2085,7 +2096,6 @@ export async function spendForgeTokens(amount, playerId = null) {
         balance.amount = (balance.amount || 0) - amount;
         await setItem('forgeBalance', balance, actualPlayerId);
         
-        // Dispatch event for UI updates
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('forge-spent', { 
                 detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
@@ -2099,11 +2109,6 @@ export async function spendForgeTokens(amount, playerId = null) {
     }
 }
 
-/**
- * Get full forge balance object
- * @param {string} playerId - Player ID
- * @returns {Promise<Object>} Forge balance object
- */
 export async function getFullForgeBalance(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
@@ -2133,7 +2138,6 @@ export async function initializeStorage(playerId = 'main') {
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     
-    // Initialize forge stores if needed
     const forgeDataExists = await getItem('forgeData', playerId);
     if (!forgeDataExists) {
         await setItem('forgeData', {
@@ -2207,6 +2211,7 @@ export async function resetGame(playerId = 'main') {
         STORAGE_KEYS.PLAYER_CLAIMS,
         STORAGE_KEYS.CLAIM_HISTORY,
         STORAGE_KEYS.CERTIFICATE_HOLDERS,
+        `${STORAGE_KEYS.PURCHASE_HISTORY}_${playerId}`,
         `voidfarer_journal_${playerId}`
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
@@ -2314,13 +2319,18 @@ window.setItem = setItem;
 window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
-
-// ===== FORGE FUNCTIONS EXPOSED =====
 window.getForgeBalance = getForgeBalance;
 window.addForgeTokens = addForgeTokens;
 window.spendForgeTokens = spendForgeTokens;
 window.getFullForgeBalance = getFullForgeBalance;
 window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
 
+// NEW: Shop purchase functions exposed
+window.recordPurchase = recordPurchase;
+window.getPurchaseHistory = getPurchaseHistory;
+window.getTotalSpent = getTotalSpent;
+window.getAllPurchases = getAllPurchases;
+
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and forge token functions');
 console.log('✅ Version 7: Fixed certificates store configuration with proper keyPath handling');
+console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
