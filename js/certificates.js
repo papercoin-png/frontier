@@ -316,6 +316,76 @@ export async function addDonationXP(playerId, index, quantity) {
     }
 }
 
+// ===== NEW FUNCTION: Award XP to ALL certificates (for shop booster) =====
+/**
+ * Award XP to all certificates (for shop Certificate Booster)
+ * @param {string} playerId - Player ID
+ * @param {number} xpAmount - Amount of XP to add to each certificate
+ * @returns {Promise<Object>} Result with success and details of level ups
+ */
+export async function awardCertificateXP(playerId, xpAmount) {
+    try {
+        if (!playerId) {
+            return { success: false, error: 'Invalid player ID' };
+        }
+        
+        if (xpAmount <= 0) {
+            return { success: false, error: 'Invalid XP amount' };
+        }
+        
+        const progress = await getCertificates(playerId);
+        let anyLeveledUp = false;
+        const levelUps = [];
+        
+        // Add XP to each certificate
+        for (let i = 0; i < CERTIFICATE_TIERS.length; i++) {
+            const cert = CERTIFICATE_TIERS[i];
+            const prog = progress[i];
+            
+            // Skip if already maxed
+            if (prog.level >= cert.totalLevels) continue;
+            
+            const oldLevel = prog.level;
+            prog.xp += xpAmount;
+            
+            // Check for level ups
+            let newLevel = prog.level;
+            while (newLevel < cert.totalLevels && prog.xp >= (newLevel + 1) * cert.xpPerLevel) {
+                newLevel++;
+            }
+            
+            if (newLevel > oldLevel) {
+                anyLeveledUp = true;
+                levelUps.push({
+                    certificate: cert.name,
+                    oldLevel: oldLevel,
+                    newLevel: newLevel
+                });
+                prog.level = newLevel;
+            }
+            prog.earned = true;
+        }
+        
+        // Save updated progress
+        const saveResult = await saveCertificates(playerId, progress);
+        
+        if (!saveResult) {
+            return { success: false, error: 'Failed to save certificate progress' };
+        }
+        
+        return {
+            success: true,
+            leveledUp: anyLeveledUp,
+            levelUps: levelUps,
+            xpAdded: xpAmount
+        };
+        
+    } catch (error) {
+        console.error('Error awarding certificate XP:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 /**
  * Format share value for display
  * @param {number} share - Share value (in hundredths of a percent)
