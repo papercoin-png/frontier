@@ -831,12 +831,12 @@
 
     <script type="module" src="js/db.js"></script>
     <script type="module" src="js/storage.js"></script>
-    <script type="module" src="js/element-prices.js"></script>
+    <script type="module" src="js/elements-data.js"></script>
     <script type="module" src="js/market-dynamics.js"></script>
     <script type="module" src="js/market-engine.js"></script>
 
     <script type="module">
-        import { ELEMENT_DATABASE, getElementByName, getElementsByRarity } from './js/element-prices.js';
+        import { getElementByName, getElementsByRarity, ELEMENTS } from './js/elements-data.js';
         import { getCurrentPrices, getBidPrice, getAskPrice } from './js/market-dynamics.js';
         import { getUserOrders, getUserTrades, cancelOrder, ORDER_TYPES, ORDER_SIDES, ORDER_STATUS } from './js/market-engine.js';
         import { getPlayer, getCollection, getCredits } from './js/storage.js';
@@ -858,17 +858,13 @@
         let orders = [];
         let trades = [];
 
-        // ===== FIXED: UPDATE BALANCE USING STORAGE.JS =====
+        // ===== UPDATE BALANCE USING STORAGE.JS =====
         async function updateBalance() {
             try {
-                // Get the actual player ID from localStorage
                 const actualPlayerId = localStorage.getItem('voidfarer_player_id') || playerId || 'main';
-                
-                // Use storage.js getCredits function
                 const credits = await getCredits(actualPlayerId);
                 currentCredits = credits;
                 
-                // Update UI
                 const balanceElement = document.getElementById('totalBalance');
                 if (balanceElement) {
                     balanceElement.innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
@@ -881,12 +877,38 @@
             }
         }
 
+        // ===== SWITCH ORDER TAB (FIXED - Added this function) =====
+        window.switchOrderTab = function(tab) {
+            currentTab = tab;
+            
+            // Update active tab styling
+            document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
+            const buttons = document.querySelectorAll('.order-tab');
+            for (let i = 0; i < buttons.length; i++) {
+                const btnText = buttons[i].textContent.toLowerCase();
+                if (btnText === tab || (tab === 'all' && btnText === 'all') ||
+                    (tab === 'buy' && btnText === 'buy') ||
+                    (tab === 'sell' && btnText === 'sell') ||
+                    (tab === 'history' && btnText === 'history')) {
+                    buttons[i].classList.add('active');
+                    break;
+                }
+            }
+            
+            currentFilter = 'all';
+            renderFilterBar();
+            renderOrders();
+            
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        };
+
         // ===== INIT =====
         async function init() {
             showLoading(true);
             
             try {
-                // Get player ID from localStorage (same as element-market.html)
                 playerId = localStorage.getItem('voidfarer_player_id');
                 if (!playerId) {
                     playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -896,21 +918,17 @@
                 const storedName = localStorage.getItem('voidfarer_player_name');
                 playerName = storedName ? storedName : `VOIDFARER #${playerId.slice(-4)}`;
                 
-                // Load balance using storage.js
                 await updateBalance();
                 currentCollection = await getCollection();
                 
-                // Load orders and trades
                 await loadUserOrders();
                 await loadUserTrades();
                 
-                // Update UI
                 updatePlayerInfo();
                 updateSummaryCards();
                 renderFilterBar();
                 renderOrders();
                 
-                // Auto-refresh every 5 seconds
                 setInterval(async () => {
                     await updateBalance();
                     await loadUserOrders();
@@ -928,7 +946,6 @@
             }
         }
 
-        // ===== LOADING =====
         function showLoading(show) {
             const overlay = document.getElementById('loadingOverlay');
             if (show) {
@@ -938,13 +955,11 @@
             }
         }
 
-        // ===== PLAYER INFO =====
         function updatePlayerInfo() {
             document.getElementById('playerName').textContent = playerName;
             document.getElementById('playerId').textContent = `ID: ${playerId.slice(0, 6)}...${playerId.slice(-4)}`;
         }
 
-        // ===== LOAD USER ORDERS =====
         async function loadUserOrders() {
             try {
                 orders = await getUserOrders(playerId) || [];
@@ -971,7 +986,6 @@
             }
         }
 
-        // ===== LOAD USER TRADES =====
         async function loadUserTrades() {
             try {
                 trades = await getUserTrades(playerId, 20) || [];
@@ -994,7 +1008,6 @@
             }
         }
 
-        // ===== UPDATE SUMMARY CARDS =====
         function updateSummaryCards() {
             const activeOrders = orders.filter(o => 
                 o.status === ORDER_STATUS.ACTIVE || o.status === ORDER_STATUS.PARTIAL
@@ -1017,7 +1030,6 @@
             document.getElementById('userVolume24h').textContent = volume24h.toLocaleString();
         }
 
-        // ===== RENDER FILTER BAR =====
         function renderFilterBar() {
             const filterBar = document.getElementById('filterBar');
             
@@ -1038,7 +1050,6 @@
             }
         }
 
-        // ===== SET FILTER =====
         window.setFilter = function(filter) {
             currentFilter = filter;
             renderFilterBar();
@@ -1049,30 +1060,6 @@
             }
         };
 
-        // ===== SWITCH TAB =====
-        window.switchOrderTab = function(tab) {
-            currentTab = tab;
-            
-            document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
-            const buttons = document.querySelectorAll('.order-tab');
-            for (let i = 0; i < buttons.length; i++) {
-                if (buttons[i].textContent.toLowerCase().includes(tab) || 
-                    (tab === 'all' && buttons[i].textContent === 'ALL')) {
-                    buttons[i].classList.add('active');
-                    break;
-                }
-            }
-            
-            currentFilter = 'all';
-            renderFilterBar();
-            renderOrders();
-            
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('light');
-            }
-        };
-
-        // ===== RENDER ORDERS =====
         function renderOrders() {
             const container = document.getElementById('ordersContainer');
             
@@ -1110,7 +1097,6 @@
             container.innerHTML = html;
         }
 
-        // ===== RENDER ORDER CARD =====
         function renderOrderCard(order) {
             const element = order.elementData;
             const icon = element.icon || '📦';
@@ -1199,7 +1185,6 @@
             `;
         }
 
-        // ===== RENDER TRADE HISTORY =====
         function renderTradeHistory(container) {
             if (trades.length === 0) {
                 container.innerHTML = `
@@ -1254,7 +1239,6 @@
             container.innerHTML = html;
         }
 
-        // ===== CANCEL ORDER =====
         window.cancelOrder = async function(orderId) {
             if (!confirm('Are you sure you want to cancel this order?')) return;
             
@@ -1285,12 +1269,10 @@
             showLoading(false);
         };
 
-        // ===== VIEW ORDER =====
         window.viewOrder = function(orderId) {
             window.location.href = `element-market.html?order=${orderId}`;
         };
 
-        // ===== REFRESH ORDERS =====
         window.refreshOrders = async function() {
             showLoading(true);
             document.getElementById('loadingText').textContent = 'REFRESHING...';
@@ -1319,13 +1301,11 @@
             showLoading(false);
         };
 
-        // ===== RETURN TO MARKET =====
         window.returnToMarket = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'element-market.html';
         };
 
-        // ===== TOAST =====
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
             toast.className = `toast-notification ${type}`;
@@ -1334,7 +1314,6 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // ===== START =====
         init();
     </script>
 </body>
