@@ -2,7 +2,7 @@
 import { getItem, setItem } from './storage.js';
 
 export const CERTIFICATE_TIERS = [
-    { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 5000, totalLevels: 10 },
+    { tier: 1, name: 'NOVICE', icon: '🌱', rarity: 'common', sharePerLevel: 5, unitsPerDonation: 10, xpPerDonation: 10, xpPerLevel: 5000, totalLevels: 10 },
     { tier: 2, name: 'APPRENTICE', icon: '📘', rarity: 'uncommon', sharePerLevel: 10, unitsPerDonation: 10, xpPerDonation: 1, xpPerLevel: 10000, totalLevels: 10 },
     { tier: 3, name: 'JOURNEYMAN', icon: '⚙️', rarity: 'rare', sharePerLevel: 15, unitsPerDonation: 10, xpPerDonation: 2, xpPerLevel: 20000, totalLevels: 10 },
     { tier: 4, name: 'ADEPT', icon: '🔮', rarity: 'very-rare', sharePerLevel: 20, unitsPerDonation: 10, xpPerDonation: 5, xpPerLevel: 40000, totalLevels: 10 },
