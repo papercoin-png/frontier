@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voidfarer - Shop</title>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: #0B0E14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            background: #0B0E14;
+        }
+        
+        .shop-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0B0E14;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 16px 100px 16px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0B0E14;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #F0B90B;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .shop-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #F0B90B;
+            letter-spacing: -0.5px;
+        }
+        
+        .shop-badge {
+            background: #2B2F36;
+            color: #848E9C;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .refresh-btn {
+            background: #2B2F36;
+            border: none;
+            color: #EAECEF;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-size: 18px;
+        }
+        
+        .refresh-btn:active {
+            background: #3A3F4A;
+            transform: scale(0.95);
+        }
+        
+        .account-bar {
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .player-name {
+            color: #EAECEF;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .player-id {
+            color: #848E9C;
+            font-size: 10px;
+        }
+        
+        .credits-value {
+            color: #F0B90B;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .credits-value span {
+            font-size: 12px;
+            color: #848E9C;
+        }
+        
+        .wallet-status {
+            background: #1A1D24;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .wallet-connect-btn {
+            background: linear-gradient(135deg, #0098ea, #0088cc);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        .wallet-connected-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .wallet-address {
+            background: #2B2F36;
+            padding: 8px 16px;
+            border-radius: 60px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #F0B90B;
+        }
+        
+        .wallet-balance {
+            color: #EAECEF;
+            font-size: 14px;
+        }
+        
+        .wallet-balance span {
+            color: #F0B90B;
+            font-weight: 600;
+        }
+        
+        .disconnect-btn {
+            background: #2B2F36;
+            border: 1px solid #F6465D;
+            color: #F6465D;
+            padding: 8px 20px;
+            border-radius: 60px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .payment-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 4px;
+        }
+        
+        .payment-tab {
+            flex: 1;
+            padding: 12px;
+            border-radius: 60px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #848E9C;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .payment-tab.active {
+            background: #F0B90B;
+            color: #0B0E14;
+        }
+        
+        .packages-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .package-card {
+            background: #1A1D24;
+            border: 1px solid #2B2F36;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .package-card:hover {
+            border-color: #F0B90B;
+            transform: translateY(-2px);
+        }
+        
+        .package-card.featured {
+            border: 2px solid #F0B90B;
+            background: linear-gradient(135deg, #1A2A2A, #1A1D24);
+        }
+        
+        .package-card.legendary {
+            border: 2px solid #ffd700;
+            background: linear-gradient(135deg, #2A1A2A, #1A1D24);
+        }
+        
+        .package-badge {
+            display: inline-block;
+            background: #F0B90B;
+            color: #0B0E14;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .package-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .package-credits {
+            font-size: 18px;
+            font-weight: 700;
+            color: #F0B90B;
+        }
+        
+        .package-price {
+            color: #848E9C;
+            font-size: 12px;
+            margin: 4px 0;
+        }
+        
+        .package-bonus {
+            font-size: 10px;
+            color: #4affaa;
+            margin-bottom: 12px;
+        }
+        
+        .buy-btn {
+            background: #F0B90B;
+            border: none;
+            color: #0B0E14;
+            padding: 8px 16px;
+            border-radius: 60px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            font-size: 12px;
+        }
+        
+        .buy-btn:active {
+            transform: scale(0.96);
+        }
+        
+        .special-offers {
+            margin-bottom: 24px;
+        }
+        
+        .special-offers h3 {
+            color: #F0B90B;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .offers-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        
+        .offer-card {
+            background: #1A1D24;
+            border: 1px solid #2B2F36;
+            border-radius: 40px 15px 40px 15px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+        }
+        
+        .offer-card:hover {
+            border-color: #F0B90B;
+        }
+        
+        .offer-icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        
+        .offer-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #EAECEF;
+        }
+        
+        .offer-price {
+            font-size: 11px;
+            color: #F0B90B;
+            margin: 4px 0;
+        }
+        
+        .offer-btn {
+            background: #2B2F36;
+            border: 1px solid #F0B90B;
+            color: #F0B90B;
+            padding: 4px 8px;
+            border-radius: 30px;
+            font-size: 10px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .burn-stats {
+            background: #1A1D24;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .burn-stats h3 {
+            color: #F0B90B;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .burn-stats-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffd700;
+        }
+        
+        .burn-stats-label {
+            font-size: 10px;
+            color: #848E9C;
+        }
+        
+        .purchase-history {
+            background: #1A1D24;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #2B2F36;
+        }
+        
+        .purchase-history h3 {
+            color: #F0B90B;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2B2F36;
+            font-size: 11px;
+        }
+        
+        .history-date {
+            color: #848E9C;
+        }
+        
+        .history-credits {
+            color: #F0B90B;
+        }
+        
+        .empty-history {
+            text-align: center;
+            color: #848E9C;
+            padding: 16px;
+            font-size: 12px;
+        }
+        
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1E2026;
+            border: 2px solid #F0B90B;
+            color: #EAECEF;
+            padding: 14px 25px;
+            border-radius: 60px 20px 60px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: fit-content;
+            min-width: 220px;
+            box-shadow: 0 0 20px rgba(240, 185, 11, 0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .back-button:active {
+            transform: translateX(-50%) scale(0.96);
+            background: #2B2F36;
+        }
+        
+        .back-arrow {
+            font-size: 20px;
+            color: #F0B90B;
+        }
+        
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1E2026;
+            border: 2px solid #F0B90B;
+            color: #EAECEF;
+            padding: 12px 20px;
+            border-radius: 60px 20px 60px 20px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            z-index: 3000;
+            animation: toast-slide 3s ease-in-out forwards;
+            text-align: center;
+            min-width: 250px;
+        }
+        
+        .toast-notification.error {
+            border-color: #F6465D;
+        }
+        
+        .toast-notification.success {
+            border-color: #0ECB81;
+        }
+        
+        @keyframes toast-slide {
+            0% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+            10% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            90% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+        }
+        
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1E2026;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #F0B90B;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <div class="shop-view" id="shopView">
+            <div class="shop-header">
+                <div class="logo-area">
+                    <span class="shop-logo">VOID MARKET</span>
+                    <span class="shop-badge">BUY & BURN</span>
+                </div>
+                <div class="header-actions">
+                    <button class="refresh-btn" onclick="window.refreshShop()">↻</button>
+                </div>
+            </div>
+            
+            <div class="account-bar">
+                <div class="player-info">
+                    <span class="player-name" id="playerName">VOIDFARER</span>
+                    <span class="player-id" id="playerId">ID: --</span>
+                </div>
+                <div class="credits-value" id="totalBalance">0 <span>⭐</span></div>
+            </div>
+            
+            <div class="wallet-status" id="walletStatus">
+                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
+                <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
+                    <span class="wallet-address" id="walletAddressShort">---</span>
+                    <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
+                    <span class="wallet-balance" id="forgeWalletBalance" style="display: none;">🔥 Forge: <span id="forgeBalance">0</span> FORGE</span>
+                    <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
+                </div>
+            </div>
+            
+            <div class="payment-tabs">
+                <button class="payment-tab active" data-method="ton">💎 TON</button>
+                <button class="payment-tab" data-method="forge">🔥 FORGE</button>
+            </div>
+            
+            <div class="burn-stats" id="burnStats">
+                <h3>🔥 TOTAL FORGE BURNED</h3>
+                <div class="burn-stats-value" id="totalBurned">0</div>
+                <div class="burn-stats-label">From shop purchases</div>
+            </div>
+            
+            <div id="tonPackages" class="packages-grid">
+                <div class="package-card" data-ton="0.5" data-credits="500">
+                    <div class="package-icon">⭐</div>
+                    <div class="package-credits">500 Credits</div>
+                    <div class="package-price">0.5 TON</div>
+                    <div class="package-bonus">+0 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card featured" data-ton="1" data-credits="1200">
+                    <div class="package-badge">🔥 BEST VALUE</div>
+                    <div class="package-icon">⭐⭐</div>
+                    <div class="package-credits">1,200 Credits</div>
+                    <div class="package-price">1 TON</div>
+                    <div class="package-bonus">+200 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card" data-ton="2.5" data-credits="3000">
+                    <div class="package-icon">⭐⭐⭐</div>
+                    <div class="package-credits">3,000 Credits</div>
+                    <div class="package-price">2.5 TON</div>
+                    <div class="package-bonus">+500 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card" data-ton="5" data-credits="6500">
+                    <div class="package-icon">⭐⭐⭐⭐</div>
+                    <div class="package-credits">6,500 Credits</div>
+                    <div class="package-price">5 TON</div>
+                    <div class="package-bonus">+1,500 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card legendary" data-ton="10" data-credits="15000">
+                    <div class="package-icon">👑</div>
+                    <div class="package-credits">15,000 Credits</div>
+                    <div class="package-price">10 TON</div>
+                    <div class="package-bonus">+5,000 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card" data-ton="20" data-credits="30000">
+                    <div class="package-icon">🌟</div>
+                    <div class="package-credits">30,000 Credits</div>
+                    <div class="package-price">20 TON</div>
+                    <div class="package-bonus">+10,000 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+            </div>
+            
+            <div id="forgePackages" class="packages-grid" style="display: none;">
+                <div class="package-card" data-forge="50" data-credits="5000">
+                    <div class="package-icon">🔥</div>
+                    <div class="package-credits">5,000 Credits</div>
+                    <div class="package-price">50 FORGE</div>
+                    <div class="package-bonus">+0 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card featured" data-forge="100" data-credits="11000">
+                    <div class="package-badge">🔥 BEST VALUE</div>
+                    <div class="package-icon">🔥🔥</div>
+                    <div class="package-credits">11,000 Credits</div>
+                    <div class="package-price">100 FORGE</div>
+                    <div class="package-bonus">+1,000 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card" data-forge="250" data-credits="28000">
+                    <div class="package-icon">🔥🔥🔥</div>
+                    <div class="package-credits">28,000 Credits</div>
+                    <div class="package-price">250 FORGE</div>
+                    <div class="package-bonus">+3,000 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+                <div class="package-card legendary" data-forge="500" data-credits="60000">
+                    <div class="package-icon">👑🔥</div>
+                    <div class="package-credits">60,000 Credits</div>
+                    <div class="package-price">500 FORGE</div>
+                    <div class="package-bonus">+10,000 Bonus</div>
+                    <button class="buy-btn">BUY NOW</button>
+                </div>
+            </div>
+            
+            <div class="special-offers">
+                <h3>🎁 SPECIAL OFFERS</h3>
+                <div class="offers-grid">
+                    <div class="offer-card" data-offer="cert_boost">
+                        <span class="offer-icon">🎓</span>
+                        <span class="offer-title">Certificate Booster</span>
+                        <span class="offer-price">2 TON / 200 FORGE</span>
+                        <button class="offer-btn">UNLOCK</button>
+                    </div>
+                    <div class="offer-card" data-offer="forge_boost">
+                        <span class="offer-icon">🔥</span>
+                        <span class="offer-title">Forge Accelerator</span>
+                        <span class="offer-price">5 TON / 500 FORGE</span>
+                        <button class="offer-btn">UNLOCK</button>
+                    </div>
+                    <div class="offer-card" data-offer="cargo_upgrade">
+                        <span class="offer-icon">🚀</span>
+                        <span class="offer-title">Cargo Upgrade</span>
+                        <span class="offer-price">3 TON / 300 FORGE</span>
+                        <button class="offer-btn">UNLOCK</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="purchase-history">
+                <h3>📜 RECENT PURCHASES</h3>
+                <div class="history-list" id="historyList">
+                    <div class="empty-history">No purchases yet</div>
+                </div>
+            </div>
+            
+            <button class="back-button" onclick="window.returnToHub()">
+                <span class="back-arrow">←</span>
+                <span class="back-text">EARTH HUB</span>
+            </button>
+        </div>
+        
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">LOADING SHOP...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { getPlayerId, getCredits, addCredits, recordPurchase, getPurchaseHistory, getTotalSpent } from './js/storage.js';
+        import { initTonWallet, connectTonWallet, disconnectTonWallet, getTonBalance, isWalletConnected, getShortAddress, buyCreditsWithTon } from './js/ton-connect.js';
+        import { getForgeBalance, getForgePrice, getBurnedSupply, forgeToCredits, buyCreditsWithForge } from './js/forge-token.js';
+
+        // ===== TELEGRAM =====
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // ===== STATE =====
+        let playerId = null;
+        let playerName = 'VOIDFARER';
+        let currentCredits = 0;
+        let currentPaymentMethod = 'ton';
+        let walletConnected = false;
+        let walletAddress = null;
+        let tonBalance = 0;
+        let forgeBalance = 0;
+        let forgePrice = 0.01;
+        let totalBurned = 0;
+
+        // ===== DOM ELEMENTS =====
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
+        // ===== UTILITIES =====
+        function showLoading(show, message = 'LOADING...') {
+            if (show) {
+                loadingText.textContent = message;
+                loadingOverlay.classList.add('active');
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // ===== UPDATE UI =====
+        async function updateBalance() {
+            try {
+                currentCredits = await getCredits(playerId);
+                document.getElementById('totalBalance').innerHTML = `${currentCredits.toLocaleString()} <span>⭐</span>`;
+            } catch (error) {
+                console.error('Error updating balance:', error);
+            }
+        }
+
+        async function updateWalletUI() {
+            walletConnected = isWalletConnected();
+            
+            const connectBtn = document.getElementById('connectWalletBtn');
+            const connectedInfo = document.getElementById('walletConnectedInfo');
+            const forgeBalanceSpan = document.getElementById('forgeWalletBalance');
+            
+            if (walletConnected) {
+                connectBtn.style.display = 'none';
+                connectedInfo.style.display = 'flex';
+                
+                walletAddress = window.getWalletAddress?.() || '';
+                document.getElementById('walletAddressShort').textContent = getShortAddress() || walletAddress?.slice(0, 10) + '...';
+                
+                tonBalance = await getTonBalance();
+                document.getElementById('walletBalance').textContent = tonBalance.toFixed(4);
+                
+                forgeBalance = await getForgeBalance(walletAddress);
+                if (forgeBalanceSpan) {
+                    forgeBalanceSpan.style.display = 'flex';
+                    document.getElementById('forgeBalance').textContent = forgeBalance.toFixed(2);
+                }
+            } else {
+                connectBtn.style.display = 'block';
+                connectedInfo.style.display = 'none';
+                if (forgeBalanceSpan) forgeBalanceSpan.style.display = 'none';
+            }
+        }
+
+        async function updateBurnStats() {
+            try {
+                totalBurned = await getBurnedSupply();
+                document.getElementById('totalBurned').textContent = totalBurned.toLocaleString();
+            } catch (error) {
+                console.error('Error updating burn stats:', error);
+            }
+        }
+
+        async function updatePurchaseHistory() {
+            try {
+                const history = await getPurchaseHistory(playerId);
+                const historyList = document.getElementById('historyList');
+                
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div class="empty-history">No purchases yet</div>';
+                    return;
+                }
+                
+                historyList.innerHTML = history.slice(-10).reverse().map(p => `
+                    <div class="history-item">
+                        <span class="history-date">${new Date(p.timestamp).toLocaleDateString()}</span>
+                        <span class="history-method">${p.paymentMethod}</span>
+                        <span class="history-credits">+${p.creditsAmount}⭐</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error updating purchase history:', error);
+            }
+        }
+
+        // ===== PAYMENT METHOD SWITCH =====
+        function switchPaymentMethod(method) {
+            currentPaymentMethod = method;
+            
+            document.querySelectorAll('.payment-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.method === method) tab.classList.add('active');
+            });
+            
+            const tonPackages = document.getElementById('tonPackages');
+            const forgePackages = document.getElementById('forgePackages');
+            
+            if (method === 'ton') {
+                tonPackages.style.display = 'grid';
+                forgePackages.style.display = 'none';
+            } else {
+                tonPackages.style.display = 'none';
+                forgePackages.style.display = 'grid';
+            }
+        }
+
+        // ===== PURCHASE FUNCTIONS =====
+        async function buyWithTon(tonAmount, creditsAmount) {
+            if (!walletConnected) {
+                showToast('Please connect your wallet first', 'error');
+                return false;
+            }
+            
+            if (tonBalance < tonAmount) {
+                showToast(`Insufficient TON. Need ${tonAmount}, have ${tonBalance.toFixed(4)}`, 'error');
+                return false;
+            }
+            
+            showLoading(true, 'Processing purchase...');
+            
+            try {
+                const result = await buyCreditsWithTon(playerId, tonAmount);
+                
+                if (result.success) {
+                    await recordPurchase(playerId, tonAmount, creditsAmount, 'TON', result.txHash);
+                    await updateBalance();
+                    await updatePurchaseHistory();
+                    await updateWalletUI();
+                    await updateBurnStats();
+                    
+                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    return true;
+                } else {
+                    showToast(result.error || 'Purchase failed', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Purchase error:', error);
+                showToast('Transaction failed', 'error');
+                return false;
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function buyWithForge(forgeAmount, creditsAmount) {
+            if (!walletConnected) {
+                showToast('Please connect your wallet first', 'error');
+                return false;
+            }
+            
+            if (forgeBalance < forgeAmount) {
+                showToast(`Insufficient FORGE. Need ${forgeAmount}, have ${forgeBalance.toFixed(2)}`, 'error');
+                return false;
+            }
+            
+            showLoading(true, 'Processing purchase...');
+            
+            try {
+                const result = await buyCreditsWithForge(playerId, forgeAmount, forgeBalance);
+                
+                if (result.success) {
+                    await recordPurchase(playerId, forgeAmount, creditsAmount, 'FORGE', result.txHash);
+                    await updateBalance();
+                    await updatePurchaseHistory();
+                    await updateWalletUI();
+                    await updateBurnStats();
+                    
+                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    return true;
+                } else {
+                    showToast(result.error || 'Purchase failed', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Purchase error:', error);
+                showToast('Transaction failed', 'error');
+                return false;
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ===== SPECIAL OFFERS =====
+        async function buyCertificateBoost() {
+            if (!walletConnected) {
+                showToast('Please connect your wallet first', 'error');
+                return;
+            }
+            
+            const costTon = 2;
+            const costForge = 200;
+            
+            if (currentPaymentMethod === 'ton' && tonBalance < costTon) {
+                showToast(`Insufficient TON. Need ${costTon} TON`, 'error');
+                return;
+            }
+            
+            if (currentPaymentMethod === 'forge' && forgeBalance < costForge) {
+                showToast(`Insufficient FORGE. Need ${costForge} FORGE`, 'error');
+                return;
+            }
+            
+            showLoading(true, 'Processing special offer...');
+            
+            try {
+                let result;
+                if (currentPaymentMethod === 'ton') {
+                    result = await buyCreditsWithTon(playerId, costTon);
+                } else {
+                    result = await buyCreditsWithForge(playerId, costForge, forgeBalance);
+                }
+                
+                if (result.success) {
+                    // Award certificate XP
+                    const { awardCertificateXP } = await import('./js/certificates.js');
+                    await awardCertificateXP(playerId, 500);
+                    
+                    await recordPurchase(playerId, currentPaymentMethod === 'ton' ? costTon : costForge, 0, `${currentPaymentMethod.toUpperCase()}_BOOST`, result.txHash);
+                    await updateBalance();
+                    await updateWalletUI();
+                    
+                    showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
+                } else {
+                    showToast(result.error || 'Purchase failed', 'error');
+                }
+            } catch (error) {
+                console.error('Boost purchase error:', error);
+                showToast('Transaction failed', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ===== EVENT HANDLERS =====
+        document.getElementById('connectWalletBtn')?.addEventListener('click', async () => {
+            showLoading(true, 'Connecting wallet...');
+            const result = await connectTonWallet();
+            if (result.success) {
+                await updateWalletUI();
+                showToast('Wallet connected!', 'success');
+            } else {
+                showToast(result.error || 'Failed to connect', 'error');
+            }
+            showLoading(false);
+        });
+        
+        document.getElementById('disconnectWalletBtn')?.addEventListener('click', async () => {
+            await disconnectTonWallet();
+            await updateWalletUI();
+            showToast('Wallet disconnected', 'info');
+        });
+        
+        document.querySelectorAll('.payment-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchPaymentMethod(tab.dataset.method));
+        });
+        
+        document.querySelectorAll('#tonPackages .package-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.classList.contains('buy-btn') || e.target === card) {
+                    const tonAmount = parseFloat(card.dataset.ton);
+                    const creditsAmount = parseInt(card.dataset.credits);
+                    buyWithTon(tonAmount, creditsAmount);
+                }
+            });
+        });
+        
+        document.querySelectorAll('#forgePackages .package-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.classList.contains('buy-btn') || e.target === card) {
+                    const forgeAmount = parseFloat(card.dataset.forge);
+                    const creditsAmount = parseInt(card.dataset.credits);
+                    buyWithForge(forgeAmount, creditsAmount);
+                }
+            });
+        });
+        
+        document.querySelectorAll('.offer-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const offerType = card.dataset.offer;
+                if (offerType === 'cert_boost') buyCertificateBoost();
+                else if (offerType === 'forge_boost') showToast('Coming soon!', 'info');
+                else if (offerType === 'cargo_upgrade') showToast('Coming soon!', 'info');
+            });
+        });
+        
+        // ===== REFRESH & NAVIGATION =====
+        window.refreshShop = async function() {
+            showLoading(true, 'Refreshing...');
+            await updateBalance();
+            await updateWalletUI();
+            await updateBurnStats();
+            await updatePurchaseHistory();
+            showLoading(false);
+            showToast('Shop updated', 'success');
+        };
+        
+        window.returnToHub = function() {
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            window.location.href = 'earth-hub.html';
+        };
+        
+        // ===== INIT =====
+        async function init() {
+            showLoading(true, 'Loading shop...');
+            
+            try {
+                playerId = getPlayerId();
+                playerName = localStorage.getItem('voidfarer_player_name') || `VOIDFARER #${playerId.slice(-4)}`;
+                
+                document.getElementById('playerName').textContent = playerName;
+                document.getElementById('playerId').textContent = `ID: ${playerId.slice(0, 6)}...${playerId.slice(-4)}`;
+                
+                await initTonWallet();
+                await updateBalance();
+                await updateWalletUI();
+                await updateBurnStats();
+                await updatePurchaseHistory();
+                
+                forgePrice = await getForgePrice();
+                
+                showLoading(false);
+                
+                setInterval(async () => {
+                    await updateBalance();
+                    await updateWalletUI();
+                }, 10000);
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                showLoading(false);
+                showToast('Error loading shop', 'error');
+            }
+        }
+        
+        init();
+        
+        window.buyWithTon = buyWithTon;
+        window.buyWithForge = buyWithForge;
+        window.buyCertificateBoost = buyCertificateBoost;
+    </script>
+</body>
+</html>
