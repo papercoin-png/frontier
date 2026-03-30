@@ -155,7 +155,7 @@
             text-transform: uppercase;
         }
         
-        /* Quick Access Row */
+        /* Quick Access Row - Added Shop button */
         .quick-access {
             display: flex;
             gap: 12px;
@@ -434,6 +434,12 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Forge balance highlight */
+        .forge-value {
+            color: #ffaa4a;
+            text-shadow: 0 0 10px rgba(255, 170, 74, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -464,7 +470,7 @@
                 <div class="cognatus-label">COGNATUS ONLINE</div>
             </div>
             
-            <!-- Quick Access Buttons -->
+            <!-- Quick Access Buttons - Added Shop button -->
             <div class="quick-access">
                 <div class="quick-btn" onclick="navigateTo('ship-bridge.html')">
                     <span class="quick-icon">🚀</span>
@@ -473,6 +479,10 @@
                 <div class="quick-btn" onclick="navigateTo('university.html')">
                     <span class="quick-icon">🎓</span>
                     <span class="quick-label">UNIVERSITY</span>
+                </div>
+                <div class="quick-btn" onclick="navigateTo('shop.html')">
+                    <span class="quick-icon">🛒</span>
+                    <span class="quick-label">SHOP</span>
                 </div>
             </div>
             
@@ -572,7 +582,7 @@
                 </div>
             </div>
             
-            <!-- Stats Bar -->
+            <!-- Stats Bar - Added Forge balance -->
             <div class="stats-bar">
                 <div class="stat-item">
                     <span class="stat-value" id="credits">12,450</span>
@@ -588,6 +598,11 @@
                     <span class="stat-value" id="labor">2.5k</span>
                     <span class="stat-label">LABOR POOL</span>
                 </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-value forge-value" id="forgeBalance">0</span>
+                    <span class="stat-label">FORGE</span>
+                </div>
             </div>
             
             <div class="footer">
@@ -602,7 +617,12 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import storage functions
+        import { getCredits, getPlayerId, getPlayer } from './js/storage.js';
+        import { getTotalLaborShare, getCertificates } from './js/certificates.js';
+        import { getForgeBalance } from './js/forge-system.js';
+
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -622,7 +642,7 @@
                     const otherArrow = document.getElementById(`arrow-${d}`);
                     if (otherCard?.classList.contains('expanded')) {
                         otherCard.classList.remove('expanded');
-                        otherArrow.style.transform = 'rotate(0deg)';
+                        if (otherArrow) otherArrow.style.transform = 'rotate(0deg)';
                     }
                 }
             });
@@ -655,18 +675,30 @@
         // ===== LOAD PLAYER STATS =====
         async function loadStats() {
             try {
-                // This will be replaced with actual storage calls
-                // const player = await window.getPlayer?.();
-                // if (player) {
-                //     document.getElementById('credits').textContent = player.credits?.toLocaleString() || '0';
-                //     document.getElementById('certificates').textContent = player.certificates?.length || '0';
-                //     document.getElementById('labor').textContent = player.laborShare?.toFixed(1) + 'k' || '0';
-                // }
+                const playerId = getPlayerId();
+                const player = await getPlayer(playerId);
                 
-                // Simulated for now
-                document.getElementById('credits').textContent = '12,450';
-                document.getElementById('certificates').textContent = '4';
-                document.getElementById('labor').textContent = '2.5k';
+                // Update credits
+                if (player?.credits !== undefined) {
+                    document.getElementById('credits').textContent = player.credits.toLocaleString();
+                }
+                
+                // Update certificates count (labor share level)
+                const certificates = await getCertificates(playerId);
+                const share = getTotalLaborShare(certificates);
+                const certificateLevel = Math.floor(share / 5) || 0;
+                document.getElementById('certificates').textContent = certificateLevel;
+                
+                // Update labor pool (placeholder - would come from labor system)
+                // document.getElementById('labor').textContent = '2.5k';
+                
+                // Update Forge balance (spendable)
+                const forgeBalance = await getForgeBalance(playerId);
+                const forgeElement = document.getElementById('forgeBalance');
+                if (forgeElement) {
+                    forgeElement.textContent = forgeBalance.toFixed(2);
+                }
+                
             } catch (error) {
                 console.error('Error loading stats:', error);
             }
@@ -674,6 +706,9 @@
 
         // ===== INIT =====
         loadStats();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadStats, 30000);
     </script>
 </body>
 </html>
