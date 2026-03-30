@@ -24,7 +24,13 @@ export async function getCertificates(playerId) {
 }
 
 export async function saveCertificates(playerId, progress) {
-    await setItem('certificates', { progress, lastUpdated: Date.now() }, playerId);
+    // Add id property for the store's keyPath
+    const item = {
+        id: playerId,
+        progress: progress,
+        lastUpdated: Date.now()
+    };
+    await setItem('certificates', item);
 }
 
 export function getCertificateStatus(progress, index) {
