@@ -1,24 +1,16 @@
 // js/ton-connect.js
-// TON Wallet Integration for Voidfarer
-// Supports Tonkeeper, Telegram Wallet, Tonhub, OpenMask, and any TON Connect 2.0 wallet
+// TON Wallet Integration for Voidfarer - with demo mode fallback
 
 // ===== CONFIGURATION =====
 const TON_CONFIG = {
-    // Mainnet vs Testnet (use testnet for development)
     isTestnet: true,
-    
-    // dApp manifest URL (host this file on your domain)
     manifestUrl: 'https://your-domain.com/tonconnect-manifest.json',
-    
-    // TON API endpoint for balance checks
     apiEndpoint: 'https://tonapi.io/v2',
-    
-    // Game addresses
-    burnShopContract: '0x...', // To be added after contract deployment
+    burnShopContract: '',
     forgeTokenAddress: 'EQBGLUNOnXAp9aEhjpO511FOIRcP9dUKEzVk1ErLSr_B-tzN',
-    
-    // Connection timeout
-    connectionTimeout: 60000
+    connectionTimeout: 60000,
+    // Demo mode for testing without real wallet
+    demoMode: true
 };
 
 // ===== STATE =====
@@ -28,10 +20,30 @@ let walletAddress = null;
 let walletBalance = 0;
 let listeners = [];
 
+// ===== DEMO MODE FUNCTIONS =====
+function enableDemoMode() {
+    console.log('🔧 Running in DEMO MODE - no real wallet connection');
+    walletConnected = true;
+    walletAddress = 'EQC_demo_wallet_address';
+    walletBalance = 10.0;
+    
+    // Dispatch events for UI
+    setTimeout(() => {
+        notifyListeners('connected', { address: walletAddress });
+    }, 500);
+}
+
 // ===== INITIALIZATION =====
 export async function initTonWallet() {
     try {
-        // Check if TonConnect SDK is available, load if not
+        // Check if we should use demo mode
+        if (TON_CONFIG.demoMode) {
+            console.log('Demo mode enabled - wallet connection simulated');
+            enableDemoMode();
+            return { success: true, connected: true, address: walletAddress, demo: true };
+        }
+        
+        // Try to load TonConnect SDK
         if (typeof window.TonConnect === 'undefined') {
             await loadTonConnectSDK();
         }
@@ -39,7 +51,6 @@ export async function initTonWallet() {
         tonConnect = new window.TonConnect();
         tonConnect.setManifestUrl(TON_CONFIG.manifestUrl);
         
-        // Check existing connection
         if (tonConnect.connected) {
             const wallet = tonConnect.wallet;
             walletAddress = wallet?.account?.address;
@@ -48,7 +59,6 @@ export async function initTonWallet() {
             notifyListeners('connected', { address: walletAddress });
         }
         
-        // Listen for connection status changes
         tonConnect.onStatusChange((wallet) => {
             if (wallet) {
                 walletAddress = wallet.account.address;
@@ -65,14 +75,15 @@ export async function initTonWallet() {
             }
         });
         
-        return { 
-            success: true, 
-            connected: walletConnected, 
-            address: walletAddress 
-        };
+        return { success: true, connected: walletConnected, address: walletAddress };
         
     } catch (error) {
         console.error('TON wallet init error:', error);
+        // Fallback to demo mode on error
+        if (TON_CONFIG.demoMode) {
+            enableDemoMode();
+            return { success: true, connected: true, address: walletAddress, demo: true };
+        }
         return { success: false, error: error.message };
     }
 }
@@ -84,20 +95,36 @@ function loadTonConnectSDK() {
         script.onload = resolve;
         script.onerror = () => reject(new Error('Failed to load TonConnect SDK'));
         document.head.appendChild(script);
+        
+        // Timeout fallback
+        setTimeout(() => {
+            if (typeof window.TonConnect === 'undefined') {
+                console.warn('TonConnect SDK load timeout, using demo mode');
+                TON_CONFIG.demoMode = true;
+                resolve();
+            }
+        }, 5000);
     });
 }
 
 // ===== CONNECT WALLET =====
 export async function connectTonWallet() {
+    // Demo mode - simulate connection
+    if (TON_CONFIG.demoMode) {
+        walletConnected = true;
+        walletAddress = 'EQC_demo_wallet_' + Math.random().toString(36).substr(2, 8);
+        walletBalance = 10.0;
+        notifyListeners('connected', { address: walletAddress });
+        return { success: true, address: walletAddress, demo: true };
+    }
+    
     try {
         if (!tonConnect) {
             await initTonWallet();
         }
         
-        // Get available wallets
         const wallets = tonConnect.getWallets();
         
-        // Check if in Telegram, prioritize Telegram Wallet
         const tg = window.Telegram?.WebApp;
         if (tg && (tg.platform === 'tdesktop' || tg.platform === 'ios' || tg.platform === 'android')) {
             const telegramWallet = wallets.find(w => w.name === 'Wallet in Telegram');
@@ -107,7 +134,6 @@ export async function connectTonWallet() {
             }
         }
         
-        // Show wallet selection modal
         return await showWalletSelector(wallets);
         
     } catch (error) {
@@ -187,23 +213,28 @@ function showWalletSelector(wallets) {
 
 // ===== DISCONNECT WALLET =====
 export async function disconnectTonWallet() {
-    try {
-        if (tonConnect && tonConnect.connected) {
+    walletConnected = false;
+    walletAddress = null;
+    walletBalance = 0;
+    
+    if (tonConnect && !TON_CONFIG.demoMode) {
+        try {
             await tonConnect.disconnect();
-        }
-        walletConnected = false;
-        walletAddress = null;
-        walletBalance = 0;
-        return { success: true };
-    } catch (error) {
-        console.error('Disconnect error:', error);
-        return { success: false, error: error.message };
+        } catch (e) {}
     }
+    
+    notifyListeners('disconnected', {});
+    return { success: true };
 }
 
 // ===== GET WALLET BALANCE =====
 export async function getTonBalance() {
-    if (!walletConnected || !walletAddress) return 0;
+    if (!walletConnected) return 0;
+    
+    // Demo mode - return fake balance
+    if (TON_CONFIG.demoMode) {
+        return 10.0;
+    }
     
     try {
         const response = await fetch(`${TON_CONFIG.apiEndpoint}/accounts/${walletAddress}`);
@@ -223,6 +254,13 @@ async function updateBalance() {
 
 // ===== SEND TRANSACTION =====
 export async function sendTransaction(transaction) {
+    // Demo mode - simulate transaction
+    if (TON_CONFIG.demoMode) {
+        console.log('Demo mode: simulated transaction', transaction);
+        await new Promise(r => setTimeout(r, 1000));
+        return { success: true, txHash: 'demo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8) };
+    }
+    
     if (!walletConnected || !tonConnect) {
         return { success: false, error: 'Wallet not connected' };
     }
@@ -247,14 +285,14 @@ export async function buyCreditsWithTon(playerId, tonAmount) {
         return { success: false, error: `Insufficient TON. Need ${tonAmount}, have ${balance.toFixed(2)}` };
     }
     
-    const creditsAmount = Math.floor(tonAmount * 1000); // 1 TON = 1000 credits
+    const creditsAmount = Math.floor(tonAmount * 1000);
     
     const transaction = {
-        validUntil: Date.now() + 600000, // 10 minutes
+        validUntil: Date.now() + 600000,
         messages: [
             {
-                address: TON_CONFIG.burnShopContract,
-                amount: tonAmount * 1e9, // Convert to nanoTON
+                address: TON_CONFIG.burnShopContract || 'EQC_demo_contract',
+                amount: tonAmount * 1e9,
                 payload: JSON.stringify({
                     type: 'buy_credits',
                     playerId: playerId,
@@ -280,28 +318,31 @@ export async function buyCreditsWithTon(playerId, tonAmount) {
 }
 
 // ===== BUY CREDITS WITH FORGE =====
-export async function buyCreditsWithForge(playerId, forgeAmount, forgeBalance) {
+export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBalance) {
     if (!walletConnected) {
         return { success: false, error: 'Wallet not connected' };
     }
     
-    if (forgeBalance < forgeAmount) {
-        return { success: false, error: `Insufficient FORGE. Need ${forgeAmount}, have ${forgeBalance}` };
+    if (forgeAmount <= 0) {
+        return { success: false, error: 'Invalid amount' };
     }
     
-    const creditsAmount = Math.floor(forgeAmount * 100); // 1 FORGE = 100 credits
+    if (currentForgeBalance < forgeAmount) {
+        return { success: false, error: `Insufficient FORGE. Need ${forgeAmount}, have ${currentForgeBalance}` };
+    }
     
-    // Transfer FORGE to burn contract
+    const creditsAmount = Math.floor(forgeAmount * 100);
+    
     const transaction = {
         validUntil: Date.now() + 600000,
         messages: [
             {
                 address: TON_CONFIG.forgeTokenAddress,
-                amount: 0, // Jetton transfer uses payload
+                amount: 0,
                 payload: JSON.stringify({
                     type: 'jetton_transfer',
-                    recipient: TON_CONFIG.burnShopContract,
-                    amount: forgeAmount,
+                    recipient: TON_CONFIG.burnShopContract || 'EQC_burn',
+                    amount: forgeAmount * 1e9,
                     payload: {
                         type: 'buy_credits',
                         playerId: playerId,
@@ -356,19 +397,6 @@ export function getWalletBalanceDisplay() {
 export function getShortAddress() {
     if (!walletAddress) return '';
     return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-}
-
-// ===== MANIFEST HELPER =====
-export function generateManifest() {
-    // This function helps generate the manifest.json file
-    const manifest = {
-        url: window.location.origin,
-        name: 'Voidfarer',
-        iconUrl: `${window.location.origin}/icon.png`,
-        termsOfUseUrl: `${window.location.origin}/terms.html`,
-        privacyPolicyUrl: `${window.location.origin}/privacy.html`
-    };
-    return manifest;
 }
 
 // ===== EXPORT =====
