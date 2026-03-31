@@ -679,7 +679,7 @@
                     </div>
                     <div class="reward-stat">
                         <span class="reward-label">Monthly Distribution</span>
-                        <span class="reward-value">70 FORGE</span>
+                        <span class="reward-value">2,083 FORGE</span>
                     </div>
                     <div class="reward-stat">
                         <span class="reward-label">Duration</span>
@@ -936,8 +936,7 @@
                 tonBalance = await getTonBalance();
                 document.getElementById('walletBalance').textContent = tonBalance.toFixed(4);
                 
-                // USDT balance (placeholder - would need USDT contract integration)
-                usdtBalance = 50.0; // Demo value
+                usdtBalance = 50.0;
                 if (usdtBalanceSpan) {
                     usdtBalanceSpan.style.display = 'flex';
                     document.getElementById('usdtBalance').textContent = usdtBalance.toFixed(2);
@@ -1070,21 +1069,23 @@
             showLoading(true, 'Processing purchase...');
             
             try {
-                // USDT purchase flow - would call buyCreditsWithUsdt from ton-connect
-                // For demo, simulate success
-                await new Promise(r => setTimeout(r, 1500));
+                const result = await buyCreditsWithUsdt(playerId, usdtAmount);
                 
-                await recordPurchase(playerId, usdtAmount, creditsAmount, 'USDT', 'demo_usdt_' + Date.now());
-                await updateBalance();
-                await updatePurchaseHistory();
-                await updateWalletUI();
-                await updateBurnStats();
-                
-                showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
-                
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                return true;
-                
+                if (result.success) {
+                    await recordPurchase(playerId, usdtAmount, creditsAmount, 'USDT', result.txHash);
+                    await updateBalance();
+                    await updatePurchaseHistory();
+                    await updateWalletUI();
+                    await updateBurnStats();
+                    
+                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
+                    
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    return true;
+                } else {
+                    showToast(result.error || 'Purchase failed', 'error');
+                    return false;
+                }
             } catch (error) {
                 console.error('Purchase error:', error);
                 showToast('Transaction failed', 'error');
@@ -1164,8 +1165,7 @@
                 if (method === 'ton') {
                     result = await buyCreditsWithTon(playerId, cost);
                 } else if (method === 'usdt') {
-                    await new Promise(r => setTimeout(r, 1000));
-                    result = { success: true };
+                    result = await buyCreditsWithUsdt(playerId, cost);
                 } else {
                     result = await buyCreditsWithForge(playerId, cost * 100, forgeBalance);
                 }
