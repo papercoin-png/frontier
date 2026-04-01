@@ -1,51 +1,51 @@
-// js/forge-system.js
-// Forge token system - Real-time accrual based on certificate level
-// Players earn Forge passively while playing (and offline)
-// Daily cap of 70 Forge, resets at midnight UTC
-// Unclaimed Forge burns if not claimed within 24 hours
+// js/fuel-system.js
+// FUEL token system - Real-time accrual based on certificate level
+// Players earn FUEL passively while playing (and offline)
+// Daily cap of 70 FUEL, resets at midnight UTC
+// Unclaimed FUEL burns if not claimed within 24 hours
 
 import { getItem, setItem } from './storage.js';
 import { getCertificates, getTotalLaborShare } from './certificates.js';
 
 // ===== CONSTANTS =====
-const FORGE_CONFIG = {
-    DAILY_CAP: 70,                    // Maximum Forge per day
-    ACCRUAL_BASE_RATE: 0.0007,        // Base Forge per 10 seconds for share 100
+const FUEL_CONFIG = {
+    DAILY_CAP: 70,                    // Maximum FUEL per day
+    ACCRUAL_BASE_RATE: 0.0007,        // Base FUEL per 10 seconds for share 100
     ACCRUAL_INTERVAL_MS: 10000,       // 10 seconds (used for rate calculation)
     RESET_HOUR: 0,                    // Midnight UTC
     RESET_MINUTE: 0,
-    CLAIM_EXPIRY_HOURS: 24            // Forge must be claimed within 24 hours
+    CLAIM_EXPIRY_HOURS: 24            // FUEL must be claimed within 24 hours
 };
 
 // Storage keys (using IndexedDB via storage.js)
 const STORAGE_KEYS = {
-    FORGE_DATA: 'forgeData',           // Main forge data store
-    FORGE_BALANCE: 'forgeBalance'      // Player's Forge balance (spendable)
+    FUEL_DATA: 'fuelData',           // Main fuel data store
+    FUEL_BALANCE: 'fuelBalance'      // Player's FUEL balance (spendable)
 };
 
 // ===== INITIALIZATION =====
 /**
- * Initialize forge system for a player
+ * Initialize fuel system for a player
  * @param {string} playerId - Player ID
- * @returns {Promise<Object>} Forge data object
+ * @returns {Promise<Object>} Fuel data object
  */
-export async function initializeForge(playerId) {
+export async function initializeFuel(playerId) {
     try {
-        let forgeData = await getItem('forgeData', playerId);
+        let fuelData = await getItem('fuelData', playerId);
         
-        if (!forgeData) {
-            forgeData = {
+        if (!fuelData) {
+            fuelData = {
                 playerId: playerId,
-                currentForge: 0,           // Forge accrued today (resets daily)
+                currentFuel: 0,           // FUEL accrued today (resets daily)
                 lastAccrualTimestamp: Date.now(),
                 lastResetDate: null,
-                pendingClaim: 0,            // Forge available to claim (from previous day)
+                pendingClaim: 0,            // FUEL available to claim (from previous day)
                 pendingClaimExpires: null,  // Timestamp when pending claim expires
                 lastClaimDate: null,        // Date when last claimed
-                totalForgeClaimed: 0,       // Lifetime Forge claimed
-                totalForgeBurned: 0         // Lifetime Forge burned
+                totalFuelClaimed: 0,       // Lifetime FUEL claimed
+                totalFuelBurned: 0         // Lifetime FUEL burned
             };
-            await setItem('forgeData', forgeData, playerId);
+            await setItem('fuelData', fuelData, playerId);
         }
         
         // Check and perform daily reset
@@ -57,9 +57,9 @@ export async function initializeForge(playerId) {
         // Update accrual based on time passed
         await updateAccrual(playerId);
         
-        return forgeData;
+        return fuelData;
     } catch (error) {
-        console.error('Error initializing forge:', error);
+        console.error('Error initializing fuel:', error);
         return null;
     }
 }
@@ -72,27 +72,27 @@ export async function initializeForge(playerId) {
  */
 export async function checkAndResetDaily(playerId) {
     try {
-        const forgeData = await getItem('forgeData', playerId);
-        if (!forgeData) return false;
+        const fuelData = await getItem('fuelData', playerId);
+        if (!fuelData) return false;
         
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         
         // Check if we need to reset
-        if (forgeData.lastResetDate !== today) {
-            // Move current Forge to pending claim (if any)
-            if (forgeData.currentForge > 0) {
-                forgeData.pendingClaim = forgeData.currentForge;
-                forgeData.pendingClaimExpires = Date.now() + (FORGE_CONFIG.CLAIM_EXPIRY_HOURS * 60 * 60 * 1000);
+        if (fuelData.lastResetDate !== today) {
+            // Move current FUEL to pending claim (if any)
+            if (fuelData.currentFuel > 0) {
+                fuelData.pendingClaim = fuelData.currentFuel;
+                fuelData.pendingClaimExpires = Date.now() + (FUEL_CONFIG.CLAIM_EXPIRY_HOURS * 60 * 60 * 1000);
             }
             
-            // Reset current Forge
-            forgeData.currentForge = 0;
-            forgeData.lastResetDate = today;
-            forgeData.lastAccrualTimestamp = Date.now();
+            // Reset current FUEL
+            fuelData.currentFuel = 0;
+            fuelData.lastResetDate = today;
+            fuelData.lastAccrualTimestamp = Date.now();
             
-            await setItem('forgeData', forgeData, playerId);
-            console.log(`🔄 Forge daily reset for ${playerId}: ${forgeData.pendingClaim} Forge moved to pending`);
+            await setItem('fuelData', fuelData, playerId);
+            console.log(`🔄 FUEL daily reset for ${playerId}: ${fuelData.pendingClaim} FUEL moved to pending`);
             return true;
         }
         
@@ -110,22 +110,22 @@ export async function checkAndResetDaily(playerId) {
  */
 export async function checkAndBurnExpiredClaim(playerId) {
     try {
-        const forgeData = await getItem('forgeData', playerId);
-        if (!forgeData) return 0;
+        const fuelData = await getItem('fuelData', playerId);
+        if (!fuelData) return 0;
         
-        if (forgeData.pendingClaim > 0 && forgeData.pendingClaimExpires) {
-            if (Date.now() > forgeData.pendingClaimExpires) {
-                const burnedAmount = forgeData.pendingClaim;
-                forgeData.totalForgeBurned += burnedAmount;
-                forgeData.pendingClaim = 0;
-                forgeData.pendingClaimExpires = null;
+        if (fuelData.pendingClaim > 0 && fuelData.pendingClaimExpires) {
+            if (Date.now() > fuelData.pendingClaimExpires) {
+                const burnedAmount = fuelData.pendingClaim;
+                fuelData.totalFuelBurned += burnedAmount;
+                fuelData.pendingClaim = 0;
+                fuelData.pendingClaimExpires = null;
                 
-                await setItem('forgeData', forgeData, playerId);
-                console.log(`🔥 ${burnedAmount} Forge burned for ${playerId} (expired)`);
+                await setItem('fuelData', fuelData, playerId);
+                console.log(`🔥 ${burnedAmount} FUEL burned for ${playerId} (expired)`);
                 
                 // Dispatch event for UI updates
                 if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('forge-burned', { 
+                    window.dispatchEvent(new CustomEvent('fuel-burned', { 
                         detail: { playerId, amount: burnedAmount } 
                     }));
                 }
@@ -144,72 +144,72 @@ export async function checkAndBurnExpiredClaim(playerId) {
 // ===== ACCRUAL CALCULATION =====
 /**
  * Calculate accrual rate based on certificate share
- * Rate = (Share / 100) × 0.0007 Forge per 10 seconds
+ * Rate = (Share / 100) × 0.0007 FUEL per 10 seconds
  * @param {number} share - Total certificate share
- * @returns {number} Forge per 10 seconds
+ * @returns {number} FUEL per 10 seconds
  */
 export function calculateAccrualRate(share) {
     if (share <= 0) return 0;
     // Base rate 0.0007 per 10 seconds for share 100
     // Share 500 = 0.0035, Share 1000 = 0.007, Share 2000 = 0.014
-    return (share / 100) * FORGE_CONFIG.ACCRUAL_BASE_RATE;
+    return (share / 100) * FUEL_CONFIG.ACCRUAL_BASE_RATE;
 }
 
 /**
- * Calculate Forge gained over a time period - CONTINUOUS (no chunking)
+ * Calculate FUEL gained over a time period - CONTINUOUS (no chunking)
  * @param {number} share - Certificate share
  * @param {number} milliseconds - Time elapsed in milliseconds
- * @returns {number} Forge gained
+ * @returns {number} FUEL gained
  */
-export function calculateForgeGained(share, milliseconds) {
+export function calculateFuelGained(share, milliseconds) {
     if (share <= 0 || milliseconds <= 0) return 0;
     
     // Rate per millisecond = (rate per 10 seconds) / 10000
     const ratePer10s = calculateAccrualRate(share);
-    const ratePerMs = ratePer10s / FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    const ratePerMs = ratePer10s / FUEL_CONFIG.ACCRUAL_INTERVAL_MS;
     
     // DIRECT CONTINUOUS CALCULATION - NO CHUNKING, NO FLOORING
-    // Any amount of time yields proportional Forge
+    // Any amount of time yields proportional FUEL
     return ratePerMs * milliseconds;
 }
 
 /**
- * Update Forge accrual based on time passed since last update
+ * Update FUEL accrual based on time passed since last update
  * @param {string} playerId - Player ID
- * @returns {Promise<number>} New current Forge amount
+ * @returns {Promise<number>} New current FUEL amount
  */
 export async function updateAccrual(playerId) {
     try {
-        const forgeData = await getItem('forgeData', playerId);
-        if (!forgeData) return 0;
+        const fuelData = await getItem('fuelData', playerId);
+        if (!fuelData) return 0;
         
         const now = Date.now();
-        const timeElapsed = now - (forgeData.lastAccrualTimestamp || now);
+        const timeElapsed = now - (fuelData.lastAccrualTimestamp || now);
         
-        if (timeElapsed <= 0) return forgeData.currentForge;
+        if (timeElapsed <= 0) return fuelData.currentFuel;
         
         // Get player's certificate share
         const certificates = await getCertificates(playerId);
         const share = getTotalLaborShare(certificates);
         
-        // Calculate Forge gained using continuous calculation
-        let gained = calculateForgeGained(share, timeElapsed);
+        // Calculate FUEL gained using continuous calculation
+        let gained = calculateFuelGained(share, timeElapsed);
         
         if (gained > 0) {
-            let newForge = forgeData.currentForge + gained;
+            let newFuel = fuelData.currentFuel + gained;
             
             // Cap at daily maximum
-            if (newForge > FORGE_CONFIG.DAILY_CAP) {
-                newForge = FORGE_CONFIG.DAILY_CAP;
+            if (newFuel > FUEL_CONFIG.DAILY_CAP) {
+                newFuel = FUEL_CONFIG.DAILY_CAP;
             }
             
-            forgeData.currentForge = newForge;
+            fuelData.currentFuel = newFuel;
         }
         
-        forgeData.lastAccrualTimestamp = now;
-        await setItem('forgeData', forgeData, playerId);
+        fuelData.lastAccrualTimestamp = now;
+        await setItem('fuelData', fuelData, playerId);
         
-        return forgeData.currentForge;
+        return fuelData.currentFuel;
     } catch (error) {
         console.error('Error updating accrual:', error);
         return 0;
@@ -218,56 +218,56 @@ export async function updateAccrual(playerId) {
 
 // ===== GETTERS =====
 /**
- * Get current Forge data for a player
+ * Get current FUEL data for a player
  * @param {string} playerId - Player ID
- * @returns {Promise<Object>} Forge data object
+ * @returns {Promise<Object>} Fuel data object
  */
-export async function getForgeData(playerId) {
+export async function getFuelData(playerId) {
     try {
-        let forgeData = await getItem('forgeData', playerId);
-        if (!forgeData) {
-            forgeData = await initializeForge(playerId);
+        let fuelData = await getItem('fuelData', playerId);
+        if (!fuelData) {
+            fuelData = await initializeFuel(playerId);
         } else {
             // Check for reset and update accrual
             await checkAndResetDaily(playerId);
             await updateAccrual(playerId);
-            forgeData = await getItem('forgeData', playerId);
+            fuelData = await getItem('fuelData', playerId);
         }
-        return forgeData;
+        return fuelData;
     } catch (error) {
-        console.error('Error getting forge data:', error);
+        console.error('Error getting fuel data:', error);
         return null;
     }
 }
 
 /**
- * Get current Forge amount (accrued today)
+ * Get current FUEL amount (accrued today)
  * @param {string} playerId - Player ID
- * @returns {Promise<number>} Current Forge amount
+ * @returns {Promise<number>} Current FUEL amount
  */
-export async function getCurrentForge(playerId) {
-    const forgeData = await getForgeData(playerId);
-    return forgeData ? forgeData.currentForge : 0;
+export async function getCurrentFuel(playerId) {
+    const fuelData = await getFuelData(playerId);
+    return fuelData ? fuelData.currentFuel : 0;
 }
 
 /**
- * Get pending Forge claim (from previous day)
+ * Get pending FUEL claim (from previous day)
  * @param {string} playerId - Player ID
  * @returns {Promise<{amount: number, expiresAt: number|null}>} Pending claim info
  */
-export async function getPendingForgeClaim(playerId) {
-    const forgeData = await getForgeData(playerId);
-    if (!forgeData) return { amount: 0, expiresAt: null };
+export async function getPendingFuelClaim(playerId) {
+    const fuelData = await getFuelData(playerId);
+    if (!fuelData) return { amount: 0, expiresAt: null };
     
     // Check if expired
-    if (forgeData.pendingClaim > 0 && forgeData.pendingClaimExpires) {
-        if (Date.now() > forgeData.pendingClaimExpires) {
+    if (fuelData.pendingClaim > 0 && fuelData.pendingClaimExpires) {
+        if (Date.now() > fuelData.pendingClaimExpires) {
             await checkAndBurnExpiredClaim(playerId);
             return { amount: 0, expiresAt: null };
         }
         return { 
-            amount: forgeData.pendingClaim, 
-            expiresAt: forgeData.pendingClaimExpires 
+            amount: fuelData.pendingClaim, 
+            expiresAt: fuelData.pendingClaimExpires 
         };
     }
     
@@ -275,46 +275,46 @@ export async function getPendingForgeClaim(playerId) {
 }
 
 /**
- * Get total Forge balance (spendable - claimed Forge)
+ * Get total FUEL balance (spendable - claimed FUEL)
  * @param {string} playerId - Player ID
- * @returns {Promise<number>} Forge balance
+ * @returns {Promise<number>} FUEL balance
  */
-export async function getForgeBalance(playerId) {
+export async function getFuelBalance(playerId) {
     try {
-        const balance = await getItem('forgeBalance', playerId);
+        const balance = await getItem('fuelBalance', playerId);
         return balance ? balance.amount : 0;
     } catch (error) {
-        console.error('Error getting forge balance:', error);
+        console.error('Error getting fuel balance:', error);
         return 0;
     }
 }
 
 // ===== CLAIM AND BALANCE MANAGEMENT =====
 /**
- * Claim pending Forge (add to spendable balance)
+ * Claim pending FUEL (add to spendable balance)
  * @param {string} playerId - Player ID
  * @returns {Promise<{success: boolean, amount: number, message: string}>} Result
  */
-export async function claimForge(playerId) {
+export async function claimFuel(playerId) {
     try {
-        const forgeData = await getForgeData(playerId);
-        if (!forgeData) {
-            return { success: false, amount: 0, message: 'Forge system not initialized' };
+        const fuelData = await getFuelData(playerId);
+        if (!fuelData) {
+            return { success: false, amount: 0, message: 'FUEL system not initialized' };
         }
         
         // Check for expired claim first
         await checkAndBurnExpiredClaim(playerId);
         
         // Refresh data after potential burn
-        const refreshedData = await getItem('forgeData', playerId);
+        const refreshedData = await getItem('fuelData', playerId);
         if (!refreshedData || refreshedData.pendingClaim <= 0) {
-            return { success: false, amount: 0, message: 'No Forge available to claim' };
+            return { success: false, amount: 0, message: 'No FUEL available to claim' };
         }
         
         const claimAmount = refreshedData.pendingClaim;
         
         // Get or create balance
-        let balance = await getItem('forgeBalance', playerId);
+        let balance = await getItem('fuelBalance', playerId);
         if (!balance) {
             balance = { playerId: playerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
         }
@@ -328,14 +328,14 @@ export async function claimForge(playerId) {
         refreshedData.pendingClaim = 0;
         refreshedData.pendingClaimExpires = null;
         refreshedData.lastClaimDate = Date.now();
-        refreshedData.totalForgeClaimed = (refreshedData.totalForgeClaimed || 0) + claimAmount;
+        refreshedData.totalFuelClaimed = (refreshedData.totalFuelClaimed || 0) + claimAmount;
         
-        await setItem('forgeBalance', balance, playerId);
-        await setItem('forgeData', refreshedData, playerId);
+        await setItem('fuelBalance', balance, playerId);
+        await setItem('fuelData', refreshedData, playerId);
         
         // Dispatch event for UI updates
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('forge-claimed', { 
+            window.dispatchEvent(new CustomEvent('fuel-claimed', { 
                 detail: { playerId, amount: claimAmount } 
             }));
         }
@@ -343,71 +343,71 @@ export async function claimForge(playerId) {
         return { 
             success: true, 
             amount: claimAmount, 
-            message: `Claimed ${claimAmount.toFixed(3)} Forge!` 
+            message: `Claimed ${claimAmount.toFixed(3)} FUEL!` 
         };
         
     } catch (error) {
-        console.error('Error claiming forge:', error);
-        return { success: false, amount: 0, message: 'Failed to claim Forge' };
+        console.error('Error claiming fuel:', error);
+        return { success: false, amount: 0, message: 'Failed to claim FUEL' };
     }
 }
 
 /**
- * Add Forge tokens to player's spendable balance (for rewards/purchases)
+ * Add FUEL tokens to player's spendable balance (for rewards/purchases)
  * @param {string} playerId - Player ID
  * @param {number} amount - Amount to add
  * @returns {Promise<boolean>} Success status
  */
-export async function addForgeToBalance(playerId, amount) {
+export async function addFuelToBalance(playerId, amount) {
     try {
         if (amount <= 0) return false;
         
-        let balance = await getItem('forgeBalance', playerId);
+        let balance = await getItem('fuelBalance', playerId);
         if (!balance) {
             balance = { playerId: playerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
         }
         
         balance.amount += amount;
-        await setItem('forgeBalance', balance, playerId);
+        await setItem('fuelBalance', balance, playerId);
         
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
+            window.dispatchEvent(new CustomEvent('fuel-balance-updated', { 
                 detail: { playerId, amount, newBalance: balance.amount } 
             }));
         }
         
         return true;
     } catch (error) {
-        console.error('Error adding forge to balance:', error);
+        console.error('Error adding fuel to balance:', error);
         return false;
     }
 }
 
 /**
- * Spend Forge tokens
+ * Spend FUEL tokens
  * @param {string} playerId - Player ID
  * @param {number} amount - Amount to spend
  * @returns {Promise<boolean>} Success status
  */
-export async function spendForge(playerId, amount) {
+export async function spendFuel(playerId, amount) {
     try {
         if (amount <= 0) return false;
         
-        const balance = await getItem('forgeBalance', playerId);
+        const balance = await getItem('fuelBalance', playerId);
         if (!balance || balance.amount < amount) return false;
         
         balance.amount -= amount;
-        await setItem('forgeBalance', balance, playerId);
+        await setItem('fuelBalance', balance, playerId);
         
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('forge-spent', { 
+            window.dispatchEvent(new CustomEvent('fuel-spent', { 
                 detail: { playerId, amount, newBalance: balance.amount } 
             }));
         }
         
         return true;
     } catch (error) {
-        console.error('Error spending forge:', error);
+        console.error('Error spending fuel:', error);
         return false;
     }
 }
@@ -419,7 +419,7 @@ export async function spendForge(playerId, amount) {
  */
 export function getSecondsUntilNextIncrement() {
     const now = Date.now();
-    const intervalMs = FORGE_CONFIG.ACCRUAL_INTERVAL_MS;
+    const intervalMs = FUEL_CONFIG.ACCRUAL_INTERVAL_MS;
     const elapsed = now % intervalMs;
     const remaining = intervalMs - elapsed;
     return Math.ceil(remaining / 1000);
@@ -432,7 +432,7 @@ export function getSecondsUntilNextIncrement() {
 export function getTimeUntilReset() {
     const now = new Date();
     const reset = new Date(now);
-    reset.setUTCHours(FORGE_CONFIG.RESET_HOUR, FORGE_CONFIG.RESET_MINUTE, 0, 0);
+    reset.setUTCHours(FUEL_CONFIG.RESET_HOUR, FUEL_CONFIG.RESET_MINUTE, 0, 0);
     
     if (now >= reset) {
         reset.setUTCDate(reset.getUTCDate() + 1);
@@ -473,18 +473,18 @@ export function getTimeUntilExpiry(expiresAt) {
  */
 export function getAccrualRateDisplay(share) {
     const rate = calculateAccrualRate(share);
-    return `+${rate.toFixed(4)}/${FORGE_CONFIG.ACCRUAL_INTERVAL_MS / 1000}s`;
+    return `+${rate.toFixed(4)}/${FUEL_CONFIG.ACCRUAL_INTERVAL_MS / 1000}s`;
 }
 
 /**
- * Get projected Forge for the rest of the day
+ * Get projected FUEL for the rest of the day
  * @param {string} playerId - Player ID
- * @returns {Promise<number>} Projected Forge by end of day
+ * @returns {Promise<number>} Projected FUEL by end of day
  */
-export async function getProjectedForge(playerId) {
+export async function getProjectedFuel(playerId) {
     try {
-        const forgeData = await getForgeData(playerId);
-        if (!forgeData) return 0;
+        const fuelData = await getFuelData(playerId);
+        if (!fuelData) return 0;
         
         const certificates = await getCertificates(playerId);
         const share = getTotalLaborShare(certificates);
@@ -496,14 +496,14 @@ export async function getProjectedForge(playerId) {
         const ratePerHour = calculateAccrualRate(share) * 360;
         const projectedGain = ratePerHour * hoursRemaining;
         
-        let projected = forgeData.currentForge + projectedGain;
-        if (projected > FORGE_CONFIG.DAILY_CAP) {
-            projected = FORGE_CONFIG.DAILY_CAP;
+        let projected = fuelData.currentFuel + projectedGain;
+        if (projected > FUEL_CONFIG.DAILY_CAP) {
+            projected = FUEL_CONFIG.DAILY_CAP;
         }
         
         return projected;
     } catch (error) {
-        console.error('Error getting projected forge:', error);
+        console.error('Error getting projected fuel:', error);
         return 0;
     }
 }
@@ -513,10 +513,10 @@ let globalUpdateInterval = null;
 let globalUpdateCallbacks = [];
 
 /**
- * Start global Forge update timer for real-time UI updates
+ * Start global FUEL update timer for real-time UI updates
  * @param {Function} callback - Function to call on each update
  */
-export function startForgeUpdates(callback) {
+export function startFuelUpdates(callback) {
     if (typeof callback === 'function') {
         globalUpdateCallbacks.push(callback);
     }
@@ -527,7 +527,7 @@ export function startForgeUpdates(callback) {
                 try {
                     await cb();
                 } catch (e) {
-                    console.error('Forge update callback error:', e);
+                    console.error('FUEL update callback error:', e);
                 }
             }
         }, 1000); // Update every second for smooth display
@@ -535,9 +535,9 @@ export function startForgeUpdates(callback) {
 }
 
 /**
- * Stop global Forge updates
+ * Stop global FUEL updates
  */
-export function stopForgeUpdates() {
+export function stopFuelUpdates() {
     if (globalUpdateInterval) {
         clearInterval(globalUpdateInterval);
         globalUpdateInterval = null;
@@ -549,7 +549,7 @@ export function stopForgeUpdates() {
  * Remove a specific callback
  * @param {Function} callback - Callback to remove
  */
-export function removeForgeUpdateCallback(callback) {
+export function removeFuelUpdateCallback(callback) {
     const index = globalUpdateCallbacks.indexOf(callback);
     if (index > -1) {
         globalUpdateCallbacks.splice(index, 1);
@@ -558,26 +558,26 @@ export function removeForgeUpdateCallback(callback) {
 
 // ===== EXPORT =====
 export default {
-    FORGE_CONFIG,
-    initializeForge,
+    FUEL_CONFIG,
+    initializeFuel,
     checkAndResetDaily,
     checkAndBurnExpiredClaim,
     calculateAccrualRate,
-    calculateForgeGained,
+    calculateFuelGained,
     updateAccrual,
-    getForgeData,
-    getCurrentForge,
-    getPendingForgeClaim,
-    getForgeBalance,
-    claimForge,
-    addForgeToBalance,
-    spendForge,
+    getFuelData,
+    getCurrentFuel,
+    getPendingFuelClaim,
+    getFuelBalance,
+    claimFuel,
+    addFuelToBalance,
+    spendFuel,
     getSecondsUntilNextIncrement,
     getTimeUntilReset,
     getTimeUntilExpiry,
     getAccrualRateDisplay,
-    getProjectedForge,
-    startForgeUpdates,
-    stopForgeUpdates,
-    removeForgeUpdateCallback
+    getProjectedFuel,
+    startFuelUpdates,
+    stopFuelUpdates,
+    removeFuelUpdateCallback
 };
