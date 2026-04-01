@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Database version updated to 6 with proper keyPath configurations for fuel stores
+// FIXED: Database version updated to 8 with proper keyPath configurations for fuel stores
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
 // FIXED: Added getPlayerLocations function for planet-status.js integration
@@ -20,7 +20,7 @@
 // FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
 // ADDED: Fuel token storage functions (getFuelBalance, addFuelTokens, spendFuelTokens)
 // ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
-// FIXED: Database version 7 - Recreate certificates store to fix keyPath configuration
+// FIXED: Database version 8 - Added fuelData and fuelBalance stores
 // ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
 
 // ===== CONSTANTS =====
@@ -293,13 +293,13 @@ let storeFixAttempted = false;
 
 /**
  * Ensure IndexedDB stores exist with correct configuration
- * Version 7 - Recreates certificates store with proper keyPath
+ * Version 8 - Added fuelData and fuelBalance stores
  */
 async function ensureDBStores() {
     if (!window.idb) return null;
     
     try {
-        const db = await window.idb.openDB('VoidfarerDB', 7, {
+        const db = await window.idb.openDB('VoidfarerDB', 8, {
             upgrade(db, oldVersion, newVersion, transaction) {
                 console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
                 
@@ -324,6 +324,23 @@ async function ensureDBStores() {
                         const oldStore = transaction.objectStore('certificates');
                         db.deleteObjectStore('certificates');
                         console.log('Deleted old certificates store for recreation');
+                    }
+                }
+                
+                // Version 8 upgrade - Add fuelData and fuelBalance stores
+                if (oldVersion < 8) {
+                    console.log('Upgrading to version 8 - adding fuelData and fuelBalance stores');
+                    
+                    if (!db.objectStoreNames.contains('fuelData')) {
+                        const fuelDataStore = db.createObjectStore('fuelData', { keyPath: 'playerId' });
+                        fuelDataStore.createIndex('by_player', 'playerId');
+                        console.log('Created fuelData store');
+                    }
+                    
+                    if (!db.objectStoreNames.contains('fuelBalance')) {
+                        const fuelBalanceStore = db.createObjectStore('fuelBalance', { keyPath: 'playerId' });
+                        fuelBalanceStore.createIndex('by_player', 'playerId');
+                        console.log('Created fuelBalance store');
                     }
                 }
                 
@@ -2332,5 +2349,5 @@ window.getTotalSpent = getTotalSpent;
 window.getAllPurchases = getAllPurchases;
 
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and fuel token functions');
-console.log('✅ Version 7: Fixed certificates store configuration with proper keyPath handling');
+console.log('✅ Version 8: Added fuelData and fuelBalance stores with proper configuration');
 console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
