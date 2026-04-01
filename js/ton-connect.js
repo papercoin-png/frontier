@@ -6,8 +6,8 @@ const TON_CONFIG = {
     isTestnet: true,
     manifestUrl: 'https://your-domain.com/tonconnect-manifest.json',
     apiEndpoint: 'https://tonapi.io/v2',
-    burnShopContract: '',
-    forgeTokenAddress: 'EQBGLUNOnXAp9aEhjpO511FOIRcP9dUKEzVk1ErLSr_B-tzN',
+    burnShopContract: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
+    forgeTokenAddress: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
     usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
     connectionTimeout: 60000,
     demoMode: true
@@ -385,21 +385,21 @@ export async function buyCreditsWithUsdt(playerId, usdtAmount) {
     return result;
 }
 
-// ===== BUY CREDITS WITH FORGE =====
-export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBalance) {
+// ===== BUY CREDITS WITH FUEL =====
+export async function buyCreditsWithFuel(playerId, fuelAmount, currentFuelBalance) {
     if (!walletConnected) {
         return { success: false, error: 'Wallet not connected' };
     }
     
-    if (forgeAmount <= 0) {
+    if (fuelAmount <= 0) {
         return { success: false, error: 'Invalid amount' };
     }
     
-    if (currentForgeBalance < forgeAmount) {
-        return { success: false, error: `Insufficient FORGE. Need ${forgeAmount}, have ${currentForgeBalance}` };
+    if (currentFuelBalance < fuelAmount) {
+        return { success: false, error: `Insufficient FUEL. Need ${fuelAmount}, have ${currentFuelBalance}` };
     }
     
-    const creditsAmount = Math.floor(forgeAmount * 100);
+    const creditsAmount = Math.floor(fuelAmount * 100);
     
     const transaction = {
         validUntil: Date.now() + 600000,
@@ -410,12 +410,12 @@ export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBal
                 payload: JSON.stringify({
                     type: 'jetton_transfer',
                     recipient: TON_CONFIG.burnShopContract || 'EQC_burn',
-                    amount: forgeAmount * 1e9,
+                    amount: fuelAmount * 1e9,
                     payload: {
                         type: 'buy_credits',
                         playerId: playerId,
                         credits: creditsAmount,
-                        paymentMethod: 'FORGE'
+                        paymentMethod: 'FUEL'
                     }
                 })
             }
@@ -427,7 +427,7 @@ export async function buyCreditsWithForge(playerId, forgeAmount, currentForgeBal
     if (result.success) {
         return {
             success: true,
-            forgeAmount: forgeAmount,
+            fuelAmount: fuelAmount,
             creditsReceived: creditsAmount,
             txHash: result.txHash
         };
@@ -483,7 +483,7 @@ export default {
     sendTransaction,
     buyCreditsWithTon,
     buyCreditsWithUsdt,
-    buyCreditsWithForge,
+    buyCreditsWithFuel,
     isWalletConnected,
     getWalletAddress,
     getShortAddress,
