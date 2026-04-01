@@ -1,7 +1,8 @@
 // js/labor-pool.js
 // Labor Pool system for Voidfarer University
-// Manages daily distribution of labor earnings based on certificate shares
-// Players earn a share of the pool based on their certificate levels
+// Manages daily distribution of FUEL based on certificate shares
+// Players earn a share of the fixed daily pool based on their certificate levels
+// Total daily pool is fixed to ensure the 250,000 FUEL lasts 10 years
 
 import { getItem, setItem, getAll, addTransaction } from './storage.js';
 import { getCertificates, getTotalLaborShare, formatShare } from './certificates.js';
@@ -19,6 +20,11 @@ const STORAGE_KEYS = {
 const DISTRIBUTION_HOUR = 0;
 const DISTRIBUTION_MINUTE = 0;
 
+// FIXED DAILY POOL - Ensures 250,000 FUEL lasts exactly 10 years
+// 250,000 FUEL ÷ (10 years × 365 days) = 68.49 FUEL/day
+const FIXED_DAILY_POOL = 68.49;  // 68.49 FUEL distributed daily total
+const MAX_DAILY_PER_PLAYER = 70;  // Hard cap per player (ensures no one exceeds)
+
 // ===== INITIALIZATION =====
 /**
  * Initialize labor pool system
@@ -31,7 +37,7 @@ export async function initializeLaborPool() {
         if (!pool) {
             pool = {
                 id: 'main',
-                balance: 0,
+                balance: FIXED_DAILY_POOL,  // Start with daily pool amount
                 totalDistributed: 0,
                 totalContributions: 0,
                 lastDistribution: null,
@@ -77,7 +83,7 @@ export async function initializeLaborPool() {
             await setItem('poolContributions', contributions);
         }
         
-        console.log('Labor pool initialized');
+        console.log('Labor pool initialized with fixed daily pool:', FIXED_DAILY_POOL, 'FUEL');
         return true;
         
     } catch (error) {
@@ -122,7 +128,7 @@ async function saveLaborPool(pool) {
 
 // ===== ADD TO LABOR POOL =====
 /**
- * Add funds to the labor pool
+ * Add funds to the labor pool (for future distributions)
  * @param {number} amount - Amount to add
  * @param {string} source - Source of funds (e.g., 'ship_purchase', 'fuel', 'repairs')
  * @param {string} description - Optional description
@@ -137,7 +143,7 @@ export async function addToLaborPool(amount, source, description = '') {
         const pool = await getLaborPool();
         if (!pool) return { success: false, reason: 'Pool not initialized' };
         
-        // Update pool
+        // Update pool balance (adds to future daily distributions)
         pool.balance += amount;
         pool.totalContributions += amount;
         
@@ -187,16 +193,8 @@ export async function addToLaborPool(amount, source, description = '') {
  */
 export async function getTotalPlayerShares() {
     try {
-        // Get all players from certificates storage
-        // Since we don't have a players list, we need to calculate from earnings
-        const earnings = await getItem('laborEarnings', 'main');
-        if (!earnings) return 0;
-        
-        // This would ideally query all players' certificates
-        // For now, we'll track total shares in distribution
         const lastDistribution = await getLastDistribution();
         return lastDistribution?.totalShares || 0;
-        
     } catch (error) {
         console.error('Error getting total player shares:', error);
         return 0;
@@ -205,22 +203,31 @@ export async function getTotalPlayerShares() {
 
 // ===== DISTRIBUTION =====
 /**
- * Calculate each player's share of the labor pool
- * @param {Object} pool - Labor pool object
+ * Calculate each player's share of the fixed daily pool
  * @param {Map} playerShares - Map of playerId -> total shares
  * @returns {Map} Map of playerId -> earnings
  */
-function calculateDistribution(pool, playerShares) {
+function calculateDistribution(playerShares) {
     const earnings = new Map();
     const totalShares = Array.from(playerShares.values()).reduce((sum, s) => sum + s, 0);
     
-    if (totalShares === 0 || pool.balance === 0) return earnings;
+    if (totalShares === 0) return earnings;
     
     for (const [playerId, shares] of playerShares) {
-        const playerEarnings = Math.floor(pool.balance * (shares / totalShares));
-        if (playerEarnings > 0) {
-            earnings.set(playerId, playerEarnings);
+        // Calculate player's share of the FIXED daily pool
+        let playerDailyEarnings = FIXED_DAILY_POOL * (shares / totalShares);
+        
+        // Apply hard cap per player (ensures no one exceeds 70 FUEL/day)
+        if (playerDailyEarnings > MAX_DAILY_PER_PLAYER) {
+            playerDailyEarnings = MAX_DAILY_PER_PLAYER;
         }
+        
+        // Ensure at least a tiny amount for active players (0.001 FUEL minimum)
+        if (playerDailyEarnings < 0.001 && shares > 0) {
+            playerDailyEarnings = 0.001;
+        }
+        
+        earnings.set(playerId, playerDailyEarnings);
     }
     
     return earnings;
@@ -230,39 +237,70 @@ function calculateDistribution(pool, playerShares) {
  * Get all players with certificate progress
  * @returns {Promise<Map>} Map of playerId -> total shares
  */
-async function getAllPlayerShares() {
-    // This is a challenge without a central player registry
-    // For now, we'll track shares during distribution
-    // In production, you'd want a players collection in IndexedDB
-    
+async function getAllActivePlayerShares() {
     const playerShares = new Map();
     
-    // Get all players from certificates storage keys
-    // Since we can't query all keys easily, we'll rely on the distribution history
-    // to know which players have been active
-    
-    const earnings = await getItem('laborEarnings', 'main');
-    if (earnings && earnings.earnings) {
-        // We have previous earners, we need to recalculate their current shares
-        // This requires loading each player's certificates
-        // For performance, we might want to store shares with earnings
+    try {
+        // Get all players from certificates storage by checking all possible player IDs
+        // We need to scan localStorage for player IDs
+        const playerIds = new Set();
+        
+        // Check localStorage for player IDs
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('voidfarer_player_')) {
+                const playerId = key.replace('voidfarer_player_', '');
+                if (playerId && playerId !== 'undefined') {
+                    playerIds.add(playerId);
+                }
+            }
+        }
+        
+        // Also check certificates store in IndexedDB
+        if (window.idb) {
+            try {
+                const db = await window.idb.openDB('VoidfarerDB');
+                if (db && db.objectStoreNames.contains('certificates')) {
+                    const allCertificates = await db.getAll('certificates');
+                    for (const cert of allCertificates) {
+                        if (cert.id && cert.id !== 'undefined') {
+                            playerIds.add(cert.id);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error reading certificates from IndexedDB:', e);
+            }
+        }
+        
+        // Load certificates for each player
+        for (const playerId of playerIds) {
+            try {
+                const certificates = await getCertificates(playerId);
+                const shares = getTotalLaborShare(certificates);
+                if (shares > 0) {
+                    playerShares.set(playerId, shares);
+                }
+            } catch (e) {
+                console.error(`Error loading certificates for ${playerId}:`, e);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error getting active players:', error);
     }
     
     return playerShares;
 }
 
 /**
- * Perform daily distribution
+ * Perform daily distribution using FIXED daily pool
  * @returns {Promise<Object>} Distribution result
  */
 export async function distributeLaborPool() {
     try {
         const pool = await getLaborPool();
         if (!pool) return { success: false, reason: 'Pool not initialized' };
-        
-        if (pool.balance <= 0) {
-            return { success: false, reason: 'No funds to distribute' };
-        }
         
         // Check if already distributed today
         const lastDist = await getLastDistribution();
@@ -271,59 +309,40 @@ export async function distributeLaborPool() {
             return { success: false, reason: 'Already distributed today' };
         }
         
-        // Get all players and their shares
-        // This requires iterating through all players' certificates
-        // For now, we'll use the players who have earnings records
-        
-        const playerShares = new Map();
-        
-        // Get players from earnings storage
-        const earningsStore = await getItem('laborEarnings', 'main');
-        if (earningsStore && earningsStore.earnings) {
-            // For each player with earnings, we need to load their certificates
-            // This is inefficient but works for now
-            for (const playerId of Object.keys(earningsStore.earnings)) {
-                try {
-                    const certificates = await getCertificates(playerId);
-                    const shares = getTotalLaborShare(certificates);
-                    if (shares > 0) {
-                        playerShares.set(playerId, shares);
-                    }
-                } catch (e) {
-                    console.error(`Error loading certificates for ${playerId}:`, e);
-                }
-            }
-        }
+        // Get all active players and their certificate shares
+        const playerShares = await getAllActivePlayerShares();
         
         if (playerShares.size === 0) {
             return { success: false, reason: 'No active players with certificates' };
         }
         
-        // Calculate distribution
+        // Calculate distribution using FIXED daily pool
         const totalShares = Array.from(playerShares.values()).reduce((sum, s) => sum + s, 0);
-        const distribution = calculateDistribution(pool, playerShares);
+        const distribution = calculateDistribution(playerShares);
         
         if (distribution.size === 0) {
             return { success: false, reason: 'No players eligible for distribution' };
         }
         
-        // Update earnings
+        // Calculate total distributed (should equal FIXED_DAILY_POOL)
+        let distributedTotal = 0;
+        for (const amount of distribution.values()) {
+            distributedTotal += amount;
+        }
+        
+        // Update earnings storage
         const earnings = await getItem('laborEarnings', 'main');
         if (!earnings) return { success: false, reason: 'Earnings storage missing' };
         
-        let distributedTotal = 0;
         for (const [playerId, amount] of distribution) {
             earnings.earnings[playerId] = (earnings.earnings[playerId] || 0) + amount;
-            distributedTotal += amount;
         }
         
         earnings.lastUpdated = Date.now();
         await setItem('laborEarnings', earnings);
         
-        // Update pool
-        const distributedAmount = pool.balance;
-        pool.balance = 0;
-        pool.totalDistributed += distributedAmount;
+        // Update pool stats (no balance change since we use fixed pool)
+        pool.totalDistributed += distributedTotal;
         pool.lastDistribution = Date.now();
         pool.distributionCount++;
         pool.activeWorkers = distribution.size;
@@ -335,7 +354,8 @@ export async function distributeLaborPool() {
             id: 'dist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             timestamp: Date.now(),
             date: new Date().toISOString(),
-            totalDistributed: distributedAmount,
+            totalDistributed: distributedTotal,
+            fixedDailyPool: FIXED_DAILY_POOL,
             totalShares,
             playerCount: distribution.size,
             recipients: Array.from(distribution.entries()).map(([id, amount]) => ({
@@ -357,11 +377,14 @@ export async function distributeLaborPool() {
             await setItem('distributionHistory', history);
         }
         
+        console.log(`✅ Daily distribution complete: ${distributedTotal.toFixed(4)} FUEL distributed to ${distribution.size} players`);
+        
         return {
             success: true,
             distribution: distributionRecord,
             recipients: distribution.size,
-            totalDistributed: distributedAmount
+            totalDistributed: distributedTotal,
+            fixedPool: FIXED_DAILY_POOL
         };
         
     } catch (error) {
@@ -372,7 +395,7 @@ export async function distributeLaborPool() {
 
 // ===== PLAYER EARNINGS =====
 /**
- * Get player's unclaimed labor earnings
+ * Get player's unclaimed labor earnings (in FUEL)
  * @param {string} playerId - Player ID
  * @returns {Promise<number>} Unclaimed earnings
  */
@@ -388,7 +411,7 @@ export async function getPlayerEarnings(playerId) {
 }
 
 /**
- * Claim player's labor earnings
+ * Claim player's labor earnings (converted to credits)
  * @param {string} playerId - Player ID
  * @returns {Promise<Object>} Result with claimed amount
  */
@@ -402,13 +425,16 @@ export async function claimLaborEarnings(playerId) {
             return { success: false, amount: 0, reason: 'No earnings to claim' };
         }
         
+        // Convert FUEL to credits (1 FUEL = 100 credits)
+        const creditsAmount = Math.floor(amount * 100);
+        
         // Add to player credits
         if (typeof window.addCredits === 'function') {
-            await window.addCredits(amount, playerId);
+            await window.addCredits(creditsAmount, playerId);
         } else {
             // Fallback to localStorage
             const currentCredits = parseInt(localStorage.getItem('voidfarer_credits') || '5000');
-            localStorage.setItem('voidfarer_credits', (currentCredits + amount).toString());
+            localStorage.setItem('voidfarer_credits', (currentCredits + creditsAmount).toString());
         }
         
         // Clear earnings
@@ -420,8 +446,9 @@ export async function claimLaborEarnings(playerId) {
         
         return {
             success: true,
-            amount,
-            message: `Claimed ${amount.toLocaleString()}⭐ from labor pool!`
+            amount: amount,
+            creditsAmount: creditsAmount,
+            message: `Claimed ${amount.toFixed(4)} FUEL (${creditsAmount.toLocaleString()}⭐) from labor pool!`
         };
         
     } catch (error) {
@@ -518,6 +545,8 @@ export async function getLaborPoolStats() {
         const activePlayers = earnings ? Object.keys(earnings.earnings || {}).length : 0;
         
         return {
+            fixedDailyPool: FIXED_DAILY_POOL,
+            maxPerPlayer: MAX_DAILY_PER_PLAYER,
             balance: pool.balance,
             totalDistributed: pool.totalDistributed,
             totalContributions: pool.totalContributions,
@@ -553,17 +582,18 @@ export async function isDistributionDue() {
 
 /**
  * Format earnings for display
- * @param {number} amount - Earnings amount
+ * @param {number} amount - Earnings amount (in FUEL)
  * @returns {string} Formatted string
  */
 export function formatEarnings(amount) {
-    if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M⭐';
-    if (amount >= 1000) return (amount / 1000).toFixed(1) + 'K⭐';
-    return amount.toLocaleString() + '⭐';
+    if (amount >= 1000) return (amount / 1000).toFixed(2) + 'K FUEL';
+    return amount.toFixed(4) + ' FUEL';
 }
 
 // ===== EXPORT =====
 export default {
+    FIXED_DAILY_POOL,
+    MAX_DAILY_PER_PLAYER,
     initializeLaborPool,
     getLaborPool,
     addToLaborPool,
