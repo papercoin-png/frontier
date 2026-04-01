@@ -188,8 +188,8 @@
             font-size: 12px;
         }
         
-        /* Forge Ticker */
-        .forge-ticker {
+        /* Fuel Ticker */
+        .fuel-ticker {
             display: flex;
             align-items: center;
             gap: 6px;
@@ -200,18 +200,18 @@
             border: 1px solid rgba(255, 215, 0, 0.3);
         }
         
-        .forge-ticker-icon {
+        .fuel-ticker-icon {
             font-size: 14px;
         }
         
-        .forge-ticker-value {
+        .fuel-ticker-value {
             font-family: 'Exo 2', sans-serif;
             font-size: 14px;
             font-weight: 600;
             color: #ffd700;
         }
         
-        .forge-ticker-rate {
+        .fuel-ticker-rate {
             font-size: 9px;
             color: #e0b0ff;
         }
@@ -859,11 +859,11 @@
                         <span class="cargo-label">CARGO</span>
                         <span class="cargo-value" id="cargoMass"><span>0</span>/<span id="cargoLimit">5000</span> AMU</span>
                     </div>
-                    <!-- Forge Ticker -->
-                    <div class="forge-ticker" id="forgeTicker">
-                        <span class="forge-ticker-icon">🔥</span>
-                        <span class="forge-ticker-value" id="forgeValue">0.0000</span>
-                        <span class="forge-ticker-rate" id="forgeRate">+0.0000/10s</span>
+                    <!-- Fuel Ticker -->
+                    <div class="fuel-ticker" id="fuelTicker">
+                        <span class="fuel-ticker-icon">🔥</span>
+                        <span class="fuel-ticker-value" id="fuelValue">0.0000</span>
+                        <span class="fuel-ticker-rate" id="fuelRate">+0.0000/10s</span>
                     </div>
                 </div>
                 
@@ -924,7 +924,7 @@
         import { getAndLoadPlanetImage, EXTERNAL_FALLBACK_URL } from './js/planet-utils.js';
         import { TIERS, TIER_1_ELEMENTS, TIER_2_ELEMENTS, TIER_3_ELEMENTS, TIER_4_ELEMENTS, TIER_5_ELEMENTS } from './js/galaxy-data.js';
         import { getCollection, addElementToCollection, removeElementFromCollection, getCurrentPlanetTier, getCurrentPlanetName, getCurrentPlanetType, getPlayerId } from './js/storage.js';
-        import { getForgeData, getCurrentForge, getAccrualRateDisplay, updateAccrual } from './js/forge-system.js';
+        import { getFuelData, getCurrentFuel, getAccrualRateDisplay, updateAccrual } from './js/fuel-system.js';
         import { getCertificates, getTotalLaborShare } from './js/certificates.js';
 
         // Expose storage functions to window
@@ -992,9 +992,9 @@
         const activeShipNameSpan = document.getElementById('activeShipName');
         const shipBonusSpan = document.getElementById('shipBonus');
         
-        // Forge elements
-        const forgeValueEl = document.getElementById('forgeValue');
-        const forgeRateEl = document.getElementById('forgeRate');
+        // Fuel elements
+        const fuelValueEl = document.getElementById('fuelValue');
+        const fuelRateEl = document.getElementById('fuelRate');
         
         const extractionNotification = document.getElementById('extractionNotification');
         const notificationIcon = document.getElementById('notificationIcon');
@@ -1026,30 +1026,30 @@
         let exploredElements = {};
         let totalElements = 4;
         
-        // Forge update function
-        let forgeUpdateInterval = null;
+        // Fuel update function
+        let fuelUpdateInterval = null;
         
         // Get player ID consistently
         function getCurrentPlayerId() {
             return getPlayerId();
         }
         
-        async function updateForgeDisplay() {
+        async function updateFuelDisplay() {
             try {
                 const playerId = getCurrentPlayerId();
                 // Force accrual update first
                 await updateAccrual(playerId);
-                const forgeData = await getForgeData(playerId);
-                const currentForge = forgeData?.currentForge || 0;
+                const fuelData = await getFuelData(playerId);
+                const currentFuel = fuelData?.currentFuel || 0;
                 
                 const certificates = await getCertificates(playerId);
                 const share = getTotalLaborShare(certificates);
                 const rateDisplay = getAccrualRateDisplay(share);
                 
-                forgeValueEl.textContent = currentForge.toFixed(4);
-                forgeRateEl.textContent = rateDisplay;
+                fuelValueEl.textContent = currentFuel.toFixed(4);
+                fuelRateEl.textContent = rateDisplay;
             } catch (error) {
-                console.error('Error updating forge display:', error);
+                console.error('Error updating fuel display:', error);
             }
         }
         
@@ -1763,14 +1763,14 @@
         function returnToShip() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
-            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            if (fuelUpdateInterval) clearInterval(fuelUpdateInterval);
             window.location.href = 'ship-bridge.html';
         }
 
         function returnToSystem() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             if (extractionTimer) clearInterval(extractionTimer);
-            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            if (fuelUpdateInterval) clearInterval(fuelUpdateInterval);
             window.location.href = 'system-view.html';
         }
 
@@ -1812,15 +1812,15 @@
                 
                 startExtraction();
                 
-                // Initialize Forge display
-                await updateForgeDisplay();
+                // Initialize Fuel display
+                await updateFuelDisplay();
                 
-                // Start forge timer (every 10 seconds)
-                if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
-                forgeUpdateInterval = setInterval(async () => {
-                    await updateForgeDisplay();
+                // Start fuel timer (every 10 seconds)
+                if (fuelUpdateInterval) clearInterval(fuelUpdateInterval);
+                fuelUpdateInterval = setInterval(async () => {
+                    await updateFuelDisplay();
                 }, 10000);
-                console.log('✅ Forge timer started, updating every 10 seconds');
+                console.log('✅ Fuel timer started, updating every 10 seconds');
                 
                 setTimeout(() => loadingOverlay.classList.remove('active'), 500);
             } catch (error) {
@@ -1832,7 +1832,7 @@
 
         window.addEventListener('beforeunload', () => {
             if (extractionTimer) clearInterval(extractionTimer);
-            if (forgeUpdateInterval) clearInterval(forgeUpdateInterval);
+            if (fuelUpdateInterval) clearInterval(fuelUpdateInterval);
         });
 
         init();
