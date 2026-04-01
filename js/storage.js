@@ -9,7 +9,7 @@
 // FIXED: Added dbSaveElementLocation function for journal tracking
 // UPDATED: Added Discovery Lock storage keys and functions for 30-day rights expiration
 // UPDATED: Added IndexedDB helper functions for certificate and labor pool systems
-// FIXED: Database version updated to 6 with proper keyPath configurations for forge stores
+// FIXED: Database version updated to 6 with proper keyPath configurations for fuel stores
 // CLEANED: Removed old crafting system references (alchemy, metallurgy, etc.)
 // ADDED: getElementRarity function for University cargo system
 // FIXED: Added getPlayerLocations function for planet-status.js integration
@@ -18,7 +18,7 @@
 // ADDED: Sector scanning functions (markSectorScanned, markStarSectorScanned, markStarScanned)
 // FIXED: setItem function to properly handle stores with keyPath (in-line keys)
 // FIXED: Added missing economic stores (activeEvents, eventHistory, dailyMetrics, hourlySnapshots) to STORE_CONFIGS
-// ADDED: Forge token storage functions (getForgeBalance, addForgeTokens, spendForgeTokens)
+// ADDED: Fuel token storage functions (getFuelBalance, addFuelTokens, spendFuelTokens)
 // ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
 // FIXED: Database version 7 - Recreate certificates store to fix keyPath configuration
 // ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
@@ -283,8 +283,8 @@ const STORE_CONFIGS = {
     supplyDemand: { keyPath: 'id' },
     marketVolume: { keyPath: 'element' },
     priceAlerts: { keyPath: 'id', autoIncrement: true },
-    forgeData: { keyPath: 'playerId' },
-    forgeBalance: { keyPath: 'playerId' }
+    fuelData: { keyPath: 'playerId' },
+    fuelBalance: { keyPath: 'playerId' }
 };
 
 const ALL_STORES = Object.keys(STORE_CONFIGS);
@@ -314,7 +314,7 @@ async function ensureDBStores() {
                 }
                 
                 if (oldVersion < 6) {
-                    console.log('Upgrading to version 6 - adding forge stores');
+                    console.log('Upgrading to version 6 - adding fuel stores');
                 }
                 
                 if (oldVersion < 7) {
@@ -372,19 +372,19 @@ async function ensureDBStores() {
                             console.log(`Created store: ${storeName} with hour index`);
                         }
                         
-                        if (storeName === 'forgeData') {
+                        if (storeName === 'fuelData') {
                             store.createIndex('by_player', 'playerId');
                             console.log(`Created store: ${storeName} with playerId keyPath`);
                         }
                         
-                        if (storeName === 'forgeBalance') {
+                        if (storeName === 'fuelBalance') {
                             store.createIndex('by_player', 'playerId');
                             console.log(`Created store: ${storeName} with playerId keyPath`);
                         }
                         
                         if (storeName === 'certificates') {
                             console.log(`Created store: ${storeName} with keyPath: ${config.keyPath}, autoIncrement: ${config.autoIncrement}`);
-                        } else if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots', 'forgeData', 'forgeBalance', 'certificates'].includes(storeName)) {
+                        } else if (!['element_locations', 'journal', 'activeEvents', 'eventHistory', 'dailyMetrics', 'hourlySnapshots', 'fuelData', 'fuelBalance', 'certificates'].includes(storeName)) {
                             console.log(`Created store: ${storeName}`);
                         }
                     }
@@ -719,9 +719,9 @@ export async function spendCredits(amount, playerId = 'main') {
 /**
  * Record a shop purchase
  * @param {string} playerId - Player ID
- * @param {number} tonAmount - Amount paid in TON (or USDT/Forge equivalent)
+ * @param {number} tonAmount - Amount paid in TON (or USDT/Fuel equivalent)
  * @param {number} creditsAmount - Credits received
- * @param {string} paymentMethod - 'TON', 'USDT', or 'FORGE'
+ * @param {string} paymentMethod - 'TON', 'USDT', or 'FUEL'
  * @param {string} txHash - Transaction hash (optional)
  * @returns {Promise<boolean>} Success status
  */
@@ -2038,26 +2038,26 @@ export async function revealStarSector(starSectorName) {
 }
 
 // ============================================================================
-// FORGE TOKEN FUNCTIONS
+// FUEL TOKEN FUNCTIONS
 // ============================================================================
 
-export async function getForgeBalance(playerId = null) {
+export async function getFuelBalance(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
-        const balance = await getItem('forgeBalance', actualPlayerId);
+        const balance = await getItem('fuelBalance', actualPlayerId);
         return balance ? balance.amount : 0;
     } catch (error) {
-        console.error('Error getting forge balance:', error);
+        console.error('Error getting fuel balance:', error);
         return 0;
     }
 }
 
-export async function addForgeTokens(amount, playerId = null) {
+export async function addFuelTokens(amount, playerId = null) {
     try {
         if (amount <= 0) return false;
         
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
-        let balance = await getItem('forgeBalance', actualPlayerId);
+        let balance = await getItem('fuelBalance', actualPlayerId);
         
         if (!balance) {
             balance = { playerId: actualPlayerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
@@ -2067,55 +2067,55 @@ export async function addForgeTokens(amount, playerId = null) {
         balance.totalClaimed = (balance.totalClaimed || 0) + amount;
         balance.lastClaimDate = Date.now();
         
-        await setItem('forgeBalance', balance, actualPlayerId);
+        await setItem('fuelBalance', balance, actualPlayerId);
         
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('forge-balance-updated', { 
+            window.dispatchEvent(new CustomEvent('fuel-balance-updated', { 
                 detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
             }));
         }
         
         return true;
     } catch (error) {
-        console.error('Error adding forge tokens:', error);
+        console.error('Error adding fuel tokens:', error);
         return false;
     }
 }
 
-export async function spendForgeTokens(amount, playerId = null) {
+export async function spendFuelTokens(amount, playerId = null) {
     try {
         if (amount <= 0) return false;
         
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
-        const balance = await getItem('forgeBalance', actualPlayerId);
+        const balance = await getItem('fuelBalance', actualPlayerId);
         
         if (!balance || (balance.amount || 0) < amount) {
             return false;
         }
         
         balance.amount = (balance.amount || 0) - amount;
-        await setItem('forgeBalance', balance, actualPlayerId);
+        await setItem('fuelBalance', balance, actualPlayerId);
         
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('forge-spent', { 
+            window.dispatchEvent(new CustomEvent('fuel-spent', { 
                 detail: { playerId: actualPlayerId, amount, newBalance: balance.amount } 
             }));
         }
         
         return true;
     } catch (error) {
-        console.error('Error spending forge tokens:', error);
+        console.error('Error spending fuel tokens:', error);
         return false;
     }
 }
 
-export async function getFullForgeBalance(playerId = null) {
+export async function getFullFuelBalance(playerId = null) {
     try {
         const actualPlayerId = playerId || localStorage.getItem('voidfarer_player_id') || 'main';
-        const balance = await getItem('forgeBalance', actualPlayerId);
+        const balance = await getItem('fuelBalance', actualPlayerId);
         return balance || { playerId: actualPlayerId, amount: 0, totalClaimed: 0, lastClaimDate: null };
     } catch (error) {
-        console.error('Error getting full forge balance:', error);
+        console.error('Error getting full fuel balance:', error);
         return { playerId: playerId || 'main', amount: 0, totalClaimed: 0, lastClaimDate: null };
     }
 }
@@ -2138,24 +2138,24 @@ export async function initializeStorage(playerId = 'main') {
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS_AMBIENT)) localStorage.setItem(STORAGE_KEYS.SETTINGS_AMBIENT, '50');
     if (!localStorage.getItem(STORAGE_KEYS.CURRENT_SECTOR)) setCurrentLocation('Orion Arm', 'B2', 'Orion Molecular Cloud', 'Star-forming', 85, 30, 40);
     
-    const forgeDataExists = await getItem('forgeData', playerId);
-    if (!forgeDataExists) {
-        await setItem('forgeData', {
+    const fuelDataExists = await getItem('fuelData', playerId);
+    if (!fuelDataExists) {
+        await setItem('fuelData', {
             playerId: playerId,
-            currentForge: 0,
+            currentFuel: 0,
             lastAccrualTimestamp: Date.now(),
             lastResetDate: null,
             pendingClaim: 0,
             pendingClaimExpires: null,
             lastClaimDate: null,
-            totalForgeClaimed: 0,
-            totalForgeBurned: 0
+            totalFuelClaimed: 0,
+            totalFuelBurned: 0
         }, playerId);
     }
     
-    const forgeBalanceExists = await getItem('forgeBalance', playerId);
-    if (!forgeBalanceExists) {
-        await setItem('forgeBalance', {
+    const fuelBalanceExists = await getItem('fuelBalance', playerId);
+    if (!fuelBalanceExists) {
+        await setItem('fuelBalance', {
             playerId: playerId,
             amount: 0,
             totalClaimed: 0,
@@ -2221,8 +2221,8 @@ export async function resetGame(playerId = 'main') {
             if (db) {
                 if (db.objectStoreNames.contains('journal')) await db.clear('journal');
                 if (db.objectStoreNames.contains('element_locations')) await db.clear('element_locations');
-                if (db.objectStoreNames.contains('forgeData')) await db.clear('forgeData');
-                if (db.objectStoreNames.contains('forgeBalance')) await db.clear('forgeBalance');
+                if (db.objectStoreNames.contains('fuelData')) await db.clear('fuelData');
+                if (db.objectStoreNames.contains('fuelBalance')) await db.clear('fuelBalance');
                 if (db.objectStoreNames.contains('certificates')) await db.clear('certificates');
             }
         } catch (idbError) {}
@@ -2319,10 +2319,10 @@ window.setItem = setItem;
 window.getAll = getAll;
 window.getByIndex = getByIndex;
 window.addTransaction = addTransaction;
-window.getForgeBalance = getForgeBalance;
-window.addForgeTokens = addForgeTokens;
-window.spendForgeTokens = spendForgeTokens;
-window.getFullForgeBalance = getFullForgeBalance;
+window.getFuelBalance = getFuelBalance;
+window.addFuelTokens = addFuelTokens;
+window.spendFuelTokens = spendFuelTokens;
+window.getFullFuelBalance = getFullFuelBalance;
 window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
 
 // NEW: Shop purchase functions exposed
@@ -2331,6 +2331,6 @@ window.getPurchaseHistory = getPurchaseHistory;
 window.getTotalSpent = getTotalSpent;
 window.getAllPurchases = getAllPurchases;
 
-console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and forge token functions');
+console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and fuel token functions');
 console.log('✅ Version 7: Fixed certificates store configuration with proper keyPath handling');
 console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
