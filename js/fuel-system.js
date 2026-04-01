@@ -14,7 +14,8 @@ const FUEL_CONFIG = {
     ACCRUAL_INTERVAL_MS: 10000,       // 10 seconds (used for rate calculation)
     RESET_HOUR: 0,                    // Midnight UTC
     RESET_MINUTE: 0,
-    CLAIM_EXPIRY_HOURS: 24            // FUEL must be claimed within 24 hours
+    CLAIM_EXPIRY_HOURS: 24,           // FUEL must be claimed within 24 hours
+    USE_SQRT_SCALING: true            // Use square root scaling for diminishing returns
 };
 
 // Storage keys (using IndexedDB via storage.js)
@@ -144,15 +145,22 @@ export async function checkAndBurnExpiredClaim(playerId) {
 // ===== ACCRUAL CALCULATION =====
 /**
  * Calculate accrual rate based on certificate share
- * Rate = (Share / 100) × 0.0007 FUEL per 10 seconds
+ * Uses square root scaling for diminishing returns
  * @param {number} share - Total certificate share
  * @returns {number} FUEL per 10 seconds
  */
 export function calculateAccrualRate(share) {
     if (share <= 0) return 0;
-    // Base rate 0.0007 per 10 seconds for share 100
-    // Share 500 = 0.0035, Share 1000 = 0.007, Share 2000 = 0.014
-    return (share / 100) * FUEL_CONFIG.ACCRUAL_BASE_RATE;
+    
+    if (FUEL_CONFIG.USE_SQRT_SCALING) {
+        // Square root scaling: Share 100 → 1x, Share 400 → 2x, Share 900 → 3x, Share 1600 → 4x
+        // This makes early levels meaningful but prevents runaway growth
+        const scalingFactor = Math.sqrt(share / 100);
+        return (scalingFactor * FUEL_CONFIG.ACCRUAL_BASE_RATE);
+    } else {
+        // Linear scaling (original)
+        return (share / 100) * FUEL_CONFIG.ACCRUAL_BASE_RATE;
+    }
 }
 
 /**
@@ -182,6 +190,11 @@ export async function updateAccrual(playerId) {
     try {
         const fuelData = await getItem('fuelData', playerId);
         if (!fuelData) return 0;
+        
+        // CRITICAL FIX: If already at cap, don't accrue more today
+        if (fuelData.currentFuel >= FUEL_CONFIG.DAILY_CAP) {
+            return fuelData.currentFuel;
+        }
         
         const now = Date.now();
         const timeElapsed = now - (fuelData.lastAccrualTimestamp || now);
