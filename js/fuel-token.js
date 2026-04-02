@@ -8,15 +8,15 @@ import { sendTransaction, isWalletConnected as getWalletConnected } from './ton-
 const FUEL_CONFIG = {
     contractAddress: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
     burnAddress: 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ',
+    stonfiApi: 'https://api.ston.fi/v1',
     apiEndpoint: 'https://tonapi.io/v2',
-    dexRouter: '0:...',
     fuelToCreditsRate: 100,
     decimals: 9
 };
 
 // ===== STATE =====
 let fuelBalance = 0;
-let fuelPrice = 0;
+let fuelPrice = 0.01;
 let lastUpdate = 0;
 
 // ===== GET FUEL BALANCE =====
@@ -24,17 +24,29 @@ export async function getFuelBalance(walletAddress) {
     if (!walletAddress) return 0;
     
     try {
+        // Try STON.fi first
         const response = await fetch(
+            `${FUEL_CONFIG.stonfiApi}/accounts/${walletAddress}/jettons/${FUEL_CONFIG.contractAddress}/balance`
+        );
+        
+        if (response.ok) {
+            const data = await response.json();
+            fuelBalance = data.balance / Math.pow(10, FUEL_CONFIG.decimals);
+            return fuelBalance;
+        }
+        
+        // Fallback to tonapi
+        const tonApiResponse = await fetch(
             `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}/accounts/${walletAddress}`
         );
         
-        if (response.status === 404) {
+        if (tonApiResponse.status === 404) {
             console.log('No FUEL balance found for this address');
             return 0;
         }
-        if (!response.ok) return 0;
+        if (!tonApiResponse.ok) return 0;
         
-        const data = await response.json();
+        const data = await tonApiResponse.json();
         fuelBalance = data.balance ? data.balance / Math.pow(10, FUEL_CONFIG.decimals) : 0;
         return fuelBalance;
     } catch (error) {
@@ -43,27 +55,37 @@ export async function getFuelBalance(walletAddress) {
     }
 }
 
-// ===== GET FUEL PRICE =====
+// ===== GET FUEL PRICE FROM STON.FI =====
 export async function getFuelPrice() {
     try {
+        // Get asset info which contains price data
         const response = await fetch(
-            `https://api.ston.fi/v1/assets/${FUEL_CONFIG.contractAddress}/price`
+            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
         );
         
         if (response.ok) {
             const data = await response.json();
-            fuelPrice = data.price || 0;
-            lastUpdate = Date.now();
-            return fuelPrice;
+            // The asset response contains price info in the asset object
+            if (data.asset && data.asset.price) {
+                fuelPrice = parseFloat(data.asset.price);
+                lastUpdate = Date.now();
+                return fuelPrice;
+            }
         }
         
-        const fallbackResponse = await fetch(
-            `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}/price`
+        // Fallback: Get price via reverse swap (1 FUEL to TON)
+        const swapResponse = await fetch(
+            `${FUEL_CONFIG.stonfiApi}/swap/estimate?` +
+            `offer_address=${FUEL_CONFIG.contractAddress}&` +
+            `ask_address=ton&` +
+            `units=${Math.pow(10, FUEL_CONFIG.decimals)}` // 1 FUEL
         );
         
-        if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            fuelPrice = data.price || 0;
+        if (swapResponse.ok) {
+            const data = await swapResponse.json();
+            // ask_units is TON amount received for 1 FUEL
+            const tonAmount = data.ask_units / 1e9;
+            fuelPrice = tonAmount;
             lastUpdate = Date.now();
             return fuelPrice;
         }
@@ -79,16 +101,16 @@ export async function getFuelPrice() {
 export async function getFuelMetadata() {
     try {
         const response = await fetch(
-            `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}`
+            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
         );
         
         if (response.status === 404) {
-            console.log('FUEL token metadata not found');
+            console.log('FUEL token metadata not found on STON.fi');
             return {
                 name: 'Fuel Token',
                 symbol: 'FUEL',
                 decimals: FUEL_CONFIG.decimals,
-                totalSupply: 0,
+                totalSupply: 250000,
                 holders: 0
             };
         }
@@ -96,12 +118,14 @@ export async function getFuelMetadata() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
+        const asset = data.asset;
+        
         return {
-            name: data.name || 'Fuel Token',
-            symbol: data.symbol || 'FUEL',
-            decimals: data.decimals || FUEL_CONFIG.decimals,
-            totalSupply: data.total_supply ? data.total_supply / Math.pow(10, FUEL_CONFIG.decimals) : 0,
-            holders: data.holders_count || 0
+            name: asset.name || 'Fuel Token',
+            symbol: asset.symbol || 'FUEL',
+            decimals: asset.decimals || FUEL_CONFIG.decimals,
+            totalSupply: asset.total_supply ? asset.total_supply / Math.pow(10, FUEL_CONFIG.decimals) : 250000,
+            holders: asset.holders_count || 0
         };
     } catch (error) {
         console.error('Error fetching FUEL metadata:', error);
@@ -109,7 +133,7 @@ export async function getFuelMetadata() {
             name: 'Fuel Token',
             symbol: 'FUEL',
             decimals: FUEL_CONFIG.decimals,
-            totalSupply: 0,
+            totalSupply: 250000,
             holders: 0
         };
     }
@@ -119,33 +143,30 @@ export async function getFuelMetadata() {
 export async function getTotalSupply() {
     try {
         const response = await fetch(
-            `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}`
+            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
         );
-        if (response.status === 404) return 0;
-        if (!response.ok) return 0;
-        const data = await response.json();
-        return data.total_supply ? data.total_supply / Math.pow(10, FUEL_CONFIG.decimals) : 0;
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.asset.total_supply / Math.pow(10, FUEL_CONFIG.decimals);
+        }
+        return 250000;
     } catch (error) {
         console.error('Error fetching total supply:', error);
-        return 0;
+        return 250000;
     }
 }
 
 // ===== GET BURNED SUPPLY =====
 export async function getBurnedSupply() {
     try {
-        const response = await fetch(
-            `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}/accounts/${FUEL_CONFIG.burnAddress}`
-        );
-        if (response.status === 404) {
-            console.log('No burned supply data available yet');
-            return 0;
-        }
-        if (!response.ok) return 0;
-        const data = await response.json();
-        return data.balance ? data.balance / Math.pow(10, FUEL_CONFIG.decimals) : 0;
+        // Get total supply and initial supply
+        const totalSupply = await getTotalSupply();
+        const initialSupply = 250000; // Max supply from reward pool
+        const burned = Math.max(0, initialSupply - totalSupply);
+        return burned;
     } catch (error) {
-        console.error('Error fetching burned supply:', error);
+        console.error('Error calculating burned supply:', error);
         return 0;
     }
 }
@@ -258,12 +279,14 @@ export async function getRecentBurns(limit = 20) {
 export async function getHolderCount() {
     try {
         const response = await fetch(
-            `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}/holders`
+            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
         );
-        if (response.status === 404) return 0;
-        if (!response.ok) return 0;
-        const data = await response.json();
-        return data.holders?.length || 0;
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.asset.holders_count || 0;
+        }
+        return 0;
     } catch (error) {
         console.error('Error fetching holder count:', error);
         return 0;
