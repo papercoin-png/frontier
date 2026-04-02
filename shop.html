@@ -8,8 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- TonConnect SDK - Using jsDelivr CDN (more reliable) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/sdk@2.0.4/dist/tonconnect-sdk.min.js"></script>
+    <!-- TonConnect SDK - Use specific version for stability -->
+    <script src="https://unpkg.com/@tonconnect/sdk@2.0.4/dist/tonconnect-sdk.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -1071,19 +1071,23 @@
             }
         }
         
-        // ===== TON CONNECT 2.0 INITIALIZATION =====
+        // ===== TON CONNECT INITIALIZATION - FIXED GLOBAL VARIABLE =====
         async function initTonConnect() {
-            // Wait for the SDK to be available
-            if (typeof window.TonConnect === 'undefined') {
+            // Wait for the SDK to be available - Note: global is TonConnectSDK, not TonConnect
+            if (typeof window.TonConnectSDK === 'undefined') {
                 console.log('Waiting for TonConnect SDK to load...');
                 setTimeout(initTonConnect, 500);
                 return;
             }
             
             try {
-                tonConnector = new window.TonConnect({
+                // Use TonConnectSDK.TonConnect (not window.TonConnect)
+                tonConnector = new window.TonConnectSDK.TonConnect({
                     manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json'
                 });
+                
+                // Try to restore previous connection
+                await tonConnector.restoreConnection();
                 
                 // Check if already connected
                 if (tonConnector.connected && tonConnector.wallet) {
@@ -1142,7 +1146,17 @@
                         closeWalletModal();
                         showLoading(true, `Connecting to ${wallet.name}...`);
                         try {
-                            await tonConnector.connect(wallet);
+                            // Connect using the appropriate method based on wallet type
+                            if (wallet.jsBridgeKey) {
+                                await tonConnector.connect({ jsBridgeKey: wallet.jsBridgeKey });
+                            } else if (wallet.universalLink) {
+                                await tonConnector.connect({ 
+                                    universalLink: wallet.universalLink,
+                                    bridgeUrl: wallet.bridgeUrl
+                                });
+                            } else {
+                                await tonConnector.connect({ bridgeUrl: wallet.bridgeUrl });
+                            }
                             showToast('Wallet connected!', 'success');
                         } catch (err) {
                             showToast(err.message || 'Connection failed', 'error');
