@@ -9,7 +9,7 @@ const TON_CONFIG = {
     burnShopContract: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
     usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
     connectionTimeout: 60000,
-    demoMode: false
+    demoMode: true  // Set to true for now until SDK loads properly
 };
 
 // ===== STATE =====
@@ -20,7 +20,17 @@ let walletBalance = 0;
 let usdtBalance = 0;
 let listeners = [];
 
-// ===== LOAD TONCONNECT SDK V1 =====
+// ===== DEMO MODE =====
+function enableDemoMode() {
+    console.log('🔧 DEMO MODE - simulated wallet');
+    walletConnected = true;
+    walletAddress = 'EQC_demo_wallet_' + Math.random().toString(36).substr(2, 8);
+    walletBalance = 10.0;
+    usdtBalance = 50.0;
+    setTimeout(() => notifyListeners('connected', { address: walletAddress }), 100);
+}
+
+// ===== LOAD TONCONNECT SDK =====
 async function loadTonConnectSDK() {
     return new Promise((resolve, reject) => {
         if (window.TonConnect) {
@@ -28,27 +38,48 @@ async function loadTonConnectSDK() {
             return;
         }
         
-        // Use stable v1 SDK
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@tonconnect/sdk@1.0.0/dist/tonconnect-sdk.min.js';
-        script.onload = () => {
-            setTimeout(() => {
-                if (window.TonConnect) {
-                    console.log('✅ TonConnect SDK loaded');
-                    resolve();
-                } else {
-                    reject(new Error('TonConnect SDK not available'));
-                }
-            }, 100);
-        };
-        script.onerror = () => reject(new Error('Failed to load TonConnect SDK'));
-        document.head.appendChild(script);
+        // Try multiple CDN URLs
+        const cdnUrls = [
+            'https://cdn.jsdelivr.net/npm/@tonconnect/sdk@1.0.0/dist/tonconnect-sdk.min.js',
+            'https://unpkg.com/@tonconnect/sdk@1.0.0/dist/tonconnect-sdk.min.js',
+            'https://esm.sh/@tonconnect/sdk'
+        ];
+        
+        let currentIndex = 0;
+        
+        function tryLoad() {
+            if (currentIndex >= cdnUrls.length) {
+                reject(new Error('All CDN attempts failed'));
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = cdnUrls[currentIndex];
+            script.onload = () => {
+                setTimeout(() => {
+                    if (window.TonConnect) {
+                        console.log('✅ TonConnect SDK loaded from:', cdnUrls[currentIndex]);
+                        resolve();
+                    } else {
+                        currentIndex++;
+                        tryLoad();
+                    }
+                }, 200);
+            };
+            script.onerror = () => {
+                currentIndex++;
+                tryLoad();
+            };
+            document.head.appendChild(script);
+        }
+        
+        tryLoad();
         
         setTimeout(() => {
             if (!window.TonConnect) {
-                reject(new Error('TonConnect SDK timeout'));
+                reject(new Error('TonConnect SDK load timeout'));
             }
-        }, 8000);
+        }, 15000);
     });
 }
 
@@ -104,15 +135,6 @@ export async function initTonWallet() {
         enableDemoMode();
         return { success: true, connected: true, address: walletAddress, demo: true };
     }
-}
-
-function enableDemoMode() {
-    console.log('🔧 DEMO MODE - simulated wallet');
-    walletConnected = true;
-    walletAddress = 'EQC_demo_wallet_address';
-    walletBalance = 10.0;
-    usdtBalance = 50.0;
-    setTimeout(() => notifyListeners('connected', { address: walletAddress }), 100);
 }
 
 // ===== CONNECT WALLET =====
@@ -248,12 +270,19 @@ export async function getTonBalance() {
     if (!walletConnected) return 0;
     if (TON_CONFIG.demoMode) return 10.0;
     
+    // Skip API call for demo addresses
+    if (walletAddress && walletAddress.startsWith('EQC_demo')) {
+        return 10.0;
+    }
+    
     try {
         const response = await fetch(`${TON_CONFIG.apiEndpoint}/accounts/${walletAddress}`);
+        if (!response.ok) return 0;
         const data = await response.json();
         walletBalance = data.balance ? data.balance / 1e9 : 0;
         return walletBalance;
     } catch (error) {
+        console.error('Balance fetch error:', error);
         return 0;
     }
 }
@@ -262,6 +291,10 @@ export async function getUsdtBalance() {
     if (!walletConnected) return 0;
     if (TON_CONFIG.demoMode) return 50.0;
     
+    if (walletAddress && walletAddress.startsWith('EQC_demo')) {
+        return 50.0;
+    }
+    
     try {
         const response = await fetch(`${TON_CONFIG.apiEndpoint}/jetton/${TON_CONFIG.usdtAddress}/accounts/${walletAddress}`);
         if (!response.ok) return 0;
@@ -269,6 +302,7 @@ export async function getUsdtBalance() {
         usdtBalance = data.balance ? data.balance / 1e6 : 0;
         return usdtBalance;
     } catch (error) {
+        console.error('USDT balance fetch error:', error);
         return 0;
     }
 }
