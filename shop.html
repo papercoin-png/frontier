@@ -8,12 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- React and ReactDOM (required for TON Connect UI) -->
-    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
-    
-    <!-- TON Connect UI Library -->
-    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui-react@2.2.0/dist/tonconnect-ui-react.umd.js"></script>
+    <!-- TON Connect 2.0 SDK - The official working version -->
+    <script src="https://unpkg.com/@tonconnect/sdk@2.0.4/dist/tonconnect-sdk.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -204,10 +200,15 @@
             border: 1px solid #2B2F36;
         }
         
-        /* TON Connect Button Styling */
-        #ton-connect-button {
-            display: flex;
-            justify-content: center;
+        .wallet-connect-btn {
+            background: linear-gradient(135deg, #0098ea, #0088cc);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
             width: 100%;
         }
         
@@ -648,10 +649,9 @@
             </div>
             
             <div class="wallet-status" id="walletStatus">
-                <div id="ton-connect-button"></div>
+                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
                 <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
                     <span class="wallet-address" id="walletAddressShort">---</span>
-                    <span class="wallet-balance" id="walletBalanceDisplay">💰 Balance: <span id="walletBalance">0</span> TON</span>
                     <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
                 </div>
             </div>
@@ -691,6 +691,7 @@
                     </div>
                 </div>
             </div>
+            
             <!-- TON Packages -->
             <div id="tonPackages" class="packages-grid">
                 <div class="package-card" data-ton="0.5" data-credits="500">
@@ -874,7 +875,7 @@
         let walletAddress = null;
         let fuelBalance = 0;
         let totalBurned = 0;
-        let tonConnectUI = null;
+        let tonConnector = null;
         
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -911,10 +912,6 @@
         async function updateFuelBalance() {
             try {
                 fuelBalance = await getFuelBalance(playerId);
-                const fuelBalanceSpan = document.getElementById('fuelBalance');
-                if (fuelBalanceSpan) {
-                    fuelBalanceSpan.textContent = fuelBalance.toFixed(2);
-                }
             } catch (error) {
                 console.error('Error updating fuel balance:', error);
             }
@@ -951,20 +948,20 @@
             }
         }
         
-        function updateWalletUI(wallet) {
-            const connectBtnContainer = document.getElementById('ton-connect-button');
+        function updateWalletUI(connected, address = '') {
+            const connectBtn = document.getElementById('connectWalletBtn');
             const connectedInfo = document.getElementById('walletConnectedInfo');
             
-            if (wallet && wallet.account) {
+            if (connected && address) {
                 walletConnected = true;
-                walletAddress = wallet.account.address;
-                connectBtnContainer.style.display = 'none';
+                walletAddress = address;
+                connectBtn.style.display = 'none';
                 connectedInfo.style.display = 'flex';
-                document.getElementById('walletAddressShort').textContent = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+                document.getElementById('walletAddressShort').textContent = `${address.slice(0, 6)}...${address.slice(-4)}`;
             } else {
                 walletConnected = false;
                 walletAddress = null;
-                connectBtnContainer.style.display = 'block';
+                connectBtn.style.display = 'block';
                 connectedInfo.style.display = 'none';
             }
         }
@@ -997,9 +994,93 @@
             }
         }
         
+        // ===== TON CONNECT 2.0 FUNCTIONS =====
+        async function initTonConnect() {
+            if (!window.TonConnect) {
+                console.error('TonConnect SDK not loaded');
+                return;
+            }
+            
+            try {
+                tonConnector = new window.TonConnect({
+                    manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json'
+                });
+                
+                // Check if already connected
+                if (tonConnector.connected && tonConnector.wallet) {
+                    updateWalletUI(true, tonConnector.wallet.account.address);
+                }
+                
+                // Listen for connection status changes
+                tonConnector.onStatusChange((wallet) => {
+                    if (wallet) {
+                        updateWalletUI(true, wallet.account.address);
+                    } else {
+                        updateWalletUI(false);
+                    }
+                });
+                
+                console.log('✅ TonConnect initialized');
+            } catch (error) {
+                console.error('TonConnect init error:', error);
+            }
+        }
+        
+        async function connectWallet() {
+            if (!tonConnector) {
+                showToast('Initializing wallet connection...', 'info');
+                await initTonConnect();
+            }
+            
+            if (tonConnector.connected) {
+                showToast('Wallet already connected', 'info');
+                return;
+            }
+            
+            showLoading(true, 'Connecting wallet...');
+            
+            try {
+                // Get available wallets
+                const wallets = await tonConnector.getWallets();
+                
+                if (wallets.length === 0) {
+                    throw new Error('No wallets found. Please install Tonkeeper or another TON wallet.');
+                }
+                
+                // Find Telegram wallet if in Telegram
+                const tg = window.Telegram?.WebApp;
+                let selectedWallet = wallets[0];
+                
+                if (tg && (tg.platform === 'tdesktop' || tg.platform === 'ios' || tg.platform === 'android')) {
+                    const telegramWallet = wallets.find(w => w.name === 'Wallet' || w.name === 'Telegram');
+                    if (telegramWallet) {
+                        selectedWallet = telegramWallet;
+                    }
+                }
+                
+                // Connect
+                await tonConnector.connect(selectedWallet);
+                showToast('Wallet connected!', 'success');
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                showToast(error.message || 'Failed to connect wallet', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function disconnectWallet() {
+            if (tonConnector && tonConnector.connected) {
+                await tonConnector.disconnect();
+                updateWalletUI(false);
+                showToast('Wallet disconnected', 'info');
+            }
+        }
+        
         // ===== PURCHASE FUNCTIONS =====
         async function buyWithTon(tonAmount, creditsAmount) {
-            if (!walletConnected || !walletAddress) {
+            if (!walletConnected || !tonConnector || !tonConnector.connected) {
                 showToast('Please connect your wallet first', 'error');
                 return false;
             }
@@ -1007,23 +1088,25 @@
             showLoading(true, 'Processing TON purchase...');
             
             try {
-                // Create transaction to send TON to burn address
+                // Create transaction to send TON to the burn/shop address
                 const transaction = {
                     validUntil: Date.now() + 600000,
-                    messages: [{
-                        address: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
-                        amount: Math.floor(tonAmount * 1e9).toString(),
-                        payload: JSON.stringify({
-                            type: 'buy_credits',
-                            playerId: playerId,
-                            credits: creditsAmount,
-                            paymentMethod: 'TON'
-                        })
-                    }]
+                    messages: [
+                        {
+                            address: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
+                            amount: Math.floor(tonAmount * 1e9).toString(),
+                            payload: JSON.stringify({
+                                type: 'buy_credits',
+                                playerId: playerId,
+                                credits: creditsAmount,
+                                paymentMethod: 'TON'
+                            })
+                        }
+                    ]
                 };
                 
-                // Send transaction through TON Connect UI
-                const result = await tonConnectUI.sendTransaction(transaction);
+                // Send transaction
+                const result = await tonConnector.sendTransaction(transaction);
                 
                 if (result) {
                     await addCredits(creditsAmount, playerId);
@@ -1121,41 +1204,9 @@
             }
         }
         
-        // ===== INITIALIZE TON CONNECT UI =====
-        async function initTonConnect() {
-            if (window.TonConnectUIReact) {
-                try {
-                    tonConnectUI = window.TonConnectUIReact.create({
-                        manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json'
-                    });
-                    
-                    // Listen for wallet connection status
-                    tonConnectUI.onStatusChange((wallet) => {
-                        updateWalletUI(wallet);
-                    });
-                    
-                    // Get initial wallet status
-                    const wallet = await tonConnectUI.getWallet();
-                    updateWalletUI(wallet);
-                    
-                    console.log('✅ TON Connect UI initialized');
-                } catch (error) {
-                    console.error('TON Connect UI init error:', error);
-                }
-            } else {
-                console.warn('TON Connect UI not loaded yet, retrying...');
-                setTimeout(initTonConnect, 500);
-            }
-        }
-        
         // ===== EVENT HANDLERS =====
-        document.getElementById('disconnectWalletBtn')?.addEventListener('click', async () => {
-            if (tonConnectUI) {
-                await tonConnectUI.disconnect();
-            }
-            updateWalletUI(null);
-            showToast('Wallet disconnected', 'info');
-        });
+        document.getElementById('connectWalletBtn')?.addEventListener('click', connectWallet);
+        document.getElementById('disconnectWalletBtn')?.addEventListener('click', disconnectWallet);
         
         document.querySelectorAll('.payment-tab').forEach(tab => {
             tab.addEventListener('click', () => switchPaymentMethod(tab.dataset.method));
@@ -1231,8 +1282,8 @@
                 await updateBurnStats();
                 await updatePurchaseHistory();
                 
-                // Initialize TON Connect UI
-                initTonConnect();
+                // Initialize TonConnect
+                await initTonConnect();
                 
                 showLoading(false);
                 
