@@ -8,8 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- TonConnect SDK Core -->
-    <script src="https://unpkg.com/@tonconnect/sdk@2.0.4/dist/tonconnect-sdk.min.js"></script>
+    <!-- TonConnect SDK - Using jsDelivr CDN (more reliable) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/sdk@2.0.4/dist/tonconnect-sdk.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -1073,6 +1073,7 @@
         
         // ===== TON CONNECT 2.0 INITIALIZATION =====
         async function initTonConnect() {
+            // Wait for the SDK to be available
             if (typeof window.TonConnect === 'undefined') {
                 console.log('Waiting for TonConnect SDK to load...');
                 setTimeout(initTonConnect, 500);
@@ -1109,6 +1110,10 @@
         async function connectWallet() {
             if (!tonConnector) {
                 await initTonConnect();
+                if (!tonConnector) {
+                    showToast('Failed to initialize wallet connection', 'error');
+                    return;
+                }
             }
             
             if (tonConnector.connected) {
