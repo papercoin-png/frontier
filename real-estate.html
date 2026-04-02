@@ -909,7 +909,7 @@
         }
 
         // ===== IMPORT STORAGE FUNCTIONS =====
-        import { getPlayerId, getCredits, spendCredits, getCollection, addElementToHub, removeElementFromCollection, addElementToCollection, getRemainingHubStorage, getHubStorageUsed, getRealEstate, saveRealEstate, getHubInventory } from './js/storage.js';
+        import { getPlayerId, getCredits, spendCredits, getCollection, addElementToHub, removeElementFromCollection, addElementToCollection, getRemainingHubStorage, getRealEstate, saveRealEstate } from './js/storage.js';
 
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -997,7 +997,13 @@
             if (typeof window.getElementMass === 'function') {
                 return window.getElementMass(elementName);
             }
-            return 100.0;
+            // Fallback mass values
+            const masses = {
+                'Hydrogen': 1.008, 'Helium': 4.003, 'Carbon': 12.01, 'Oxygen': 16.00,
+                'Iron': 55.85, 'Gold': 197.0, 'Silver': 107.9, 'Copper': 63.55,
+                'Uranium': 238.0, 'Plutonium': 244.0, 'default': 100.0
+            };
+            return masses[elementName] || masses.default;
         }
 
         // ===== GET ELEMENT RARITY =====
@@ -1008,6 +1014,9 @@
             if (['Carbon', 'Oxygen', 'Iron'].includes(elementName)) return 'uncommon';
             return 'common';
         }
+
+        // ===== STATE =====
+        let currentShipItems = [];
 
         // ===== GET CURRENT PLAYER ID =====
         function getCurrentPlayerId() {
@@ -1131,11 +1140,6 @@
         async function getCurrentHubStorageUsed() {
             let used = 0;
             
-            try {
-                used = await getHubStorageUsed();
-                return used;
-            } catch (e) {}
-            
             const storedUsed = localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED);
             if (storedUsed) {
                 used = parseFloat(storedUsed);
@@ -1159,7 +1163,6 @@
         // ===== NAVIGATION =====
         function returnToEarthHub() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-            
             updateHubStorageBeforeLeave();
             window.location.href = 'earth-hub.html';
         }
