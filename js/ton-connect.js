@@ -7,7 +7,6 @@ const TON_CONFIG = {
     manifestUrl: 'https://your-domain.com/tonconnect-manifest.json',
     apiEndpoint: 'https://tonapi.io/v2',
     burnShopContract: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
-    forgeTokenAddress: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
     usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
     connectionTimeout: 60000,
     demoMode: true
@@ -385,57 +384,6 @@ export async function buyCreditsWithUsdt(playerId, usdtAmount) {
     return result;
 }
 
-// ===== BUY CREDITS WITH FUEL =====
-export async function buyCreditsWithFuel(playerId, fuelAmount, currentFuelBalance) {
-    if (!walletConnected) {
-        return { success: false, error: 'Wallet not connected' };
-    }
-    
-    if (fuelAmount <= 0) {
-        return { success: false, error: 'Invalid amount' };
-    }
-    
-    if (currentFuelBalance < fuelAmount) {
-        return { success: false, error: `Insufficient FUEL. Need ${fuelAmount}, have ${currentFuelBalance}` };
-    }
-    
-    const creditsAmount = Math.floor(fuelAmount * 100);
-    
-    const transaction = {
-        validUntil: Date.now() + 600000,
-        messages: [
-            {
-                address: TON_CONFIG.forgeTokenAddress,
-                amount: 0,
-                payload: JSON.stringify({
-                    type: 'jetton_transfer',
-                    recipient: TON_CONFIG.burnShopContract || 'EQC_burn',
-                    amount: fuelAmount * 1e9,
-                    payload: {
-                        type: 'buy_credits',
-                        playerId: playerId,
-                        credits: creditsAmount,
-                        paymentMethod: 'FUEL'
-                    }
-                })
-            }
-        ]
-    };
-    
-    const result = await sendTransaction(transaction);
-    
-    if (result.success) {
-        return {
-            success: true,
-            fuelAmount: fuelAmount,
-            creditsReceived: creditsAmount,
-            txHash: result.txHash
-        };
-    }
-    
-    return result;
-}
-
 // ===== EVENT LISTENERS =====
 export function onWalletEvent(callback) {
     listeners.push(callback);
@@ -483,7 +431,6 @@ export default {
     sendTransaction,
     buyCreditsWithTon,
     buyCreditsWithUsdt,
-    buyCreditsWithFuel,
     isWalletConnected,
     getWalletAddress,
     getShortAddress,
