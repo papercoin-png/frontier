@@ -7,7 +7,6 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
@@ -637,7 +636,9 @@
             border: 2px solid #F0B90B;
             border-radius: 40px;
             padding: 24px;
-            width: 280px;
+            width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
             text-align: center;
         }
         
@@ -663,12 +664,41 @@
             cursor: pointer;
             font-size: 14px;
             transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .wallet-option:hover {
+            background: #3a3a5a;
         }
         
         .wallet-option:active {
             background: #F0B90B;
             color: #0B0E14;
             transform: scale(0.96);
+        }
+        
+        .wallet-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .wallet-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .wallet-name {
+            flex: 1;
+            text-align: left;
         }
         
         .wallet-modal-close {
@@ -909,7 +939,9 @@
         <div class="wallet-modal" id="walletModal">
             <div class="wallet-modal-content">
                 <div class="wallet-modal-title">Connect Wallet</div>
-                <div class="wallet-list" id="walletList"></div>
+                <div class="wallet-list" id="walletList">
+                    <div style="text-align: center; padding: 20px;">Loading wallets...</div>
+                </div>
                 <button class="wallet-modal-close" onclick="closeWalletModal()">Cancel</button>
             </div>
         </div>
@@ -932,6 +964,7 @@
         
         // ===== CONFIGURATION =====
         const SHOP_WALLET_ADDRESS = 'UQAwbP_8ZLRueHqSxmmiCLr64ETQ3aa6RWqFwx9Dx9feUtOC';
+        const WALLETS_LIST_URL = 'https://raw.githubusercontent.com/ton-connect/wallets-list/main/wallets.json';
         
         // ===== STATE =====
         let playerId = null;
@@ -942,11 +975,13 @@
         let walletAddress = null;
         let fuelBalance = 0;
         let totalBurned = 0;
+        let availableWallets = [];
         
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const walletModal = document.getElementById('walletModal');
+        const walletListEl = document.getElementById('walletList');
         
         // ===== UTILITIES =====
         function showLoading(show, message = 'LOADING...') {
@@ -1067,46 +1102,103 @@
             }
         }
         
-        // ===== WALLET CONNECTION FOR TELEGRAM (DEEPLINKS) =====
-        async function connectWallet() {
-            // Get available wallets for Telegram deeplinks
-            const manifestUrl = encodeURIComponent('https://papercoin-png.github.io/tonconnect-manifest.json');
-            
-            const wallets = [
-                { name: 'Tonkeeper', url: `tonkeeper://ton-connect?manifestUrl=${manifestUrl}` },
-                { name: 'Tonhub', url: `tonhub://ton-connect?manifestUrl=${manifestUrl}` },
-                { name: 'MyTonWallet', url: `mytonwallet://ton-connect?manifestUrl=${manifestUrl}` }
-            ];
-            
-            const walletListEl = document.getElementById('walletList');
-            walletListEl.innerHTML = '';
-            
-            wallets.forEach(wallet => {
-                const btn = document.createElement('button');
-                btn.className = 'wallet-option';
-                btn.textContent = wallet.name;
-                btn.onclick = () => {
-                    closeWalletModal();
-                    // Open the wallet app via deeplink
-                    window.location.href = wallet.url;
-                    showToast(`Opening ${wallet.name}... Approve connection in the app`, 'info');
-                    
-                    // Simulate connection after returning to the app
-                    setTimeout(() => {
-                        // For demo purposes, simulate a connected wallet
-                        // In production, you would receive the wallet address from the callback
-                        if (confirm('After approving in your wallet, click OK to continue')) {
-                            simulateWalletConnection();
-                        }
-                    }, 5000);
-                };
-                walletListEl.appendChild(btn);
-            });
-            
-            walletModal.classList.add('active');
+        // ===== FETCH WALLETS FROM OFFICIAL LIST =====
+        async function fetchWallets() {
+            try {
+                const response = await fetch(WALLETS_LIST_URL);
+                if (!response.ok) throw new Error('Failed to fetch wallets list');
+                const wallets = await response.json();
+                return wallets;
+            } catch (error) {
+                console.error('Error fetching wallets:', error);
+                // Fallback to basic wallets if fetch fails
+                return [
+                    { name: 'Tonkeeper', universal_url: 'https://app.tonkeeper.com/ton-connect', image: 'https://tonkeeper.com/assets/tonconnect-icon.png' },
+                    { name: 'Tonhub', universal_url: 'tonhub://ton-connect', image: '' },
+                    { name: 'MyTonWallet', universal_url: 'mytonwallet://ton-connect', image: '' }
+                ];
+            }
         }
         
-        function simulateWalletConnection() {
+        // ===== UNIVERSAL WALLET CONNECTION =====
+        async function connectWallet() {
+            showLoading(true, 'Loading wallets...');
+            
+            try {
+                // Fetch all supported wallets dynamically
+                const wallets = await fetchWallets();
+                availableWallets = wallets;
+                
+                if (!availableWallets || availableWallets.length === 0) {
+                    throw new Error('No wallets found');
+                }
+                
+                // Build wallet list UI dynamically
+                walletListEl.innerHTML = '';
+                
+                availableWallets.forEach(wallet => {
+                    const btn = document.createElement('button');
+                    btn.className = 'wallet-option';
+                    
+                    // Add wallet icon if available
+                    const iconHtml = wallet.image ? 
+                        `<div class="wallet-icon"><img src="${wallet.image}" alt="${wallet.name}" onerror="this.style.display='none'"></div>` : 
+                        '<div class="wallet-icon">💰</div>';
+                    
+                    btn.innerHTML = `
+                        ${iconHtml}
+                        <span class="wallet-name">${wallet.name}</span>
+                    `;
+                    
+                    btn.onclick = async () => {
+                        closeWalletModal();
+                        showLoading(true, `Connecting to ${wallet.name}...`);
+                        try {
+                            // Generate connection URL based on wallet's universal_url
+                            const manifestUrl = encodeURIComponent('https://papercoin-png.github.io/tonconnect-manifest.json');
+                            let connectionUrl;
+                            
+                            if (wallet.universal_url) {
+                                // Use wallet's universal URL if available
+                                connectionUrl = `${wallet.universal_url}?manifestUrl=${manifestUrl}`;
+                            } else if (wallet.bridge && wallet.bridge.length > 0 && wallet.bridge[0].url) {
+                                // Fallback to HTTP bridge connection
+                                connectionUrl = `https://app.tonkeeper.com/ton-connect?manifestUrl=${manifestUrl}`;
+                            } else {
+                                // Default to Tonkeeper
+                                connectionUrl = `https://app.tonkeeper.com/ton-connect?manifestUrl=${manifestUrl}`;
+                            }
+                            
+                            // Open the wallet connection URL
+                            window.location.href = connectionUrl;
+                            showToast(`Opening ${wallet.name}... Approve connection in the app`, 'info');
+                            
+                            // Simulate connection after user returns
+                            setTimeout(() => {
+                                if (confirm(`After approving in ${wallet.name}, click OK to continue`)) {
+                                    simulateWalletConnection(wallet.name);
+                                }
+                            }, 5000);
+                        } catch (err) {
+                            showToast(`Connection to ${wallet.name} failed: ${err.message}`, 'error');
+                        } finally {
+                            showLoading(false);
+                        }
+                    };
+                    walletListEl.appendChild(btn);
+                });
+                
+                walletModal.classList.add('active');
+                showLoading(false);
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                showToast(error.message || 'Failed to load wallets', 'error');
+                showLoading(false);
+            }
+        }
+        
+        function simulateWalletConnection(walletName) {
             walletConnected = true;
             walletAddress = 'EQD_simulated_' + Math.random().toString(36).substr(2, 8);
             const connectBtn = document.getElementById('connectWalletBtn');
@@ -1114,7 +1206,7 @@
             connectBtn.style.display = 'none';
             connectedInfo.style.display = 'flex';
             document.getElementById('walletAddressShort').textContent = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
-            showToast('Wallet connected!', 'success');
+            showToast(`${walletName} connected!`, 'success');
         }
         
         async function disconnectWallet() {
