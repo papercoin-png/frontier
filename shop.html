@@ -189,6 +189,63 @@
             color: #848E9C;
         }
         
+        .wallet-status {
+            background: #1A1D24;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .wallet-connect-btn {
+            background: linear-gradient(135deg, #0098ea, #0088cc);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        .wallet-connected-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .wallet-address {
+            background: #2B2F36;
+            padding: 8px 16px;
+            border-radius: 60px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #F0B90B;
+        }
+        
+        .wallet-balance {
+            color: #EAECEF;
+            font-size: 14px;
+        }
+        
+        .wallet-balance span {
+            color: #F0B90B;
+            font-weight: 600;
+        }
+        
+        .disconnect-btn {
+            background: #2B2F36;
+            border: 1px solid #F6465D;
+            color: #F6465D;
+            padding: 8px 20px;
+            border-radius: 60px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
         .payment-tabs {
             display: flex;
             gap: 4px;
@@ -589,6 +646,16 @@
                 <div class="credits-value" id="totalBalance">0 <span>⭐</span></div>
             </div>
             
+            <div class="wallet-status" id="walletStatus">
+                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
+                <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
+                    <span class="wallet-address" id="walletAddressShort">---</span>
+                    <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
+                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span></span>
+                    <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
+                </div>
+            </div>
+            
             <div class="payment-tabs">
                 <button class="payment-tab active" data-method="ton">💎 TON</button>
                 <button class="payment-tab" data-method="usdt">💵 USDT</button>
@@ -813,7 +880,6 @@
         let walletConnected = false;
         let walletAddress = null;
         let tonBalance = 0;
-        let usdtBalance = 0;
         let fuelBalance = 0;
         let totalBurned = 0;
 
@@ -854,6 +920,7 @@
             
             const connectBtn = document.getElementById('connectWalletBtn');
             const connectedInfo = document.getElementById('walletConnectedInfo');
+            const fuelBalanceSpan = document.getElementById('fuelWalletBalance');
             
             if (walletConnected) {
                 connectBtn.style.display = 'none';
@@ -865,17 +932,20 @@
                 tonBalance = await getTonBalance();
                 document.getElementById('walletBalance').textContent = tonBalance.toFixed(4);
                 
-                // Update in-game fuel balance
                 fuelBalance = await getFuelBalance(playerId);
+                if (fuelBalanceSpan) {
+                    fuelBalanceSpan.style.display = 'flex';
+                    document.getElementById('fuelBalance').textContent = fuelBalance.toFixed(2);
+                }
             } else {
                 connectBtn.style.display = 'block';
                 connectedInfo.style.display = 'none';
+                if (fuelBalanceSpan) fuelBalanceSpan.style.display = 'none';
             }
         }
 
         async function updateBurnStats() {
             try {
-                // Mock burned supply (in-game tracking)
                 totalBurned = 0;
                 document.getElementById('totalBurned').textContent = totalBurned.toLocaleString();
             } catch (error) {
@@ -902,50 +972,6 @@
                 `).join('');
             } catch (error) {
                 console.error('Error updating purchase history:', error);
-            }
-        }
-
-        // ===== VERIFY BURN TRANSACTION =====
-        async function verifyBurnTransaction(txHash, expectedFuelAmount) {
-            try {
-                // Wait a few seconds for blockchain confirmation
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                
-                // Query TON API for transaction
-                const response = await fetch(`https://tonapi.io/v2/transactions/${txHash}`);
-                
-                if (!response.ok) {
-                    return { valid: false, reason: 'Transaction not found' };
-                }
-                
-                const tx = await response.json();
-                
-                // Check if FUEL was sent to burn address
-                const burnMessage = tx.messages?.find(msg => 
-                    msg.destination === BURN_ADDRESS &&
-                    msg.jetton?.address === FUEL_CONTRACT_ADDRESS
-                );
-                
-                if (!burnMessage) {
-                    return { valid: false, reason: 'No burn detected' };
-                }
-                
-                // Verify amount (allow 5% slippage)
-                const burnedAmount = burnMessage.jetton.amount / 1e9;
-                if (burnedAmount < expectedFuelAmount * 0.95) {
-                    return { valid: false, reason: 'Amount mismatch' };
-                }
-                
-                return {
-                    valid: true,
-                    fuelAmount: burnedAmount,
-                    from: burnMessage.source,
-                    txHash: txHash
-                };
-                
-            } catch (error) {
-                console.error('Verification error:', error);
-                return { valid: false, reason: error.message };
             }
         }
 
@@ -977,9 +1003,48 @@
             }
         }
 
+        // ===== VERIFY BURN TRANSACTION =====
+        async function verifyBurnTransaction(txHash, expectedFuelAmount) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                const response = await fetch(`https://tonapi.io/v2/transactions/${txHash}`);
+                
+                if (!response.ok) {
+                    return { valid: false, reason: 'Transaction not found' };
+                }
+                
+                const tx = await response.json();
+                
+                const burnMessage = tx.messages?.find(msg => 
+                    msg.destination === BURN_ADDRESS &&
+                    msg.jetton?.address === FUEL_CONTRACT_ADDRESS
+                );
+                
+                if (!burnMessage) {
+                    return { valid: false, reason: 'No burn detected' };
+                }
+                
+                const burnedAmount = burnMessage.jetton.amount / 1e9;
+                if (burnedAmount < expectedFuelAmount * 0.95) {
+                    return { valid: false, reason: 'Amount mismatch' };
+                }
+                
+                return {
+                    valid: true,
+                    fuelAmount: burnedAmount,
+                    from: burnMessage.source,
+                    txHash: txHash
+                };
+                
+            } catch (error) {
+                console.error('Verification error:', error);
+                return { valid: false, reason: error.message };
+            }
+        }
+
         // ===== STON.FI WIDGET PURCHASE =====
         async function buyWithStonFi(currency, amount, creditsAmount, expectedFuelAmount) {
-            // Ensure wallet is connected
             if (!walletConnected) {
                 showToast('Please connect your wallet first', 'error');
                 return false;
@@ -988,7 +1053,6 @@
             showLoading(true, 'Opening STON.fi...');
             
             try {
-                // Configure the swap
                 const swapConfig = {
                     from: currency.toUpperCase(),
                     to: FUEL_CONTRACT_ADDRESS,
@@ -997,11 +1061,9 @@
                         console.log('Swap completed:', txHash);
                         showLoading(true, 'Verifying burn...');
                         
-                        // Verify the burn transaction
                         const verification = await verifyBurnTransaction(txHash, expectedFuelAmount);
                         
                         if (verification.valid) {
-                            // Award credits
                             await addCredits(creditsAmount, playerId);
                             await recordPurchase(playerId, amount, creditsAmount, currency.toUpperCase(), txHash);
                             await updateBalance();
@@ -1010,27 +1072,24 @@
                             showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
                             
                             if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                            return true;
                         } else {
                             showToast(`Verification failed: ${verification.reason}`, 'error');
-                            return false;
                         }
+                        showLoading(false);
                     },
                     onError: (error) => {
                         console.error('Swap error:', error);
                         showToast('Swap failed. Please try again.', 'error');
-                        return false;
+                        showLoading(false);
                     },
                     onClose: () => {
                         showLoading(false);
                     }
                 };
                 
-                // Open STON.fi widget
                 if (window.StonFiWidget) {
                     const widget = new window.StonFiWidget(swapConfig);
                     widget.open();
-                    showLoading(false);
                 } else {
                     throw new Error('STON.fi widget not loaded');
                 }
@@ -1045,19 +1104,16 @@
 
         // ===== PURCHASE FUNCTIONS =====
         async function buyWithTon(tonAmount, creditsAmount) {
-            // Calculate expected FUEL (assuming 1 TON = 100 FUEL at $0.01 each)
             const expectedFuelAmount = tonAmount * 100;
             return buyWithStonFi('ton', tonAmount, creditsAmount, expectedFuelAmount);
         }
         
         async function buyWithUsdt(usdtAmount, creditsAmount) {
-            // Calculate expected FUEL (assuming 1 USDT = 100 FUEL)
             const expectedFuelAmount = usdtAmount * 100;
             return buyWithStonFi('usdt', usdtAmount, creditsAmount, expectedFuelAmount);
         }
         
         async function buyWithFuel(fuelAmount, creditsAmount) {
-            // In-game FUEL purchase - no blockchain required
             const currentFuel = await getFuelBalance(playerId);
             
             if (currentFuel < fuelAmount) {
@@ -1116,7 +1172,6 @@
                 await awardCertificateXP(playerId, 500);
                 showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
             } else {
-                // In-game FUEL purchase
                 const currentFuel = await getFuelBalance(playerId);
                 if (currentFuel < 200) {
                     showToast(`Insufficient FUEL. Need 200 FUEL`, 'error');
@@ -1131,21 +1186,6 @@
                     showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
                 }
             }
-        }
-
-        // ===== CREATE WALLET UI ELEMENTS =====
-        // Add wallet connect button to the page
-        const walletStatusDiv = document.getElementById('walletStatus');
-        if (walletStatusDiv) {
-            walletStatusDiv.innerHTML = `
-                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
-                <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
-                    <span class="wallet-address" id="walletAddressShort">---</span>
-                    <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
-                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span></span>
-                    <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
-                </div>
-            `;
         }
 
         // ===== EVENT HANDLERS =====
