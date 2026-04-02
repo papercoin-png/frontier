@@ -22,6 +22,7 @@
 // ADDED: rebuildCollectionFromLocations function to recover from corrupted collection data
 // FIXED: Database version 8 - Added fuelData and fuelBalance stores
 // ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
+// ADDED: Real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -730,7 +731,7 @@ export async function spendCredits(amount, playerId = 'main') {
 }
 
 // ============================================================================
-// SHOP PURCHASE HISTORY (NEW)
+// SHOP PURCHASE HISTORY
 // ============================================================================
 
 /**
@@ -2138,6 +2139,45 @@ export async function getFullFuelBalance(playerId = null) {
 }
 
 // ============================================================================
+// REAL ESTATE FUNCTIONS (NEW)
+// ============================================================================
+
+/**
+ * Get real estate properties for a player
+ * @param {string} playerId - Player ID
+ * @returns {Promise<Object>} Real estate data object with properties array
+ */
+export async function getRealEstate(playerId = null) {
+    try {
+        const actualPlayerId = playerId || getPlayerId();
+        const key = `${STORAGE_KEYS.REAL_ESTATE}_${actualPlayerId}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : { properties: [] };
+    } catch (error) {
+        console.error('Error getting real estate:', error);
+        return { properties: [] };
+    }
+}
+
+/**
+ * Save real estate properties for a player
+ * @param {Object} propertyData - Real estate data object
+ * @param {string} playerId - Player ID
+ * @returns {Promise<boolean>} Success status
+ */
+export async function saveRealEstate(propertyData, playerId = null) {
+    try {
+        const actualPlayerId = playerId || getPlayerId();
+        const key = `${STORAGE_KEYS.REAL_ESTATE}_${actualPlayerId}`;
+        localStorage.setItem(key, JSON.stringify(propertyData));
+        return true;
+    } catch (error) {
+        console.error('Error saving real estate:', error);
+        return false;
+    }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -2229,7 +2269,8 @@ export async function resetGame(playerId = 'main') {
         STORAGE_KEYS.CLAIM_HISTORY,
         STORAGE_KEYS.CERTIFICATE_HOLDERS,
         `${STORAGE_KEYS.PURCHASE_HISTORY}_${playerId}`,
-        `voidfarer_journal_${playerId}`
+        `voidfarer_journal_${playerId}`,
+        `${STORAGE_KEYS.REAL_ESTATE}_${playerId}`
     ];
     keysToRemove.forEach(key => localStorage.removeItem(key));
     if (window.idb) {
@@ -2341,6 +2382,8 @@ window.addFuelTokens = addFuelTokens;
 window.spendFuelTokens = spendFuelTokens;
 window.getFullFuelBalance = getFullFuelBalance;
 window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
+window.getRealEstate = getRealEstate;
+window.saveRealEstate = saveRealEstate;
 
 // NEW: Shop purchase functions exposed
 window.recordPurchase = recordPurchase;
@@ -2351,3 +2394,4 @@ window.getAllPurchases = getAllPurchases;
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and fuel token functions');
 console.log('✅ Version 8: Added fuelData and fuelBalance stores with proper configuration');
 console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
+console.log('✅ Added real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties');
