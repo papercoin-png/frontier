@@ -20,43 +20,35 @@ let walletBalance = 0;
 let usdtBalance = 0;
 let listeners = [];
 
-// ===== LOAD TONCONNECT SDK - CORRECT CDN =====
+// ===== LOAD TONCONNECT SDK V1 =====
 async function loadTonConnectSDK() {
     return new Promise((resolve, reject) => {
-        // Check if already loaded
         if (window.TonConnect) {
             resolve();
             return;
         }
         
-        // Use the correct TonConnect SDK URL
+        // Use stable v1 SDK
         const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@tonconnect/sdk@2.0.0/dist/tonconnect-sdk.min.js';
+        script.src = 'https://unpkg.com/@tonconnect/sdk@1.0.0/dist/tonconnect-sdk.min.js';
         script.onload = () => {
-            // Wait for the SDK to be fully initialized
             setTimeout(() => {
                 if (window.TonConnect) {
-                    console.log('✅ TonConnect SDK loaded successfully');
+                    console.log('✅ TonConnect SDK loaded');
                     resolve();
                 } else {
-                    console.warn('TonConnect SDK not available after load');
                     reject(new Error('TonConnect SDK not available'));
                 }
-            }, 200);
+            }, 100);
         };
-        script.onerror = () => {
-            console.error('Failed to load TonConnect SDK');
-            reject(new Error('Failed to load TonConnect SDK'));
-        };
+        script.onerror = () => reject(new Error('Failed to load TonConnect SDK'));
         document.head.appendChild(script);
         
-        // Timeout fallback
         setTimeout(() => {
             if (!window.TonConnect) {
-                console.warn('TonConnect SDK load timeout');
-                reject(new Error('TonConnect SDK load timeout'));
+                reject(new Error('TonConnect SDK timeout'));
             }
-        }, 10000);
+        }, 8000);
     });
 }
 
@@ -64,84 +56,70 @@ async function loadTonConnectSDK() {
 export async function initTonWallet() {
     try {
         if (TON_CONFIG.demoMode) {
-            console.log('Demo mode enabled - wallet connection simulated');
             enableDemoMode();
             return { success: true, connected: true, address: walletAddress, demo: true };
         }
         
-        // Load SDK if needed
         if (typeof window.TonConnect === 'undefined') {
             try {
                 await loadTonConnectSDK();
             } catch (sdkError) {
-                console.error('SDK load failed, falling back to demo mode:', sdkError);
-                TON_CONFIG.demoMode = true;
+                console.warn('SDK load failed, using demo mode:', sdkError);
                 enableDemoMode();
                 return { success: true, connected: true, address: walletAddress, demo: true };
             }
         }
         
-        // Initialize TonConnect
         tonConnect = new window.TonConnect();
         tonConnect.setManifestUrl(TON_CONFIG.manifestUrl);
         
-        // Check if already connected
-        if (tonConnect.connected) {
-            const wallet = tonConnect.wallet;
-            walletAddress = wallet?.account?.address;
+        if (tonConnect.connected && tonConnect.wallet) {
+            walletAddress = tonConnect.wallet.account.address;
             walletConnected = true;
             await updateBalances();
             notifyListeners('connected', { address: walletAddress });
         }
         
-        // Set up status change listener
         tonConnect.onStatusChange((wallet) => {
             if (wallet) {
                 walletAddress = wallet.account.address;
                 walletConnected = true;
                 updateBalances();
                 notifyListeners('connected', { address: walletAddress });
-                console.log('✅ TON Wallet connected:', walletAddress);
+                console.log('✅ Wallet connected:', walletAddress);
             } else {
                 walletConnected = false;
                 walletAddress = null;
                 walletBalance = 0;
                 usdtBalance = 0;
                 notifyListeners('disconnected', {});
-                console.log('❌ TON Wallet disconnected');
+                console.log('❌ Wallet disconnected');
             }
         });
         
         return { success: true, connected: walletConnected, address: walletAddress };
         
     } catch (error) {
-        console.error('TON wallet init error:', error);
-        if (TON_CONFIG.demoMode) {
-            enableDemoMode();
-            return { success: true, connected: true, address: walletAddress, demo: true };
-        }
-        return { success: false, error: error.message };
+        console.error('Init error:', error);
+        enableDemoMode();
+        return { success: true, connected: true, address: walletAddress, demo: true };
     }
 }
 
-// ===== DEMO MODE FUNCTIONS =====
 function enableDemoMode() {
-    console.log('🔧 Running in DEMO MODE - no real wallet connection');
+    console.log('🔧 DEMO MODE - simulated wallet');
     walletConnected = true;
     walletAddress = 'EQC_demo_wallet_address';
     walletBalance = 10.0;
     usdtBalance = 50.0;
-    
-    setTimeout(() => {
-        notifyListeners('connected', { address: walletAddress });
-    }, 500);
+    setTimeout(() => notifyListeners('connected', { address: walletAddress }), 100);
 }
 
 // ===== CONNECT WALLET =====
 export async function connectTonWallet() {
     if (TON_CONFIG.demoMode) {
         walletConnected = true;
-        walletAddress = 'EQC_demo_wallet_' + Math.random().toString(36).substr(2, 8);
+        walletAddress = 'EQC_demo_' + Math.random().toString(36).substr(2, 8);
         walletBalance = 10.0;
         usdtBalance = 50.0;
         notifyListeners('connected', { address: walletAddress });
@@ -158,14 +136,13 @@ export async function connectTonWallet() {
         }
         
         const wallets = tonConnect.getWallets();
-        
         if (!wallets || wallets.length === 0) {
-            throw new Error('No wallets available');
+            throw new Error('No wallets found');
         }
         
         const tg = window.Telegram?.WebApp;
         if (tg && (tg.platform === 'tdesktop' || tg.platform === 'ios' || tg.platform === 'android')) {
-            const telegramWallet = wallets.find(w => w.name === 'Wallet in Telegram' || w.name === 'Telegram');
+            const telegramWallet = wallets.find(w => w.name === 'Wallet' || w.name === 'Telegram');
             if (telegramWallet) {
                 await tonConnect.connect({ wallet: telegramWallet });
                 return { success: true, address: walletAddress };
@@ -269,10 +246,7 @@ export async function disconnectTonWallet() {
 // ===== BALANCE FUNCTIONS =====
 export async function getTonBalance() {
     if (!walletConnected) return 0;
-    
-    if (TON_CONFIG.demoMode) {
-        return 10.0;
-    }
+    if (TON_CONFIG.demoMode) return 10.0;
     
     try {
         const response = await fetch(`${TON_CONFIG.apiEndpoint}/accounts/${walletAddress}`);
@@ -280,29 +254,21 @@ export async function getTonBalance() {
         walletBalance = data.balance ? data.balance / 1e9 : 0;
         return walletBalance;
     } catch (error) {
-        console.error('Balance fetch error:', error);
         return 0;
     }
 }
 
 export async function getUsdtBalance() {
     if (!walletConnected) return 0;
-    
-    if (TON_CONFIG.demoMode) {
-        return 50.0;
-    }
+    if (TON_CONFIG.demoMode) return 50.0;
     
     try {
-        const response = await fetch(
-            `${TON_CONFIG.apiEndpoint}/jetton/${TON_CONFIG.usdtAddress}/accounts/${walletAddress}`
-        );
-        if (response.status === 404) return 0;
+        const response = await fetch(`${TON_CONFIG.apiEndpoint}/jetton/${TON_CONFIG.usdtAddress}/accounts/${walletAddress}`);
         if (!response.ok) return 0;
         const data = await response.json();
         usdtBalance = data.balance ? data.balance / 1e6 : 0;
         return usdtBalance;
     } catch (error) {
-        console.error('USDT balance fetch error:', error);
         return 0;
     }
 }
@@ -316,7 +282,6 @@ export async function updateBalances() {
 // ===== SEND TRANSACTION =====
 export async function sendTransaction(transaction) {
     if (TON_CONFIG.demoMode) {
-        console.log('Demo mode: simulated transaction', transaction);
         await new Promise(r => setTimeout(r, 1000));
         return { success: true, txHash: 'demo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8) };
     }
@@ -329,16 +294,13 @@ export async function sendTransaction(transaction) {
         const result = await tonConnect.sendTransaction(transaction);
         return { success: true, txHash: result };
     } catch (error) {
-        console.error('Transaction error:', error);
         return { success: false, error: error.message };
     }
 }
 
-// ===== BUY CREDITS WITH TON =====
+// ===== BUY CREDITS =====
 export async function buyCreditsWithTon(playerId, tonAmount) {
-    if (!walletConnected) {
-        return { success: false, error: 'Wallet not connected' };
-    }
+    if (!walletConnected) return { success: false, error: 'Wallet not connected' };
     
     const balance = await getTonBalance();
     if (balance < tonAmount) {
@@ -346,42 +308,24 @@ export async function buyCreditsWithTon(playerId, tonAmount) {
     }
     
     const creditsAmount = Math.floor(tonAmount * 1000);
-    
     const transaction = {
         validUntil: Date.now() + 600000,
-        messages: [
-            {
-                address: TON_CONFIG.burnShopContract || 'EQC_demo_contract',
-                amount: tonAmount * 1e9,
-                payload: JSON.stringify({
-                    type: 'buy_credits',
-                    playerId: playerId,
-                    credits: creditsAmount,
-                    paymentMethod: 'TON'
-                })
-            }
-        ]
+        messages: [{
+            address: TON_CONFIG.burnShopContract,
+            amount: tonAmount * 1e9,
+            payload: JSON.stringify({ type: 'buy_credits', playerId, credits: creditsAmount, paymentMethod: 'TON' })
+        }]
     };
     
     const result = await sendTransaction(transaction);
-    
     if (result.success) {
-        return {
-            success: true,
-            tonAmount: tonAmount,
-            creditsReceived: creditsAmount,
-            txHash: result.txHash
-        };
+        return { success: true, tonAmount, creditsReceived: creditsAmount, txHash: result.txHash };
     }
-    
     return result;
 }
 
-// ===== BUY CREDITS WITH USDT =====
 export async function buyCreditsWithUsdt(playerId, usdtAmount) {
-    if (!walletConnected) {
-        return { success: false, error: 'Wallet not connected' };
-    }
+    if (!walletConnected) return { success: false, error: 'Wallet not connected' };
     
     const balance = await getUsdtBalance();
     if (balance < usdtAmount) {
@@ -389,79 +333,45 @@ export async function buyCreditsWithUsdt(playerId, usdtAmount) {
     }
     
     const creditsAmount = Math.floor(usdtAmount * 1000);
-    
     const transaction = {
         validUntil: Date.now() + 600000,
-        messages: [
-            {
-                address: TON_CONFIG.usdtAddress,
-                amount: 0,
-                payload: JSON.stringify({
-                    type: 'jetton_transfer',
-                    recipient: TON_CONFIG.burnShopContract || 'EQC_burn',
-                    amount: usdtAmount * 1e6,
-                    payload: {
-                        type: 'buy_credits',
-                        playerId: playerId,
-                        credits: creditsAmount,
-                        paymentMethod: 'USDT'
-                    }
-                })
-            }
-        ]
+        messages: [{
+            address: TON_CONFIG.usdtAddress,
+            amount: 0,
+            payload: JSON.stringify({
+                type: 'jetton_transfer',
+                recipient: TON_CONFIG.burnShopContract,
+                amount: usdtAmount * 1e6,
+                payload: { type: 'buy_credits', playerId, credits: creditsAmount, paymentMethod: 'USDT' }
+            })
+        }]
     };
     
     const result = await sendTransaction(transaction);
-    
     if (result.success) {
-        return {
-            success: true,
-            usdtAmount: usdtAmount,
-            creditsReceived: creditsAmount,
-            txHash: result.txHash
-        };
+        return { success: true, usdtAmount, creditsReceived: creditsAmount, txHash: result.txHash };
     }
-    
     return result;
 }
 
 // ===== EVENT LISTENERS =====
-export function onWalletEvent(callback) {
-    listeners.push(callback);
-}
-
+export function onWalletEvent(callback) { listeners.push(callback); }
 export function offWalletEvent(callback) {
     const index = listeners.indexOf(callback);
     if (index > -1) listeners.splice(index, 1);
 }
-
-function notifyListeners(event, data) {
-    listeners.forEach(callback => callback(event, data));
-}
+function notifyListeners(event, data) { listeners.forEach(cb => cb(event, data)); }
 
 // ===== GETTERS =====
-export function isWalletConnected() {
-    return walletConnected;
-}
-
-export function getWalletAddress() {
-    return walletAddress;
-}
-
-export function getWalletBalanceDisplay() {
-    return walletBalance.toFixed(2);
-}
-
-export function getUsdtBalanceDisplay() {
-    return usdtBalance.toFixed(2);
-}
-
+export function isWalletConnected() { return walletConnected; }
+export function getWalletAddress() { return walletAddress; }
+export function getWalletBalanceDisplay() { return walletBalance.toFixed(2); }
+export function getUsdtBalanceDisplay() { return usdtBalance.toFixed(2); }
 export function getShortAddress() {
     if (!walletAddress) return '';
     return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 }
 
-// ===== EXPORT =====
 export default {
     initTonWallet,
     connectTonWallet,
