@@ -4,12 +4,12 @@
 // ===== CONFIGURATION =====
 const TON_CONFIG = {
     isTestnet: true,
-    manifestUrl: 'https://your-domain.com/tonconnect-manifest.json',
+    manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json',
     apiEndpoint: 'https://tonapi.io/v2',
     burnShopContract: 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY',
     usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
     connectionTimeout: 60000,
-    demoMode: true
+    demoMode: false
 };
 
 // ===== STATE =====
