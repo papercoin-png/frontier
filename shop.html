@@ -8,8 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- TON Connect UI - Universal wallet support -->
-    <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+    <!-- TON Connect UI - Correct CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.0.0/dist/tonconnect-ui.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -984,14 +984,14 @@
         
         // ===== TON CONNECT 2.0 INITIALIZATION =====
         async function initTonConnect() {
-            if (typeof TonConnectUI === 'undefined') {
+            if (typeof window.TonConnectUI === 'undefined') {
                 console.log('Waiting for TonConnectUI to load...');
                 setTimeout(initTonConnect, 500);
                 return;
             }
             
             try {
-                tonConnectUI = new TonConnectUI({
+                tonConnectUI = new window.TonConnectUI({
                     manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json',
                     buttonRootId: 'ton-connect-button'
                 });
@@ -1041,12 +1041,12 @@
                         {
                             address: SHOP_WALLET_ADDRESS,
                             amount: Math.floor(tonAmount * 1e9).toString(),
-                            payload: JSON.stringify({
+                            payload: btoa(JSON.stringify({
                                 type: 'buy_credits',
                                 playerId: playerId,
                                 credits: creditsAmount,
                                 paymentMethod: 'TON'
-                            })
+                            }))
                         }
                     ]
                 };
@@ -1095,7 +1095,7 @@
                         {
                             address: USDT_JETTON_ADDRESS,
                             amount: '0',
-                            payload: JSON.stringify({
+                            payload: btoa(JSON.stringify({
                                 type: 'jetton_transfer',
                                 recipient: SHOP_WALLET_ADDRESS,
                                 amount: usdtNano.toString(),
@@ -1105,7 +1105,7 @@
                                     credits: creditsAmount,
                                     paymentMethod: 'USDT'
                                 })
-                            })
+                            }))
                         }
                     ]
                 };
