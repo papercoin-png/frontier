@@ -7,6 +7,8 @@
     
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
+    <!-- STON.fi Widget -->
+    <script src="https://widget.ston.fi/swap.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
@@ -185,63 +187,6 @@
         .credits-value span {
             font-size: 12px;
             color: #848E9C;
-        }
-        
-        .wallet-status {
-            background: #1A1D24;
-            border-radius: 60px 20px 60px 20px;
-            padding: 16px;
-            margin-bottom: 20px;
-            text-align: center;
-            border: 1px solid #2B2F36;
-        }
-        
-        .wallet-connect-btn {
-            background: linear-gradient(135deg, #0098ea, #0088cc);
-            border: none;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 60px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-            width: 100%;
-        }
-        
-        .wallet-connected-info {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            align-items: center;
-        }
-        
-        .wallet-address {
-            background: #2B2F36;
-            padding: 8px 16px;
-            border-radius: 60px;
-            font-family: monospace;
-            font-size: 12px;
-            color: #F0B90B;
-        }
-        
-        .wallet-balance {
-            color: #EAECEF;
-            font-size: 14px;
-        }
-        
-        .wallet-balance span {
-            color: #F0B90B;
-            font-weight: 600;
-        }
-        
-        .disconnect-btn {
-            background: #2B2F36;
-            border: 1px solid #F6465D;
-            color: #F6465D;
-            padding: 8px 20px;
-            border-radius: 60px;
-            cursor: pointer;
-            font-size: 12px;
         }
         
         .payment-tabs {
@@ -644,17 +589,6 @@
                 <div class="credits-value" id="totalBalance">0 <span>⭐</span></div>
             </div>
             
-            <div class="wallet-status" id="walletStatus">
-                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
-                <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
-                    <span class="wallet-address" id="walletAddressShort">---</span>
-                    <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
-                    <span class="wallet-balance" id="usdtWalletBalance" style="display: none;">💵 USDT: <span id="usdtBalance">0</span></span>
-                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span></span>
-                    <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
-                </div>
-            </div>
-            
             <div class="payment-tabs">
                 <button class="payment-tab active" data-method="ton">💎 TON</button>
                 <button class="payment-tab" data-method="usdt">💵 USDT</button>
@@ -857,12 +791,12 @@
 
     <script type="module">
         import { getPlayerId, getCredits, addCredits, recordPurchase, getPurchaseHistory, getTotalSpent, getFuelBalance, spendFuelTokens } from './js/storage.js';
-        import { initTonWallet, connectTonWallet, disconnectTonWallet, getTonBalance, isWalletConnected, getShortAddress, buyCreditsWithTon, buyCreditsWithUsdt } from './js/ton-connect.js';
+        import { initTonWallet, connectTonWallet, disconnectTonWallet, getTonBalance, isWalletConnected, getShortAddress } from './js/ton-connect.js';
 
-        // Mock burned supply function (FUEL is now in-game only)
-        async function getBurnedSupply() {
-            return 0;
-        }
+        // ===== CONFIGURATION =====
+        const FUEL_CONTRACT_ADDRESS = 'EQDdojh4v4YhY2xpORtPXWct2vOkGmf-6AADOyw5imltevOY';
+        const BURN_ADDRESS = 'UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ';
+        const USDT_CONTRACT_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
 
         // ===== TELEGRAM =====
         const tg = window.Telegram?.WebApp;
@@ -920,8 +854,6 @@
             
             const connectBtn = document.getElementById('connectWalletBtn');
             const connectedInfo = document.getElementById('walletConnectedInfo');
-            const usdtBalanceSpan = document.getElementById('usdtWalletBalance');
-            const fuelBalanceSpan = document.getElementById('fuelWalletBalance');
             
             if (walletConnected) {
                 connectBtn.style.display = 'none';
@@ -933,29 +865,18 @@
                 tonBalance = await getTonBalance();
                 document.getElementById('walletBalance').textContent = tonBalance.toFixed(4);
                 
-                usdtBalance = 50.0;
-                if (usdtBalanceSpan) {
-                    usdtBalanceSpan.style.display = 'flex';
-                    document.getElementById('usdtBalance').textContent = usdtBalance.toFixed(2);
-                }
-                
                 // Update in-game fuel balance
                 fuelBalance = await getFuelBalance(playerId);
-                if (fuelBalanceSpan) {
-                    fuelBalanceSpan.style.display = 'flex';
-                    document.getElementById('fuelBalance').textContent = fuelBalance.toFixed(2);
-                }
             } else {
                 connectBtn.style.display = 'block';
                 connectedInfo.style.display = 'none';
-                if (usdtBalanceSpan) usdtBalanceSpan.style.display = 'none';
-                if (fuelBalanceSpan) fuelBalanceSpan.style.display = 'none';
             }
         }
 
         async function updateBurnStats() {
             try {
-                totalBurned = await getBurnedSupply();
+                // Mock burned supply (in-game tracking)
+                totalBurned = 0;
                 document.getElementById('totalBurned').textContent = totalBurned.toLocaleString();
             } catch (error) {
                 console.error('Error updating burn stats:', error);
@@ -981,6 +902,50 @@
                 `).join('');
             } catch (error) {
                 console.error('Error updating purchase history:', error);
+            }
+        }
+
+        // ===== VERIFY BURN TRANSACTION =====
+        async function verifyBurnTransaction(txHash, expectedFuelAmount) {
+            try {
+                // Wait a few seconds for blockchain confirmation
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                // Query TON API for transaction
+                const response = await fetch(`https://tonapi.io/v2/transactions/${txHash}`);
+                
+                if (!response.ok) {
+                    return { valid: false, reason: 'Transaction not found' };
+                }
+                
+                const tx = await response.json();
+                
+                // Check if FUEL was sent to burn address
+                const burnMessage = tx.messages?.find(msg => 
+                    msg.destination === BURN_ADDRESS &&
+                    msg.jetton?.address === FUEL_CONTRACT_ADDRESS
+                );
+                
+                if (!burnMessage) {
+                    return { valid: false, reason: 'No burn detected' };
+                }
+                
+                // Verify amount (allow 5% slippage)
+                const burnedAmount = burnMessage.jetton.amount / 1e9;
+                if (burnedAmount < expectedFuelAmount * 0.95) {
+                    return { valid: false, reason: 'Amount mismatch' };
+                }
+                
+                return {
+                    valid: true,
+                    fuelAmount: burnedAmount,
+                    from: burnMessage.source,
+                    txHash: txHash
+                };
+                
+            } catch (error) {
+                console.error('Verification error:', error);
+                return { valid: false, reason: error.message };
             }
         }
 
@@ -1012,89 +977,87 @@
             }
         }
 
-        // ===== PURCHASE FUNCTIONS =====
-        async function buyWithTon(tonAmount, creditsAmount) {
+        // ===== STON.FI WIDGET PURCHASE =====
+        async function buyWithStonFi(currency, amount, creditsAmount, expectedFuelAmount) {
+            // Ensure wallet is connected
             if (!walletConnected) {
                 showToast('Please connect your wallet first', 'error');
                 return false;
             }
             
-            if (tonBalance < tonAmount) {
-                showToast(`Insufficient TON. Need ${tonAmount}, have ${tonBalance.toFixed(4)}`, 'error');
-                return false;
-            }
-            
-            showLoading(true, 'Processing purchase...');
+            showLoading(true, 'Opening STON.fi...');
             
             try {
-                const result = await buyCreditsWithTon(playerId, tonAmount);
+                // Configure the swap
+                const swapConfig = {
+                    from: currency.toUpperCase(),
+                    to: FUEL_CONTRACT_ADDRESS,
+                    amount: amount,
+                    onSuccess: async (txHash) => {
+                        console.log('Swap completed:', txHash);
+                        showLoading(true, 'Verifying burn...');
+                        
+                        // Verify the burn transaction
+                        const verification = await verifyBurnTransaction(txHash, expectedFuelAmount);
+                        
+                        if (verification.valid) {
+                            // Award credits
+                            await addCredits(creditsAmount, playerId);
+                            await recordPurchase(playerId, amount, creditsAmount, currency.toUpperCase(), txHash);
+                            await updateBalance();
+                            await updatePurchaseHistory();
+                            
+                            showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
+                            
+                            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                            return true;
+                        } else {
+                            showToast(`Verification failed: ${verification.reason}`, 'error');
+                            return false;
+                        }
+                    },
+                    onError: (error) => {
+                        console.error('Swap error:', error);
+                        showToast('Swap failed. Please try again.', 'error');
+                        return false;
+                    },
+                    onClose: () => {
+                        showLoading(false);
+                    }
+                };
                 
-                if (result.success) {
-                    await recordPurchase(playerId, tonAmount, creditsAmount, 'TON', result.txHash);
-                    await updateBalance();
-                    await updatePurchaseHistory();
-                    await updateWalletUI();
-                    await updateBurnStats();
-                    
-                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    return true;
+                // Open STON.fi widget
+                if (window.StonFiWidget) {
+                    const widget = new window.StonFiWidget(swapConfig);
+                    widget.open();
+                    showLoading(false);
                 } else {
-                    showToast(result.error || 'Purchase failed', 'error');
-                    return false;
+                    throw new Error('STON.fi widget not loaded');
                 }
+                
             } catch (error) {
-                console.error('Purchase error:', error);
-                showToast('Transaction failed', 'error');
-                return false;
-            } finally {
+                console.error('STON.fi error:', error);
+                showToast('Failed to open STON.fi', 'error');
                 showLoading(false);
+                return false;
             }
+        }
+
+        // ===== PURCHASE FUNCTIONS =====
+        async function buyWithTon(tonAmount, creditsAmount) {
+            // Calculate expected FUEL (assuming 1 TON = 100 FUEL at $0.01 each)
+            const expectedFuelAmount = tonAmount * 100;
+            return buyWithStonFi('ton', tonAmount, creditsAmount, expectedFuelAmount);
         }
         
         async function buyWithUsdt(usdtAmount, creditsAmount) {
-            if (!walletConnected) {
-                showToast('Please connect your wallet first', 'error');
-                return false;
-            }
-            
-            if (usdtBalance < usdtAmount) {
-                showToast(`Insufficient USDT. Need ${usdtAmount}, have ${usdtBalance.toFixed(2)}`, 'error');
-                return false;
-            }
-            
-            showLoading(true, 'Processing purchase...');
-            
-            try {
-                const result = await buyCreditsWithUsdt(playerId, usdtAmount);
-                
-                if (result.success) {
-                    await recordPurchase(playerId, usdtAmount, creditsAmount, 'USDT', result.txHash);
-                    await updateBalance();
-                    await updatePurchaseHistory();
-                    await updateWalletUI();
-                    await updateBurnStats();
-                    
-                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    return true;
-                } else {
-                    showToast(result.error || 'Purchase failed', 'error');
-                    return false;
-                }
-            } catch (error) {
-                console.error('Purchase error:', error);
-                showToast('Transaction failed', 'error');
-                return false;
-            } finally {
-                showLoading(false);
-            }
+            // Calculate expected FUEL (assuming 1 USDT = 100 FUEL)
+            const expectedFuelAmount = usdtAmount * 100;
+            return buyWithStonFi('usdt', usdtAmount, creditsAmount, expectedFuelAmount);
         }
         
         async function buyWithFuel(fuelAmount, creditsAmount) {
-            // In-game FUEL purchase - no wallet required
+            // In-game FUEL purchase - no blockchain required
             const currentFuel = await getFuelBalance(playerId);
             
             if (currentFuel < fuelAmount) {
@@ -1112,8 +1075,6 @@
                     await recordPurchase(playerId, fuelAmount, creditsAmount, 'FUEL', null);
                     await updateBalance();
                     await updatePurchaseHistory();
-                    await updateWalletUI();
-                    await updateBurnStats();
                     
                     showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
                     
@@ -1134,7 +1095,6 @@
 
         // ===== SPECIAL OFFERS =====
         async function buyCertificateBoost() {
-            let cost = 2;
             let method = currentPaymentMethod;
             
             if (method === 'ton') {
@@ -1142,19 +1102,19 @@
                     showToast('Please connect your wallet first', 'error');
                     return;
                 }
-                if (tonBalance < cost) {
-                    showToast(`Insufficient TON. Need ${cost} TON`, 'error');
-                    return;
-                }
+                await buyWithStonFi('ton', 2, 0, 200);
+                const { awardCertificateXP } = await import('./js/certificates.js');
+                await awardCertificateXP(playerId, 500);
+                showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
             } else if (method === 'usdt') {
                 if (!walletConnected) {
                     showToast('Please connect your wallet first', 'error');
                     return;
                 }
-                if (usdtBalance < cost) {
-                    showToast(`Insufficient USDT. Need ${cost} USDT`, 'error');
-                    return;
-                }
+                await buyWithStonFi('usdt', 2, 0, 200);
+                const { awardCertificateXP } = await import('./js/certificates.js');
+                await awardCertificateXP(playerId, 500);
+                showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
             } else {
                 // In-game FUEL purchase
                 const currentFuel = await getFuelBalance(playerId);
@@ -1162,40 +1122,30 @@
                     showToast(`Insufficient FUEL. Need 200 FUEL`, 'error');
                     return;
                 }
-            }
-            
-            showLoading(true, 'Processing special offer...');
-            
-            try {
-                let result;
-                if (method === 'ton') {
-                    result = await buyCreditsWithTon(playerId, cost);
-                } else if (method === 'usdt') {
-                    result = await buyCreditsWithUsdt(playerId, cost);
-                } else {
-                    const spent = await spendFuelTokens(200, playerId);
-                    result = spent ? { success: true } : { success: false, error: 'Failed to spend FUEL' };
-                }
                 
-                if (result.success) {
+                const spent = await spendFuelTokens(200, playerId);
+                if (spent) {
                     const { awardCertificateXP } = await import('./js/certificates.js');
                     await awardCertificateXP(playerId, 500);
-                    
-                    const boostCost = method === 'fuel' ? 200 : cost;
-                    await recordPurchase(playerId, boostCost, 0, `${method.toUpperCase()}_BOOST`, result.txHash);
-                    await updateBalance();
-                    await updateWalletUI();
-                    
+                    await recordPurchase(playerId, 200, 0, 'FUEL_BOOST', null);
                     showToast('🎓 Certificate Booster applied! +500 XP to all certificates', 'success');
-                } else {
-                    showToast(result.error || 'Purchase failed', 'error');
                 }
-            } catch (error) {
-                console.error('Boost purchase error:', error);
-                showToast('Transaction failed', 'error');
-            } finally {
-                showLoading(false);
             }
+        }
+
+        // ===== CREATE WALLET UI ELEMENTS =====
+        // Add wallet connect button to the page
+        const walletStatusDiv = document.getElementById('walletStatus');
+        if (walletStatusDiv) {
+            walletStatusDiv.innerHTML = `
+                <button class="wallet-connect-btn" id="connectWalletBtn">🔗 Connect TON Wallet</button>
+                <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
+                    <span class="wallet-address" id="walletAddressShort">---</span>
+                    <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
+                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span></span>
+                    <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
+                </div>
+            `;
         }
 
         // ===== EVENT HANDLERS =====
