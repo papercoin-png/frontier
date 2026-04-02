@@ -20,17 +20,44 @@ let walletBalance = 0;
 let usdtBalance = 0;
 let listeners = [];
 
-// ===== DEMO MODE FUNCTIONS =====
-function enableDemoMode() {
-    console.log('🔧 Running in DEMO MODE - no real wallet connection');
-    walletConnected = true;
-    walletAddress = 'EQC_demo_wallet_address';
-    walletBalance = 10.0;
-    usdtBalance = 50.0;
-    
-    setTimeout(() => {
-        notifyListeners('connected', { address: walletAddress });
-    }, 500);
+// ===== LOAD TONCONNECT SDK - CORRECT CDN =====
+async function loadTonConnectSDK() {
+    return new Promise((resolve, reject) => {
+        // Check if already loaded
+        if (window.TonConnect) {
+            resolve();
+            return;
+        }
+        
+        // Use the correct TonConnect SDK URL
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@tonconnect/sdk@2.0.0/dist/tonconnect-sdk.min.js';
+        script.onload = () => {
+            // Wait for the SDK to be fully initialized
+            setTimeout(() => {
+                if (window.TonConnect) {
+                    console.log('✅ TonConnect SDK loaded successfully');
+                    resolve();
+                } else {
+                    console.warn('TonConnect SDK not available after load');
+                    reject(new Error('TonConnect SDK not available'));
+                }
+            }, 200);
+        };
+        script.onerror = () => {
+            console.error('Failed to load TonConnect SDK');
+            reject(new Error('Failed to load TonConnect SDK'));
+        };
+        document.head.appendChild(script);
+        
+        // Timeout fallback
+        setTimeout(() => {
+            if (!window.TonConnect) {
+                console.warn('TonConnect SDK load timeout');
+                reject(new Error('TonConnect SDK load timeout'));
+            }
+        }, 10000);
+    });
 }
 
 // ===== INITIALIZATION =====
@@ -42,13 +69,23 @@ export async function initTonWallet() {
             return { success: true, connected: true, address: walletAddress, demo: true };
         }
         
+        // Load SDK if needed
         if (typeof window.TonConnect === 'undefined') {
-            await loadTonConnectSDK();
+            try {
+                await loadTonConnectSDK();
+            } catch (sdkError) {
+                console.error('SDK load failed, falling back to demo mode:', sdkError);
+                TON_CONFIG.demoMode = true;
+                enableDemoMode();
+                return { success: true, connected: true, address: walletAddress, demo: true };
+            }
         }
         
+        // Initialize TonConnect
         tonConnect = new window.TonConnect();
         tonConnect.setManifestUrl(TON_CONFIG.manifestUrl);
         
+        // Check if already connected
         if (tonConnect.connected) {
             const wallet = tonConnect.wallet;
             walletAddress = wallet?.account?.address;
@@ -57,6 +94,7 @@ export async function initTonWallet() {
             notifyListeners('connected', { address: walletAddress });
         }
         
+        // Set up status change listener
         tonConnect.onStatusChange((wallet) => {
             if (wallet) {
                 walletAddress = wallet.account.address;
@@ -86,22 +124,17 @@ export async function initTonWallet() {
     }
 }
 
-function loadTonConnectSDK() {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js';
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('Failed to load TonConnect SDK'));
-        document.head.appendChild(script);
-        
-        setTimeout(() => {
-            if (typeof window.TonConnect === 'undefined') {
-                console.warn('TonConnect SDK load timeout, using demo mode');
-                TON_CONFIG.demoMode = true;
-                resolve();
-            }
-        }, 5000);
-    });
+// ===== DEMO MODE FUNCTIONS =====
+function enableDemoMode() {
+    console.log('🔧 Running in DEMO MODE - no real wallet connection');
+    walletConnected = true;
+    walletAddress = 'EQC_demo_wallet_address';
+    walletBalance = 10.0;
+    usdtBalance = 50.0;
+    
+    setTimeout(() => {
+        notifyListeners('connected', { address: walletAddress });
+    }, 500);
 }
 
 // ===== CONNECT WALLET =====
@@ -120,11 +153,19 @@ export async function connectTonWallet() {
             await initTonWallet();
         }
         
+        if (!tonConnect) {
+            throw new Error('TonConnect not initialized');
+        }
+        
         const wallets = tonConnect.getWallets();
+        
+        if (!wallets || wallets.length === 0) {
+            throw new Error('No wallets available');
+        }
         
         const tg = window.Telegram?.WebApp;
         if (tg && (tg.platform === 'tdesktop' || tg.platform === 'ios' || tg.platform === 'android')) {
-            const telegramWallet = wallets.find(w => w.name === 'Wallet in Telegram');
+            const telegramWallet = wallets.find(w => w.name === 'Wallet in Telegram' || w.name === 'Telegram');
             if (telegramWallet) {
                 await tonConnect.connect({ wallet: telegramWallet });
                 return { success: true, address: walletAddress };
