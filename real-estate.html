@@ -908,6 +908,9 @@
             tg.setBackgroundColor('#0a2a3a');
         }
 
+        // ===== IMPORT STORAGE FUNCTIONS =====
+        import { getPlayerId, getCredits, spendCredits, getCollection, addElementToHub, removeElementFromCollection, addElementToCollection, getRemainingHubStorage, getHubStorageUsed, getRealEstate, saveRealEstate, getHubInventory } from './js/storage.js';
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -926,6 +929,9 @@
         window.transferIncrementQty = transferIncrementQty;
         window.transferDecrementQty = transferDecrementQty;
         window.confirmTransfer = confirmTransfer;
+
+        // ===== PLAYER ID =====
+        let currentPlayerId = null;
 
         // ===== PROPERTY TYPES (with mass capacity) =====
         const PROPERTY_TYPES = {
@@ -961,57 +967,11 @@
 
         // ===== STORAGE KEYS =====
         const STORAGE_KEYS = {
-            CREDITS: 'voidfarer_credits',
-            REAL_ESTATE: 'voidfarer_real_estate',
             HUB_STORAGE_MAX: 'voidfarer_hub_storage_max',
             HUB_STORAGE_USED: 'voidfarer_hub_storage_used',
-            HUB_INVENTORY: 'voidfarer_hub_inventory',
             SHIP_STORAGE_MAX: 'voidfarer_ship_storage_max',
             SHIP_STORAGE_USED: 'voidfarer_ship_storage_used'
         };
-
-        // ===== FALLBACK STORAGE FUNCTIONS =====
-        if (typeof window.getCredits !== 'function') {
-            window.getCredits = async function() {
-                return parseInt(localStorage.getItem(STORAGE_KEYS.CREDITS) || '50000');
-            };
-        }
-        
-        if (typeof window.spendCredits !== 'function') {
-            window.spendCredits = async function(amount) {
-                let credits = parseInt(localStorage.getItem(STORAGE_KEYS.CREDITS) || '50000');
-                if (credits < amount) return false;
-                credits -= amount;
-                localStorage.setItem(STORAGE_KEYS.CREDITS, credits.toString());
-                return true;
-            };
-        }
-        
-        if (typeof window.getRealEstate !== 'function') {
-            window.getRealEstate = async function() {
-                const data = localStorage.getItem(STORAGE_KEYS.REAL_ESTATE);
-                return data ? JSON.parse(data) : { properties: [] };
-            };
-        }
-        
-        if (typeof window.saveRealEstate !== 'function') {
-            window.saveRealEstate = async function(data) {
-                localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(data));
-            };
-        }
-        
-        if (typeof window.getHubStorageUsed !== 'function') {
-            window.getHubStorageUsed = async function() {
-                return parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
-            };
-        }
-
-        // ===== STATE =====
-        let currentShipItems = [];
-        let currentHubAvailable = 0;
-        let currentTransferItem = null;
-        let currentTransferMax = 1;
-        let currentTransferMassPerUnit = 0;
 
         // ===== ELEMENT ICONS =====
         const elementIcons = {
@@ -1049,18 +1009,24 @@
             return 'common';
         }
 
+        // ===== GET CURRENT PLAYER ID =====
+        function getCurrentPlayerId() {
+            if (!currentPlayerId) {
+                currentPlayerId = getPlayerId();
+            }
+            return currentPlayerId;
+        }
+
         // ===== LOAD SHIP CARGO =====
         async function loadShipCargo() {
             try {
-                let collection = {};
-                if (typeof window.getCollection === 'function') {
-                    collection = await window.getCollection();
-                }
+                const playerId = getCurrentPlayerId();
+                let collection = await getCollection(playerId);
                 
                 // Convert to array and sort by count (largest first)
                 currentShipItems = [];
                 for (const [name, data] of Object.entries(collection)) {
-                    const count = data.count || 1;
+                    const count = typeof data === 'object' ? data.count : data;
                     currentShipItems.push({
                         name: name,
                         count: count,
@@ -1075,8 +1041,8 @@
                 
                 // Get ship total mass
                 let totalMass = 0;
-                if (typeof window.getTotalCargoMass === 'function') {
-                    totalMass = await window.getTotalCargoMass();
+                for (const item of currentShipItems) {
+                    totalMass += item.count * item.massPerUnit;
                 }
                 
                 // Update ship cargo stats
@@ -1150,14 +1116,6 @@
                     console.log('Could not update hub data:', e);
                 }
                 
-                if (typeof window.setHubStorageMax === 'function') {
-                    await window.setHubStorageMax(totalCapacity);
-                }
-                
-                if (typeof window.setHubStorageUsed === 'function') {
-                    await window.setHubStorageUsed(usedStorage);
-                }
-                
                 window.dispatchEvent(new CustomEvent('hub-storage-updated', {
                     detail: { max: totalCapacity, used: usedStorage }
                 }));
@@ -1173,12 +1131,10 @@
         async function getCurrentHubStorageUsed() {
             let used = 0;
             
-            if (typeof window.getHubStorageUsed === 'function') {
-                try {
-                    used = await window.getHubStorageUsed();
-                    return used;
-                } catch (e) {}
-            }
+            try {
+                used = await getHubStorageUsed();
+                return used;
+            } catch (e) {}
             
             const storedUsed = localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED);
             if (storedUsed) {
@@ -1186,29 +1142,18 @@
                 return used;
             }
             
-            try {
-                const hubJson = localStorage.getItem('voidfarer_hub_data');
-                if (hubJson) {
-                    const hub = JSON.parse(hubJson);
-                    if (hub.storageUsed) {
-                        used = hub.storageUsed;
-                        return used;
-                    }
-                }
-            } catch (e) {}
-            
             return used;
         }
 
         // ===== GET HUB AVAILABLE SPACE =====
         async function getHubAvailable() {
-            if (typeof window.getRemainingHubStorage === 'function') {
-                return await window.getRemainingHubStorage();
+            try {
+                return await getRemainingHubStorage();
+            } catch (error) {
+                const max = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX) || '0');
+                const used = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
+                return Math.max(0, max - used);
             }
-            
-            const max = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX) || '0');
-            const used = parseFloat(localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED) || '0');
-            return Math.max(0, max - used);
         }
 
         // ===== NAVIGATION =====
@@ -1221,7 +1166,7 @@
 
         async function updateHubStorageBeforeLeave() {
             try {
-                const propertyData = await window.getRealEstate();
+                const propertyData = await getRealEstate(getCurrentPlayerId());
                 await updateHubStorage(propertyData);
             } catch (e) {
                 console.log('Final hub storage update:', e);
@@ -1259,23 +1204,24 @@
             try {
                 let transferred = 0;
                 let failed = 0;
+                let currentAvailable = await getHubAvailable();
                 
                 for (const item of currentShipItems) {
                     const massToTransfer = item.count * item.massPerUnit;
                     
-                    if (massToTransfer <= currentHubAvailable) {
+                    if (massToTransfer <= currentAvailable) {
                         // Remove from ship
-                        const removeResult = await window.removeElementFromCollection(item.name, item.count);
+                        const removeResult = await removeElementFromCollection(item.name, item.count);
                         if (removeResult.success) {
                             // Add to hub
-                            const addResult = await window.addElementToHub(item.name, item.count);
+                            const addResult = await addElementToHub(item.name, item.count);
                             if (addResult.success) {
                                 transferred += item.count;
-                                currentHubAvailable -= massToTransfer;
+                                currentAvailable -= massToTransfer;
                             } else {
                                 failed++;
                                 // Rollback ship removal
-                                await window.addElementToCollection(item.name, item.count);
+                                await addElementToCollection(item.name, item.count);
                             }
                         }
                     }
@@ -1306,6 +1252,7 @@
             try {
                 let transferred = 0;
                 let failed = 0;
+                let currentAvailable = await getHubAvailable();
                 
                 const rareItems = currentShipItems.filter(item => 
                     item.rarity === 'rare' || item.rarity === 'very-rare' || item.rarity === 'legendary'
@@ -1314,16 +1261,16 @@
                 for (const item of rareItems) {
                     const massToTransfer = item.count * item.massPerUnit;
                     
-                    if (massToTransfer <= currentHubAvailable) {
-                        const removeResult = await window.removeElementFromCollection(item.name, item.count);
+                    if (massToTransfer <= currentAvailable) {
+                        const removeResult = await removeElementFromCollection(item.name, item.count);
                         if (removeResult.success) {
-                            const addResult = await window.addElementToHub(item.name, item.count);
+                            const addResult = await addElementToHub(item.name, item.count);
                             if (addResult.success) {
                                 transferred += item.count;
-                                currentHubAvailable -= massToTransfer;
+                                currentAvailable -= massToTransfer;
                             } else {
                                 failed++;
-                                await window.addElementToCollection(item.name, item.count);
+                                await addElementToCollection(item.name, item.count);
                             }
                         }
                     }
@@ -1343,7 +1290,14 @@
         }
 
         // ===== TRANSFER MODAL FUNCTIONS =====
-        function showTransferModal(itemName, currentCount, massPerUnit) {
+        let currentTransferItem = null;
+        let currentTransferMax = 1;
+        let currentTransferMassPerUnit = 0;
+        let currentHubAvailable = 0;
+
+        async function showTransferModal(itemName, currentCount, massPerUnit) {
+            currentHubAvailable = await getHubAvailable();
+            
             if (currentHubAvailable < massPerUnit) {
                 alert('Not enough hub storage space!');
                 return;
@@ -1412,6 +1366,8 @@
             const quantity = parseInt(document.getElementById('transferQuantity').value);
             const massToTransfer = quantity * currentTransferMassPerUnit;
             
+            currentHubAvailable = await getHubAvailable();
+            
             if (massToTransfer > currentHubAvailable) {
                 document.getElementById('transferWarning').textContent = 'Not enough hub storage space!';
                 return;
@@ -1421,17 +1377,17 @@
             loadingText.textContent = 'transferring to hub...';
             
             try {
-                const removeResult = await window.removeElementFromCollection(currentTransferItem, quantity);
+                const removeResult = await removeElementFromCollection(currentTransferItem, quantity);
                 
                 if (!removeResult.success) {
-                    throw new Error(removeResult.reason || 'Failed to remove from ship');
+                    throw new Error(removeResult.error || 'Failed to remove from ship');
                 }
                 
-                const addResult = await window.addElementToHub(currentTransferItem, quantity);
+                const addResult = await addElementToHub(currentTransferItem, quantity);
                 
                 if (!addResult.success) {
-                    await window.addElementToCollection(currentTransferItem, quantity);
-                    throw new Error(addResult.reason || 'Failed to add to hub');
+                    await addElementToCollection(currentTransferItem, quantity);
+                    throw new Error(addResult.error || 'Failed to add to hub');
                 }
                 
                 closeTransferModal();
@@ -1452,16 +1408,9 @@
         // ===== LOAD DATA =====
         async function loadData() {
             try {
-                let credits = 50000;
-                if (typeof window.getCredits === 'function') {
-                    credits = await window.getCredits();
-                }
-
-                let propertyData = { properties: [] };
-                if (typeof window.getRealEstate === 'function') {
-                    propertyData = await window.getRealEstate();
-                }
-
+                const playerId = getCurrentPlayerId();
+                let credits = await getCredits(playerId);
+                let propertyData = await getRealEstate(playerId);
                 let usedStorage = await getCurrentHubStorageUsed();
                 currentHubAvailable = await getHubAvailable();
 
@@ -1582,14 +1531,15 @@
             const propType = PROPERTY_TYPES[type];
             if (!propType) return;
 
-            let credits = typeof window.getCredits === 'function' ? await window.getCredits() : 50000;
+            const playerId = getCurrentPlayerId();
+            let credits = await getCredits(playerId);
 
             if (credits < propType.price) {
                 alert('Not enough credits!');
                 return;
             }
 
-            let propertyData = typeof window.getRealEstate === 'function' ? await window.getRealEstate() : { properties: [] };
+            let propertyData = await getRealEstate(playerId);
 
             if (propertyData.properties?.some(p => p.type === type)) {
                 alert('You already own this type of property!');
@@ -1600,13 +1550,9 @@
             loadingText.textContent = 'expanding hub storage...';
 
             try {
-                if (typeof window.spendCredits === 'function') {
-                    const spent = await window.spendCredits(propType.price);
-                    if (!spent) {
-                        throw new Error('Failed to spend credits');
-                    }
-                } else {
-                    localStorage.setItem(STORAGE_KEYS.CREDITS, (credits - propType.price).toString());
+                const spent = await spendCredits(propType.price, playerId);
+                if (!spent) {
+                    throw new Error('Failed to spend credits');
                 }
 
                 let currentUsed = await getCurrentHubStorageUsed();
@@ -1628,18 +1574,14 @@
 
                 propertyData.properties.push(newProp);
                 
-                if (typeof window.saveRealEstate === 'function') {
-                    await window.saveRealEstate(propertyData);
-                } else {
-                    localStorage.setItem(STORAGE_KEYS.REAL_ESTATE, JSON.stringify(propertyData));
-                }
+                await saveRealEstate(propertyData, playerId);
 
                 const { totalCapacity } = await updateHubStorage(propertyData);
 
                 const shipMax = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_MAX) || '500';
                 const shipUsed = localStorage.getItem(STORAGE_KEYS.SHIP_STORAGE_USED) || '0';
 
-                await loadData();
+                await loadAllData();
 
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 
@@ -1667,15 +1609,20 @@
             navigateTo(`hub-inventory.html?property=${propertyId}`);
         }
 
+        // ===== LOAD ALL DATA =====
+        async function loadAllData() {
+            await loadData();
+        }
+
         // ===== INITIALIZE =====
         async function init() {
             try {
                 loadingOverlay.classList.add('active');
                 loadingText.textContent = 'loading earth hub real estate...';
 
-                if (!localStorage.getItem(STORAGE_KEYS.CREDITS)) {
-                    localStorage.setItem(STORAGE_KEYS.CREDITS, '50000');
-                }
+                // Initialize player ID
+                currentPlayerId = getPlayerId();
+                console.log('Real Estate loading for player:', currentPlayerId);
 
                 if (!localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX)) {
                     localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, '0');
@@ -1691,7 +1638,7 @@
                     localStorage.setItem(STORAGE_KEYS.SHIP_STORAGE_USED, '0');
                 }
 
-                await loadData();
+                await loadAllData();
 
                 setTimeout(() => {
                     loadingOverlay.classList.remove('active');
