@@ -11,7 +11,9 @@ const FUEL_CONFIG = {
     stonfiApi: 'https://api.ston.fi/v1',
     apiEndpoint: 'https://tonapi.io/v2',
     fuelToCreditsRate: 100,
-    decimals: 9
+    decimals: 9,
+    // USDT jetton address on TON
+    usdtAddress: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs'
 };
 
 // ===== STATE =====
@@ -24,7 +26,6 @@ export async function getFuelBalance(walletAddress) {
     if (!walletAddress) return 0;
     
     try {
-        // Try STON.fi first
         const response = await fetch(
             `${FUEL_CONFIG.stonfiApi}/accounts/${walletAddress}/jettons/${FUEL_CONFIG.contractAddress}/balance`
         );
@@ -35,7 +36,6 @@ export async function getFuelBalance(walletAddress) {
             return fuelBalance;
         }
         
-        // Fallback to tonapi
         const tonApiResponse = await fetch(
             `${FUEL_CONFIG.apiEndpoint}/jetton/${FUEL_CONFIG.contractAddress}/accounts/${walletAddress}`
         );
@@ -55,46 +55,67 @@ export async function getFuelBalance(walletAddress) {
     }
 }
 
-// ===== GET FUEL PRICE FROM STON.FI =====
+// ===== GET FUEL PRICE FROM STON.FI (FUEL/USDT) =====
 export async function getFuelPrice() {
     try {
-        // Get asset info which contains price data
+        // Get price via FUEL -> USDT swap estimate
         const response = await fetch(
-            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
+            `${FUEL_CONFIG.stonfiApi}/swap/estimate?` +
+            `offer_address=${FUEL_CONFIG.contractAddress}&` +
+            `ask_address=${FUEL_CONFIG.usdtAddress}&` +
+            `units=${Math.pow(10, FUEL_CONFIG.decimals)}` // 1 FUEL
         );
         
         if (response.ok) {
             const data = await response.json();
-            // The asset response contains price info in the asset object
-            if (data.asset && data.asset.price) {
-                fuelPrice = parseFloat(data.asset.price);
-                lastUpdate = Date.now();
-                return fuelPrice;
-            }
-        }
-        
-        // Fallback: Get price via reverse swap (1 FUEL to TON)
-        const swapResponse = await fetch(
-            `${FUEL_CONFIG.stonfiApi}/swap/estimate?` +
-            `offer_address=${FUEL_CONFIG.contractAddress}&` +
-            `ask_address=ton&` +
-            `units=${Math.pow(10, FUEL_CONFIG.decimals)}` // 1 FUEL
-        );
-        
-        if (swapResponse.ok) {
-            const data = await swapResponse.json();
-            // ask_units is TON amount received for 1 FUEL
-            const tonAmount = data.ask_units / 1e9;
-            fuelPrice = tonAmount;
+            // ask_units is USDT amount received for 1 FUEL (USDT has 6 decimals)
+            const usdtAmount = data.ask_units / 1e6;
+            fuelPrice = usdtAmount;
             lastUpdate = Date.now();
             return fuelPrice;
+        }
+        
+        // Alternative: Get price via USDT -> FUEL swap estimate
+        const reverseResponse = await fetch(
+            `${FUEL_CONFIG.stonfiApi}/swap/estimate?` +
+            `offer_address=${FUEL_CONFIG.usdtAddress}&` +
+            `ask_address=${FUEL_CONFIG.contractAddress}&` +
+            `units=1000000` // 1 USDT = 1e6
+        );
+        
+        if (reverseResponse.ok) {
+            const data = await reverseResponse.json();
+            // ask_units is FUEL amount received for 1 USDT
+            const fuelAmount = data.ask_units / Math.pow(10, FUEL_CONFIG.decimals);
+            fuelPrice = 1 / fuelAmount;
+            lastUpdate = Date.now();
+            return fuelPrice;
+        }
+        
+        // Fallback to asset info
+        const assetResponse = await fetch(
+            `${FUEL_CONFIG.stonfiApi}/assets/${FUEL_CONFIG.contractAddress}`
+        );
+        
+        if (assetResponse.ok) {
+            const data = await assetResponse.json();
+            if (data.asset && data.asset.price) {
+                fuelPrice = parseFloat(data.asset.price);
+                return fuelPrice;
+            }
         }
         
         return 0.01;
     } catch (error) {
         console.error('Error fetching FUEL price:', error);
-        return fuelPrice || 0.01;
+        return 0.01;
     }
+}
+
+// ===== GET FUEL PRICE IN USDT (for display) =====
+export async function getFuelPriceInUsdt() {
+    const price = await getFuelPrice();
+    return price;
 }
 
 // ===== GET FUEL METADATA =====
@@ -105,7 +126,6 @@ export async function getFuelMetadata() {
         );
         
         if (response.status === 404) {
-            console.log('FUEL token metadata not found on STON.fi');
             return {
                 name: 'Fuel Token',
                 symbol: 'FUEL',
@@ -160,9 +180,8 @@ export async function getTotalSupply() {
 // ===== GET BURNED SUPPLY =====
 export async function getBurnedSupply() {
     try {
-        // Get total supply and initial supply
         const totalSupply = await getTotalSupply();
-        const initialSupply = 250000; // Max supply from reward pool
+        const initialSupply = 250000;
         const burned = Math.max(0, initialSupply - totalSupply);
         return burned;
     } catch (error) {
@@ -294,13 +313,6 @@ export async function getHolderCount() {
 }
 
 // ===== BUY CREDITS WITH FUEL (DIRECT BURN) =====
-/**
- * Buy game credits using FUEL tokens (direct burn)
- * @param {string} playerId - Player ID
- * @param {number} fuelAmount - Amount of FUEL to burn
- * @param {number} currentFuelBalance - Current FUEL balance (for verification)
- * @returns {Promise<Object>} Result with success, credits, txHash
- */
 export async function buyCreditsWithFuel(playerId, fuelAmount, currentFuelBalance) {
     const walletConnected = getWalletConnected();
     
@@ -374,6 +386,7 @@ export default {
     FUEL_CONFIG,
     getFuelBalance,
     getFuelPrice,
+    getFuelPriceInUsdt,
     getFuelMetadata,
     getTotalSupply,
     getBurnedSupply,
