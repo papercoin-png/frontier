@@ -650,7 +650,7 @@
                     <span class="wallet-address" id="walletAddressShort">---</span>
                     <span class="wallet-balance">💰 Balance: <span id="walletBalance">0</span> TON</span>
                     <span class="wallet-balance" id="usdtWalletBalance" style="display: none;">💵 USDT: <span id="usdtBalance">0</span></span>
-                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span> FUEL</span>
+                    <span class="wallet-balance" id="fuelWalletBalance" style="display: none;">🔥 FUEL: <span id="fuelBalance">0</span></span>
                     <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
                 </div>
             </div>
@@ -785,7 +785,7 @@
                 </div>
             </div>
             
-            <!-- FUEL Packages -->
+            <!-- FUEL Packages (In-Game Currency) -->
             <div id="fuelPackages" class="packages-grid" style="display: none;">
                 <div class="package-card" data-fuel="50" data-credits="5000">
                     <div class="package-icon">🔥</div>
@@ -827,12 +827,6 @@
                         <span class="offer-price">2 TON / 2 USDT / 200 FUEL</span>
                         <button class="offer-btn">UNLOCK</button>
                     </div>
-                    <div class="offer-card" data-offer="fuel_boost">
-                        <span class="offer-icon">🔥</span>
-                        <span class="offer-title">Fuel Accelerator</span>
-                        <span class="offer-price">5 TON / 5 USDT / 500 FUEL</span>
-                        <button class="offer-btn">UNLOCK</button>
-                    </div>
                     <div class="offer-card" data-offer="cargo_upgrade">
                         <span class="offer-icon">🚀</span>
                         <span class="offer-title">Cargo Upgrade</span>
@@ -862,9 +856,9 @@
     </div>
 
     <script type="module">
-        import { getPlayerId, getCredits, addCredits, recordPurchase, getPurchaseHistory, getTotalSpent } from './js/storage.js';
+        import { getPlayerId, getCredits, addCredits, recordPurchase, getPurchaseHistory, getTotalSpent, getFuelBalance, spendFuelTokens } from './js/storage.js';
         import { initTonWallet, connectTonWallet, disconnectTonWallet, getTonBalance, isWalletConnected, getShortAddress, buyCreditsWithTon, buyCreditsWithUsdt } from './js/ton-connect.js';
-        import { getFuelBalance, getFuelPrice, getBurnedSupply, fuelToCredits, buyCreditsWithFuel } from './js/fuel-token.js';
+        import { getBurnedSupply } from './js/fuel-token.js';
 
         // ===== TELEGRAM =====
         const tg = window.Telegram?.WebApp;
@@ -883,7 +877,6 @@
         let tonBalance = 0;
         let usdtBalance = 0;
         let fuelBalance = 0;
-        let fuelPrice = 0.01;
         let totalBurned = 0;
 
         // ===== DOM ELEMENTS =====
@@ -923,8 +916,8 @@
             
             const connectBtn = document.getElementById('connectWalletBtn');
             const connectedInfo = document.getElementById('walletConnectedInfo');
-            const fuelBalanceSpan = document.getElementById('fuelWalletBalance');
             const usdtBalanceSpan = document.getElementById('usdtWalletBalance');
+            const fuelBalanceSpan = document.getElementById('fuelWalletBalance');
             
             if (walletConnected) {
                 connectBtn.style.display = 'none';
@@ -942,7 +935,8 @@
                     document.getElementById('usdtBalance').textContent = usdtBalance.toFixed(2);
                 }
                 
-                fuelBalance = await getFuelBalance(walletAddress);
+                // Update in-game fuel balance
+                fuelBalance = await getFuelBalance(playerId);
                 if (fuelBalanceSpan) {
                     fuelBalanceSpan.style.display = 'flex';
                     document.getElementById('fuelBalance').textContent = fuelBalance.toFixed(2);
@@ -950,8 +944,8 @@
             } else {
                 connectBtn.style.display = 'block';
                 connectedInfo.style.display = 'none';
-                if (fuelBalanceSpan) fuelBalanceSpan.style.display = 'none';
                 if (usdtBalanceSpan) usdtBalanceSpan.style.display = 'none';
+                if (fuelBalanceSpan) fuelBalanceSpan.style.display = 'none';
             }
         }
 
@@ -1096,23 +1090,22 @@
         }
         
         async function buyWithFuel(fuelAmount, creditsAmount) {
-            if (!walletConnected) {
-                showToast('Please connect your wallet first', 'error');
-                return false;
-            }
+            // In-game FUEL purchase - no wallet required
+            const currentFuel = await getFuelBalance(playerId);
             
-            if (fuelBalance < fuelAmount) {
-                showToast(`Insufficient FUEL. Need ${fuelAmount}, have ${fuelBalance.toFixed(2)}`, 'error');
+            if (currentFuel < fuelAmount) {
+                showToast(`Insufficient FUEL. Need ${fuelAmount}, have ${currentFuel}`, 'error');
                 return false;
             }
             
             showLoading(true, 'Processing purchase...');
             
             try {
-                const result = await buyCreditsWithFuel(playerId, fuelAmount, fuelBalance);
+                const spent = await spendFuelTokens(fuelAmount, playerId);
                 
-                if (result.success) {
-                    await recordPurchase(playerId, fuelAmount, creditsAmount, 'FUEL', result.txHash);
+                if (spent) {
+                    await addCredits(creditsAmount, playerId);
+                    await recordPurchase(playerId, fuelAmount, creditsAmount, 'FUEL', null);
                     await updateBalance();
                     await updatePurchaseHistory();
                     await updateWalletUI();
@@ -1123,7 +1116,7 @@
                     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                     return true;
                 } else {
-                    showToast(result.error || 'Purchase failed', 'error');
+                    showToast('Purchase failed', 'error');
                     return false;
                 }
             } catch (error) {
@@ -1137,25 +1130,34 @@
 
         // ===== SPECIAL OFFERS =====
         async function buyCertificateBoost() {
-            if (!walletConnected) {
-                showToast('Please connect your wallet first', 'error');
-                return;
-            }
-            
             let cost = 2;
             let method = currentPaymentMethod;
             
-            if (method === 'ton' && tonBalance < cost) {
-                showToast(`Insufficient TON. Need ${cost} TON`, 'error');
-                return;
-            }
-            if (method === 'usdt' && usdtBalance < cost) {
-                showToast(`Insufficient USDT. Need ${cost} USDT`, 'error');
-                return;
-            }
-            if (method === 'fuel' && fuelBalance < cost * 100) {
-                showToast(`Insufficient FUEL. Need ${cost * 100} FUEL`, 'error');
-                return;
+            if (method === 'ton') {
+                if (!walletConnected) {
+                    showToast('Please connect your wallet first', 'error');
+                    return;
+                }
+                if (tonBalance < cost) {
+                    showToast(`Insufficient TON. Need ${cost} TON`, 'error');
+                    return;
+                }
+            } else if (method === 'usdt') {
+                if (!walletConnected) {
+                    showToast('Please connect your wallet first', 'error');
+                    return;
+                }
+                if (usdtBalance < cost) {
+                    showToast(`Insufficient USDT. Need ${cost} USDT`, 'error');
+                    return;
+                }
+            } else {
+                // In-game FUEL purchase
+                const currentFuel = await getFuelBalance(playerId);
+                if (currentFuel < 200) {
+                    showToast(`Insufficient FUEL. Need 200 FUEL`, 'error');
+                    return;
+                }
             }
             
             showLoading(true, 'Processing special offer...');
@@ -1167,14 +1169,16 @@
                 } else if (method === 'usdt') {
                     result = await buyCreditsWithUsdt(playerId, cost);
                 } else {
-                    result = await buyCreditsWithFuel(playerId, cost * 100, fuelBalance);
+                    const spent = await spendFuelTokens(200, playerId);
+                    result = spent ? { success: true } : { success: false, error: 'Failed to spend FUEL' };
                 }
                 
                 if (result.success) {
                     const { awardCertificateXP } = await import('./js/certificates.js');
                     await awardCertificateXP(playerId, 500);
                     
-                    await recordPurchase(playerId, method === 'ton' ? cost : method === 'usdt' ? cost : cost * 100, 0, `${method.toUpperCase()}_BOOST`, result.txHash);
+                    const boostCost = method === 'fuel' ? 200 : cost;
+                    await recordPurchase(playerId, boostCost, 0, `${method.toUpperCase()}_BOOST`, result.txHash);
                     await updateBalance();
                     await updateWalletUI();
                     
@@ -1247,7 +1251,6 @@
             card.addEventListener('click', () => {
                 const offerType = card.dataset.offer;
                 if (offerType === 'cert_boost') buyCertificateBoost();
-                else if (offerType === 'fuel_boost') showToast('Coming soon!', 'info');
                 else if (offerType === 'cargo_upgrade') showToast('Coming soon!', 'info');
             });
         });
@@ -1284,8 +1287,6 @@
                 await updateWalletUI();
                 await updateBurnStats();
                 await updatePurchaseHistory();
-                
-                fuelPrice = await getFuelPrice();
                 
                 showLoading(false);
                 
