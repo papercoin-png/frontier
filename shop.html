@@ -8,13 +8,12 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- CORRECT CDN - Vanilla JS version (works in both browser and Telegram) -->
+    <!-- TON Connect UI - Vanilla JS version (works in both browser and Telegram) -->
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        /* Your existing styles - keep them */
         * {
             margin: 0;
             padding: 0;
@@ -54,9 +53,155 @@
             -webkit-overflow-scrolling: touch;
         }
         
-        /* Add all your existing styles here */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0B0E14;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            flex-direction: column;
+            gap: 20px;
+        }
         
-        .tc-button {
+        .loading-overlay.active {
+            display: flex;
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #F0B90B;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .loading-text {
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .shop-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .shop-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #F0B90B;
+            letter-spacing: -0.5px;
+        }
+        
+        .shop-badge {
+            background: #2B2F36;
+            color: #848E9C;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .refresh-btn {
+            background: #2B2F36;
+            border: none;
+            color: #EAECEF;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-size: 18px;
+        }
+        
+        .refresh-btn:active {
+            background: #3A3F4A;
+            transform: scale(0.95);
+        }
+        
+        .account-bar {
+            background: #1E2026;
+            border-radius: 60px 20px 60px 20px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .player-name {
+            color: #EAECEF;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .player-id {
+            color: #848E9C;
+            font-size: 10px;
+        }
+        
+        .credits-value {
+            color: #F0B90B;
+            font-size: 20px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        .credits-value span {
+            font-size: 12px;
+            color: #848E9C;
+        }
+        
+        .wallet-status {
+            background: #1A1D24;
+            border-radius: 60px 20px 60px 20px;
+            padding: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #2B2F36;
+        }
+        
+        /* TON Connect button styling */
+        #ton-connect-button {
             display: flex;
             justify-content: center;
             width: 100%;
@@ -88,7 +233,6 @@
             font-size: 12px;
         }
         
-        /* Keep all your payment-tabs, packages-grid, etc. styles */
         .payment-tabs {
             display: flex;
             gap: 4px;
@@ -842,7 +986,6 @@
         
         // ===== TON CONNECT UI INITIALIZATION - CORRECT VANILLA JS VERSION =====
         function initTonConnect() {
-            // Check if the library loaded (TON_CONNECT_UI global variable)
             if (typeof window.TON_CONNECT_UI === 'undefined') {
                 console.log('Waiting for TON_CONNECT_UI to load...');
                 setTimeout(initTonConnect, 500);
@@ -850,20 +993,10 @@
             }
             
             try {
-                // Create the TonConnectUI instance - NOTE: Use TON_CONNECT_UI.TonConnectUI, not TonConnectUI directly
                 tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
-                    manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json',
+                    manifestUrl: 'https://papercoin-png.github.io/frontier/tonconnect-manifest.json',
                     buttonRootId: 'ton-connect-button'
                 });
-                
-                // Set return URL for Telegram Mini App [citation:1][citation:5]
-                if (tg) {
-                    tonConnectUI.setOptions({
-                        actionsConfiguration: {
-                            twaReturnUrl: 'https://t.me/papercoin_png_bot/voidfarer'
-                        }
-                    });
-                }
                 
                 // Listen for wallet connection status
                 tonConnectUI.onStatusChange((wallet) => {
@@ -1155,7 +1288,7 @@
                 await updateBurnStats();
                 await updatePurchaseHistory();
                 
-                // Initialize TON Connect UI - CORRECT VANILLA JS VERSION
+                // Initialize TON Connect UI
                 initTonConnect();
                 
                 showLoading(false);
