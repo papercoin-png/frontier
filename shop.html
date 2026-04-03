@@ -1111,38 +1111,29 @@
                 return wallets;
             } catch (error) {
                 console.error('Error fetching wallets:', error);
-                // Fallback to basic wallets if fetch fails
-                return [
-                    { name: 'Tonkeeper', universal_url: 'https://app.tonkeeper.com/ton-connect', image: 'https://tonkeeper.com/assets/tonconnect-icon.png' },
-                    { name: 'Tonhub', universal_url: 'tonhub://ton-connect', image: '' },
-                    { name: 'MyTonWallet', universal_url: 'mytonwallet://ton-connect', image: '' }
-                ];
+                return [];
             }
         }
         
-        // ===== UNIVERSAL WALLET CONNECTION =====
+        // ===== UNIVERSAL WALLET CONNECTION - EACH WALLET OPENS ITS OWN APP =====
         async function connectWallet() {
             showLoading(true, 'Loading wallets...');
             
             try {
-                // Fetch all supported wallets dynamically
                 const wallets = await fetchWallets();
-                availableWallets = wallets;
                 
-                if (!availableWallets || availableWallets.length === 0) {
+                if (!wallets || wallets.length === 0) {
                     throw new Error('No wallets found');
                 }
                 
-                // Build wallet list UI dynamically
                 walletListEl.innerHTML = '';
                 
-                availableWallets.forEach(wallet => {
+                wallets.forEach(wallet => {
                     const btn = document.createElement('button');
                     btn.className = 'wallet-option';
                     
-                    // Add wallet icon if available
-                    const iconHtml = wallet.image ? 
-                        `<div class="wallet-icon"><img src="${wallet.image}" alt="${wallet.name}" onerror="this.style.display='none'"></div>` : 
+                    const iconHtml = wallet.image_url ? 
+                        `<div class="wallet-icon"><img src="${wallet.image_url}" alt="${wallet.name}" onerror="this.style.display='none'"></div>` : 
                         '<div class="wallet-icon">💰</div>';
                     
                     btn.innerHTML = `
@@ -1152,35 +1143,25 @@
                     
                     btn.onclick = async () => {
                         closeWalletModal();
-                        showLoading(true, `Connecting to ${wallet.name}...`);
+                        showLoading(true, `Opening ${wallet.name}...`);
                         try {
-                            // Generate connection URL based on wallet's universal_url
                             const manifestUrl = encodeURIComponent('https://papercoin-png.github.io/tonconnect-manifest.json');
-                            let connectionUrl;
                             
+                            // Use the wallet's own universal URL - THIS IS THE KEY FIX
                             if (wallet.universal_url) {
-                                // Use wallet's universal URL if available
-                                connectionUrl = `${wallet.universal_url}?manifestUrl=${manifestUrl}`;
-                            } else if (wallet.bridge && wallet.bridge.length > 0 && wallet.bridge[0].url) {
-                                // Fallback to HTTP bridge connection
-                                connectionUrl = `https://app.tonkeeper.com/ton-connect?manifestUrl=${manifestUrl}`;
+                                const connectionUrl = `${wallet.universal_url}?manifestUrl=${manifestUrl}`;
+                                window.location.href = connectionUrl;
+                                showToast(`Opening ${wallet.name}... Approve connection in the app`, 'info');
+                            } else if (wallet.jsBridgeKey) {
+                                // Browser extension wallet
+                                showToast(`${wallet.name} extension will open. Please approve.`, 'info');
+                                // For extension wallets, the connection will be handled by the extension
+                                simulateWalletConnection(wallet.name);
                             } else {
-                                // Default to Tonkeeper
-                                connectionUrl = `https://app.tonkeeper.com/ton-connect?manifestUrl=${manifestUrl}`;
+                                throw new Error(`No connection method for ${wallet.name}`);
                             }
-                            
-                            // Open the wallet connection URL
-                            window.location.href = connectionUrl;
-                            showToast(`Opening ${wallet.name}... Approve connection in the app`, 'info');
-                            
-                            // Simulate connection after user returns
-                            setTimeout(() => {
-                                if (confirm(`After approving in ${wallet.name}, click OK to continue`)) {
-                                    simulateWalletConnection(wallet.name);
-                                }
-                            }, 5000);
                         } catch (err) {
-                            showToast(`Connection to ${wallet.name} failed: ${err.message}`, 'error');
+                            showToast(`Failed to open ${wallet.name}: ${err.message}`, 'error');
                         } finally {
                             showLoading(false);
                         }
