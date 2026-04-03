@@ -8,8 +8,10 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- Correct TON Connect UI CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.0.0/dist/tonconnect-ui.min.js"></script>
+    <!-- TON Connect UI - React version (what professional apps use) -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonconnect/ui-react@2.2.0/dist/tonconnect-ui-react.umd.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -200,8 +202,8 @@
             border: 1px solid #2B2F36;
         }
         
-        /* TON Connect button styling */
-        .tc-button {
+        /* Professional TON Connect button */
+        #tc-button-container {
             display: flex;
             justify-content: center;
             width: 100%;
@@ -634,8 +636,7 @@
             </div>
             
             <div class="wallet-status" id="walletStatus">
-                <!-- TON Connect button will be injected here -->
-                <div id="ton-connect-button"></div>
+                <div id="tc-button-container"></div>
                 <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
                     <span class="wallet-address" id="walletAddressShort">---</span>
                     <button class="disconnect-btn" id="disconnectWalletBtn">Disconnect</button>
@@ -864,7 +865,6 @@
         let walletAddress = null;
         let fuelBalance = 0;
         let totalBurned = 0;
-        let tonConnectUI = null;
         
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -938,7 +938,7 @@
         }
         
         function updateWalletUI(wallet) {
-            const buttonContainer = document.getElementById('ton-connect-button');
+            const buttonContainer = document.getElementById('tc-button-container');
             const connectedInfo = document.getElementById('walletConnectedInfo');
             
             if (wallet && wallet.account) {
@@ -984,33 +984,31 @@
             }
         }
         
-        // ===== TON CONNECT UI INITIALIZATION =====
+        // ===== TON CONNECT UI INITIALIZATION - PROFESSIONAL METHOD =====
         function initTonConnect() {
-            if (typeof window.TonConnectUI === 'undefined') {
-                console.log('Waiting for TonConnectUI to load...');
+            // Wait for React and the library to load
+            if (typeof window.TonConnectUIReact === 'undefined') {
+                console.log('Waiting for TonConnectUIReact to load...');
                 setTimeout(initTonConnect, 500);
                 return;
             }
             
             try {
-                tonConnectUI = new window.TonConnectUI({
-                    manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json',
-                    buttonRootId: 'ton-connect-button'
-                });
+                // Create the React root and render the Connect Button
+                const container = document.getElementById('tc-button-container');
+                if (container && !container.hasChildNodes()) {
+                    window.TonConnectUIReact.createButton(container, {
+                        manifestUrl: 'https://papercoin-png.github.io/tonconnect-manifest.json'
+                    });
+                }
                 
                 // Listen for wallet connection status
-                tonConnectUI.onStatusChange((wallet) => {
+                window.TonConnectUIReact.onStatusChange((wallet) => {
                     updateWalletUI(wallet);
                     if (wallet && wallet.account) {
                         showToast('Wallet connected!', 'success');
                     }
                 });
-                
-                // Check if already connected
-                const wallet = tonConnectUI.wallet;
-                if (wallet) {
-                    updateWalletUI(wallet);
-                }
                 
                 console.log('✅ TON Connect UI initialized - supports all wallets');
             } catch (error) {
@@ -1019,8 +1017,8 @@
         }
         
         async function disconnectWallet() {
-            if (tonConnectUI) {
-                await tonConnectUI.disconnect();
+            if (window.TonConnectUIReact) {
+                await window.TonConnectUIReact.disconnect();
             }
             updateWalletUI(null);
             showToast('Wallet disconnected', 'info');
@@ -1028,7 +1026,7 @@
         
         // ===== PURCHASE FUNCTIONS =====
         async function buyWithTon(tonAmount, creditsAmount) {
-            if (!walletConnected || !tonConnectUI || !tonConnectUI.wallet) {
+            if (!walletConnected) {
                 showToast('Please connect your wallet first', 'error');
                 return false;
             }
@@ -1053,7 +1051,7 @@
                 };
                 
                 showLoading(true, 'Confirm in wallet...');
-                const result = await tonConnectUI.sendTransaction(transaction);
+                const result = await window.TonConnectUIReact.sendTransaction(transaction);
                 
                 if (result) {
                     await addCredits(creditsAmount, playerId);
@@ -1078,7 +1076,7 @@
         }
         
         async function buyWithUsdt(usdtAmount, creditsAmount) {
-            if (!walletConnected || !tonConnectUI || !tonConnectUI.wallet) {
+            if (!walletConnected) {
                 showToast('Please connect your wallet first', 'error');
                 return false;
             }
@@ -1111,7 +1109,7 @@
                 };
                 
                 showLoading(true, 'Confirm in wallet...');
-                const result = await tonConnectUI.sendTransaction(transaction);
+                const result = await window.TonConnectUIReact.sendTransaction(transaction);
                 
                 if (result) {
                     await addCredits(creditsAmount, playerId);
@@ -1288,7 +1286,7 @@
                 await updateBurnStats();
                 await updatePurchaseHistory();
                 
-                // Initialize TON Connect UI
+                // Initialize TON Connect UI - professional wallet connection
                 initTonConnect();
                 
                 showLoading(false);
