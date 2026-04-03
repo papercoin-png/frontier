@@ -8,11 +8,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
     
-    <!-- TON Connect UI - Vanilla JS version (works in both browser and Telegram) -->
+    <!-- TON Connect UI - Vanilla JS version -->
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-    
-    <!-- TON library for building cells -->
-    <script src="https://unpkg.com/@ton/ton@14.0.0/dist/index.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
@@ -203,7 +200,6 @@
             border: 1px solid #2B2F36;
         }
         
-        /* TON Connect button styling */
         #ton-connect-button {
             display: flex;
             justify-content: center;
@@ -637,7 +633,6 @@
             </div>
             
             <div class="wallet-status" id="walletStatus">
-                <!-- TON Connect button will be injected here -->
                 <div id="ton-connect-button"></div>
                 <div id="walletConnectedInfo" style="display: none;" class="wallet-connected-info">
                     <span class="wallet-address" id="walletAddressShort">---</span>
@@ -681,7 +676,6 @@
                 </div>
             </div>
             
-            <!-- TON Packages -->
             <div id="tonPackages" class="packages-grid">
                 <div class="package-card" data-ton="0.5" data-credits="500">
                     <div class="package-icon">⭐</div>
@@ -728,7 +722,6 @@
                 </div>
             </div>
             
-            <!-- USDT Packages -->
             <div id="usdtPackages" class="packages-grid" style="display: none;">
                 <div class="package-card" data-usdt="0.5" data-credits="500">
                     <div class="package-icon">💵</div>
@@ -775,7 +768,6 @@
                 </div>
             </div>
             
-            <!-- FUEL Packages (In-Game Currency) -->
             <div id="fuelPackages" class="packages-grid" style="display: none;">
                 <div class="package-card" data-fuel="50" data-credits="5000">
                     <div class="package-icon">🔥</div>
@@ -848,17 +840,14 @@
     <script type="module">
         import { getPlayerId, getCredits, addCredits, recordPurchase, getPurchaseHistory, getTotalSpent, getFuelBalance, spendFuelTokens } from './js/storage.js';
         
-        // ===== TELEGRAM =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.ready();
             tg.expand();
         }
         
-        // ===== CONFIGURATION =====
         const SHOP_WALLET_ADDRESS = 'UQAwbP_8ZLRueHqSxmmiCLr64ETQ3aa6RWqFwx9Dx9feUtOC';
         
-        // ===== STATE =====
         let playerId = null;
         let playerName = 'VOIDFARER';
         let currentCredits = 0;
@@ -869,11 +858,9 @@
         let totalBurned = 0;
         let tonConnectUI = null;
         
-        // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         
-        // ===== UTILITIES =====
         function showLoading(show, message = 'LOADING...') {
             if (show) {
                 loadingText.textContent = message;
@@ -891,7 +878,6 @@
             setTimeout(() => toast.remove(), 3000);
         }
         
-        // ===== UPDATE UI =====
         async function updateBalance() {
             try {
                 currentCredits = await getCredits(playerId);
@@ -959,7 +945,6 @@
             }
         }
         
-        // ===== PAYMENT METHOD SWITCH =====
         function switchPaymentMethod(method) {
             currentPaymentMethod = method;
             
@@ -987,7 +972,35 @@
             }
         }
         
-        // ===== TON CONNECT UI INITIALIZATION =====
+        // Helper function to create a text comment payload without external libraries
+        // Based on TON docs: storeUint(0, 32) + storeStringTail(text) -> then convert to base64
+        function createTextCommentPayload(comment) {
+            // Helper to convert string to bytes (UTF-8)
+            const encoder = new TextEncoder();
+            const textBytes = encoder.encode(comment);
+            
+            // Build the cell structure manually
+            // A TON cell has: data length prefix + data + references
+            // For a simple text comment: 0x00000000 + string bytes
+            // The format: 0x00000000 (4 bytes) then the UTF-8 string
+            
+            // Create buffer for the payload (4 bytes + string length)
+            const buffer = new ArrayBuffer(4 + textBytes.length);
+            const view = new DataView(buffer);
+            
+            // Write 0x00000000 (32-bit integer) - this is the text comment flag
+            view.setUint32(0, 0, false);
+            
+            // Write the string bytes
+            for (let i = 0; i < textBytes.length; i++) {
+                view.setUint8(4 + i, textBytes[i]);
+            }
+            
+            // Convert to base64
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            return base64;
+        }
+        
         function initTonConnect() {
             if (typeof window.TON_CONNECT_UI === 'undefined') {
                 console.log('Waiting for TON_CONNECT_UI to load...');
@@ -1001,7 +1014,6 @@
                     buttonRootId: 'ton-connect-button'
                 });
                 
-                // Listen for wallet connection status
                 tonConnectUI.onStatusChange((wallet) => {
                     updateWalletUI(wallet);
                     if (wallet && wallet.account) {
@@ -1009,13 +1021,12 @@
                     }
                 });
                 
-                // Check if already connected
                 const wallet = tonConnectUI.wallet;
                 if (wallet) {
                     updateWalletUI(wallet);
                 }
                 
-                console.log('✅ TON Connect UI initialized - supports all wallets in browser and Telegram');
+                console.log('✅ TON Connect UI initialized');
             } catch (error) {
                 console.error('TON Connect init error:', error);
             }
@@ -1029,7 +1040,6 @@
             showToast('Wallet disconnected', 'info');
         }
         
-        // ===== PURCHASE FUNCTIONS =====
         async function buyWithTon(tonAmount, creditsAmount) {
             if (!walletConnected || !tonConnectUI || !tonConnectUI.wallet) {
                 showToast('Please connect your wallet first', 'error');
@@ -1039,20 +1049,7 @@
             showLoading(true, 'Preparing transaction...');
             
             try {
-                // Create the comment text
                 const comment = `buy_credits:${playerId}:${creditsAmount}`;
-                
-                // Use window.TON to build the cell correctly
-                const { beginCell } = window.TON;
-                
-                // Build cell according to TON docs: store 0 (text comment flag) then the string
-                const body = beginCell()
-                    .storeUint(0, 32)           // 0x00000000 = text comment flag
-                    .storeStringTail(comment)    // Store the comment string
-                    .endCell();
-                
-                // Convert to base64 - this is what the wallet expects
-                const payload = body.toBoc().toString('base64');
                 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 600,
@@ -1060,7 +1057,7 @@
                         {
                             address: SHOP_WALLET_ADDRESS,
                             amount: Math.floor(tonAmount * 1e9).toString(),
-                            payload: payload
+                            payload: createTextCommentPayload(comment)
                         }
                     ]
                 };
@@ -1151,7 +1148,6 @@
             }
         }
         
-        // ===== SPECIAL OFFERS =====
         async function buyCertificateBoost() {
             let method = currentPaymentMethod;
             
@@ -1190,7 +1186,6 @@
             }
         }
         
-        // ===== EVENT HANDLERS =====
         document.getElementById('disconnectWalletBtn')?.addEventListener('click', disconnectWallet);
         
         document.querySelectorAll('.payment-tab').forEach(tab => {
@@ -1235,7 +1230,6 @@
             });
         });
         
-        // ===== REFRESH & NAVIGATION =====
         window.refreshShop = async function() {
             showLoading(true, 'Refreshing...');
             await updateBalance();
@@ -1251,7 +1245,6 @@
             window.location.href = 'earth-hub.html';
         };
         
-        // ===== INIT =====
         async function init() {
             showLoading(true, 'Loading shop...');
             
@@ -1267,7 +1260,6 @@
                 await updateBurnStats();
                 await updatePurchaseHistory();
                 
-                // Initialize TON Connect UI
                 initTonConnect();
                 
                 showLoading(false);
