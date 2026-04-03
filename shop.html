@@ -11,9 +11,6 @@
     <!-- TON Connect UI - Vanilla JS version -->
     <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
     
-    <!-- TON library for building payload cells -->
-    <script src="https://unpkg.com/@ton/ton@14.0.0/dist/index.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
@@ -1014,6 +1011,29 @@
             showToast('Wallet disconnected', 'info');
         }
         
+        // Pure JavaScript function to build text comment payload (no external libraries)
+        // According to TON docs: storeUint(0, 32) + storeStringTail(text) -> base64
+        function buildTextCommentPayload(text) {
+            // Encode the text as UTF-8
+            const encoder = new TextEncoder();
+            const textBytes = encoder.encode(text);
+            
+            // Create buffer: 4 bytes (0x00000000) + UTF-8 bytes
+            const buffer = new ArrayBuffer(4 + textBytes.length);
+            const view = new DataView(buffer);
+            
+            // Write 0x00000000 (32-bit integer, big-endian) - text comment flag
+            view.setUint32(0, 0, false);
+            
+            // Write UTF-8 bytes
+            for (let i = 0; i < textBytes.length; i++) {
+                view.setUint8(4 + i, textBytes[i]);
+            }
+            
+            // Convert to base64
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        }
+        
         async function buyWithTon(tonAmount, creditsAmount) {
             if (!walletConnected || !tonConnectUI || !tonConnectUI.wallet) {
                 showToast('Please connect your wallet first', 'error');
@@ -1024,12 +1044,7 @@
             
             try {
                 const comment = `buy_credits:${playerId}:${creditsAmount}`;
-                
-                // Build payload using @ton/ton library - OFFICIAL TON WAY
-                const body = window.TON.beginCell()
-                    .storeUint(0, 32)              // text comment flag (0x00000000)
-                    .storeStringTail(comment)       // UTF-8 string comment
-                    .endCell();
+                const payload = buildTextCommentPayload(comment);
                 
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 600,
@@ -1037,7 +1052,7 @@
                         {
                             address: SHOP_WALLET_ADDRESS,
                             amount: Math.floor(tonAmount * 1e9).toString(),
-                            payload: body.toBoc().toString('base64')
+                            payload: payload
                         }
                     ]
                 };
