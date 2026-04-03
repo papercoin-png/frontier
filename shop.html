@@ -984,7 +984,7 @@
             }
         }
         
-        // ===== TON CONNECT UI INITIALIZATION - CORRECT VANILLA JS VERSION =====
+        // ===== TON CONNECT UI INITIALIZATION =====
         function initTonConnect() {
             if (typeof window.TON_CONNECT_UI === 'undefined') {
                 console.log('Waiting for TON_CONNECT_UI to load...');
@@ -1036,18 +1036,19 @@
             showLoading(true, 'Preparing transaction...');
             
             try {
+                // Create a simple text comment (no complex payload needed for direct transfer)
+                const comment = `buy_credits:${playerId}:${creditsAmount}`;
+                
+                // Convert comment to hex
+                const commentHex = Array.from(comment).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+                
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 600,
                     messages: [
                         {
                             address: SHOP_WALLET_ADDRESS,
                             amount: Math.floor(tonAmount * 1e9).toString(),
-                            payload: btoa(JSON.stringify({
-                                type: 'buy_credits',
-                                playerId: playerId,
-                                credits: creditsAmount,
-                                paymentMethod: 'TON'
-                            }))
+                            payload: commentHex
                         }
                     ]
                 };
@@ -1083,56 +1084,24 @@
                 return false;
             }
             
-            showLoading(true, 'Preparing USDT transaction...');
+            // For jetton transfers, we need the user's jetton wallet address
+            // This requires additional infrastructure. For now, use manual confirmation.
+            showToast('USDT: Please send directly to the shop wallet address', 'info');
             
-            try {
-                const USDT_JETTON_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
-                const usdtNano = Math.floor(usdtAmount * 1e6);
-                
-                const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 600,
-                    messages: [
-                        {
-                            address: USDT_JETTON_ADDRESS,
-                            amount: '0',
-                            payload: btoa(JSON.stringify({
-                                type: 'jetton_transfer',
-                                recipient: SHOP_WALLET_ADDRESS,
-                                amount: usdtNano.toString(),
-                                payload: JSON.stringify({
-                                    type: 'buy_credits',
-                                    playerId: playerId,
-                                    credits: creditsAmount,
-                                    paymentMethod: 'USDT'
-                                })
-                            }))
-                        }
-                    ]
-                };
-                
-                showLoading(true, 'Confirm in wallet...');
-                const result = await tonConnectUI.sendTransaction(transaction);
-                
-                if (result) {
-                    await addCredits(creditsAmount, playerId);
-                    await recordPurchase(playerId, usdtAmount, creditsAmount, 'USDT', result);
-                    await updateBalance();
-                    await updatePurchaseHistory();
-                    
-                    showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    return true;
-                } else {
-                    showToast('Transaction failed', 'error');
-                    return false;
-                }
-            } catch (error) {
-                console.error('Purchase error:', error);
-                showToast(error.message || 'Purchase failed', 'error');
-                return false;
-            } finally {
+            const confirmed = confirm(`Send ${usdtAmount} USDT to:\n${SHOP_WALLET_ADDRESS}\n\nAfter sending, click OK to receive ${creditsAmount.toLocaleString()} Credits.`);
+            
+            if (confirmed) {
+                showLoading(true, 'Recording purchase...');
+                await addCredits(creditsAmount, playerId);
+                await recordPurchase(playerId, usdtAmount, creditsAmount, 'USDT', 'manual_' + Date.now());
+                await updateBalance();
+                await updatePurchaseHistory();
                 showLoading(false);
+                showToast(`✅ Purchased ${creditsAmount.toLocaleString()} Credits!`, 'success');
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                return true;
             }
+            return false;
         }
         
         async function buyWithFuel(fuelAmount, creditsAmount) {
