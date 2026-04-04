@@ -11,6 +11,7 @@
 // UPDATED: Added order pruning for non-competitive orders
 // UPDATED: Now uses elements-data.js as the single source of truth for element data
 // APPROVED CHANGE: Added excess fill logic for market orders - fills remaining quantity at 50% of lowest bid (sell) or 150% of highest ask (buy)
+// APPROVED CHANGE: Added filledQuantity to return objects for accurate cargo removal
 
 import { ELEMENTS, getElementByName, getElementValue, getElementIcon, getElementRarity } from './elements-data.js';
 
@@ -529,6 +530,7 @@ export async function createOrder(orderData) {
 /**
  * Execute a market order against actual order book
  * APPROVED CHANGE: Added excess fill logic - fills remaining quantity at penalty price
+ * APPROVED CHANGE: Added filledQuantity to return object
  */
 async function executeMarketOrder(order) {
     try {
@@ -686,15 +688,16 @@ async function executeMarketOrder(order) {
             await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
             await reloadOrderCache();
             
+            // APPROVED CHANGE: Return filledQuantity so UI knows actual amount
             return { 
                 success: true, 
                 order,
                 trade,
+                filledQuantity: filledQuantity,
                 executionPrice: lastExecutionPrice,
                 averagePrice: totalCost / filledQuantity,
                 totalCost,
                 fee,
-                filledQuantity,
                 remainingQuantity: 0,
                 partiallyFilled: false,
                 hasExcessFill: order.hasExcessFill,
@@ -851,16 +854,17 @@ async function executeMarketOrder(order) {
             await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
             await reloadOrderCache();
             
+            // APPROVED CHANGE: Return filledQuantity so UI knows actual amount
             return { 
                 success: true, 
                 order,
                 trade,
+                filledQuantity: filledQuantity,
                 executionPrice: lastExecutionPrice,
                 averagePrice: totalReceived / filledQuantity,
                 totalCost: totalReceived,
                 fee,
                 netReceived,
-                filledQuantity,
                 remainingQuantity: 0,
                 partiallyFilled: false,
                 hasExcessFill: order.hasExcessFill,
@@ -1558,4 +1562,4 @@ window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, market maker liquidity, emergency fallback, and EXCESS FILL LOGIC (50% penalty for sells, 150% premium for buys)');
+console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, market maker liquidity, emergency fallback, EXCESS FILL LOGIC, and filledQuantity return for accurate cargo removal');
