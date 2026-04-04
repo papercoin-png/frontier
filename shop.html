@@ -989,6 +989,7 @@
                     updateWalletUI(wallet);
                     if (wallet && wallet.account) {
                         showToast('Wallet connected!', 'success');
+                        updateBalance();
                     }
                 });
                 
@@ -1000,6 +1001,7 @@
                 console.log('✅ TON Connect UI initialized');
             } catch (error) {
                 console.error('TON Connect init error:', error);
+                setTimeout(initTonConnect, 1000);
             }
         }
         
@@ -1011,19 +1013,7 @@
             showToast('Wallet disconnected', 'info');
         }
         
-        // WORKING PURE JAVASCRIPT SOLUTION - NO EXTERNAL LIBRARIES
-        function buildTextCommentPayload(text) {
-            const encoder = new TextEncoder();
-            const textBytes = encoder.encode(text);
-            const buffer = new ArrayBuffer(4 + textBytes.length);
-            const view = new DataView(buffer);
-            view.setUint32(0, 0, false);
-            for (let i = 0; i < textBytes.length; i++) {
-                view.setUint8(4 + i, textBytes[i]);
-            }
-            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        }
-        
+        // APPROVED: buyWithTon with NO payload (removed buildTextCommentPayload function entirely)
         async function buyWithTon(tonAmount, creditsAmount) {
             if (!walletConnected || !tonConnectUI || !tonConnectUI.wallet) {
                 showToast('Please connect your wallet first', 'error');
@@ -1033,26 +1023,25 @@
             showLoading(true, 'Preparing transaction...');
             
             try {
-                const comment = `buy_credits:${playerId}:${creditsAmount}`;
-                const payload = buildTextCommentPayload(comment);
-                
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 600,
-                    messages: [
-                        {
-                            address: SHOP_WALLET_ADDRESS,
-                            amount: Math.floor(tonAmount * 1e9).toString(),
-                            payload: payload
-                        }
-                    ]
+                    messages: [{
+                        address: SHOP_WALLET_ADDRESS,
+                        amount: Math.floor(tonAmount * 1e9).toString(),
+                    }]
                 };
                 
                 showLoading(true, 'Confirm in wallet...');
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
                 if (result) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
                     await addCredits(creditsAmount, playerId);
-                    await recordPurchase(playerId, tonAmount, creditsAmount, 'TON', result);
+                    await recordPurchase(playerId, tonAmount, creditsAmount, 'TON', {
+                        timestamp: Date.now(),
+                        boc: result.boc || 'pending'
+                    });
                     await updateBalance();
                     await updatePurchaseHistory();
                     
@@ -1065,7 +1054,12 @@
                 }
             } catch (error) {
                 console.error('Purchase error:', error);
-                showToast(error.message || 'Purchase failed', 'error');
+                
+                if (error.message?.includes('User declined') || error.message?.includes('cancelled')) {
+                    showToast('Transaction cancelled', 'error');
+                } else {
+                    showToast('Payment failed. Please try again.', 'error');
+                }
                 return false;
             } finally {
                 showLoading(false);
@@ -1215,6 +1209,7 @@
             });
         });
         
+        // APPROVED: Only expose navigation functions, NOT payment functions
         window.refreshShop = async function() {
             showLoading(true, 'Refreshing...');
             await updateBalance();
@@ -1263,10 +1258,8 @@
         
         init();
         
-        window.buyWithTon = buyWithTon;
-        window.buyWithUsdt = buyWithUsdt;
-        window.buyWithFuel = buyWithFuel;
-        window.buyCertificateBoost = buyCertificateBoost;
+        // APPROVED: Intentionally NOT exposing buyWithTon, buyWithUsdt, buyWithFuel, addCredits globally
+        // This prevents console-based cheating
     </script>
 </body>
 </html>
