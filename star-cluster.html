@@ -751,6 +751,9 @@
         let currentSectorId = 'B2'; // Default to Orion Arm
         let hiddenPlanets = [];
         let scannedStars = [];
+        
+        // APPROVED CHANGE: Load galaxy tier from sector (passed from star-sectors.html)
+        let currentGalaxyTier = 1;
 
         // Cache for planet statuses to check explored systems
         let exploredPlanetsCache = new Set();
@@ -759,7 +762,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const isPlotMode = urlParams.get('mode') === 'plot';
 
-        // ===== DISCOVERY LOCK FUNCTIONS (NEW) =====
+        // ===== DISCOVERY LOCK FUNCTIONS =====
         
         async function loadHiddenPlanets() {
             hiddenPlanets = await getHiddenPlanets();
@@ -994,8 +997,9 @@
             return parseFloat((baseDistance + randomFactor).toFixed(1));
         }
 
-        // ===== GENERATE PLANETS FOR A STAR =====
-        function generatePlanetsForStar(starSeed, starType, starName, sectorId) {
+        // ===== GENERATE PLANETS FOR A STAR - APPROVED CHANGE =====
+        // Now accepts galaxyTier parameter and passes it to resource generation
+        function generatePlanetsForStar(starSeed, starType, starName, sectorId, galaxyTier) {
             const planets = [];
             const planetCount = starType.maxPlanets > 0 ? 
                 seededRandomRange(starSeed, 100, starType.minPlanets, Math.min(starType.maxPlanets, 8)) : 0;
@@ -1022,11 +1026,9 @@
                 // Generate unique planet name
                 const planetName = generatePlanetName(planetSeed, i, sectorId, planetType);
                 
-                // Generate resources (max 4)
-                const resources = generatePlanetResources(planetSeed, planetType);
-                
-                // Determine planet tier based on star's galaxy tier
-                const planetTier = Math.min(5, Math.floor(Math.random() * 5) + 1);
+                // APPROVED CHANGE: Use galaxyTier from star/sector instead of random
+                // Pass galaxyTier to generatePlanetResources for proper element filtering
+                const resources = generatePlanetResources(planetSeed, planetType, galaxyTier);
                 
                 planets.push({
                     index: i,
@@ -1044,7 +1046,7 @@
                     distanceFromStar: 0.5 + (i * 0.8),
                     orbitRadius: 70 + i * 40,
                     orbitSpeed: 0.002 - (i * 0.0002),
-                    galaxyTier: planetTier
+                    galaxyTier: galaxyTier  // APPROVED CHANGE: Use passed galaxyTier
                 });
             }
             
@@ -1220,11 +1222,15 @@
             }
         }
 
-        // ===== LOAD CLUSTER DATA =====
+        // ===== LOAD CLUSTER DATA - APPROVED CHANGE =====
         async function loadClusterData() {
             try {
                 console.log('Loading cluster data...');
                 console.log('Is plot mode:', isPlotMode);
+                
+                // APPROVED CHANGE: Load galaxy tier from localStorage (set by star-sectors.html)
+                currentGalaxyTier = parseInt(localStorage.getItem('voidfarer_current_sector_tier') || '1');
+                console.log(`📍 Current galaxy tier: ${currentGalaxyTier}`);
                 
                 // First check if we're in plot mode with a selected star sector
                 let targetCluster = null;
@@ -1315,7 +1321,8 @@
                     type: clusterType,
                     stars: clusterStars,
                     currentStar: currentStarName,
-                    sectorId: currentSectorId
+                    sectorId: currentSectorId,
+                    galaxyTier: currentGalaxyTier
                 });
 
                 return true;
@@ -1328,14 +1335,14 @@
             }
         }
 
-        // ===== GENERATE STARS =====
+        // ===== GENERATE STARS - APPROVED CHANGE =====
         function generateStars() {
             stars = [];
             
             // Use cluster name to create a unique seed - this ensures different clusters have different stars
             const clusterSeed = UNIVERSE_SEED + hashString(clusterName) % 1000000;
             
-            console.log(`Generating stars for cluster: ${clusterName} with seed: ${clusterSeed}`);
+            console.log(`Generating stars for cluster: ${clusterName} with seed: ${clusterSeed} (Tier: ${currentGalaxyTier})`);
             
             // Use a Set to track generated names and ensure uniqueness
             const usedNames = new Set();
@@ -1362,8 +1369,8 @@
                 const isCurrent = (starName === currentStarName);
                 const distance = generateStarDistance(i, isCurrent);
                 
-                // Generate planets for this star
-                const planets = generatePlanetsForStar(starSeed, starType, starName, currentSectorId);
+                // APPROVED CHANGE: Pass currentGalaxyTier to planet generation
+                const planets = generatePlanetsForStar(starSeed, starType, starName, currentSectorId, currentGalaxyTier);
                 
                 stars.push({
                     index: i,
@@ -1377,6 +1384,7 @@
                     distance: distance,
                     isCurrent: isCurrent,
                     seed: starSeed,
+                    galaxyTier: currentGalaxyTier,  // APPROVED CHANGE: Store galaxy tier on star
                     hasExplored: false // Will be set after checking cache
                 });
             }
@@ -1393,7 +1401,7 @@
                 return a.distance - b.distance;
             });
             
-            console.log(`Generated ${stars.length} unique stars for cluster ${clusterName}`);
+            console.log(`Generated ${stars.length} unique stars for cluster ${clusterName} (Tier ${currentGalaxyTier})`);
             console.log('First 5 stars:', stars.slice(0, 5).map(s => s.name));
             console.log('Last 5 stars:', stars.slice(-5).map(s => s.name));
         }
@@ -1494,15 +1502,17 @@
                         color: selectedStar.color,
                         icon: selectedStar.icon,
                         index: selectedStar.index,
-                        seed: selectedStar.seed
+                        seed: selectedStar.seed,
+                        galaxyTier: selectedStar.galaxyTier || currentGalaxyTier  // APPROVED CHANGE: Include star tier
                     },
                     planets: selectedStar.planets.map(p => ({
                         ...p,
-                        // Ensure resources are included
-                        resources: p.resources || []
+                        resources: p.resources || [],
+                        galaxyTier: p.galaxyTier || currentGalaxyTier  // APPROVED CHANGE: Ensure planet tier is set
                     })),
                     clusterName: clusterName,
                     sectorId: currentSectorId,
+                    galaxyTier: currentGalaxyTier,  // APPROVED CHANGE: Store cluster tier
                     timestamp: Date.now()
                 };
                 
@@ -1542,15 +1552,17 @@
                         color: selectedStar.color,
                         icon: selectedStar.icon,
                         index: selectedStar.index,
-                        seed: selectedStar.seed
+                        seed: selectedStar.seed,
+                        galaxyTier: selectedStar.galaxyTier || currentGalaxyTier
                     },
                     planets: selectedStar.planets.map(p => ({
                         ...p,
-                        // Ensure resources are included
-                        resources: p.resources || []
+                        resources: p.resources || [],
+                        galaxyTier: p.galaxyTier || currentGalaxyTier
                     })),
                     clusterName: clusterName,
                     sectorId: currentSectorId,
+                    galaxyTier: currentGalaxyTier,
                     timestamp: Date.now()
                 };
                 
@@ -1567,7 +1579,8 @@
                     star: selectedStar.name,
                     distance: selectedStar.distance,
                     previousCumulative: currentCumulative,
-                    newCumulative: newCumulative
+                    newCumulative: newCumulative,
+                    galaxyTier: currentGalaxyTier
                 });
                 
                 // Save star data
