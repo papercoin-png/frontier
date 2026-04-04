@@ -498,7 +498,6 @@
             font-size: 14px;
         }
         
-        /* Rarity color styles for element names */
         .element-name.common { color: #A0A0A0; }
         .element-name.uncommon { color: #4affaa; }
         .element-name.rare { color: #4169E1; }
@@ -1050,6 +1049,12 @@
         
         .toast-notification.success {
             border-color: #0ECB81;
+        }
+        
+        .toast-notification.warning {
+            border-color: #F0B90B;
+            background: #1E2026;
+            color: #F0B90B;
         }
         
         @keyframes toast-slide {
@@ -1767,6 +1772,7 @@
                 if (result.success && result.trade) {
                     const creditAmount = result.totalCost;
                     
+                    // APPROVED CHANGE: Fixed credit handling for large orders
                     if (orderSide === ORDER_SIDES.BUY) {
                         const success = await spendCredits(creditAmount, PLAYER_ID);
                         if (success) {
@@ -1783,10 +1789,10 @@
                         });
                         
                     } else {
-                        const newTotal = await addCredits(creditAmount, PLAYER_ID);
-                        if (newTotal !== undefined && !isNaN(newTotal) && newTotal > 0) {
-                            currentCredits = newTotal;
-                        } else {
+                        // APPROVED CHANGE: Simplified credit addition for sell orders
+                        await addCredits(creditAmount, PLAYER_ID);
+                        currentCredits = await getCredits(PLAYER_ID);
+                        if (currentCredits === undefined || isNaN(currentCredits)) {
                             showToast('Failed to process credits', 'error');
                             showLoading(false);
                             return;
@@ -1799,7 +1805,13 @@
                     currentCollection = await getCollection();
                     await renderOrderBook();
                     
-                    showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${result.executionPrice}⭐`, 'success');
+                    // APPROVED CHANGE: Show warning if excess fill penalty was applied
+                    if (result.hasExcessFill && result.excessFillQuantity > 0) {
+                        showToast(`⚠️ ${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at avg ${Math.round(result.averagePrice)}⭐ (${result.excessFillQuantity} units at penalty rate)`, 'warning');
+                    } else {
+                        showToast(`${orderSide === ORDER_SIDES.BUY ? 'Bought' : 'Sold'} ${orderQuantity} ${selectedElement.name} at ${Math.round(result.executionPrice)}⭐`, 'success');
+                    }
+                    
                     closeOrderModal();
                 } else {
                     showToast(result.error || 'Order failed', 'error');
