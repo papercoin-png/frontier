@@ -23,6 +23,7 @@
 // FIXED: Database version 8 - Added fuelData and fuelBalance stores
 // ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
 // ADDED: Real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties
+// ADDED: Hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -1393,6 +1394,85 @@ export async function getRemainingHubStorage() {
     }
 }
 
+// ===== NEW HUB STORAGE FUNCTIONS (APPROVED CHANGES) =====
+
+/**
+ * Get maximum hub storage capacity
+ * @returns {number} Maximum hub storage in AMU
+ */
+export function getHubStorageMax() {
+    try {
+        const max = localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_MAX);
+        return max ? parseFloat(max) : 1000;
+    } catch (error) {
+        console.error('Error getting hub storage max:', error);
+        return 1000;
+    }
+}
+
+/**
+ * Get current used hub storage
+ * @returns {Promise<number>} Used hub storage in AMU
+ */
+export async function getHubStorageUsed() {
+    try {
+        const used = localStorage.getItem(STORAGE_KEYS.HUB_STORAGE_USED);
+        if (used) return parseFloat(used);
+        
+        // Calculate from hub inventory if not stored
+        const hubInventory = await getHubInventory();
+        let total = 0;
+        for (const [name, data] of Object.entries(hubInventory)) {
+            total += (data.count || 1) * getElementMass(name);
+        }
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_USED, total.toString());
+        return total;
+    } catch (error) {
+        console.error('Error getting hub storage used:', error);
+        return 0;
+    }
+}
+
+/**
+ * Set maximum hub storage capacity (upgrade)
+ * @param {number} newCapacity - New maximum capacity in AMU
+ * @returns {Promise<boolean>} Success status
+ */
+export async function setHubStorageCapacity(newCapacity) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.HUB_STORAGE_MAX, newCapacity.toString());
+        
+        // Also update real estate data for backward compatibility
+        const playerId = getPlayerId();
+        try {
+            let propertyData = await getRealEstate(playerId);
+            if (!propertyData.properties) propertyData.properties = [];
+            
+            // Add a virtual property representing total capacity
+            const virtualProp = propertyData.properties.find(p => p.type === 'virtual_storage');
+            if (virtualProp) {
+                virtualProp.capacity = newCapacity;
+            } else {
+                propertyData.properties.push({
+                    id: 'virtual_storage',
+                    type: 'virtual_storage',
+                    name: 'Hub Storage',
+                    capacity: newCapacity,
+                    purchaseDate: new Date().toISOString()
+                });
+            }
+            await saveRealEstate(propertyData, playerId);
+        } catch(e) {
+            console.log('Could not update real estate:', e);
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error setting hub storage capacity:', error);
+        return false;
+    }
+}
+
 export async function getRemainingShipStorage() {
     try {
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
@@ -2139,7 +2219,7 @@ export async function getFullFuelBalance(playerId = null) {
 }
 
 // ============================================================================
-// REAL ESTATE FUNCTIONS (NEW)
+// REAL ESTATE FUNCTIONS
 // ============================================================================
 
 /**
@@ -2391,7 +2471,13 @@ window.getPurchaseHistory = getPurchaseHistory;
 window.getTotalSpent = getTotalSpent;
 window.getAllPurchases = getAllPurchases;
 
+// NEW: Hub storage functions exposed
+window.getHubStorageMax = getHubStorageMax;
+window.getHubStorageUsed = getHubStorageUsed;
+window.setHubStorageCapacity = setHubStorageCapacity;
+
 console.log('✅ storage.js loaded with consistent player ID fallback (main), fixed setItem for keyPath stores, sector scanning functions, and fuel token functions');
 console.log('✅ Version 8: Added fuelData and fuelBalance stores with proper configuration');
 console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
 console.log('✅ Added real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties');
+console.log('✅ Added hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades');
