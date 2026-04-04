@@ -258,40 +258,6 @@
             letter-spacing: 1px;
         }
         
-        /* Property Filter */
-        .property-filter {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 15px;
-            overflow-x: auto;
-            padding-bottom: 5px;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .property-filter-btn {
-            padding: 8px 14px;
-            border-radius: 40px;
-            font-size: 12px;
-            font-weight: 600;
-            background: rgba(30, 60, 70, 0.7);
-            border: 2px solid #4a9a8a;
-            color: #e0f0ff;
-            cursor: pointer;
-            transition: all 0.1s;
-            white-space: nowrap;
-        }
-        
-        .property-filter-btn.active {
-            background: #4a9a8a;
-            color: #ffffff;
-            border-color: #7ac0b0;
-            box-shadow: 0 0 15px #2a5a5a;
-        }
-        
-        .property-filter-btn:active {
-            transform: scale(0.95);
-        }
-        
         /* Filter Bar */
         .filter-bar {
             display: flex;
@@ -432,16 +398,6 @@
             color: #ffaa4a;
         }
         
-        .item-property {
-            color: #a0c0ff;
-            font-size: 11px;
-            background: rgba(0,0,0,0.3);
-            padding: 2px 8px;
-            border-radius: 20px;
-            margin-top: 4px;
-            display: inline-block;
-        }
-        
         /* Item Actions */
         .item-actions {
             display: flex;
@@ -474,26 +430,6 @@
             background: #ffaa4a;
             color: #0a2a3a;
             transform: scale(0.95);
-        }
-        
-        .transfer-btn {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #b0ffd0;
-        }
-        
-        .transfer-btn:active {
-            background: #4affaa;
-            color: #0a2a3a;
-            transform: scale(0.95);
-        }
-        
-        .transfer-btn.disabled {
-            opacity: 0.3;
-            pointer-events: none;
-            border-color: #6a8ac0;
-            background: rgba(106, 138, 192, 0.1);
-            color: #6a8ac0;
         }
         
         /* Transfer Modal */
@@ -641,17 +577,6 @@
             transform: scale(0.95);
         }
         
-        .modal-btn.transfer-confirm {
-            background: rgba(74, 255, 170, 0.2);
-            border-color: #4affaa;
-            color: #b0ffd0;
-        }
-        
-        .modal-btn.transfer-confirm:active {
-            background: #4affaa;
-            color: #0a2a3a;
-        }
-        
         .modal-btn.sell-confirm {
             background: rgba(255, 170, 74, 0.2);
             border-color: #ffaa4a;
@@ -754,20 +679,6 @@
         .rarity-rare { color: #b0b0ff; }
         .rarity-very-rare { color: #e0b0ff; }
         .rarity-legendary { color: #ffd700; }
-
-        /* Migration status (debug) */
-        .migration-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.5);
-            color: #a0c0ff;
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 1001;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -822,41 +733,34 @@
                 </div>
             </div>
             
-            <!-- Property Filter -->
-            <div class="property-filter" id="propertyFilter">
-                <!-- Filled by JavaScript -->
-            </div>
-            
             <!-- Filter Bar -->
             <div class="filter-bar">
-                <span class="filter-btn active" onclick="window.filterItems('all')">All</span>
-                <span class="filter-btn" onclick="window.filterItems('common')">Common</span>
-                <span class="filter-btn" onclick="window.filterItems('uncommon')">Uncommon</span>
-                <span class="filter-btn" onclick="window.filterItems('rare')">Rare</span>
-                <span class="filter-btn" onclick="window.filterItems('very-rare')">Very Rare</span>
-                <span class="filter-btn" onclick="window.filterItems('legendary')">Legendary</span>
+                <span class="filter-btn active" data-filter="all">All</span>
+                <span class="filter-btn" data-filter="common">Common</span>
+                <span class="filter-btn" data-filter="uncommon">Uncommon</span>
+                <span class="filter-btn" data-filter="rare">Rare</span>
+                <span class="filter-btn" data-filter="very-rare">Very Rare</span>
+                <span class="filter-btn" data-filter="legendary">Legendary</span>
             </div>
             
             <!-- Search Box -->
             <div class="search-container">
-                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search hub items..." oninput="window.searchItems()">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search hub items...">
             </div>
             
             <!-- Sort Bar -->
             <div class="sort-bar">
-                <select class="sort-select" id="sortSelect" onchange="window.sortItems()">
+                <select class="sort-select" id="sortSelect">
                     <option value="name">Sort by Name</option>
                     <option value="count">Sort by Quantity</option>
                     <option value="mass">Sort by Mass</option>
                     <option value="value">Sort by Value</option>
                     <option value="rarity">Sort by Rarity</option>
-                    <option value="property">Sort by Property</option>
                 </select>
             </div>
             
             <!-- Items Grid -->
             <div class="items-grid" id="itemsGrid">
-                <!-- Filled by JavaScript -->
                 <div class="empty-state">Loading hub inventory...</div>
             </div>
             
@@ -871,33 +775,6 @@
             </button>
         </div>
         
-        <!-- Transfer to Ship Modal -->
-        <div class="modal-overlay" id="transferModal">
-            <div class="modal-content">
-                <div class="modal-title">🚀 TRANSFER TO SHIP</div>
-                <div class="modal-item-name" id="transferItemName">Item</div>
-                <div class="modal-current" id="transferCurrentCount">Current: 0</div>
-                
-                <div class="modal-quantity">
-                    <button class="qty-btn" id="transferDecrementBtn" onclick="window.transferDecrementQty()">−</button>
-                    <input type="number" id="transferQuantity" value="1" min="1" max="99" readonly>
-                    <button class="qty-btn" id="transferIncrementBtn" onclick="window.transferIncrementQty()">+</button>
-                </div>
-                
-                <div class="transfer-mass-info">
-                    Transfer mass: <span class="transfer-mass" id="transferMass">0</span> AMU<br>
-                    Ship available: <span class="transfer-mass" id="shipAvailable">0</span> AMU
-                </div>
-                
-                <div class="warning-text" id="transferWarning"></div>
-                
-                <div class="modal-buttons">
-                    <button class="modal-btn transfer-confirm" onclick="window.confirmTransfer()">🚀 TRANSFER</button>
-                    <button class="modal-btn" onclick="window.closeTransferModal()">CANCEL</button>
-                </div>
-            </div>
-        </div>
-        
         <!-- Sell Modal -->
         <div class="modal-overlay" id="sellModal">
             <div class="modal-content">
@@ -906,9 +783,9 @@
                 <div class="modal-current" id="sellCurrentCount">Current: 0</div>
                 
                 <div class="modal-quantity">
-                    <button class="qty-btn" id="sellDecrementBtn" onclick="window.sellDecrementQty()">−</button>
+                    <button class="qty-btn" id="sellDecrementBtn">−</button>
                     <input type="number" id="sellQuantity" value="1" min="1" max="99" readonly>
-                    <button class="qty-btn" id="sellIncrementBtn" onclick="window.sellIncrementQty()">+</button>
+                    <button class="qty-btn" id="sellIncrementBtn">+</button>
                 </div>
                 
                 <div class="transfer-mass-info">
@@ -919,8 +796,8 @@
                 <div class="warning-text" id="sellWarning"></div>
                 
                 <div class="modal-buttons">
-                    <button class="modal-btn sell-confirm" onclick="window.confirmSell()">💰 SELL</button>
-                    <button class="modal-btn" onclick="window.closeSellModal()">CANCEL</button>
+                    <button class="modal-btn sell-confirm" id="confirmSellBtn">💰 SELL</button>
+                    <button class="modal-btn" id="closeSellModalBtn">CANCEL</button>
                 </div>
             </div>
         </div>
@@ -930,17 +807,14 @@
             <div class="loading-spinner"></div>
             <div class="loading-text" id="loadingText">processing...</div>
         </div>
-        
-        <!-- Migration status (debug) -->
-        <div class="migration-status" id="migrationStatus"></div>
     </div>
 
-    <!-- Load JavaScript files -->
-    <script src="js/db.js"></script>
-    <script src="js/storage.js"></script>
-    <script src="js/migration.js"></script>
+    <!-- APPROVED CHANGES: Added type="module" to all script tags -->
+    <script type="module" src="js/db.js"></script>
+    <script type="module" src="js/storage.js"></script>
+    <script type="module" src="js/migration.js"></script>
 
-    <script>
+    <script type="module">
         // ===== TELEGRAM INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -948,175 +822,48 @@
             tg.expand();
         }
 
+        // ===== IMPORTS =====
+        import { getHubInventory, getHubStorageMax, getHubStorageUsed, getElementMass, getCredits, getPlayerId, getElementRarity, spendCredits, addCredits, removeElementFromHub } from './js/storage.js';
+
         // ===== DOM ELEMENTS =====
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
 
-        // ===== EXPOSE FUNCTIONS TO GLOBAL SCOPE =====
-        window.returnToEarthHub = returnToEarthHub;
-        window.filterItems = filterItems;
-        window.searchItems = searchItems;
-        window.sortItems = sortItems;
-        window.filterByProperty = filterByProperty;
-        window.showTransferModal = showTransferModal;
-        window.closeTransferModal = closeTransferModal;
-        window.transferIncrementQty = transferIncrementQty;
-        window.transferDecrementQty = transferDecrementQty;
-        window.confirmTransfer = confirmTransfer;
-        window.showSellModal = showSellModal;
-        window.closeSellModal = closeSellModal;
-        window.sellIncrementQty = sellIncrementQty;
-        window.sellDecrementQty = sellDecrementQty;
-        window.confirmSell = confirmSell;
-
         // ===== STATE =====
         let hubItems = [];
         let filteredItems = [];
-        let properties = [];
-        let currentPropertyFilter = 'all';
         let currentRarityFilter = 'all';
         let searchTerm = '';
         let sortBy = 'name';
-        let canTransfer = true; // At Earth Hub, can always transfer
-        let currentShipAvailable = 5000;
-        
-        // Transfer modal state
-        let currentTransferItem = null;
-        let currentTransferMax = 1;
-        let currentTransferMassPerUnit = 0;
-        let currentTransferValuePerUnit = 0;
-        
-        // Sell modal state
-        let currentSellItem = null;
-        let currentSellMax = 1;
-        let currentSellPricePerUnit = 0;
+        let currentCredits = 0;
+        let currentHubMax = 0;
+        let currentHubUsed = 0;
 
-        // ===== ELEMENT DATABASE =====
-        const ELEMENT_DATABASE = {
-            // Common elements (base value: 100⭐)
-            'Hydrogen': { icon: '💧', rarity: 'common', value: 100 },
-            'Helium': { icon: '🎈', rarity: 'common', value: 100 },
-            'Lithium': { icon: '🔋', rarity: 'common', value: 100 },
-            'Beryllium': { icon: '💎', rarity: 'common', value: 100 },
-            'Boron': { icon: '🧪', rarity: 'common', value: 100 },
-            'Carbon': { icon: '⚫', rarity: 'uncommon', value: 250 },
-            'Nitrogen': { icon: '🌬️', rarity: 'uncommon', value: 250 },
-            'Oxygen': { icon: '💨', rarity: 'uncommon', value: 250 },
-            'Fluorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
-            'Neon': { icon: '💡', rarity: 'uncommon', value: 250 },
-            'Sodium': { icon: '🧂', rarity: 'common', value: 100 },
-            'Magnesium': { icon: '✨', rarity: 'common', value: 100 },
-            'Aluminum': { icon: '🥫', rarity: 'common', value: 100 },
-            'Silicon': { icon: '💻', rarity: 'common', value: 100 },
-            'Phosphorus': { icon: '🔥', rarity: 'uncommon', value: 250 },
-            'Sulfur': { icon: '🟡', rarity: 'uncommon', value: 250 },
-            'Chlorine': { icon: '🧪', rarity: 'uncommon', value: 250 },
-            'Argon': { icon: '💨', rarity: 'uncommon', value: 250 },
-            'Potassium': { icon: '🍌', rarity: 'common', value: 100 },
-            'Calcium': { icon: '🥛', rarity: 'common', value: 100 },
-            'Scandium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Titanium': { icon: '🔷', rarity: 'rare', value: 1000 },
-            'Vanadium': { icon: '⚙️', rarity: 'rare', value: 1000 },
-            'Chromium': { icon: '🔩', rarity: 'rare', value: 1000 },
-            'Manganese': { icon: '⚙️', rarity: 'rare', value: 1000 },
-            'Iron': { icon: '⚙️', rarity: 'uncommon', value: 250 },
-            'Cobalt': { icon: '🔵', rarity: 'rare', value: 1000 },
-            'Nickel': { icon: '🔩', rarity: 'uncommon', value: 250 },
-            'Copper': { icon: '🔴', rarity: 'rare', value: 1000 },
-            'Zinc': { icon: '⚪', rarity: 'rare', value: 1000 },
-            'Gallium': { icon: '🧪', rarity: 'rare', value: 1000 },
-            'Germanium': { icon: '💻', rarity: 'rare', value: 1000 },
-            'Arsenic': { icon: '☠️', rarity: 'rare', value: 1000 },
-            'Selenium': { icon: '🟡', rarity: 'rare', value: 1000 },
-            'Bromine': { icon: '🧪', rarity: 'rare', value: 1000 },
-            'Krypton': { icon: '💨', rarity: 'rare', value: 1000 },
-            'Rubidium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Strontium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Yttrium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Zirconium': { icon: '💎', rarity: 'rare', value: 1000 },
-            'Niobium': { icon: '🔷', rarity: 'rare', value: 1000 },
-            'Molybdenum': { icon: '⚙️', rarity: 'rare', value: 1000 },
-            'Technetium': { icon: '☢️', rarity: 'rare', value: 1000 },
-            'Ruthenium': { icon: '🔷', rarity: 'rare', value: 1000 },
-            'Rhodium': { icon: '⬜', rarity: 'rare', value: 1000 },
-            'Palladium': { icon: '⬜', rarity: 'rare', value: 1000 },
-            'Silver': { icon: '⚪', rarity: 'rare', value: 1000 },
-            'Cadmium': { icon: '🔩', rarity: 'rare', value: 1000 },
-            'Indium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Tin': { icon: '🥫', rarity: 'rare', value: 1000 },
-            'Antimony': { icon: '⚙️', rarity: 'rare', value: 1000 },
-            'Tellurium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Iodine': { icon: '🧪', rarity: 'rare', value: 1000 },
-            'Xenon': { icon: '💨', rarity: 'rare', value: 1000 },
-            'Cesium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Barium': { icon: '⚖️', rarity: 'rare', value: 1000 },
-            'Lanthanum': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Cerium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Praseodymium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Neodymium': { icon: '🧲', rarity: 'rare', value: 1000 },
-            'Promethium': { icon: '✨', rarity: 'legendary', value: 25000 },
-            'Samarium': { icon: '🧲', rarity: 'rare', value: 1000 },
-            'Europium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Gadolinium': { icon: '🧲', rarity: 'rare', value: 1000 },
-            'Terbium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Dysprosium': { icon: '🧲', rarity: 'rare', value: 1000 },
-            'Holmium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Erbium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Thulium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Ytterbium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Lutetium': { icon: '✨', rarity: 'rare', value: 1000 },
-            'Hafnium': { icon: '🔩', rarity: 'rare', value: 1000 },
-            'Tantalum': { icon: '🔩', rarity: 'rare', value: 1000 },
-            'Tungsten': { icon: '💡', rarity: 'rare', value: 1000 },
-            'Rhenium': { icon: '⚙️', rarity: 'rare', value: 1000 },
-            'Osmium': { icon: '⚫', rarity: 'rare', value: 1000 },
-            'Iridium': { icon: '⬜', rarity: 'rare', value: 1000 },
-            'Platinum': { icon: '⬜', rarity: 'rare', value: 1000 },
-            'Gold': { icon: '🟡', rarity: 'rare', value: 1000 },
-            'Mercury': { icon: '💧', rarity: 'rare', value: 1000 },
-            'Thallium': { icon: '☠️', rarity: 'rare', value: 1000 },
-            'Lead': { icon: '⚖️', rarity: 'rare', value: 1000 },
-            'Bismuth': { icon: '🌈', rarity: 'rare', value: 1000 },
-            
-            // Very Rare elements (5000⭐)
-            'Polonium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Astatine': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Radon': { icon: '💨', rarity: 'very-rare', value: 5000 },
-            'Francium': { icon: '✨', rarity: 'very-rare', value: 5000 },
-            'Radium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Actinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Thorium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Protactinium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            'Uranium': { icon: '☢️', rarity: 'very-rare', value: 5000 },
-            
-            // Legendary elements (25000⭐)
-            'Neptunium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Plutonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Americium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Curium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Berkelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Californium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Einsteinium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Fermium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Mendelevium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Nobelium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Lawrencium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Rutherfordium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Dubnium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Seaborgium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Bohrium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Hassium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Meitnerium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Darmstadtium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Roentgenium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Copernicium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Nihonium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Flerovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Moscovium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Livermorium': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Tennessine': { icon: '☢️', rarity: 'legendary', value: 25000 },
-            'Oganesson': { icon: '☢️', rarity: 'legendary', value: 25000 }
+        // ===== ELEMENT DATABASE WITH VALUES =====
+        const ELEMENT_VALUES = {
+            'Hydrogen': 100, 'Helium': 100, 'Lithium': 100, 'Beryllium': 100,
+            'Boron': 100, 'Carbon': 250, 'Nitrogen': 250, 'Oxygen': 250,
+            'Fluorine': 250, 'Neon': 250, 'Sodium': 100, 'Magnesium': 250,
+            'Aluminum': 100, 'Silicon': 100, 'Phosphorus': 250, 'Sulfur': 250,
+            'Chlorine': 250, 'Argon': 250, 'Potassium': 100, 'Calcium': 100,
+            'Titanium': 1000, 'Chromium': 1000, 'Manganese': 1000, 'Iron': 250,
+            'Cobalt': 1000, 'Nickel': 250, 'Copper': 1000, 'Zinc': 1000,
+            'Silver': 1000, 'Gold': 1000, 'Platinum': 1000, 'Uranium': 5000,
+            'Thorium': 5000, 'Plutonium': 25000, 'Promethium': 25000
         };
+
+        function getElementValue(elementName) {
+            return ELEMENT_VALUES[elementName] || 100;
+        }
+
+        function getElementIcon(elementName) {
+            const icons = {
+                'Hydrogen': '💧', 'Helium': '🎈', 'Carbon': '⚫', 'Oxygen': '💨',
+                'Iron': '⚙️', 'Gold': '🟡', 'Silver': '⚪', 'Copper': '🔴',
+                'Titanium': '🔷', 'Uranium': '🟣', 'Plutonium': '☢️', 'default': '🔹'
+            };
+            return icons[elementName] || icons.default;
+        }
 
         // ===== RARITY COLORS =====
         const rarityColors = {
@@ -1127,75 +874,23 @@
             'legendary': '#ffd700'
         };
 
-        // ===== GET ELEMENT MASS =====
-        function getElementMass(elementName) {
-            if (typeof window.getElementMass === 'function') {
-                return window.getElementMass(elementName);
-            }
-            return 100.0;
-        }
-
-        // ===== GET ELEMENT ICON =====
-        function getElementIcon(elementName) {
-            return ELEMENT_DATABASE[elementName]?.icon || '🔹';
-        }
-
-        // ===== GET ELEMENT RARITY =====
-        function getElementRarity(elementName) {
-            return ELEMENT_DATABASE[elementName]?.rarity || 'common';
-        }
-
-        // ===== GET ELEMENT VALUE =====
-        function getElementValue(elementName) {
-            return ELEMENT_DATABASE[elementName]?.value || 100;
-        }
-
         // ===== LOAD HUB DATA =====
         async function loadHubData() {
             try {
                 console.log('Loading hub inventory...');
                 
-                // Get credits
-                let credits = 5000;
-                if (typeof window.getCredits === 'function') {
-                    credits = await window.getCredits();
-                }
-                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${credits.toLocaleString()}`;
+                currentCredits = await getCredits();
+                document.getElementById('creditsDisplay').innerHTML = `<span>⭐</span> ${currentCredits.toLocaleString()}`;
                 
-                // Get hub inventory
-                let hubInventory = {};
-                if (typeof window.getHubInventory === 'function') {
-                    hubInventory = await window.getHubInventory();
-                }
+                const hubInventory = await getHubInventory();
+                currentHubMax = await getHubStorageMax();
+                currentHubUsed = await getHubStorageUsed();
                 
-                // Get hub storage stats
-                let hubMax = 0;
-                let hubUsed = 0;
-                if (typeof window.getHubStorageMax === 'function') {
-                    hubMax = await window.getHubStorageMax();
-                }
-                if (typeof window.getHubStorageUsed === 'function') {
-                    hubUsed = await window.getHubStorageUsed();
-                }
-                
-                // Get ship available space
-                if (typeof window.getRemainingShipStorage === 'function') {
-                    currentShipAvailable = await window.getRemainingShipStorage();
-                }
-                
-                // Get real estate properties
-                if (typeof window.getRealEstate === 'function') {
-                    const estateData = await window.getRealEstate();
-                    properties = estateData.properties || [];
-                }
-                
-                // Update capacity display
-                document.getElementById('hubCapacityDisplay').textContent = `Used: ${hubUsed.toFixed(1)}/${hubMax} AMU`;
-                document.getElementById('capacityText').textContent = `${hubUsed.toFixed(1)} / ${hubMax} AMU`;
-                const capacityPercent = hubMax > 0 ? (hubUsed / hubMax) * 100 : 0;
+                document.getElementById('hubCapacityDisplay').textContent = `Used: ${currentHubUsed.toFixed(1)}/${currentHubMax.toLocaleString()} AMU`;
+                document.getElementById('capacityText').textContent = `${currentHubUsed.toFixed(1)} / ${currentHubMax.toLocaleString()} AMU`;
+                const capacityPercent = currentHubMax > 0 ? (currentHubUsed / currentHubMax) * 100 : 0;
                 document.getElementById('capacityBar').style.width = Math.min(100, capacityPercent) + '%';
                 
-                // Convert hub inventory to array
                 hubItems = [];
                 let totalItems = 0;
                 let totalValue = 0;
@@ -1210,10 +905,6 @@
                     totalItems += count;
                     totalValue += totalItemValue;
                     
-                    // For now, assign to first property (in future, track per property)
-                    const propertyId = data.propertyId || (properties.length > 0 ? properties[0].id : 'unknown');
-                    const propertyName = properties.find(p => p.id === propertyId)?.name || 'Earth Hub';
-                    
                     hubItems.push({
                         name: name,
                         count: count,
@@ -1222,21 +913,14 @@
                         valuePerUnit: valuePerUnit,
                         totalValue: totalItemValue,
                         icon: getElementIcon(name),
-                        rarity: getElementRarity(name),
-                        propertyId: propertyId,
-                        propertyName: propertyName
+                        rarity: getElementRarity(name)
                     });
                 }
                 
-                // Update stats
                 document.getElementById('totalItems').textContent = totalItems;
                 document.getElementById('uniqueItems').textContent = hubItems.length;
                 document.getElementById('totalValue').textContent = totalValue.toLocaleString();
                 
-                // Render property filter
-                renderPropertyFilter();
-                
-                // Apply filters and render
                 applyFilters();
                 
             } catch (error) {
@@ -1245,39 +929,19 @@
             }
         }
 
-        // ===== RENDER PROPERTY FILTER =====
-        function renderPropertyFilter() {
-            const filterEl = document.getElementById('propertyFilter');
-            
-            let html = '<span class="property-filter-btn active" onclick="window.filterByProperty(\'all\')">🏢 All Properties</span>';
-            
-            properties.forEach(prop => {
-                const propType = prop.type === 'storage_locker' ? '🔐' : 
-                                prop.type === 'small_warehouse' ? '🏢' :
-                                prop.type === 'commercial_depot' ? '🏭' : '🛰️';
-                html += `<span class="property-filter-btn" onclick="window.filterByProperty('${prop.id}')">${propType} ${prop.name}</span>`;
-            });
-            
-            filterEl.innerHTML = html;
-        }
-
-        // ===== APPLY FILTERS AND RENDER =====
+        // ===== APPLY FILTERS =====
         function applyFilters() {
-            // Apply property filter
             let filtered = hubItems.filter(item => {
-                if (currentPropertyFilter !== 'all' && item.propertyId !== currentPropertyFilter) return false;
                 if (currentRarityFilter !== 'all' && item.rarity !== currentRarityFilter) return false;
                 if (searchTerm && !item.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
                 return true;
             });
             
             filteredItems = filtered;
-            
-            // Apply sorting
             sortItemsList();
         }
 
-        // ===== SORT ITEMS LIST =====
+        // ===== SORT ITEMS =====
         function sortItemsList() {
             switch(sortBy) {
                 case 'name':
@@ -1295,9 +959,6 @@
                 case 'rarity':
                     const rarityOrder = { 'legendary': 5, 'very-rare': 4, 'rare': 3, 'uncommon': 2, 'common': 1 };
                     filteredItems.sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0));
-                    break;
-                case 'property':
-                    filteredItems.sort((a, b) => a.propertyName.localeCompare(b.propertyName));
                     break;
             }
             
@@ -1327,181 +988,31 @@
                                 <span class="item-mass">Mass: ${item.totalMass.toFixed(1)} AMU</span>
                                 <span class="item-value">Value: ${item.totalValue.toLocaleString()}⭐</span>
                             </div>
-                            <div class="item-property">📍 ${item.propertyName}</div>
                         </div>
                         <div class="item-actions">
-                            <button class="action-btn transfer-btn" onclick="window.showTransferModal('${item.name}', ${item.count}, ${item.massPerUnit}, ${item.valuePerUnit})">🚀 SHIP</button>
-                            <button class="action-btn sell-btn" onclick="window.showSellModal('${item.name}', ${item.count}, ${item.valuePerUnit})">💰 SELL</button>
+                            <button class="action-btn sell-btn" data-item="${item.name}" data-count="${item.count}" data-value="${item.valuePerUnit}">💰 SELL</button>
                         </div>
                     </div>
                 `;
             });
             
             grid.innerHTML = html;
-        }
-
-        // ===== FILTER ITEMS BY RARITY =====
-        function filterItems(rarity) {
-            currentRarityFilter = rarity;
             
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
+            document.querySelectorAll('.sell-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const itemName = btn.dataset.item;
+                    const currentCount = parseInt(btn.dataset.count);
+                    const valuePerUnit = parseInt(btn.dataset.value);
+                    showSellModal(itemName, currentCount, valuePerUnit);
+                });
             });
-            event.target.classList.add('active');
-            
-            applyFilters();
-        }
-
-        // ===== FILTER BY PROPERTY =====
-        function filterByProperty(propertyId) {
-            currentPropertyFilter = propertyId;
-            
-            document.querySelectorAll('.property-filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            applyFilters();
-        }
-
-        // ===== SEARCH ITEMS =====
-        function searchItems() {
-            searchTerm = document.getElementById('searchInput').value;
-            applyFilters();
-        }
-
-        // ===== SORT ITEMS =====
-        function sortItems() {
-            sortBy = document.getElementById('sortSelect').value;
-            sortItemsList();
-        }
-
-        // ===== TRANSFER MODAL FUNCTIONS =====
-        function showTransferModal(itemName, currentCount, massPerUnit, valuePerUnit) {
-            if (currentShipAvailable < massPerUnit) {
-                alert('Not enough ship cargo space!');
-                return;
-            }
-            
-            currentTransferItem = itemName;
-            currentTransferMax = currentCount;
-            currentTransferMassPerUnit = massPerUnit;
-            currentTransferValuePerUnit = valuePerUnit;
-            
-            document.getElementById('transferItemName').textContent = itemName;
-            document.getElementById('transferCurrentCount').textContent = `Current: ${currentCount}`;
-            document.getElementById('transferQuantity').value = 1;
-            document.getElementById('transferMass').textContent = massPerUnit.toFixed(1);
-            document.getElementById('shipAvailable').textContent = currentShipAvailable.toFixed(1);
-            document.getElementById('transferWarning').textContent = '';
-            
-            document.getElementById('transferDecrementBtn').disabled = true;
-            document.getElementById('transferIncrementBtn').disabled = (currentCount <= 1 || massPerUnit > currentShipAvailable);
-            
-            document.getElementById('transferModal').classList.add('active');
-            
-            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-        }
-
-        function closeTransferModal() {
-            document.getElementById('transferModal').classList.remove('active');
-            currentTransferItem = null;
-        }
-
-        function transferIncrementQty() {
-            let current = parseInt(document.getElementById('transferQuantity').value);
-            if (current < currentTransferMax) {
-                current++;
-                document.getElementById('transferQuantity').value = current;
-                const massToTransfer = current * currentTransferMassPerUnit;
-                document.getElementById('transferMass').textContent = massToTransfer.toFixed(1);
-                
-                document.getElementById('transferDecrementBtn').disabled = (current <= 1);
-                document.getElementById('transferIncrementBtn').disabled = (current >= currentTransferMax || massToTransfer >= currentShipAvailable);
-                
-                if (massToTransfer > currentShipAvailable * 0.9) {
-                    document.getElementById('transferWarning').textContent = '⚠️ Approaching ship cargo limit';
-                } else {
-                    document.getElementById('transferWarning').textContent = '';
-                }
-            }
-        }
-
-        function transferDecrementQty() {
-            let current = parseInt(document.getElementById('transferQuantity').value);
-            if (current > 1) {
-                current--;
-                document.getElementById('transferQuantity').value = current;
-                const massToTransfer = current * currentTransferMassPerUnit;
-                document.getElementById('transferMass').textContent = massToTransfer.toFixed(1);
-                
-                document.getElementById('transferDecrementBtn').disabled = (current <= 1);
-                document.getElementById('transferIncrementBtn').disabled = (current >= currentTransferMax || massToTransfer >= currentShipAvailable);
-                document.getElementById('transferWarning').textContent = '';
-            }
-        }
-
-        async function confirmTransfer() {
-            if (!currentTransferItem) return;
-            
-            const quantity = parseInt(document.getElementById('transferQuantity').value);
-            const massToTransfer = quantity * currentTransferMassPerUnit;
-            
-            if (massToTransfer > currentShipAvailable) {
-                document.getElementById('transferWarning').textContent = 'Not enough ship cargo space!';
-                return;
-            }
-            
-            loadingOverlay.classList.add('active');
-            loadingText.textContent = 'transferring to ship...';
-            
-            try {
-                // Use transfer function from storage.js
-                if (typeof window.transferHubToShip === 'function') {
-                    const result = await window.transferHubToShip(currentTransferItem, quantity);
-                    
-                    if (result.success) {
-                        closeTransferModal();
-                        await loadHubData();
-                        
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                        alert(`✅ Transferred ${quantity}x ${currentTransferItem} to ship`);
-                    } else {
-                        document.getElementById('transferWarning').textContent = result.reason || 'Transfer failed';
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-                    }
-                } else {
-                    // Manual transfer if function not available
-                    const removeResult = await window.removeElementFromHub(currentTransferItem, quantity);
-                    
-                    if (!removeResult.success) {
-                        throw new Error(removeResult.reason || 'Failed to remove from hub');
-                    }
-                    
-                    const addResult = await window.addElementToCollection(currentTransferItem, quantity);
-                    
-                    if (!addResult.success) {
-                        await window.addElementToHub(currentTransferItem, quantity);
-                        throw new Error(addResult.reason || 'Failed to add to ship');
-                    }
-                    
-                    closeTransferModal();
-                    await loadHubData();
-                    
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                    alert(`✅ Transferred ${quantity}x ${currentTransferItem} to ship`);
-                }
-                
-            } catch (error) {
-                console.error('Transfer error:', error);
-                document.getElementById('transferWarning').textContent = error.message || 'Error transferring';
-                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-            }
-            
-            loadingOverlay.classList.remove('active');
         }
 
         // ===== SELL MODAL FUNCTIONS =====
+        let currentSellItem = null;
+        let currentSellMax = 1;
+        let currentSellPricePerUnit = 0;
+
         function showSellModal(itemName, currentCount, pricePerUnit) {
             currentSellItem = itemName;
             currentSellMax = currentCount;
@@ -1555,27 +1066,24 @@
             if (!currentSellItem) return;
             
             const quantity = parseInt(document.getElementById('sellQuantity').value);
+            const totalValue = quantity * currentSellPricePerUnit;
             
             loadingOverlay.classList.add('active');
             loadingText.textContent = 'selling...';
             
             try {
-                // Use sell function from storage.js
-                if (typeof window.safeSellHubElement === 'function') {
-                    const result = await window.safeSellHubElement(currentSellItem, quantity, currentSellPricePerUnit);
+                const removeResult = await removeElementFromHub(currentSellItem, quantity);
+                
+                if (removeResult.success) {
+                    await addCredits(totalValue);
+                    closeSellModal();
+                    await loadHubData();
                     
-                    if (result.success) {
-                        closeSellModal();
-                        await loadHubData();
-                        
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                        alert(`✅ Sold ${quantity}x ${currentSellItem} for ${result.earnings}⭐`);
-                    } else {
-                        document.getElementById('sellWarning').textContent = result.reason || 'Sale failed';
-                        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
-                    }
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    alert(`✅ Sold ${quantity}x ${currentSellItem} for ${totalValue.toLocaleString()}⭐`);
                 } else {
-                    document.getElementById('sellWarning').textContent = 'Sell function not available';
+                    document.getElementById('sellWarning').textContent = removeResult.error || 'Sale failed';
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
                 }
                 
             } catch (error) {
@@ -1586,11 +1094,46 @@
             loadingOverlay.classList.remove('active');
         }
 
+        // ===== FILTER FUNCTIONS =====
+        function filterItems(rarity) {
+            currentRarityFilter = rarity;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.filter === rarity) btn.classList.add('active');
+            });
+            
+            applyFilters();
+        }
+
+        function searchItems() {
+            searchTerm = document.getElementById('searchInput').value;
+            applyFilters();
+        }
+
+        function sortItems() {
+            sortBy = document.getElementById('sortSelect').value;
+            sortItemsList();
+        }
+
         // ===== NAVIGATION =====
-        function returnToEarthHub() {
+        window.returnToEarthHub = function() {
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             window.location.href = 'earth-hub.html';
-        }
+        };
+
+        // ===== EVENT LISTENERS =====
+        document.getElementById('searchInput').addEventListener('input', searchItems);
+        document.getElementById('sortSelect').addEventListener('change', sortItems);
+        
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => filterItems(btn.dataset.filter));
+        });
+        
+        document.getElementById('sellDecrementBtn').addEventListener('click', sellDecrementQty);
+        document.getElementById('sellIncrementBtn').addEventListener('click', sellIncrementQty);
+        document.getElementById('confirmSellBtn').addEventListener('click', confirmSell);
+        document.getElementById('closeSellModalBtn').addEventListener('click', closeSellModal);
 
         // ===== INITIALIZE =====
         async function init() {
@@ -1613,7 +1156,6 @@
             }
         }
 
-        // ===== START =====
         init();
     </script>
 </body>
