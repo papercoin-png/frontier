@@ -10,6 +10,7 @@
 // UPDATED: Throttled error logging to reduce console spam
 // UPDATED: Added order pruning for non-competitive orders
 // UPDATED: Now uses elements-data.js as the single source of truth for element data
+// APPROVED CHANGE: Added excess fill logic for market orders - fills remaining quantity at 50% of lowest bid (sell) or 150% of highest ask (buy)
 
 import { ELEMENTS, getElementByName, getElementValue, getElementIcon, getElementRarity } from './elements-data.js';
 
@@ -70,7 +71,10 @@ const ENGINE_CONFIG = {
     MARKET_MAKER_QUANTITY: 1000,  // Default quantity per order
     EMERGENCY_QUANTITY: 500,  // Emergency liquidity quantity
     PRUNE_NON_COMPETITIVE: true,  // Remove orders that won't execute
-    PRUNE_AGE_HOURS: 24  // Remove stale orders after 24 hours
+    PRUNE_AGE_HOURS: 24,  // Remove stale orders after 24 hours
+    
+    // APPROVED: Excess fill penalty (50% penalty for sells, 50% premium for buys)
+    EXCESS_FILL_PENALTY: 0.5  // 50% of lowest bid for sells, 150% of highest ask for buys
 };
 
 // Throttling for error logging
@@ -524,9 +528,7 @@ export async function createOrder(orderData) {
 
 /**
  * Execute a market order against actual order book
- * FIXED: Now uses real orders, not theoretical prices
- * UPDATED: Added emergency liquidity fallback
- * UPDATED: Throttled error logging
+ * APPROVED CHANGE: Added excess fill logic - fills remaining quantity at penalty price
  */
 async function executeMarketOrder(order) {
     try {
@@ -549,7 +551,6 @@ async function executeMarketOrder(order) {
             if (activeSells.length === 0) {
                 const added = await ensureElementLiquidity(order.element, ORDER_SIDES.BUY);
                 if (added) {
-                    // Reload cache and try again
                     await reloadOrderCache();
                     sellOrders = sellOrdersCache[order.element] || [];
                     activeSells = sellOrders.filter(o => 
@@ -558,14 +559,10 @@ async function executeMarketOrder(order) {
                 }
             }
             
-            if (activeSells.length === 0) {
-                throw new Error('No sellers available at this time');
-            }
-            
             let remainingToBuy = quantity;
             let totalCost = 0;
             let filledQuantity = 0;
-            let lastExecutionPrice = activeSells[0].price;
+            let lastExecutionPrice = activeSells.length > 0 ? activeSells[0].price : 0;
             const matchedOrders = [];
             
             // Fill against available sell orders
@@ -605,21 +602,56 @@ async function executeMarketOrder(order) {
                 }
             }
             
+            // APPROVED CHANGE: Handle excess quantity that couldn't be filled by market orders
+            if (remainingToBuy > 0) {
+                // Get the highest ask price from available orders, or use base price
+                let highestAsk = 0;
+                if (activeSells.length > 0) {
+                    highestAsk = Math.max(...activeSells.map(s => s.price));
+                } else {
+                    const elementData = getElementByName(order.element);
+                    highestAsk = elementData ? elementData.value || 100 : 100;
+                }
+                
+                // Calculate penalty price: 150% of highest ask (50% premium)
+                const penaltyPrice = Math.ceil(highestAsk * (1 + ENGINE_CONFIG.EXCESS_FILL_PENALTY));
+                const excessTotal = remainingToBuy * penaltyPrice;
+                
+                totalCost += excessTotal;
+                filledQuantity += remainingToBuy;
+                lastExecutionPrice = penaltyPrice;
+                
+                matchedOrders.push({
+                    orderId: 'excess_fill',
+                    userId: 'market_maker',
+                    price: penaltyPrice,
+                    quantity: remainingToBuy,
+                    total: excessTotal,
+                    isNPC: true,
+                    isExcessFill: true,
+                    penaltyApplied: true
+                });
+                
+                console.log(`⚠️ Excess buy fill: ${remainingToBuy} ${order.element} at ${penaltyPrice}⭐ (150% of ${highestAsk}⭐)`);
+                remainingToBuy = 0;
+            }
+            
             if (filledQuantity === 0) {
                 throw new Error('No sellers available');
             }
             
             const fee = totalCost * ENGINE_CONFIG.FEE_PERCENT;
-            const orderStatus = remainingToBuy === 0 ? ORDER_STATUS.FILLED : ORDER_STATUS.PARTIAL;
+            const orderStatus = ORDER_STATUS.FILLED; // Always fully filled now
             
             // Update order
             order.status = orderStatus;
             order.filledQuantity = filledQuantity;
-            order.remainingQuantity = remainingToBuy;
+            order.remainingQuantity = 0;
             order.executionPrice = lastExecutionPrice;
             order.fee = fee;
             order.executedAt = Date.now();
             order.matchedOrders = matchedOrders;
+            order.hasExcessFill = matchedOrders.some(m => m.isExcessFill);
             
             // Create trade record
             const trade = {
@@ -635,12 +667,13 @@ async function executeMarketOrder(order) {
                 fee: fee,
                 timestamp: Date.now(),
                 isNPC: order.isNPC,
-                matchedOrders: matchedOrders
+                matchedOrders: matchedOrders,
+                hasExcessFill: order.hasExcessFill
             };
             
             recordTrade(order.element, filledQuantity, order.side);
             await addToMatchedTrades(trade);
-            await recordOrderHistory(order, orderStatus === ORDER_STATUS.FILLED ? 'filled' : 'partial');
+            await recordOrderHistory(order, 'filled');
             
             if (!order.isNPC) {
                 await saveUserOrder(order);
@@ -662,8 +695,10 @@ async function executeMarketOrder(order) {
                 totalCost,
                 fee,
                 filledQuantity,
-                remainingQuantity: remainingToBuy,
-                partiallyFilled: remainingToBuy > 0
+                remainingQuantity: 0,
+                partiallyFilled: false,
+                hasExcessFill: order.hasExcessFill,
+                excessFillQuantity: order.hasExcessFill ? (matchedOrders.find(m => m.isExcessFill)?.quantity || 0) : 0
             };
             
         // ===== SELL MARKET ORDER =====
@@ -678,7 +713,6 @@ async function executeMarketOrder(order) {
             if (activeBuys.length === 0) {
                 const added = await ensureElementLiquidity(order.element, ORDER_SIDES.SELL);
                 if (added) {
-                    // Reload cache and try again
                     await reloadOrderCache();
                     buyOrders = buyOrdersCache[order.element] || [];
                     activeBuys = buyOrders.filter(o => 
@@ -687,14 +721,10 @@ async function executeMarketOrder(order) {
                 }
             }
             
-            if (activeBuys.length === 0) {
-                throw new Error('No buyers available at this time');
-            }
-            
             let remainingToSell = quantity;
             let totalReceived = 0;
             let filledQuantity = 0;
-            let lastExecutionPrice = activeBuys[0].price;
+            let lastExecutionPrice = activeBuys.length > 0 ? activeBuys[0].price : 0;
             const matchedOrders = [];
             
             // Fill against available buy orders
@@ -734,23 +764,58 @@ async function executeMarketOrder(order) {
                 }
             }
             
+            // APPROVED CHANGE: Handle excess quantity that couldn't be filled by market orders
+            if (remainingToSell > 0) {
+                // Get the lowest bid price from available orders, or use base price
+                let lowestBid = 0;
+                if (activeBuys.length > 0) {
+                    lowestBid = Math.min(...activeBuys.map(b => b.price));
+                } else {
+                    const elementData = getElementByName(order.element);
+                    lowestBid = elementData ? elementData.value || 100 : 100;
+                }
+                
+                // Calculate penalty price: 50% of lowest bid
+                const penaltyPrice = Math.floor(lowestBid * ENGINE_CONFIG.EXCESS_FILL_PENALTY);
+                const excessTotal = remainingToSell * penaltyPrice;
+                
+                totalReceived += excessTotal;
+                filledQuantity += remainingToSell;
+                lastExecutionPrice = penaltyPrice;
+                
+                matchedOrders.push({
+                    orderId: 'excess_fill',
+                    userId: 'market_maker',
+                    price: penaltyPrice,
+                    quantity: remainingToSell,
+                    total: excessTotal,
+                    isNPC: true,
+                    isExcessFill: true,
+                    penaltyApplied: true
+                });
+                
+                console.log(`⚠️ Excess sell fill: ${remainingToSell} ${order.element} at ${penaltyPrice}⭐ (50% of ${lowestBid}⭐)`);
+                remainingToSell = 0;
+            }
+            
             if (filledQuantity === 0) {
                 throw new Error('No buyers available');
             }
             
             const fee = totalReceived * ENGINE_CONFIG.FEE_PERCENT;
             const netReceived = totalReceived - fee;
-            const orderStatus = remainingToSell === 0 ? ORDER_STATUS.FILLED : ORDER_STATUS.PARTIAL;
+            const orderStatus = ORDER_STATUS.FILLED; // Always fully filled now
             
             // Update order
             order.status = orderStatus;
             order.filledQuantity = filledQuantity;
-            order.remainingQuantity = remainingToSell;
+            order.remainingQuantity = 0;
             order.executionPrice = lastExecutionPrice;
             order.fee = fee;
             order.netReceived = netReceived;
             order.executedAt = Date.now();
             order.matchedOrders = matchedOrders;
+            order.hasExcessFill = matchedOrders.some(m => m.isExcessFill);
             
             // Create trade record
             const trade = {
@@ -767,12 +832,13 @@ async function executeMarketOrder(order) {
                 netReceived: netReceived,
                 timestamp: Date.now(),
                 isNPC: order.isNPC,
-                matchedOrders: matchedOrders
+                matchedOrders: matchedOrders,
+                hasExcessFill: order.hasExcessFill
             };
             
             recordTrade(order.element, filledQuantity, order.side);
             await addToMatchedTrades(trade);
-            await recordOrderHistory(order, orderStatus === ORDER_STATUS.FILLED ? 'filled' : 'partial');
+            await recordOrderHistory(order, 'filled');
             
             if (!order.isNPC) {
                 await saveUserOrder(order);
@@ -785,19 +851,20 @@ async function executeMarketOrder(order) {
             await dbSaveMarketOrders(sellOrdersCache, 'sell_orders');
             await reloadOrderCache();
             
-            // FIXED: Return totalCost instead of totalReceived to match HTML expectations
             return { 
                 success: true, 
                 order,
                 trade,
                 executionPrice: lastExecutionPrice,
                 averagePrice: totalReceived / filledQuantity,
-                totalCost: totalReceived,  // <-- FIXED: Use totalCost property name
+                totalCost: totalReceived,
                 fee,
                 netReceived,
                 filledQuantity,
-                remainingQuantity: remainingToSell,
-                partiallyFilled: remainingToSell > 0
+                remainingQuantity: 0,
+                partiallyFilled: false,
+                hasExcessFill: order.hasExcessFill,
+                excessFillQuantity: order.hasExcessFill ? (matchedOrders.find(m => m.isExcessFill)?.quantity || 0) : 0
             };
         }
         
@@ -1491,4 +1558,4 @@ window.get24HourSummary = get24HourSummary;
 window.isNPCOrder = isNPCOrder;
 window.getTraderDisplayName = getTraderDisplayName;
 
-console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, market maker liquidity, and emergency fallback');
+console.log('✅ market-engine.js loaded - IndexedDB version ready with market order fix, unlimited player orders, market maker liquidity, emergency fallback, and EXCESS FILL LOGIC (50% penalty for sells, 150% premium for buys)');
