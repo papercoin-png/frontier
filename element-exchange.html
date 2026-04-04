@@ -1789,8 +1789,11 @@
                         });
                         
                     } else {
-                        // APPROVED CHANGE: Simplified credit addition for sell orders
-                        await addCredits(creditAmount, PLAYER_ID);
+                        // APPROVED CHANGE: Use actual filled quantity from the market engine
+                        const filledQuantity = result.filledQuantity || result.trade?.quantity || orderQuantity;
+                        const actualTotal = result.totalCost || (result.trade?.total || executionPrice * filledQuantity);
+                        
+                        await addCredits(actualTotal, PLAYER_ID);
                         currentCredits = await getCredits(PLAYER_ID);
                         if (currentCredits === undefined || isNaN(currentCredits)) {
                             showToast('Failed to process credits', 'error');
@@ -1798,7 +1801,9 @@
                             return;
                         }
                         
-                        await window.removeElementFromCollection(selectedElement.name, orderQuantity);
+                        // Remove ONLY what was actually sold
+                        await window.removeElementFromCollection(selectedElement.name, filledQuantity);
+                        console.log(`✅ SOLD: requested ${orderQuantity}, actual filled ${filledQuantity}, removed ${filledQuantity} from cargo`);
                     }
                     
                     await updateBalance();
