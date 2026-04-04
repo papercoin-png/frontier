@@ -701,27 +701,13 @@
                 const playerId = window.getPlayerId();
                 console.log('📖 Loading journal for player:', playerId);
                 
+                // APPROVED CHANGE: Removed automatic rebuild that was causing cargo inflation
+                // The rebuildCollectionFromLocations function should only be called manually,
+                // never automatically on page load, as it was summing all location entries
+                // and causing exponential cargo mass growth.
                 let collection = await window.getCollection(playerId);
                 
-                // SAFETY CHECK: If collection is empty but player exists, try to rebuild from locations
-                if (Object.keys(collection).length === 0) {
-                    // Check if player has forge data (indicates player exists)
-                    const forgeData = await getItem('forgeData', playerId);
-                    if (forgeData) {
-                        console.log('⚠️ Collection empty but player exists. Attempting to rebuild from locations...');
-                        loadingText.textContent = 'rebuilding collection...';
-                        
-                        const rebuildSuccess = await window.rebuildCollectionFromLocations(playerId);
-                        if (rebuildSuccess) {
-                            // Reload collection after rebuild
-                            collection = await window.getCollection(playerId);
-                            console.log('✅ Collection rebuilt successfully:', Object.keys(collection).length, 'unique elements');
-                        } else {
-                            console.log('No locations found to rebuild from');
-                        }
-                    }
-                }
-                
+                // Log collection size for debugging - no automatic rebuild
                 console.log('📦 Collection loaded:', Object.keys(collection).length, 'unique elements');
                 
                 allElements = [];
@@ -759,7 +745,7 @@
                 document.getElementById('uniqueElements').textContent = allElements.length;
                 document.getElementById('totalMass').textContent = Math.round(totalMass);
                 
-                console.log(`📊 Journal stats: ${totalCount} total units, ${allElements.length} unique elements`);
+                console.log(`📊 Journal stats: ${totalCount} total units, ${allElements.length} unique elements, ${Math.round(totalMass)} AMU`);
                 
                 // Preload all locations after collection is loaded
                 await preloadAllLocations();
