@@ -208,6 +208,7 @@
     <script type="module">
         import { getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
         import { getHiddenPlanets, revealPlanet, getScannedSectors, markSectorScanned, getCurrentPlanetTier } from './js/storage.js';
+        import { getShipStats, parseShipString } from './js/ship-data.js';
 
         // Center Earth with balanced padding: max radius is 3400px, add 400px padding = 3800px from center to edge
         // So map size = 3800 * 2 = 7600, but we'll use 7000 for tighter fit
@@ -251,7 +252,49 @@
         let hiddenSectors = [];
         let scannedSectors = [];
 
-        // ===== DISCOVERY LOCK FUNCTIONS (NEW) =====
+        // ===== LOAD SHIP TIER FROM STORAGE (APPROVED CHANGE) =====
+        async function loadShipTier() {
+            try {
+                // Try to get from active ship stats
+                const shipStats = JSON.parse(localStorage.getItem('voidfarer_active_ship_stats') || '{}');
+                if (shipStats.tier) {
+                    currentShipTier = shipStats.tier;
+                } else {
+                    // Fallback: check if there's an active ship stored
+                    const activeShip = localStorage.getItem('voidfarer_active_ship');
+                    if (activeShip) {
+                        // Try to parse tier from ship name or stats
+                        const { name } = parseShipString(activeShip);
+                        const stats = getShipStats(name);
+                        if (stats) {
+                            currentShipTier = stats.tier;
+                        } else {
+                            currentShipTier = 1;
+                        }
+                    } else {
+                        currentShipTier = 1;
+                    }
+                }
+                
+                console.log(`🛸 Loaded ship tier: ${currentShipTier}`);
+                
+                // Update UI
+                const shipNameEl = document.getElementById('shipName');
+                const shipTierEl = document.getElementById('shipTier');
+                
+                if (shipNameEl) {
+                    shipNameEl.innerHTML = SHIP_TIERS[currentShipTier]?.name || 'Prospector';
+                }
+                if (shipTierEl) {
+                    shipTierEl.innerHTML = `Tier ${currentShipTier} • Range: ${SHIP_TIERS[currentShipTier]?.range || 100} LY`;
+                }
+            } catch (error) {
+                console.error('Error loading ship tier:', error);
+                currentShipTier = 1;
+            }
+        }
+
+        // ===== DISCOVERY LOCK FUNCTIONS =====
         
         async function loadHiddenSectors() {
             try {
@@ -678,6 +721,9 @@
         async function init() {
             const loading = document.getElementById('loadingOverlay');
             loading.classList.remove('hidden');
+            
+            // Load ship tier from storage (APPROVED CHANGE)
+            await loadShipTier();
             
             drawRingBoundaries();
             
