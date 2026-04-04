@@ -963,6 +963,19 @@
             return icons[element] || '📦';
         }
 
+        // ===== SHIP MATERIAL REQUIREMENTS =====
+        const SHIP_MATERIALS = {
+            'Deep Miner': { 'Iron': 800, 'Copper': 400, 'Titanium': 200, 'Nickel': 250, 'Chromium': 180, 'Steel': 150 },
+            'Excavator': { 'Titanium': 350, 'Steel': 450, 'Nickel': 350, 'Chromium': 280, 'Zinc': 250, 'Silver': 150, 'Cobalt': 140 },
+            'Borealis': { 'Steel': 800, 'Titanium': 600, 'Nickel': 550, 'Silver': 350, 'Iridium': 220, 'Manganese': 350, 'Lead': 300 },
+            'Core Digger': { 'Steel': 1200, 'Titanium': 1000, 'Iridium': 400, 'Uranium': 200, 'Thorium': 150, 'Neodymium': 120 },
+            'Abyss Miner': { 'Uranium': 400, 'Thorium': 300, 'Plutonium': 200, 'Rhodium': 160, 'Palladium': 120, 'Neodymium': 200 },
+            'Void Excavator': { 'Plutonium': 400, 'Rhodium': 300, 'Osmium': 240, 'Ruthenium': 200, 'Technetium': 160, 'Palladium': 240 },
+            'Singularity Miner': { 'Osmium': 400, 'Ruthenium': 360, 'Rhenium': 240, 'Hafnium': 200, 'Promethium': 160, 'Technetium': 200 },
+            'Quasar Drill': { 'Rhenium': 500, 'Hafnium': 400, 'Californium': 200, 'Einsteinium': 160, 'Fermium': 120, 'Promethium': 240 },
+            'Event Horizon': { 'Californium': 400, 'Einsteinium': 300, 'Fermium': 200, 'Mendelevium': 160, 'Nobelium': 120, 'Lawrencium': 100 }
+        };
+
         // ===== ORDER MATERIALS FUNCTION =====
         window.orderMaterials = async function(element, neededAmount) {
             event.stopPropagation();
@@ -1081,6 +1094,7 @@
         }
 
         // ===== BUILD SHIP FUNCTION =====
+        // APPROVED FIX: Changed ship.elements to SHIP_MATERIALS[shipName]
         window.buildShip = async function(shipName, tier, variantId = null) {
             const ship = getShipStats(shipName);
             if (!ship) return;
@@ -1093,13 +1107,14 @@
                 return;
             }
             
-            // For non-starter ships, check orders
+            // For non-starter ships, check orders using SHIP_MATERIALS
             if (!isStarter) {
                 const orders = getShipyardOrders();
+                const shipMaterials = SHIP_MATERIALS[shipName] || {};
                 
                 // Check if all required materials are ordered
                 let allOrdered = true;
-                for (const [element, needed] of Object.entries(ship.elements)) {
+                for (const [element, needed] of Object.entries(shipMaterials)) {
                     const ordered = orders[element]?.quantity || 0;
                     if (ordered < needed) {
                         allOrdered = false;
@@ -1248,19 +1263,6 @@
         // ===== VARIANT TRACKING =====
         let selectedVariants = {};
         
-        // ===== SHIP MATERIAL REQUIREMENTS =====
-        const SHIP_MATERIALS = {
-            'Deep Miner': { 'Iron': 800, 'Copper': 400, 'Titanium': 200, 'Nickel': 250, 'Chromium': 180, 'Steel': 150 },
-            'Excavator': { 'Titanium': 350, 'Steel': 450, 'Nickel': 350, 'Chromium': 280, 'Zinc': 250, 'Silver': 150, 'Cobalt': 140 },
-            'Borealis': { 'Steel': 800, 'Titanium': 600, 'Nickel': 550, 'Silver': 350, 'Iridium': 220, 'Manganese': 350, 'Lead': 300 },
-            'Core Digger': { 'Steel': 1200, 'Titanium': 1000, 'Iridium': 400, 'Uranium': 200, 'Thorium': 150, 'Neodymium': 120 },
-            'Abyss Miner': { 'Uranium': 400, 'Thorium': 300, 'Plutonium': 200, 'Rhodium': 160, 'Palladium': 120, 'Neodymium': 200 },
-            'Void Excavator': { 'Plutonium': 400, 'Rhodium': 300, 'Osmium': 240, 'Ruthenium': 200, 'Technetium': 160, 'Palladium': 240 },
-            'Singularity Miner': { 'Osmium': 400, 'Ruthenium': 360, 'Rhenium': 240, 'Hafnium': 200, 'Promethium': 160, 'Technetium': 200 },
-            'Quasar Drill': { 'Rhenium': 500, 'Hafnium': 400, 'Californium': 200, 'Einsteinium': 160, 'Fermium': 120, 'Promethium': 240 },
-            'Event Horizon': { 'Californium': 400, 'Einsteinium': 300, 'Fermium': 200, 'Mendelevium': 160, 'Nobelium': 120, 'Lawrencium': 100 }
-        };
-
         // ===== GENERATE SHIP CARD =====
         async function generateShipCard(ship) {
             const stats = getShipStats(ship.name);
