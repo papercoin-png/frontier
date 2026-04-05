@@ -732,11 +732,15 @@
         let currentSectorId = 'B2';
         let currentStarSector = 'Orion Molecular Cloud';
         let starSectors = [];
+        let filteredStarSectors = [];
         let selectedStarSector = null;
         let selectedIndex = -1;
         let journeyDistance = 0;
         let hiddenSectors = [];
         let scannedStarSectors = [];
+        
+        // APPROVED CHANGE: Load galaxy tier for filtering
+        let currentGalaxyTier = 1;
         
         // ===== CHECK FOR PLOT MODE =====
         const urlParams = new URLSearchParams(window.location.search);
@@ -754,7 +758,7 @@
             sectorDistance: 0
         };
 
-        // ===== DISCOVERY LOCK FUNCTIONS (NEW) =====
+        // ===== DISCOVERY LOCK FUNCTIONS =====
         
         async function loadHiddenStarSectors() {
             try {
@@ -844,8 +848,6 @@
         
         async function loadDiscoveryHistory(sectorName) {
             try {
-                // For star sectors, we might not have discovery history directly
-                // This would need to be implemented based on planets within the sector
                 discoveryPanel.style.display = 'none';
             } catch (error) {
                 console.error('Error loading discovery history:', error);
@@ -1010,6 +1012,10 @@
                 console.log('Loading region data...');
                 console.log('Is plot mode:', isPlotMode);
                 
+                // APPROVED CHANGE: Load galaxy tier for filtering
+                currentGalaxyTier = parseInt(localStorage.getItem('voidfarer_current_sector_tier') || '1');
+                console.log(`📍 Current galaxy tier for filtering: ${currentGalaxyTier}`);
+                
                 // First check if we're in plot mode with a target sector
                 let targetRegion = null;
                 let targetSector = null;
@@ -1077,11 +1083,20 @@
                 document.getElementById('currentLocationText').textContent = currentStarSector;
 
                 // Get star sectors for this region
-                starSectors = starSectorData[currentRegion];
+                const allSectors = starSectorData[currentRegion];
+                
+                // APPROVED CHANGE: Filter star sectors by galaxy tier
+                // Only show sectors with tier >= currentGalaxyTier
+                // This ensures that when you travel to a T3 galaxy sector, you only see T3+ star sectors
+                filteredStarSectors = allSectors.filter(sector => sector.tier >= currentGalaxyTier);
+                
+                console.log(`Original sectors: ${allSectors.length}, Filtered to tier >= ${currentGalaxyTier}: ${filteredStarSectors.length}`);
+                console.log('Filtered star sectors:', filteredStarSectors.map(s => `${s.name} (T${s.tier})`));
+                
+                starSectors = filteredStarSectors;
 
                 // Log what we loaded
                 console.log(`Loaded ${starSectors.length} star sectors for:`, currentRegion);
-                console.log('First star sector:', starSectors[0]);
 
                 // Load journey distance
                 loadJourneyDistance();
@@ -1100,7 +1115,9 @@
             } catch (error) {
                 console.error('Error loading region data:', error);
                 currentRegion = 'Orion Arm';
-                starSectors = starSectorData['Orion Arm'];
+                const fallbackSectors = starSectorData['Orion Arm'];
+                filteredStarSectors = fallbackSectors.filter(s => s.tier >= 1);
+                starSectors = filteredStarSectors;
                 document.getElementById('regionTitle').textContent = 'Orion Arm - Star Sectors';
                 document.getElementById('currentLocationText').textContent = 'Orion Molecular Cloud';
                 return false;
@@ -1210,7 +1227,7 @@
                 const newTotal = journeyDistance + selectedStarSector.distance;
                 localStorage.setItem('voidfarer_journey_distance', newTotal.toString());
                 
-                // APPROVED CHANGE: Save sector tier for downstream pages
+                // Save sector tier for downstream pages
                 const sectorTier = selectedStarSector.tier || 1;
                 localStorage.setItem('voidfarer_current_sector_tier', sectorTier.toString());
                 console.log(`📍 Saved star sector tier: ${sectorTier} to localStorage`);
@@ -1266,7 +1283,7 @@
                     tier: selectedStarSector.tier
                 });
                 
-                // APPROVED CHANGE: Save sector tier for downstream pages
+                // Save sector tier for downstream pages
                 const sectorTier = selectedStarSector.tier || 1;
                 localStorage.setItem('voidfarer_current_sector_tier', sectorTier.toString());
                 console.log(`📍 Saved star sector tier: ${sectorTier} to localStorage`);
