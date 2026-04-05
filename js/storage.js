@@ -24,6 +24,8 @@
 // ADDED: Shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)
 // ADDED: Real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties
 // ADDED: Hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades
+// APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER as they are no longer used for travel
+// APPROVED CHANGE: Removed getShipFuel, saveShipFuel, getShipPower, saveShipPower functions
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -70,7 +72,6 @@ const STORAGE_KEYS = {
     WARP_RETURN: 'voidfarer_warp_return',
     WARP_CYCLES: 'voidfarer_warp_cycles',
     WARP_DISTANCE: 'voidfarer_warp_distance',
-    WARP_FUEL: 'voidfarer_warp_fuel',
     WARP_DESTINATION_PLANET: 'voidfarer_warp_destination_planet',
     WARP_DESTINATION_PLANET_TYPE: 'voidfarer_warp_destination_planet_type',
     WARP_ORIGIN_PLANET: 'voidfarer_warp_origin_planet',
@@ -87,9 +88,7 @@ const STORAGE_KEYS = {
     SCAN_HISTORY: 'voidfarer_scan_history',
     
     // Ship data
-    SHIP_POWER: 'voidfarer_ship_power',
     SHIP_UPGRADES: 'voidfarer_ship_upgrades',
-    SHIP_FUEL: 'voidfarer_ship_fuel',
     
     // Settings
     SETTINGS_HAPTICS: 'voidfarer_haptics',
@@ -1556,51 +1555,22 @@ export function setCurrentPlanet(name, type, resources, tier = 1) {
 }
 
 // ============================================================================
-// SHIP DATA
+// SHIP DATA (REMOVED FUEL AND POWER - APPROVED CHANGE)
 // ============================================================================
 
-export function getShipFuel() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_FUEL)) || 100;
-    } catch (error) {
-        return 100;
-    }
-}
-
-export function saveShipFuel(fuel) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.SHIP_FUEL, fuel.toString());
-    } catch (error) {
-        console.error('Error saving ship fuel:', error);
-    }
-}
-
-export function getShipPower() {
-    try {
-        return parseInt(localStorage.getItem(STORAGE_KEYS.SHIP_POWER)) || 100;
-    } catch (error) {
-        return 100;
-    }
-}
-
-export function saveShipPower(power) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.SHIP_POWER, power.toString());
-    } catch (error) {
-        console.error('Error saving ship power:', error);
-    }
-}
+// NOTE: getShipFuel, saveShipFuel, getShipPower, saveShipPower have been removed
+// as they are no longer used for ship travel. Ship travel is now free and only
+// restricted by ship tier access.
 
 // ============================================================================
 // WARP DATA
 // ============================================================================
 
-export function setWarpData(destination, returnPage, cycles, distance, fuel) {
+export function setWarpData(destination, returnPage, cycles, distance) {
     localStorage.setItem(STORAGE_KEYS.WARP_DESTINATION, destination);
     localStorage.setItem(STORAGE_KEYS.WARP_RETURN, returnPage);
     localStorage.setItem(STORAGE_KEYS.WARP_CYCLES, cycles.toString());
     if (distance) localStorage.setItem(STORAGE_KEYS.WARP_DISTANCE, distance.toString());
-    if (fuel) localStorage.setItem(STORAGE_KEYS.WARP_FUEL, fuel.toString());
 }
 
 export function getWarpData() {
@@ -1608,8 +1578,7 @@ export function getWarpData() {
         destination: localStorage.getItem(STORAGE_KEYS.WARP_DESTINATION) || 'Unknown',
         returnPage: localStorage.getItem(STORAGE_KEYS.WARP_RETURN) || 'galaxy-map.html',
         cycles: parseInt(localStorage.getItem(STORAGE_KEYS.WARP_CYCLES)) || 1,
-        distance: parseFloat(localStorage.getItem(STORAGE_KEYS.WARP_DISTANCE)) || 0,
-        fuel: parseInt(localStorage.getItem(STORAGE_KEYS.WARP_FUEL)) || 0
+        distance: parseFloat(localStorage.getItem(STORAGE_KEYS.WARP_DISTANCE)) || 0
     };
 }
 
@@ -1619,7 +1588,6 @@ export function clearWarpData() {
         STORAGE_KEYS.WARP_RETURN,
         STORAGE_KEYS.WARP_CYCLES,
         STORAGE_KEYS.WARP_DISTANCE,
-        STORAGE_KEYS.WARP_FUEL,
         STORAGE_KEYS.WARP_DESTINATION_PLANET,
         STORAGE_KEYS.WARP_DESTINATION_PLANET_TYPE,
         STORAGE_KEYS.WARP_ORIGIN_PLANET,
@@ -2136,7 +2104,7 @@ export async function revealStarSector(starSectorName) {
 }
 
 // ============================================================================
-// FUEL TOKEN FUNCTIONS
+// FUEL TOKEN FUNCTIONS (For in-game currency, not travel)
 // ============================================================================
 
 export async function getFuelBalance(playerId = null) {
@@ -2319,8 +2287,6 @@ export async function resetGame(playerId = 'main') {
         `${STORAGE_KEYS.PLAYER}_${playerId}`,
         `${STORAGE_KEYS.COLLECTION}_${playerId}`,
         STORAGE_KEYS.CREDITS,
-        STORAGE_KEYS.SHIP_FUEL,
-        STORAGE_KEYS.SHIP_POWER,
         STORAGE_KEYS.CURRENT_SECTOR,
         STORAGE_KEYS.CURRENT_REGION,
         STORAGE_KEYS.CURRENT_STAR_SECTOR,
@@ -2394,10 +2360,6 @@ window.getCredits = getCredits;
 window.saveCredits = saveCredits;
 window.addCredits = addCredits;
 window.spendCredits = spendCredits;
-window.getShipFuel = getShipFuel;
-window.saveShipFuel = saveShipFuel;
-window.getShipPower = getShipPower;
-window.saveShipPower = saveShipPower;
 window.getCurrentPlanetName = getCurrentPlanetName;
 window.getCurrentPlanetType = getCurrentPlanetType;
 window.getCurrentPlanetResources = getCurrentPlanetResources;
@@ -2481,3 +2443,4 @@ console.log('✅ Version 8: Added fuelData and fuelBalance stores with proper co
 console.log('✅ Added shop purchase history functions (recordPurchase, getPurchaseHistory, getTotalSpent)');
 console.log('✅ Added real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties');
 console.log('✅ Added hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades');
+console.log('✅ APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER (no longer used for travel)');
