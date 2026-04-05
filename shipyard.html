@@ -210,32 +210,6 @@
             color: #ffd966;
         }
         
-        .fuel-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            font-size: 12px;
-        }
-        
-        .fuel-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #4affaa;
-        }
-        
-        .buy-fuel-btn {
-            background: rgba(74, 255, 170, 0.2);
-            border: 1px solid #4affaa;
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 10px;
-            cursor: pointer;
-            color: #4affaa;
-        }
-        
         .ships-grid {
             display: flex;
             flex-direction: column;
@@ -719,13 +693,6 @@
             border-radius: 30px;
         }
         
-        .fuel-note {
-            font-size: 10px;
-            color: #4affaa;
-            text-align: center;
-            margin-top: 8px;
-        }
-        
         .price-note {
             font-size: 9px;
             color: #ffaa4a;
@@ -792,13 +759,6 @@
                     <span>Available Credits</span>
                     <span class="credits-value" id="credits">Loading...</span>
                 </div>
-                <div class="fuel-row">
-                    <span>⚡ Fuel Cells</span>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span class="fuel-value" id="fuelCells">0</span>
-                        <button class="buy-fuel-btn" onclick="buyFuel()">BUY FUEL (10⭐)</button>
-                    </div>
-                </div>
             </div>
             
             <div class="ships-grid" id="shipsContainer">
@@ -827,7 +787,7 @@
     <script type="module">
         import { getCredits, getPlayer, getCollection, addCredits, spendCredits } from './js/storage.js';
         import { recordTrade, getAskPrice, getBidPrice, updatePrices } from './js/market-dynamics.js';
-        import { getAllShips, getShipStats, getVariantsForTier, getVariantStats, getFullShipStats, getWarpSpeed, getFuelCostPer100LY } from './js/ship-data.js';
+        import { getAllShips, getShipStats, getVariantsForTier, getVariantStats, getFullShipStats, getWarpSpeed } from './js/ship-data.js';
 
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -1094,7 +1054,6 @@
         }
 
         // ===== BUILD SHIP FUNCTION =====
-        // APPROVED FIX: Changed ship.elements to SHIP_MATERIALS[shipName]
         window.buildShip = async function(shipName, tier, variantId = null) {
             const ship = getShipStats(shipName);
             if (!ship) return;
@@ -1236,24 +1195,6 @@
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         };
         
-        window.buyFuel = async function() {
-            const credits = await getCredits(getPlayerId());
-            const fuelCells = parseInt(localStorage.getItem('voidfarer_fuel_cells') || '0');
-            if (credits >= 10) {
-                const spent = await spendCredits(10, getPlayerId(), 'Fuel purchase');
-                if (spent) {
-                    localStorage.setItem('voidfarer_fuel_cells', (fuelCells + 1).toString());
-                    await updateCreditsDisplay();
-                    document.getElementById('fuelCells').textContent = fuelCells + 1;
-                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                } else {
-                    alert('Failed to purchase fuel');
-                }
-            } else {
-                alert('Insufficient credits! Need 10⭐ for 1 fuel cell.');
-            }
-        };
-        
         window.returnToEarthHub = function() {
             document.getElementById('loadingOverlay').classList.add('active');
             document.getElementById('loadingText').textContent = 'RETURNING TO HUB...';
@@ -1361,7 +1302,6 @@
             const canBuild = isStarter ? true : (allOrdered && canAffordLabor);
             const starterBadge = isStarter ? '<span class="tier-badge starter-badge">⭐ STARTER SHIP • FREE</span>' : `<span class="tier-badge">TIER ${stats.tier} MINING VESSEL</span>`;
             const warpSpeed = getWarpSpeed(25, fuelMult);
-            const fuelCostPer100LY = getFuelCostPer100LY(fuelMult);
             const hasOrders = Object.keys(orders).length > 0;
             
             let buildButtonHtml = '';
@@ -1404,7 +1344,6 @@
                             <div class="cost-row"><span class="cost-label">Labor Cost:</span><span class="cost-value">${laborCost.toLocaleString()} ⭐</span></div>
                             <div class="cost-row total-row"><span class="cost-label">TOTAL DUE AT BUILD:</span><span class="cost-total">${laborCost.toLocaleString()} ⭐</span></div>
                             <div class="labor-note">👷 Labor fees distributed to certificate holders</div>
-                            <div class="fuel-note">⚡ Fuel cost: ${fuelCostPer100LY}⭐ per 100 LY</div>
                             <div class="price-note">📊 Market prices update every 60 seconds</div>
                         </div>
                         <div class="requirements-section">
@@ -1441,9 +1380,6 @@
             if (savedVariants) selectedVariants = JSON.parse(savedVariants);
             
             await updateCreditsDisplay();
-            
-            const fuelCells = localStorage.getItem('voidfarer_fuel_cells') || '0';
-            document.getElementById('fuelCells').textContent = fuelCells;
             
             const playerId = getPlayerId();
             const player = await getPlayer(playerId);
@@ -1492,7 +1428,6 @@
         window.clearAllOrders = clearAllOrders;
         window.buildShip = buildShip;
         window.selectVariant = selectVariant;
-        window.buyFuel = buyFuel;
         window.returnToEarthHub = returnToEarthHub;
     </script>
 </body>
