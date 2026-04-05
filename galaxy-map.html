@@ -36,8 +36,6 @@
         .ship-status { position: fixed; top: 15px; left: 15px; background: rgba(10,20,35,0.95); backdrop-filter: blur(12px); border: 1px solid #4affaa; border-radius: 40px 12px 40px 12px; padding: 8px 12px; z-index: 100; min-width: 180px; }
         .ship-name { font-size: 12px; color: #4affaa; font-weight: 600; }
         .ship-tier { font-size: 9px; color: #a0c0ff; }
-        .damage-bar { background: #2a2a3a; border-radius: 20px; height: 3px; margin: 4px 0; overflow: hidden; }
-        .damage-fill { height: 100%; background: #ff4444; width: 0%; }
 
         .info-panel { position: fixed; bottom: 20px; right: 20px; background: rgba(10,20,35,0.96); backdrop-filter: blur(12px); border: 2px solid #ffaa4a; border-radius: 40px 15px 40px 15px; padding: 12px; width: 280px; z-index: 100; max-height: 80vh; overflow-y: auto; }
         .info-panel.hidden { display: none; }
@@ -123,8 +121,6 @@
         <div class="ship-status">
             <div class="ship-name" id="shipName">Prospector</div>
             <div class="ship-tier" id="shipTier">Tier 1 • Range: 100 LY</div>
-            <div class="damage-bar"><div class="damage-fill" id="damageFill"></div></div>
-            <div id="damageText" style="font-size: 8px;">Hull: 100%</div>
         </div>
 
         <div class="legend">
@@ -170,8 +166,6 @@
             
             <div style="background:rgba(74,138,192,0.2);border-radius:20px;padding:4px;margin:4px 0;">
                 <div class="info-row"><span class="info-label">Warp Time:</span><span class="info-value" id="infoWarpTime">0 min</span></div>
-                <div class="info-row"><span class="info-label">Fuel Cost:</span><span class="info-value" id="infoFuel">0⭐</span></div>
-                <div class="info-row"><span class="info-label">Arrival Damage:</span><span class="info-value" id="infoDamage">0%</span></div>
             </div>
             
             <!-- NEW: Scan Button -->
@@ -244,7 +238,6 @@
         ];
 
         let currentShipTier = 1;
-        let currentDamage = 0;
         let selectedSector = null;
         let zoom = 1;
         let isWarping = false;
@@ -564,8 +557,6 @@
             
             const ship = SHIP_TIERS[currentShipTier];
             const warpTime = Math.max(1, Math.ceil(sector.distance / ship.speed));
-            const fuelCost = Math.floor(sector.distance * 0.35 * ship.fuelMult);
-            const arrivalDamage = Math.min(100, Math.floor(sector.risk * 0.4));
             
             document.getElementById('infoTitle').innerHTML = sector.name;
             document.getElementById('infoDist').innerHTML = `${sector.distance} LY`;
@@ -575,8 +566,6 @@
             document.getElementById('infoRare').innerHTML = `${sector.rareChance}%`;
             document.getElementById('infoTier').innerHTML = `Tier ${sector.requiredTier}`;
             document.getElementById('infoWarpTime').innerHTML = `${warpTime} min`;
-            document.getElementById('infoFuel').innerHTML = `${fuelCost}⭐`;
-            document.getElementById('infoDamage').innerHTML = `+${arrivalDamage}%`;
             
             // Load discovery history and rights status
             await loadDiscoveryHistory(sector);
@@ -595,9 +584,6 @@
             if (sector.requiredTier > currentShipTier) {
                 btn.classList.add('disabled'); btn.disabled = true;
                 btn.innerHTML = '❌ NEED TIER ' + sector.requiredTier;
-            } else if (currentDamage + arrivalDamage >= 100) {
-                btn.classList.add('disabled'); btn.disabled = true;
-                btn.innerHTML = '⚠️ REPAIR SHIP';
             } else if (!isVisible) {
                 btn.classList.add('disabled'); btn.disabled = true;
                 btn.innerHTML = '🔒 SECTOR HIDDEN';
@@ -627,12 +613,6 @@
             
             const ship = SHIP_TIERS[currentShipTier];
             const warpTime = Math.max(1, Math.ceil(selectedSector.distance / ship.speed));
-            const arrivalDamage = Math.min(100, Math.floor(selectedSector.risk * 0.4));
-            
-            if (currentDamage + arrivalDamage >= 100) {
-                alert(`Ship would be destroyed!`);
-                return;
-            }
             
             // APPROVED CHANGE: Save sector tier to localStorage for downstream pages
             localStorage.setItem('voidfarer_current_sector_tier', selectedSector.requiredTier.toString());
@@ -675,26 +655,13 @@
             if (warpInterval) clearInterval(warpInterval);
             warpInterval = null;
             
-            const arrivalDamage = Math.min(100, Math.floor(selectedSector.risk * 0.4));
-            currentDamage = Math.min(100, currentDamage + arrivalDamage);
-            
-            document.getElementById('damageFill').style.width = `${currentDamage}%`;
-            document.getElementById('damageText').innerHTML = `Hull: ${100 - currentDamage}%`;
-            
             document.getElementById('warpModal').classList.add('hidden');
             isWarping = false;
             
-            if (currentDamage >= 100) {
-                alert(`💀 SHIP DESTROYED!\n\nYou have respawned at Earth with a repaired ship.`);
-                currentDamage = 0;
-                document.getElementById('damageFill').style.width = '0%';
-                document.getElementById('damageText').innerHTML = 'Hull: 100%';
-            } else {
-                alert(`✅ Arrived at ${selectedSector.name}!\n\nShip damage: ${currentDamage}%\n\nThis sector contains multiple star systems with planets to explore.`);
-                setTimeout(() => {
-                    window.location.href = 'star-sectors.html?mode=plot';
-                }, 500);
-            }
+            alert(`✅ Arrived at ${selectedSector.name}!\n\nThis sector contains multiple star systems with planets to explore.`);
+            setTimeout(() => {
+                window.location.href = 'star-sectors.html?mode=plot';
+            }, 500);
             
             selectedSector = null;
             document.getElementById('infoPanel').classList.add('hidden');
