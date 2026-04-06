@@ -222,6 +222,43 @@
             letter-spacing: 1px;
         }
         
+        /* Boost Info Panel - shows active boost */
+        .boost-panel {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(74, 255, 170, 0.15);
+            backdrop-filter: blur(8px);
+            border: 2px solid #4affaa;
+            border-radius: 40px 10px 40px 10px;
+            padding: 6px 16px;
+            color: #4affaa;
+            z-index: 35;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            pointer-events: none;
+            animation: boostPulse 1s ease-in-out;
+        }
+        
+        @keyframes boostPulse {
+            0% { transform: translateX(-50%) scale(1); opacity: 0.5; }
+            50% { transform: translateX(-50%) scale(1.05); opacity: 1; }
+            100% { transform: translateX(-50%) scale(1); opacity: 0.8; }
+        }
+        
+        .boost-panel.visible {
+            display: flex;
+        }
+        
+        .boost-icon {
+            font-size: 14px;
+        }
+        
         /* Status Message - appears briefly */
         .status-message {
             position: absolute;
@@ -252,7 +289,7 @@
         /* Claim Info Panel - Shows owner and fee for claimed planets */
         .claim-info-panel {
             position: absolute;
-            top: 120px;
+            top: 160px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10,10,26,0.8);
@@ -328,7 +365,7 @@
         /* Planet Info Preview (for surface) */
         .planet-preview {
             position: absolute;
-            top: 180px;
+            top: 200px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(10,10,26,0.6);
@@ -368,8 +405,9 @@
             .journey-panel { top: max(20px, env(safe-area-inset-top)); }
             .stats-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); left: max(20px, env(safe-area-inset-left)); }
             .cycle-panel { bottom: max(30px, env(safe-area-inset-bottom) + 10px); right: max(20px, env(safe-area-inset-right)); }
-            .claim-info-panel { top: 120px; }
-            .planet-preview { top: 180px; }
+            .boost-panel { top: 120px; }
+            .claim-info-panel { top: 160px; }
+            .planet-preview { top: 200px; }
             .dest-info { bottom: max(10px, env(safe-area-inset-bottom)); }
         }
     </style>
@@ -402,7 +440,13 @@
                 </div>
             </div>
             
-            <!-- Claim Info Panel - NEW: Shows when destination is a claimed planet -->
+            <!-- Boost Info Panel - NEW (APPROVED CHANGE) -->
+            <div class="boost-panel" id="boostPanel">
+                <span class="boost-icon" id="boostIcon">⚡</span>
+                <span id="boostText">STANDARD SPEED</span>
+            </div>
+            
+            <!-- Claim Info Panel - Shows when destination is a claimed planet -->
             <div class="claim-info-panel" id="claimInfoPanel">
                 <span class="claim-icon">👑</span>
                 <div class="claim-details">
@@ -484,7 +528,12 @@
         const previewName = document.getElementById('previewName');
         const previewType = document.getElementById('previewType');
         
-        // NEW: Claim info elements
+        // NEW: Boost panel elements
+        const boostPanel = document.getElementById('boostPanel');
+        const boostText = document.getElementById('boostText');
+        const boostIcon = document.getElementById('boostIcon');
+        
+        // Claim info elements
         const claimInfoPanel = document.getElementById('claimInfoPanel');
         const claimOwner = document.getElementById('claimOwner');
         const claimFee = document.getElementById('claimFee');
@@ -508,10 +557,20 @@
             isHubReturn: false // Flag to identify hub returns
         };
         
+        // APPROVED CHANGE: Boost state (loaded from localStorage set by galaxy-map.html)
+        let warpBoost = {
+            type: 'standard',
+            multiplier: 1,
+            cost: 0,
+            originalWarpTime: 0,
+            effectiveWarpTime: 0
+        };
+        
         let currentCycle = 1;
         let animationFrame;
         let startTime = Date.now();
-        const CYCLE_DURATION = 2000;
+        const BASE_CYCLE_DURATION = 2000;
+        let cycleDuration = BASE_CYCLE_DURATION;
         let warpComplete = false;
 
         // ===== MAP POSITIONS =====
@@ -548,6 +607,60 @@
             ripple: '#3a6a8a',
             highlight: '#5a9ac0'
         };
+
+        // ===== LOAD BOOST DATA (APPROVED CHANGE) =====
+        function loadBoostData() {
+            try {
+                const savedBoost = localStorage.getItem('voidfarer_warp_boost');
+                if (savedBoost) {
+                    warpBoost = JSON.parse(savedBoost);
+                    console.log(`⚡ Boost loaded: ${warpBoost.type} (${warpBoost.multiplier}x, cost: ${warpBoost.cost}⭐)`);
+                    
+                    // Update boost panel display
+                    if (warpBoost.type === 'accelerated') {
+                        boostText.textContent = `ACCELERATED (${warpBoost.multiplier}x SPEED)`;
+                        boostIcon.textContent = '⚡⚡';
+                        boostPanel.style.borderColor = '#ffaa4a';
+                    } else if (warpBoost.type === 'instant') {
+                        boostText.textContent = `INSTANT WARP`;
+                        boostIcon.textContent = '✨✨';
+                        boostPanel.style.borderColor = '#ffd700';
+                    } else {
+                        boostText.textContent = `STANDARD SPEED`;
+                        boostIcon.textContent = '⚡';
+                        boostPanel.style.borderColor = '#4affaa';
+                    }
+                    boostPanel.classList.add('visible');
+                    
+                    // Set cycle duration based on boost multiplier
+                    if (warpBoost.multiplier > 1 && warpBoost.multiplier !== Infinity) {
+                        cycleDuration = BASE_CYCLE_DURATION / warpBoost.multiplier;
+                        console.log(`⚡ Boost applied: Warp cycles are ${warpBoost.multiplier}x faster`);
+                    } else if (warpBoost.multiplier === Infinity) {
+                        cycleDuration = 0;
+                        console.log(`✨ Instant warp enabled`);
+                    } else {
+                        cycleDuration = BASE_CYCLE_DURATION;
+                    }
+                } else {
+                    console.log('No boost data found, using standard speed');
+                    warpBoost = { type: 'standard', multiplier: 1, cost: 0, originalWarpTime: 0, effectiveWarpTime: 0 };
+                    boostText.textContent = `STANDARD SPEED`;
+                    boostIcon.textContent = '⚡';
+                    boostPanel.style.borderColor = '#4affaa';
+                    boostPanel.classList.add('visible');
+                    cycleDuration = BASE_CYCLE_DURATION;
+                }
+            } catch (error) {
+                console.error('Error loading boost data:', error);
+                cycleDuration = BASE_CYCLE_DURATION;
+            }
+        }
+        
+        // Clear boost data after warp (called on complete)
+        function clearBoostData() {
+            localStorage.removeItem('voidfarer_warp_boost');
+        }
 
         // ===== CHECK IF DESTINATION IS CLAIMED =====
         async function checkDestinationClaimed() {
@@ -963,15 +1076,23 @@
         async function updateCycle() {
             if (warpComplete) return;
             
+            // Handle instant warp (no animation)
+            if (cycleDuration === 0) {
+                warpComplete = true;
+                await showWaterRipple();
+                completeWarp();
+                return;
+            }
+            
             const elapsed = Date.now() - startTime;
-            const totalDuration = warpData.warpCycles * CYCLE_DURATION;
+            const totalDuration = warpData.warpCycles * cycleDuration;
             const progress = Math.min(elapsed / totalDuration, 1);
 
-            const cycleElapsed = elapsed % CYCLE_DURATION;
-            const cycleProgress = cycleElapsed / CYCLE_DURATION;
+            const cycleElapsed = elapsed % cycleDuration;
+            const cycleProgress = cycleElapsed / cycleDuration;
             const speedFactor = getSpeedFactor(cycleProgress);
 
-            const newCycle = Math.floor(elapsed / CYCLE_DURATION) + 1;
+            const newCycle = Math.floor(elapsed / cycleDuration) + 1;
             if (newCycle <= warpData.warpCycles && newCycle !== currentCycle) {
                 currentCycle = newCycle;
                 currentCycleSpan.textContent = currentCycle;
@@ -1079,8 +1200,9 @@
                 localStorage.removeItem('voidfarer_warp_destination_planet_type');
             }
             
-            // Clear warp data
+            // Clear warp data and boost data
             localStorage.removeItem('voidfarer_warp_data');
+            clearBoostData();
             
             // Navigate to return page
             const destinationPage = warpData.returnPage || 'surface.html';
@@ -1136,6 +1258,9 @@
             try {
                 await loadWarpData();
                 
+                // APPROVED CHANGE: Load boost data
+                loadBoostData();
+                
                 startPos = { x: 0.15, y: 0.5 + (Math.random() * 0.2 - 0.1) };
                 destPos = { x: 0.85, y: 0.5 + (Math.random() * 0.2 - 0.1) };
                 shipPos = { ...startPos };
@@ -1143,12 +1268,18 @@
                 drawStarfield(0, 0);
                 drawMap(0, 0);
                 
+                // Show boost status message
+                if (warpBoost.type === 'accelerated') {
+                    statusMessage.textContent = `⚡ ACCELERATED WARP (${warpBoost.multiplier}x SPEED) ⚡`;
+                } else if (warpBoost.type === 'instant') {
+                    statusMessage.textContent = `✨ INSTANT WARP ✨`;
+                } else {
+                    statusMessage.textContent = 'INITIATING WARP';
+                }
+                statusMessage.classList.add('visible');
                 setTimeout(() => {
-                    statusMessage.classList.add('visible');
-                    setTimeout(() => {
-                        statusMessage.classList.remove('visible');
-                    }, 2000);
-                }, 100);
+                    statusMessage.classList.remove('visible');
+                }, 2000);
 
                 animate();
 
