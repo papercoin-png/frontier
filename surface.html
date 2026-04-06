@@ -1436,7 +1436,7 @@
             return mass;
         }
 
-        // ===== TIER-BASED RESOURCE GENERATION (APPROVED CHANGE) =====
+        // ===== TIER-BASED RESOURCE GENERATION =====
         function getTierBasedResources(planetType, planetTier) {
             // Tier-specific element pools
             const TIER_1_ELEMENTS = ['Hydrogen', 'Helium', 'Lithium', 'Beryllium', 'Boron', 'Carbon', 'Nitrogen', 'Oxygen', 'Fluorine', 'Neon', 'Sodium', 'Aluminum', 'Silicon', 'Phosphorus', 'Sulfur', 'Chlorine', 'Argon', 'Potassium', 'Calcium'];
@@ -1532,7 +1532,7 @@
                 if (!planetNameStr) planetNameStr = 'Earth';
                 if (!planetTypeStr) planetTypeStr = 'lush';
                 
-                // APPROVED CHANGE: Use tier-based resource generation if no resources exist
+                // Use tier-based resource generation if no resources exist
                 if (!planetResources || planetResources.length === 0) {
                     planetResources = getTierBasedResources(planetTypeStr, planetTier);
                     console.log(`🌍 Generated T${planetTier} resources for ${planetNameStr}:`, planetResources);
@@ -1555,7 +1555,6 @@
                 planetName.textContent = currentPlanet.name;
                 planetType.textContent = currentPlanet.typeName;
                 
-                // APPROVED CHANGE: Display galaxy tier prominently
                 const status = await getPlanetStatus(currentPlanet.name);
                 const highestRarity = status.highestRarity || 'common';
                 
@@ -1568,7 +1567,7 @@
                 };
                 
                 const tierDisplay = rarityToTier[highestRarity] || rarityToTier['common'];
-                // APPROVED CHANGE: Show both galaxy tier and rarity tier
+                // Show both galaxy tier and rarity tier
                 planetTierBadge.textContent = `🌌 GALAXY TIER ${currentPlanetTier} • ${tierDisplay.name}`;
                 planetTierBadge.style.backgroundColor = 'rgba(74, 255, 170, 0.15)';
                 planetTierBadge.style.color = '#4affaa';
@@ -1739,6 +1738,7 @@
                     const totalMass = massPerUnit * quantity;
                     
                     if (currentMass + totalMass <= cargoLimit) {
+                        // APPROVED CHANGE: ALWAYS include planet name to ensure location is saved to journal
                         const locationData = {
                             planet: currentPlanet.name,
                             planetType: currentPlanet.type,
@@ -1749,6 +1749,8 @@
                             discoveredDate: new Date().toISOString(),
                             value: RARITY_CONFIG[rarity]?.basePrice || 100
                         };
+                        
+                        console.log(`📝 Saving extraction location: ${resource} x${quantity} on ${currentPlanet.name} (T${currentPlanetTier})`);
                         
                         const result = await addElementToCollection(resource, quantity, locationData);
                         
