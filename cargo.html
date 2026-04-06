@@ -725,6 +725,20 @@
             color: white;
         }
         
+        /* Eject All Button (NEW) */
+        .eject-all-btn {
+            background: rgba(255, 100, 100, 0.4);
+            border-color: #ff6b6b;
+            color: #ffb0b0;
+            margin-bottom: 10px;
+        }
+        
+        .eject-all-btn:active {
+            background: #ff6b6b;
+            color: white;
+            transform: scale(0.96);
+        }
+        
         /* Transfer Modal */
         .modal-content.transfer {
             border-color: #4affaa;
@@ -1027,6 +1041,9 @@
                 <div class="modal-item-name" id="ejectItemName">Item</div>
                 <div class="modal-current" id="ejectCurrentCount">Current: 0</div>
                 
+                <!-- APPROVED CHANGE: Eject All button -->
+                <button class="modal-btn eject-all-btn" id="ejectAllBtn" onclick="window.setEjectAll()">🗑️ EJECT ALL</button>
+                
                 <div class="eject-quantity">
                     <button class="qty-btn" id="decrementBtn" onclick="window.decrementQty()">−</button>
                     <input type="number" id="ejectQuantity" value="1" min="1" max="99" readonly>
@@ -1151,6 +1168,7 @@
         window.incrementQty = incrementQty;
         window.decrementQty = decrementQty;
         window.confirmEject = confirmEject;
+        window.setEjectAll = setEjectAll;
         window.showTransferModal = showTransferModal;
         window.closeTransferModal = closeTransferModal;
         window.transferIncrementQty = transferIncrementQty;
@@ -1812,6 +1830,20 @@
             incrementBtn.disabled = (currentCount <= 1);
             
             ejectModal.classList.add('active');
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        }
+        
+        // ===== SET EJECT ALL (APPROVED CHANGE) =====
+        function setEjectAll() {
+            if (!currentEjectItem) return;
+            
+            ejectQuantity.value = currentEjectMax;
+            ejectMass.textContent = (currentEjectMax * currentEjectMassPerUnit).toFixed(1);
+            
+            // Update button states
+            decrementBtn.disabled = (currentEjectMax <= 1);
+            incrementBtn.disabled = true;
             
             if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
         }
