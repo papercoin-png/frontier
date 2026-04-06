@@ -48,6 +48,61 @@
         .travel-btn { width: 100%; background: #ffaa4a; border: none; color: #0a0a1a; padding: 6px; border-radius: 40px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
         .travel-btn.disabled { background: #4a4a6a; color: #aaa; cursor: not-allowed; }
         
+        /* NEW: Boost Selector */
+        .boost-selector {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px 8px 30px 8px;
+        }
+        .boost-title {
+            font-size: 9px;
+            color: #a0c0ff;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .boost-options {
+            display: flex;
+            gap: 6px;
+        }
+        .boost-option {
+            flex: 1;
+            background: rgba(30,45,70,0.6);
+            border: 1px solid #4a8ac0;
+            border-radius: 30px;
+            padding: 4px 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .boost-option.active {
+            background: #4affaa;
+            border-color: #4affaa;
+            color: #0a0a1a;
+        }
+        .boost-option.active .boost-name {
+            color: #0a0a1a;
+        }
+        .boost-option.active .boost-cost {
+            color: #0a0a1a;
+        }
+        .boost-option:active {
+            transform: scale(0.96);
+        }
+        .boost-name {
+            font-size: 9px;
+            font-weight: 600;
+            color: #4affaa;
+        }
+        .boost-cost {
+            font-size: 7px;
+            color: #ffd966;
+        }
+        .boost-effect {
+            font-size: 7px;
+            color: #a0c0ff;
+        }
+        
         /* NEW: Scan Button */
         .scan-sector-btn { width: 100%; background: #4a8ac0; border: none; color: white; padding: 6px; border-radius: 40px; font-size: 11px; font-weight: 600; cursor: pointer; margin-top: 6px; }
         .scan-sector-btn:active { background: #6aa0e0; transform: scale(0.98); }
@@ -168,6 +223,28 @@
                 <div class="info-row"><span class="info-label">Warp Time:</span><span class="info-value" id="infoWarpTime">0 min</span></div>
             </div>
             
+            <!-- NEW: Boost Selector (APPROVED CHANGE) -->
+            <div class="boost-selector" id="boostSelector">
+                <div class="boost-title">⚡ WARP BOOST</div>
+                <div class="boost-options">
+                    <div class="boost-option active" data-boost="standard" onclick="window.selectBoost('standard')">
+                        <div class="boost-name">STANDARD</div>
+                        <div class="boost-cost">Free</div>
+                        <div class="boost-effect">1x speed</div>
+                    </div>
+                    <div class="boost-option" data-boost="accelerated" onclick="window.selectBoost('accelerated')">
+                        <div class="boost-name">ACCELERATED</div>
+                        <div class="boost-cost">10⭐</div>
+                        <div class="boost-effect">2x speed</div>
+                    </div>
+                    <div class="boost-option" data-boost="instant" onclick="window.selectBoost('instant')">
+                        <div class="boost-name">INSTANT</div>
+                        <div class="boost-cost">50⭐</div>
+                        <div class="boost-effect">0 wait</div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- NEW: Scan Button -->
             <button class="scan-sector-btn" id="scanBtn" onclick="window.scanSector()" style="display: none;">🔭 SCAN SECTOR</button>
             
@@ -201,7 +278,7 @@
 
     <script type="module">
         import { getPlanetRightsStatus, getFormattedPlanetDiscoveryHistory, addPlanetDiscoveryRecord } from './js/planet-status.js';
-        import { getHiddenPlanets, revealPlanet, getScannedSectors, markSectorScanned, getCurrentPlanetTier } from './js/storage.js';
+        import { getHiddenPlanets, revealPlanet, getScannedSectors, markSectorScanned, getCurrentPlanetTier, getCredits, spendCredits } from './js/storage.js';
         import { getShipStats, parseShipString } from './js/ship-data.js';
 
         // Center Earth with balanced padding: max radius is 3400px, add 400px padding = 3800px from center to edge
@@ -244,19 +321,19 @@
         let allSectors = [];
         let hiddenSectors = [];
         let scannedSectors = [];
+        
+        // APPROVED CHANGE: Boost selection state
+        let selectedBoost = 'standard'; // standard, accelerated, instant
 
-        // ===== LOAD SHIP TIER FROM STORAGE (APPROVED CHANGE) =====
+        // ===== LOAD SHIP TIER FROM STORAGE =====
         async function loadShipTier() {
             try {
-                // Try to get from active ship stats
                 const shipStats = JSON.parse(localStorage.getItem('voidfarer_active_ship_stats') || '{}');
                 if (shipStats.tier) {
                     currentShipTier = shipStats.tier;
                 } else {
-                    // Fallback: check if there's an active ship stored
                     const activeShip = localStorage.getItem('voidfarer_active_ship');
                     if (activeShip) {
-                        // Try to parse tier from ship name or stats
                         const { name } = parseShipString(activeShip);
                         const stats = getShipStats(name);
                         if (stats) {
@@ -271,7 +348,6 @@
                 
                 console.log(`🛸 Loaded ship tier: ${currentShipTier}`);
                 
-                // Update UI
                 const shipNameEl = document.getElementById('shipName');
                 const shipTierEl = document.getElementById('shipTier');
                 
@@ -285,6 +361,51 @@
                 console.error('Error loading ship tier:', error);
                 currentShipTier = 1;
             }
+        }
+        
+        // APPROVED CHANGE: Select boost function
+        window.selectBoost = function(boost) {
+            selectedBoost = boost;
+            document.querySelectorAll('.boost-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            document.querySelector(`.boost-option[data-boost="${boost}"]`).classList.add('active');
+            
+            // Update travel button text to reflect boost cost if sector is selected
+            if (selectedSector) {
+                updateTravelButton();
+            }
+            
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        };
+        
+        // Get boost multiplier and cost
+        function getBoostInfo() {
+            switch(selectedBoost) {
+                case 'accelerated':
+                    return { multiplier: 2, cost: 10, name: 'ACCELERATED' };
+                case 'instant':
+                    return { multiplier: Infinity, cost: 50, name: 'INSTANT' };
+                default:
+                    return { multiplier: 1, cost: 0, name: 'STANDARD' };
+            }
+        }
+        
+        // Check if player can afford the boost
+        async function canAffordBoost() {
+            const boost = getBoostInfo();
+            if (boost.cost === 0) return true;
+            
+            const credits = await getCredits();
+            return credits >= boost.cost;
+        }
+        
+        // Spend boost cost if applicable
+        async function spendBoostCost() {
+            const boost = getBoostInfo();
+            if (boost.cost === 0) return true;
+            
+            return await spendCredits(boost.cost);
         }
 
         // ===== DISCOVERY LOCK FUNCTIONS =====
@@ -315,9 +436,7 @@
         }
         
         async function isSectorVisible(sectorId) {
-            // Sector is visible if it's been scanned
             if (scannedSectors.includes(sectorId)) return true;
-            // Or if it's not hidden
             return !(await isSectorHidden(sectorId));
         }
         
@@ -331,7 +450,6 @@
                 const playerId = localStorage.getItem('voidfarer_player_id') || 'player_default';
                 const playerName = localStorage.getItem('voidfarer_player_name') || 'Voidfarer';
                 
-                // Mark sector as scanned
                 const key = `voidfarer_scanned_sectors_${playerId}`;
                 const scanned = JSON.parse(localStorage.getItem(key) || '[]');
                 if (!scanned.includes(selectedSector.id.toString())) {
@@ -341,13 +459,11 @@
                 
                 await loadScannedSectors();
                 
-                // Remove from hidden list if present
                 const hidden = JSON.parse(localStorage.getItem('voidfarer_hidden_sectors') || '[]');
                 const updatedHidden = hidden.filter(h => h !== selectedSector.id.toString());
                 localStorage.setItem('voidfarer_hidden_sectors', JSON.stringify(updatedHidden));
                 await loadHiddenSectors();
                 
-                // Show rediscovery notification
                 const notification = document.getElementById('rediscoveryNotification');
                 notification.textContent = `🔓 REDISCOVERED! ${selectedSector.name} sector has been mapped again.`;
                 notification.style.display = 'block';
@@ -356,10 +472,8 @@
                     notification.style.display = 'none';
                 }, 3000);
                 
-                // Refresh the sector display
                 renderGalaxy(allSectors);
                 
-                // Refresh the current sector info
                 if (selectedSector) {
                     await loadDiscoveryHistory(selectedSector);
                     await loadRightsStatus(selectedSector);
@@ -380,8 +494,6 @@
         
         async function loadDiscoveryHistory(sector) {
             try {
-                // For galactic sectors, we might not have discovery history directly
-                // This would need to be implemented based on planets within the sector
                 const discoveryPanel = document.getElementById('discoveryPanel');
                 discoveryPanel.style.display = 'none';
             } catch (error) {
@@ -464,7 +576,6 @@
                 }
             }
             
-            // Final cleanup to ensure no overlaps
             for (let i = 0; i < sectors.length; i++) {
                 for (let j = i + 1; j < sectors.length; j++) {
                     const dx = sectors[i].x - sectors[j].x;
@@ -481,7 +592,6 @@
                 }
             }
             
-            // Earth
             sectors.unshift({
                 id: 'earth',
                 name: 'Earth',
@@ -556,7 +666,7 @@
             selectedSector = sector;
             
             const ship = SHIP_TIERS[currentShipTier];
-            const warpTime = Math.max(1, Math.ceil(sector.distance / ship.speed));
+            let warpTime = Math.max(1, Math.ceil(sector.distance / ship.speed));
             
             document.getElementById('infoTitle').innerHTML = sector.name;
             document.getElementById('infoDist').innerHTML = `${sector.distance} LY`;
@@ -567,11 +677,9 @@
             document.getElementById('infoTier').innerHTML = `Tier ${sector.requiredTier}`;
             document.getElementById('infoWarpTime').innerHTML = `${warpTime} min`;
             
-            // Load discovery history and rights status
             await loadDiscoveryHistory(sector);
             await loadRightsStatus(sector);
             
-            // Show/hide scan button
             const scanBtn = document.getElementById('scanBtn');
             if (isHidden && !isVisible) {
                 scanBtn.style.display = 'block';
@@ -580,19 +688,45 @@
                 scanBtn.style.display = 'none';
             }
             
+            updateTravelButton();
+            
+            document.getElementById('infoPanel').classList.remove('hidden');
+        }
+        
+        async function updateTravelButton() {
+            if (!selectedSector) return;
+            
+            const isVisible = await isSectorVisible(selectedSector.id.toString());
             const btn = document.getElementById('travelBtn');
-            if (sector.requiredTier > currentShipTier) {
+            const ship = SHIP_TIERS[currentShipTier];
+            let warpTime = Math.max(1, Math.ceil(selectedSector.distance / ship.speed));
+            const boost = getBoostInfo();
+            
+            if (boost.multiplier === Infinity) {
+                warpTime = 0;
+            } else if (boost.multiplier > 1) {
+                warpTime = Math.max(1, Math.ceil(selectedSector.distance / (ship.speed * boost.multiplier)));
+            }
+            
+            if (selectedSector.requiredTier > currentShipTier) {
                 btn.classList.add('disabled'); btn.disabled = true;
-                btn.innerHTML = '❌ NEED TIER ' + sector.requiredTier;
+                btn.innerHTML = '❌ NEED TIER ' + selectedSector.requiredTier;
             } else if (!isVisible) {
                 btn.classList.add('disabled'); btn.disabled = true;
                 btn.innerHTML = '🔒 SECTOR HIDDEN';
+            } else if (boost.cost > 0 && !(await canAffordBoost())) {
+                btn.classList.add('disabled'); btn.disabled = true;
+                btn.innerHTML = `⚠️ NEED ${boost.cost}⭐ FOR ${boost.name}`;
             } else {
                 btn.classList.remove('disabled'); btn.disabled = false;
-                btn.innerHTML = `🚀 TRAVEL (${warpTime} min)`;
+                if (boost.multiplier === Infinity) {
+                    btn.innerHTML = `✨ INSTANT WARP (${boost.cost}⭐) ✨`;
+                } else if (boost.multiplier > 1) {
+                    btn.innerHTML = `🚀 TRAVEL (${warpTime} min) +${boost.name} (${boost.cost}⭐)`;
+                } else {
+                    btn.innerHTML = `🚀 TRAVEL (${warpTime} min)`;
+                }
             }
-            
-            document.getElementById('infoPanel').classList.remove('hidden');
         }
 
         let warpInterval = null, warpStartTime = 0, warpDuration = 0;
@@ -611,12 +745,36 @@
                 return;
             }
             
-            const ship = SHIP_TIERS[currentShipTier];
-            const warpTime = Math.max(1, Math.ceil(selectedSector.distance / ship.speed));
+            const boost = getBoostInfo();
+            if (boost.cost > 0) {
+                const canAfford = await canAffordBoost();
+                if (!canAfford) {
+                    alert(`Insufficient credits! Need ${boost.cost}⭐ for ${boost.name} boost.`);
+                    return;
+                }
+            }
             
-            // APPROVED CHANGE: Save sector tier to localStorage for downstream pages
+            const ship = SHIP_TIERS[currentShipTier];
+            let baseWarpTime = Math.max(1, Math.ceil(selectedSector.distance / ship.speed));
+            let effectiveWarpTime = baseWarpTime;
+            
+            if (boost.multiplier === Infinity) {
+                effectiveWarpTime = 0;
+            } else if (boost.multiplier > 1) {
+                effectiveWarpTime = Math.max(1, Math.ceil(selectedSector.distance / (ship.speed * boost.multiplier)));
+            }
+            
+            if (boost.cost > 0) {
+                const spent = await spendBoostCost();
+                if (!spent) {
+                    alert('Failed to process boost payment.');
+                    return;
+                }
+            }
+            
             localStorage.setItem('voidfarer_current_sector_tier', selectedSector.requiredTier.toString());
             console.log(`📍 Saved sector tier: ${selectedSector.requiredTier} to localStorage`);
+            console.log(`⚡ Boost applied: ${boost.name} (${boost.multiplier === Infinity ? 'INSTANT' : boost.multiplier + 'x'})`);
             
             localStorage.setItem('voidfarer_plot_sector', selectedSector.id);
             localStorage.setItem('voidfarer_plot_region', selectedSector.name);
@@ -625,15 +783,37 @@
             localStorage.setItem('voidfarer_target_sector', selectedSector.id);
             localStorage.setItem('voidfarer_target_region', selectedSector.name);
             
+            // APPROVED CHANGE: Save boost info for warp.html
+            localStorage.setItem('voidfarer_warp_boost', JSON.stringify({
+                type: selectedBoost,
+                multiplier: boost.multiplier,
+                cost: boost.cost,
+                originalWarpTime: baseWarpTime,
+                effectiveWarpTime: effectiveWarpTime
+            }));
+            
             document.getElementById('warpDest').innerHTML = `Destination: ${selectedSector.name}`;
             document.getElementById('warpDist').innerHTML = `${selectedSector.distance} LY`;
             document.getElementById('warpFill').style.width = '0%';
-            document.getElementById('warpRemaining').innerHTML = `Time remaining: ${warpTime} min`;
+            
+            if (effectiveWarpTime === 0) {
+                document.getElementById('warpRemaining').innerHTML = `Time remaining: INSTANT`;
+            } else {
+                document.getElementById('warpRemaining').innerHTML = `Time remaining: ${effectiveWarpTime} min`;
+            }
+            
             document.getElementById('warpModal').classList.remove('hidden');
+            
+            if (effectiveWarpTime === 0) {
+                setTimeout(() => {
+                    completeWarp();
+                }, 500);
+                return;
+            }
             
             isWarping = true;
             warpStartTime = Date.now();
-            warpDuration = warpTime * 60 * 1000;
+            warpDuration = effectiveWarpTime * 60 * 1000;
             
             if (warpInterval) clearInterval(warpInterval);
             warpInterval = setInterval(updateWarp, 100);
@@ -684,16 +864,15 @@
         document.getElementById('zoomIn').onclick = () => setZoom(zoom + 0.1);
         document.getElementById('zoomOut').onclick = () => setZoom(zoom - 0.1);
         
-        // Expose functions to window
         window.startTravel = startTravel;
         window.abortWarp = abortWarp;
         window.scanSector = scanSector;
+        window.selectBoost = selectBoost;
         
         async function init() {
             const loading = document.getElementById('loadingOverlay');
             loading.classList.remove('hidden');
             
-            // APPROVED CHANGE: Load ship tier from storage
             await loadShipTier();
             
             drawRingBoundaries();
