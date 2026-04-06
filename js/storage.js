@@ -27,6 +27,7 @@
 // APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER as they are no longer used for travel
 // APPROVED CHANGE: Removed getShipFuel, saveShipFuel, getShipPower, saveShipPower functions
 // APPROVED CHANGE: Added warp boost storage functions (saveWarpBoost, getWarpBoost)
+// APPROVED CHANGE: Improved getElementLocations with better error handling and logging
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -936,6 +937,14 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
         const playerId = localStorage.getItem('voidfarer_player_id') || 'main';
         const entryId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
+        // Validate required fields
+        if (!elementName || !planetName) {
+            console.error('Cannot save location: missing elementName or planetName', { elementName, planetName });
+            return false;
+        }
+        
+        console.log(`📝 Saving location: ${elementName} on ${planetName} (T${locationData.galaxyTier || 1})`);
+        
         const journalKey = `voidfarer_journal_${playerId}`;
         let journal = await getJournal();
         if (!journal) {
@@ -989,9 +998,8 @@ async function dbSaveElementLocation(elementName, planetName, locationData = {})
                 
                 if (db.objectStoreNames.contains('element_locations')) {
                     await db.put('element_locations', locationEntry);
+                    console.log(`✅ Saved location to IndexedDB: ${elementName} on ${planetName}`);
                 }
-                
-                console.log(`✅ Saved location for ${elementName} on ${planetName}`);
             } catch (idbError) {
                 console.error('Failed to save to IndexedDB:', idbError);
             }
@@ -1024,6 +1032,7 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
         
         localStorage.setItem(key, JSON.stringify(collection));
         
+        // APPROVED CHANGE: ALWAYS save location if planet is provided
         if (metadata && metadata.planet) {
             await dbSaveElementLocation(elementName, metadata.planet, {
                 planetType: metadata.planetType || 'unknown',
@@ -1033,6 +1042,8 @@ export async function addElementToCollection(elementName, quantity = 1, metadata
                 rarity: metadata.rarity || getElementRarity(elementName),
                 value: metadata.value || 100
             });
+        } else {
+            console.warn(`⚠️ No planet metadata provided for ${elementName}, location not saved`);
         }
         
         return {
@@ -1158,35 +1169,69 @@ export async function getPlayerLocations() {
     }
 }
 
+// ===== IMPROVED getElementLocations (APPROVED CHANGE) =====
 export async function getElementLocations(elementName) {
     try {
-        if (window.idb) {
-            try {
-                const locations = await getByIndex('element_locations', 'by_element', elementName);
-                if (locations && locations.length > 0) {
-                    return locations;
-                }
-            } catch (idbError) {}
+        if (!elementName) {
+            console.warn('getElementLocations called with no elementName');
+            return [];
         }
         
+        console.log(`🔍 Looking up locations for element: ${elementName}`);
+        let locations = [];
+        
+        // Try IndexedDB first
+        if (window.idb) {
+            try {
+                const db = await ensureDBStores();
+                if (db && db.objectStoreNames.contains('element_locations')) {
+                    const tx = db.transaction('element_locations', 'readonly');
+                    const store = tx.objectStore('element_locations');
+                    const index = store.index('by_element');
+                    locations = await index.getAll(elementName);
+                    
+                    if (locations && locations.length > 0) {
+                        console.log(`✅ Found ${locations.length} locations for ${elementName} in IndexedDB`);
+                        return locations;
+                    } else {
+                        console.log(`⚠️ No locations found in IndexedDB for ${elementName}`);
+                    }
+                } else {
+                    console.warn('element_locations store not available in IndexedDB');
+                }
+            } catch (idbError) {
+                console.error(`IndexedDB error for ${elementName}:`, idbError);
+            }
+        }
+        
+        // Fallback to journal in localStorage
         const journal = await getJournal();
         if (journal && journal.entries) {
-            return journal.entries
+            locations = journal.entries
                 .filter(entry => entry.element === elementName)
                 .map(entry => ({
                     id: entry.id,
                     elementName: entry.element,
-                    planet: entry.location?.planet,
-                    planetType: entry.location?.planetType,
+                    planet: entry.location?.planet || 'Unknown',
+                    planetType: entry.location?.planetType || 'unknown',
                     quantity: entry.quantity,
                     timestamp: entry.timestamp,
                     date: entry.date,
-                    rarity: entry.rarity
+                    rarity: entry.rarity,
+                    galaxyTier: entry.location?.galaxyTier || 1
                 }));
+            
+            if (locations.length > 0) {
+                console.log(`✅ Found ${locations.length} locations for ${elementName} in journal fallback`);
+                return locations;
+            }
         }
+        
+        console.log(`❌ No locations found for ${elementName}`);
         return [];
+        
     } catch (error) {
-        console.error('Error getting element locations:', error);
+        console.error(`Error getting element locations for ${elementName}:`, error);
         return [];
     }
 }
@@ -2479,3 +2524,4 @@ console.log('✅ Added real estate functions (getRealEstate, saveRealEstate) for
 console.log('✅ Added hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades');
 console.log('✅ APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER (no longer used for travel)');
 console.log('✅ APPROVED CHANGE: Added warp boost storage functions (saveWarpBoost, getWarpBoost, clearWarpBoost)');
+console.log('✅ APPROVED CHANGE: Improved getElementLocations with better error handling and logging');
