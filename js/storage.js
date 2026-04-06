@@ -26,6 +26,7 @@
 // ADDED: Hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades
 // APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER as they are no longer used for travel
 // APPROVED CHANGE: Removed getShipFuel, saveShipFuel, getShipPower, saveShipPower functions
+// APPROVED CHANGE: Added warp boost storage functions (saveWarpBoost, getWarpBoost)
 
 // ===== CONSTANTS =====
 // CARGO_MASS_LIMIT is now defined in the HTML files to avoid duplicate declaration
@@ -72,6 +73,7 @@ const STORAGE_KEYS = {
     WARP_RETURN: 'voidfarer_warp_return',
     WARP_CYCLES: 'voidfarer_warp_cycles',
     WARP_DISTANCE: 'voidfarer_warp_distance',
+    WARP_BOOST: 'voidfarer_warp_boost',
     WARP_DESTINATION_PLANET: 'voidfarer_warp_destination_planet',
     WARP_DESTINATION_PLANET_TYPE: 'voidfarer_warp_destination_planet_type',
     WARP_ORIGIN_PLANET: 'voidfarer_warp_origin_planet',
@@ -1582,12 +1584,41 @@ export function getWarpData() {
     };
 }
 
+// ===== APPROVED CHANGE: Warp Boost Storage Functions =====
+export function saveWarpBoost(boostData) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.WARP_BOOST, JSON.stringify(boostData));
+        return true;
+    } catch (error) {
+        console.error('Error saving warp boost:', error);
+        return false;
+    }
+}
+
+export function getWarpBoost() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEYS.WARP_BOOST);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+        return { type: 'standard', multiplier: 1, cost: 0, name: 'STANDARD' };
+    } catch (error) {
+        console.error('Error getting warp boost:', error);
+        return { type: 'standard', multiplier: 1, cost: 0, name: 'STANDARD' };
+    }
+}
+
+export function clearWarpBoost() {
+    localStorage.removeItem(STORAGE_KEYS.WARP_BOOST);
+}
+
 export function clearWarpData() {
     const keys = [
         STORAGE_KEYS.WARP_DESTINATION,
         STORAGE_KEYS.WARP_RETURN,
         STORAGE_KEYS.WARP_CYCLES,
         STORAGE_KEYS.WARP_DISTANCE,
+        STORAGE_KEYS.WARP_BOOST,
         STORAGE_KEYS.WARP_DESTINATION_PLANET,
         STORAGE_KEYS.WARP_DESTINATION_PLANET_TYPE,
         STORAGE_KEYS.WARP_ORIGIN_PLANET,
@@ -2426,6 +2457,9 @@ window.getFullFuelBalance = getFullFuelBalance;
 window.rebuildCollectionFromLocations = rebuildCollectionFromLocations;
 window.getRealEstate = getRealEstate;
 window.saveRealEstate = saveRealEstate;
+window.saveWarpBoost = saveWarpBoost;
+window.getWarpBoost = getWarpBoost;
+window.clearWarpBoost = clearWarpBoost;
 
 // NEW: Shop purchase functions exposed
 window.recordPurchase = recordPurchase;
@@ -2444,3 +2478,4 @@ console.log('✅ Added shop purchase history functions (recordPurchase, getPurch
 console.log('✅ Added real estate functions (getRealEstate, saveRealEstate) for Earth Hub properties');
 console.log('✅ Added hub storage functions (getHubStorageMax, getHubStorageUsed, setHubStorageCapacity) for simplified storage upgrades');
 console.log('✅ APPROVED CHANGE: Removed SHIP_FUEL and SHIP_POWER (no longer used for travel)');
+console.log('✅ APPROVED CHANGE: Added warp boost storage functions (saveWarpBoost, getWarpBoost, clearWarpBoost)');
